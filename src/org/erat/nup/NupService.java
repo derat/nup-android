@@ -12,6 +12,7 @@ import android.util.Log;
 
 interface NupServiceObserver {
     void onPauseStateChanged(boolean isPaused);
+    void onCurrentTrackChanged(String artist, String title, String album);
 }
 
 public class NupService extends Service implements MediaPlayer.OnPreparedListener {

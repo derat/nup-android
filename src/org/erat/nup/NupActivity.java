@@ -10,18 +10,25 @@ import android.os.IBinder;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.TextView;
 
 public class NupActivity extends Activity implements NupServiceObserver {
-    private Button mPauseButton;
-
     private NupService mService;
+
+    private Button mPauseButton;
+    private TextView mArtistLabel, mTitleLabel, mAlbumLabel, mTimeLabel;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         Log.i(this.toString(), "activity created");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
+
         mPauseButton = (Button) findViewById(R.id.pause_button);
+        mArtistLabel = (TextView) findViewById(R.id.artist_label);
+        mTitleLabel = (TextView) findViewById(R.id.title_label);
+        mAlbumLabel = (TextView) findViewById(R.id.album_label);
+        mTimeLabel = (TextView) findViewById(R.id.time_label);
 
         Intent serviceIntent = new Intent(this, NupService.class);
         startService(serviceIntent);
@@ -50,11 +57,14 @@ public class NupActivity extends Activity implements NupServiceObserver {
         }
     };
 
-    boolean mIsBound = false;
+    public void onSearchButtonClicked(View view) {
+    }
 
     public void onPauseButtonClicked(View view) {
         mService.togglePause();
     }
+
+
     public void onExitButtonClicked(View view) {
         stopService(new Intent(this, NupService.class));
         finish();
@@ -63,5 +73,12 @@ public class NupActivity extends Activity implements NupServiceObserver {
     @Override
     public void onPauseStateChanged(boolean isPaused) {
         mPauseButton.setText(isPaused ? "Play" : "Pause");
+    }
+
+    @Override
+    public void onCurrentTrackChanged(String artist, String title, String album) {
+        mArtistLabel.setText(artist);
+        mTitleLabel.setText(title);
+        mAlbumLabel.setText(album);
     }
 }
