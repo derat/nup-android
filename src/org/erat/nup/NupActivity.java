@@ -11,57 +11,51 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 
-public class nup extends Activity implements NupServiceObserver {
+public class NupActivity extends Activity implements NupServiceObserver {
     private Button mPauseButton;
 
     private NupService mService;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
+        Log.i(this.toString(), "activity created");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
         mPauseButton = (Button) findViewById(R.id.pauseButton);
-        doBindService();
+
+        Intent serviceIntent = new Intent(this, NupService.class);
+        startService(serviceIntent);
+        bindService(new Intent(this, NupService.class), mConnection, 0);
     }
 
     @Override
     protected void onDestroy() {
+        Log.i(this.toString(), "activity destroyed");
         super.onDestroy();
-        doUnbindService();
+        unbindService(mConnection);
     }
 
     private ServiceConnection mConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, IBinder service) {
-            Log.i(this.toString(), "service connected");
-            mService = ((NupService.LocalBinder)service).getService();
-            mService.setObserver(nup.this);
+            Log.i(this.toString(), "connected to service");
+            mService = ((NupService.LocalBinder) service).getService();
+            mService.setObserver(NupActivity.this);
         }
 
         public void onServiceDisconnected(ComponentName className) {
-            Log.i(this.toString(), "service disconnected");
+            Log.i(this.toString(), "disconnected from service");
             mService = null;
         }
     };
 
     boolean mIsBound = false;
 
-    void doBindService() {
-        if (!mIsBound) {
-            bindService(new Intent(this, NupService.class), mConnection, Context.BIND_AUTO_CREATE);
-            mIsBound = true;
-        }
-    }
-
-    void doUnbindService() {
-        if (mIsBound) {
-            unbindService(mConnection);
-            mIsBound = false;
-        }
-    }
-
     public void onPauseButtonClicked(View view) {
-        Log.i(this.toString(), "Pause button clicked");
         mService.togglePause();
+    }
+    public void onExitButtonClicked(View view) {
+        stopService(new Intent(this, NupService.class));
+        finish();
     }
 
     @Override
