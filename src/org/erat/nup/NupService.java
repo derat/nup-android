@@ -7,6 +7,10 @@ import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
 
+interface NupServiceObserver {
+    void onPauseStateChanged(boolean isPaused);
+}
+
 public class NupService extends Service implements MediaPlayer.OnPreparedListener {
     private MediaPlayer curPlayer, nextPlayer;
 
@@ -50,13 +54,29 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     @Override
     public void onPrepared(MediaPlayer player) {
         Log.i(this.toString(), "onPrepared");
+        mPaused = false;
+        if (mObserver != null) {
+            mObserver.onPauseStateChanged(mPaused);
+        }
         //player.start();
     }
 
-    public void insertTrack(String url, int position) throws android.os.RemoteException {
+    NupServiceObserver mObserver;
+    public void setObserver(NupServiceObserver observer) {
+        mObserver = observer;
     }
-    public void togglePause() throws android.os.RemoteException {
+
+    public void insertTrack(String url, int position) {
     }
-    public void selectTrack(int offset) throws android.os.RemoteException {
+
+    boolean mPaused;
+    public void togglePause() {
+        mPaused = !mPaused;
+        if (mObserver != null) {
+            mObserver.onPauseStateChanged(mPaused);
+        }
+    }
+
+    public void selectTrack(int offset) {
     }
 }

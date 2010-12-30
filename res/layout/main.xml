@@ -9,5 +9,12 @@
     android:layout_height="wrap_content" 
     android:text="Hello World, nup"
     />
+<Button
+    android:id="@+id/pauseButton"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="Pause"
+    android:onClick="onPauseButtonClicked"
+    />
 </LinearLayout>
 
