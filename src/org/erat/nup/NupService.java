@@ -71,33 +71,53 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     public void onPrepared(MediaPlayer player) {
         Log.i(this.toString(), "onPrepared");
         mPaused = false;
-        if (mObserver != null) {
-            mObserver.onPauseStateChanged(mPaused);
-        }
         mPlayer.start();
+
+        synchronized(mObserverLock) {
+            if (mObserver != null) {
+                mObserver.onPauseStateChanged(mPaused);
+            }
+        }
     }
 
-    NupServiceObserver mObserver;
-    public void setObserver(NupServiceObserver observer) {
-        mObserver = observer;
+    private NupServiceObserver mObserver;
+    private Object mObserverLock = new Object();
+    public void addObserver(NupServiceObserver observer) {
+        synchronized(mObserverLock) {
+            if (mObserver != null) {
+                Log.wtf(this.toString(), "tried to add observer while one is already registered");
+            }
+            mObserver = observer;
+        }
+    }
+    public void removeObserver(NupServiceObserver observer) {
+        synchronized(mObserverLock) {
+            if (mObserver != observer) {
+                Log.wtf(this.toString(), "tried to remove non-registered observer");
+            }
+            mObserver = null;
+        }
     }
 
-    public void insertTrack(String url, int position) {
+    public synchronized void insertTrack(String url, int position) {
     }
 
     boolean mPaused;
-    public void togglePause() {
+    public synchronized void togglePause() {
         mPaused = !mPaused;
         if (mPaused) {
             mPlayer.pause();
         } else {
             mPlayer.start();
         }
-        if (mObserver != null) {
-            mObserver.onPauseStateChanged(mPaused);
+
+        synchronized(mObserverLock) {
+            if (mObserver != null) {
+                mObserver.onPauseStateChanged(mPaused);
+            }
         }
     }
 
-    public void selectTrack(int offset) {
+    public synchronized void selectTrack(int offset) {
     }
 }

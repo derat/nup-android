@@ -32,6 +32,8 @@ public class NupActivity extends Activity implements NupServiceObserver {
     protected void onDestroy() {
         Log.i(this.toString(), "activity destroyed");
         super.onDestroy();
+        if (mService != null)
+            mService.removeObserver(this);
         unbindService(mConnection);
     }
 
@@ -39,7 +41,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
         public void onServiceConnected(ComponentName className, IBinder service) {
             Log.i(this.toString(), "connected to service");
             mService = ((NupService.LocalBinder) service).getService();
-            mService.setObserver(NupActivity.this);
+            mService.addObserver(NupActivity.this);
         }
 
         public void onServiceDisconnected(ComponentName className) {
