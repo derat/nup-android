@@ -4,13 +4,41 @@
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
     >
-<TextView  
-    android:layout_width="fill_parent" 
-    android:layout_height="wrap_content" 
-    android:text="Hello World, nup"
+<TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="Artist"
+    />
+<EditText
+    android:id="@+id/artist_edit_text"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:singleLine="true"
+    />
+<TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="Title"
+    />
+<EditText
+    android:id="@+id/title_edit_text"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:singleLine="true"
+    />
+<TextView
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:text="Album"
+    />
+<EditText
+    android:id="@+id/album_edit_text"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:singleLine="true"
     />
 <Button
-    android:id="@+id/pauseButton"
+    android:id="@+id/pause_button"
     android:layout_width="wrap_content"
     android:layout_height="wrap_content"
     android:text="Pause"

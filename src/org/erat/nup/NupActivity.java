@@ -21,7 +21,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
         Log.i(this.toString(), "activity created");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
-        mPauseButton = (Button) findViewById(R.id.pauseButton);
+        mPauseButton = (Button) findViewById(R.id.pause_button);
 
         Intent serviceIntent = new Intent(this, NupService.class);
         startService(serviceIntent);
