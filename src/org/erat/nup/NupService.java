@@ -37,8 +37,8 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         mNotificationManager.notify(mNotificationId, notification);
         startForeground(mNotificationId, notification);
 
-        /*
         mPlayer = new MediaPlayer();
+        /*
         String url = "http://10.0.0.5:8080/music/virt/v-canyon.mp3";
         try {
             mPlayer.setDataSource(url);
@@ -60,6 +60,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     public void onDestroy() {
         Log.i(this.toString(), "service destroyed");
         mNotificationManager.cancel(mNotificationId);
+        mPlayer.stop();
     }
 
     @Override
@@ -68,19 +69,6 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     }
 
     private final IBinder mBinder = new LocalBinder();
-
-    @Override
-    public void onPrepared(MediaPlayer player) {
-        Log.i(this.toString(), "onPrepared");
-        mPaused = false;
-        mPlayer.start();
-
-        synchronized(mObserverLock) {
-            if (mObserver != null) {
-                mObserver.onPauseStateChanged(mPaused);
-            }
-        }
-    }
 
     private NupServiceObserver mObserver;
     private Object mObserverLock = new Object();
@@ -101,7 +89,10 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         }
     }
 
-    boolean mPaused;
+    private List<Song> mSongs;
+    private int mCurrentSongIndex;
+    private boolean mPaused;
+
     public synchronized void togglePause() {
         mPaused = !mPaused;
         if (mPaused) {
@@ -117,8 +108,43 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         }
     }
 
-    List<Song> mSongs;
     public synchronized void setPlaylist(List<Song> songs) {
         mSongs = songs;
+        if (songs.size() > 0)
+            playSongAtIndex(0);
+    }
+
+    private void playSongAtIndex(int index) {
+        if (index < 0 || index >= mSongs.size()) {
+            Log.e(this.toString(), "ignoring request to play song " + index + " (" + mSongs.size() + " in playlist)");
+            return;
+        }
+
+        mCurrentSongIndex = index;
+        Song song = mSongs.get(mCurrentSongIndex);
+        String url = "http://10.0.0.5:8080/music/" + song.getFilename();
+        mPlayer.stop();
+        try {
+            mPlayer.setDataSource(url);
+        } catch (java.io.IOException err) {
+            Log.e(this.toString(), "got exception while setting data source to " + url + ": " + err.toString());
+            return;
+        }
+        mPlayer.setOnPreparedListener(this);
+        mPlayer.prepareAsync();
+    }
+
+    @Override
+    public void onPrepared(MediaPlayer player) {
+        Log.i(this.toString(), "onPrepared");
+        mPaused = false;
+        mPlayer.start();
+
+        synchronized(mObserverLock) {
+            if (mObserver != null) {
+                mObserver.onSongChanged(mSongs.get(mCurrentSongIndex));
+                mObserver.onPauseStateChanged(mPaused);
+            }
+        }
     }
 }

@@ -150,6 +150,8 @@ public class NupActivity extends Activity implements NupServiceObserver {
         mService.togglePause();
     }
 
+    public void onNextButtonClicked(View view) {
+    }
 
     public void onExitButtonClicked(View view) {
         stopService(new Intent(this, NupService.class));

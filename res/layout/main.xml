@@ -96,21 +96,33 @@
     android:layout_height="wrap_content"
     >
     <Button
-        android:layout_width="wrap_content"
+        android:id="@+id/search_button"
+        android:layout_width="fill_parent"
         android:layout_height="wrap_content"
+        android:layout_weight="0.25"
         android:text="Search"
         android:onClick="onSearchButtonClicked"
         />
     <Button
         android:id="@+id/pause_button"
-        android:layout_width="wrap_content"
+        android:layout_width="fill_parent"
         android:layout_height="wrap_content"
+        android:layout_weight="0.25"
         android:text="Pause"
         android:onClick="onPauseButtonClicked"
         />
     <Button
-        android:layout_width="wrap_content"
+        android:id="@+id/next_button"
+        android:layout_width="fill_parent"
         android:layout_height="wrap_content"
+        android:layout_weight="0.25"
+        android:text="Next"
+        android:onClick="onNextButtonClicked"
+        />
+    <Button
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_weight="0.25"
         android:text="Exit"
         android:onClick="onExitButtonClicked"
         />
