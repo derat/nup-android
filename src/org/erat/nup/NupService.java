@@ -9,17 +9,20 @@ import android.media.MediaPlayer;
 import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
+import java.io.IOException;
+import java.lang.Thread;
 import java.util.List;
 
 interface NupServiceObserver {
     void onPauseStateChanged(boolean isPaused);
     void onSongChanged(Song currentSong);
-    void onSongPositionChanged(int curSec);
 }
 
 public class NupService extends Service implements MediaPlayer.OnPreparedListener, MediaPlayer.OnCompletionListener {
     private NotificationManager mNotificationManager;
     private MediaPlayer mPlayer;
+    private LocalProxy mProxy;
+    private Thread mProxyThread;
     private final int mNotificationId = 0;
 
     public class LocalBinder extends Binder {
@@ -41,6 +44,14 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         mPlayer = new MediaPlayer();
         mPlayer.setOnPreparedListener(this);
         mPlayer.setOnCompletionListener(this);
+
+        try {
+            mProxy = new LocalProxy("10.0.0.5", 8080, "http");
+            mProxyThread = new Thread(mProxy);
+            mProxyThread.start();
+        } catch (IOException err) {
+            Log.wtf(this.toString(), "creating proxy failed: " + err);
+        }
     }
 
     @Override
@@ -118,11 +129,12 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
 
         mCurrentSongIndex = index;
         Song song = mSongs.get(mCurrentSongIndex);
-        String url = "http://10.0.0.5:8080/music/" + song.getFilename();
+        //String url = "http://10.0.0.5:8080/music/" + song.getFilename();
+        String url = "http://localhost:" + mProxy.getPort() + "/music/" + song.getFilename();
         mPlayer.reset();
         try {
             mPlayer.setDataSource(url);
-        } catch (java.io.IOException err) {
+        } catch (IOException err) {
             Log.e(this.toString(), "got exception while setting data source to " + url + ": " + err.toString());
             return;
         }

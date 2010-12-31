@@ -83,7 +83,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
         @Override
         protected List<Song> doInBackground(String... urls) {
             final String userAgent = "whatever";
-            AndroidHttpClient client = AndroidHttpClient.newInstance(userAgent, NupActivity.this);
+            AndroidHttpClient client = AndroidHttpClient.newInstance(userAgent);
             HttpResponse response;
             try {
                 response = client.execute(new HttpGet(urls[0]));
