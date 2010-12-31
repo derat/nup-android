@@ -16,6 +16,8 @@ import android.widget.TextView;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
 import org.apache.http.client.methods.HttpGet;
 import org.apache.http.HttpResponse;
 import org.json.JSONArray;
@@ -67,9 +69,9 @@ public class NupActivity extends Activity implements NupServiceObserver {
         }
     };
 
-    class SendSearchRequestTask extends AsyncTask<String, Void, String> {
+    class SendSearchRequestTask extends AsyncTask<String, Void, List<Song>> {
         @Override
-        protected String doInBackground(String... urls) {
+        protected List<Song> doInBackground(String... urls) {
             final String userAgent = "whatever";
             AndroidHttpClient client = AndroidHttpClient.newInstance(userAgent, NupActivity.this);
             HttpResponse response;
@@ -77,9 +79,10 @@ public class NupActivity extends Activity implements NupServiceObserver {
                 response = client.execute(new HttpGet(urls[0]));
             } catch (IOException err) {
                 Log.e(this.toString(), "query failed");
-                return "";
+                return new ArrayList<Song>();
             }
             Log.i(this.toString(), "got response from server");
+
 
             // Yay.
             StringBuilder sb = new StringBuilder();
@@ -90,26 +93,24 @@ public class NupActivity extends Activity implements NupServiceObserver {
                     sb.append(line);
                 }
             } catch (IOException err) {
-                return "";
+                return new ArrayList<Song>();
             }
 
             try {
-                JSONArray songs;
-                songs = (JSONArray) new JSONTokener(sb.toString()).nextValue();
-                for (int i = 0; i < songs.length(); ++i) {
-                    JSONObject song = songs.getJSONObject(i);
-                    Log.i(this.toString(), song.getString("artist") + " - " + song.getString("title"));
+                JSONArray jsonSongs = (JSONArray) new JSONTokener(sb.toString()).nextValue();
+                List<Song> songs = new ArrayList<Song>();
+                for (int i = 0; i < jsonSongs.length(); ++i) {
+                    songs.add(new Song(jsonSongs.getJSONObject(i)));
                 }
+                return songs;
             } catch (org.json.JSONException err) {
                 Log.e(this.toString(), "unable to parse json");
-                return "";
+                return new ArrayList<Song>();
             }
-
-            return "foo";
         }
 
         @Override
-        protected void onPostExecute(String result) {
+        protected void onPostExecute(List<Song> songs) {
             if (mService != null) {
             }
         }
