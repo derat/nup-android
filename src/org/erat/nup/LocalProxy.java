@@ -1,10 +1,13 @@
 package org.erat.nup;
 
+import android.net.SSLCertificateSocketFactory;
 import android.util.Log;
 import java.io.IOException;
 import java.lang.Thread;
 import java.net.ServerSocket;
 import java.net.Socket;
+import javax.net.ssl.SSLSocketFactory;
+//import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.HttpException;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
@@ -18,14 +21,15 @@ import org.apache.http.RequestLine;
 import org.apache.http.StatusLine;
 
 class LocalProxy implements Runnable {
-    private String mRemoteHostname;
-    private int mRemotePort;
+    private final String mRemoteHostname;
+    private final int mRemotePort;
+    private final boolean mUseSsl;
     private final ServerSocket mServerSocket;
 
-    public LocalProxy(String remoteHostname, int remotePort, String remoteScheme) throws IOException {
+    public LocalProxy(String remoteHostname, int remotePort, boolean useSsl) throws IOException {
         mRemoteHostname = remoteHostname;
         mRemotePort = remotePort;
-        // FIXME: scheme
+        mUseSsl = useSsl;
 
         mServerSocket = new ServerSocket(0);
         Log.i(this.toString(), "listening on port " + mServerSocket.getLocalPort());
@@ -75,6 +79,11 @@ class LocalProxy implements Runnable {
 
                 DefaultHttpClientConnection clientConn = new DefaultHttpClientConnection();
                 Socket clientSocket = new Socket(mRemoteHostname, mRemotePort);
+                if (mUseSsl) {
+                    //SSLSocketFactory factory = SSLCertificateSocketFactory.getHttpSocketFactory(5000, null);
+                    SSLSocketFactory factory = SSLCertificateSocketFactory.getInsecure(5000, null);
+                    clientSocket = factory.createSocket(clientSocket, mRemoteHostname, mRemotePort, true);
+                }
                 clientConn.bind(clientSocket, mParams);
 
                 clientConn.sendRequestHeader(request);

@@ -90,7 +90,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
                 jsonData = Util.getStringFromInputStream(stream);
                 Log.i(this.toString(), "got " + jsonData.length() + "-byte string");
             } catch (IOException err) {
-                Log.e(this.toString(), "query failed");
+                Log.e(this.toString(), "query failed: " + err);
                 return songs;
             }
 
