@@ -25,6 +25,8 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     private Thread mProxyThread;
     private final int mNotificationId = 0;
 
+    public int getProxyPort() { return mProxy.getPort(); }
+
     public class LocalBinder extends Binder {
         NupService getService() {
             return NupService.this;

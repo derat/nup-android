@@ -90,6 +90,8 @@ public class NupActivity extends Activity implements NupServiceObserver {
             } catch (IOException err) {
                 Log.e(this.toString(), "query failed");
                 return new ArrayList<Song>();
+            } finally {
+                client.close();
             }
             Log.i(this.toString(), "got response from server");
 
@@ -143,7 +145,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
         builder.addStringParam(mArtistEdit, "artist");
         builder.addStringParam(mTitleEdit, "title");
         builder.addStringParam(mAlbumEdit, "album");
-        new SendSearchRequestTask().execute("http://10.0.0.5:8080/query?" + TextUtils.join("&", builder.params));
+        new SendSearchRequestTask().execute("http://localhost:" + mService.getProxyPort() + "/query?" + TextUtils.join("&", builder.params));
     }
 
     public void onPauseButtonClicked(View view) {
