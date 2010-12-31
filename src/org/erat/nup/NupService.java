@@ -131,7 +131,6 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
 
         mCurrentSongIndex = index;
         Song song = mSongs.get(mCurrentSongIndex);
-        //String url = "http://10.0.0.5:8080/music/" + song.getFilename();
         String url = "http://localhost:" + mProxy.getPort() + "/music/" + song.getFilename();
         mPlayer.reset();
         try {

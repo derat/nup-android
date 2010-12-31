@@ -113,6 +113,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
             } catch (IOException err) {
                 return new ArrayList<Song>();
             }
+            Log.i(this.toString(), "got " + sb.toString().length() + "-byte string");
 
             try {
                 JSONArray jsonSongs = (JSONArray) new JSONTokener(sb.toString()).nextValue();

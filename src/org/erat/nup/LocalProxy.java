@@ -85,10 +85,10 @@ class LocalProxy implements Runnable {
                 serverConn.sendResponseHeader(response);
 
                 clientConn.receiveResponseEntity(response);
+                Log.i(this.toString(), "entity length=" + response.getEntity().getContentLength());
                 serverConn.sendResponseEntity(response);
-
-                clientSocket.close();
-                mServerSocket.close();
+                serverConn.close();
+                clientConn.close();
             } catch (IOException err) {
                 Log.e(this.toString(), "got IO exception while proxying request: " + err);
             } catch (HttpException err) {
