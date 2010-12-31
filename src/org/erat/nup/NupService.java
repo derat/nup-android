@@ -9,10 +9,11 @@ import android.media.MediaPlayer;
 import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
+import java.util.List;
 
 interface NupServiceObserver {
     void onPauseStateChanged(boolean isPaused);
-    void onCurrentTrackChanged(String artist, String title, String album);
+    void onSongChanged(Song currentSong);
 }
 
 public class NupService extends Service implements MediaPlayer.OnPreparedListener {
@@ -100,9 +101,6 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         }
     }
 
-    public synchronized void insertTrack(String url, int position) {
-    }
-
     boolean mPaused;
     public synchronized void togglePause() {
         mPaused = !mPaused;
@@ -119,6 +117,8 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         }
     }
 
-    public synchronized void selectTrack(int offset) {
+    List<Song> mSongs;
+    public synchronized void setPlaylist(List<Song> songs) {
+        mSongs = songs;
     }
 }

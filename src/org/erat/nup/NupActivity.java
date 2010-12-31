@@ -9,13 +9,16 @@ import android.net.http.AndroidHttpClient;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.IBinder;
+import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.IOException;
+import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 import org.apache.http.client.methods.HttpGet;
@@ -29,6 +32,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
 
     private Button mPauseButton;
     private TextView mArtistLabel, mTitleLabel, mAlbumLabel, mTimeLabel;
+    private EditText mArtistEdit, mTitleEdit, mAlbumEdit;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -37,10 +41,15 @@ public class NupActivity extends Activity implements NupServiceObserver {
         setContentView(R.layout.main);
 
         mPauseButton = (Button) findViewById(R.id.pause_button);
+
         mArtistLabel = (TextView) findViewById(R.id.artist_label);
         mTitleLabel = (TextView) findViewById(R.id.title_label);
         mAlbumLabel = (TextView) findViewById(R.id.album_label);
         mTimeLabel = (TextView) findViewById(R.id.time_label);
+
+        mArtistEdit = (EditText) findViewById(R.id.artist_edit_text);
+        mTitleEdit = (EditText) findViewById(R.id.title_edit_text);
+        mAlbumEdit = (EditText) findViewById(R.id.album_edit_text);
 
         Intent serviceIntent = new Intent(this, NupService.class);
         startService(serviceIntent);
@@ -70,6 +79,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
     };
 
     class SendSearchRequestTask extends AsyncTask<String, Void, List<Song>> {
+        // TODO: Report success/error instead of returning song list.
         @Override
         protected List<Song> doInBackground(String... urls) {
             final String userAgent = "whatever";
@@ -98,9 +108,13 @@ public class NupActivity extends Activity implements NupServiceObserver {
 
             try {
                 JSONArray jsonSongs = (JSONArray) new JSONTokener(sb.toString()).nextValue();
+                Log.i(this.toString(), "got " + jsonSongs.length() + " song(s) from server");
                 List<Song> songs = new ArrayList<Song>();
                 for (int i = 0; i < jsonSongs.length(); ++i) {
                     songs.add(new Song(jsonSongs.getJSONObject(i)));
+                }
+                if (mService != null) {
+                    mService.setPlaylist(songs);
                 }
                 return songs;
             } catch (org.json.JSONException err) {
@@ -111,13 +125,25 @@ public class NupActivity extends Activity implements NupServiceObserver {
 
         @Override
         protected void onPostExecute(List<Song> songs) {
-            if (mService != null) {
-            }
         }
     }
 
     public void onSearchButtonClicked(View view) throws IOException {
-        new SendSearchRequestTask().execute("http://10.0.0.5:8080/query?artist=Bola");
+        class QueryBuilder {
+            public List<String> params = new ArrayList<String>();
+            public void addStringParam(EditText view, String paramName) throws java.io.UnsupportedEncodingException {
+                String value = view.getText().toString().trim();
+                if (!value.isEmpty()) {
+                    String param = paramName + "=" + URLEncoder.encode(value, "UTF-8");
+                    params.add(param);
+                }
+            }
+        }
+        QueryBuilder builder = new QueryBuilder();
+        builder.addStringParam(mArtistEdit, "artist");
+        builder.addStringParam(mTitleEdit, "title");
+        builder.addStringParam(mAlbumEdit, "album");
+        new SendSearchRequestTask().execute("http://10.0.0.5:8080/query?" + TextUtils.join("&", builder.params));
     }
 
     public void onPauseButtonClicked(View view) {
@@ -136,9 +162,9 @@ public class NupActivity extends Activity implements NupServiceObserver {
     }
 
     @Override
-    public void onCurrentTrackChanged(String artist, String title, String album) {
-        mArtistLabel.setText(artist);
-        mTitleLabel.setText(title);
-        mAlbumLabel.setText(album);
+    public void onSongChanged(Song currentSong) {
+        mArtistLabel.setText(currentSong.getArtist());
+        mTitleLabel.setText(currentSong.getTitle());
+        mAlbumLabel.setText(currentSong.getAlbum());
     }
 }

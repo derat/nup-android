@@ -18,4 +18,14 @@ class Song {
         mRating = json.getDouble("rating");
         // TODO: Tags.
     }
+
+    // Yay.
+    public final String getArtist() { return mArtist; }
+    public final String getTitle() { return mTitle; }
+    public final String getAlbum() { return mAlbum; }
+    public final String getFilename() { return mFilename; }
+    public final String getCoverFilename() { return mCoverFilename; }
+    public final int getLengthSec() { return mLengthSec; }
+    public final int getSongId() { return mSongId; }
+    public final double getRating() { return mRating; }
 }
