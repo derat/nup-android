@@ -93,6 +93,9 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     private int mCurrentSongIndex;
     private boolean mPaused;
 
+    public final List<Song> getSongs() { return mSongs; }
+    public final int getCurrentSongIndex() { return mCurrentSongIndex; }
+
     public synchronized void togglePause() {
         mPaused = !mPaused;
         if (mPaused) {
@@ -114,7 +117,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
             playSongAtIndex(0);
     }
 
-    private void playSongAtIndex(int index) {
+    public synchronized void playSongAtIndex(int index) {
         if (index < 0 || index >= mSongs.size()) {
             Log.e(this.toString(), "ignoring request to play song " + index + " (" + mSongs.size() + " in playlist)");
             return;
@@ -123,7 +126,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         mCurrentSongIndex = index;
         Song song = mSongs.get(mCurrentSongIndex);
         String url = "http://10.0.0.5:8080/music/" + song.getFilename();
-        mPlayer.stop();
+        mPlayer.reset();
         try {
             mPlayer.setDataSource(url);
         } catch (java.io.IOException err) {

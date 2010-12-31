@@ -151,6 +151,10 @@ public class NupActivity extends Activity implements NupServiceObserver {
     }
 
     public void onNextButtonClicked(View view) {
+        // FIXME: not threadsafe
+        int index = mService.getCurrentSongIndex();
+        if (index + 1 < mService.getSongs().size())
+            mService.playSongAtIndex(index + 1);
     }
 
     public void onExitButtonClicked(View view) {
