@@ -14,9 +14,10 @@ import java.util.List;
 interface NupServiceObserver {
     void onPauseStateChanged(boolean isPaused);
     void onSongChanged(Song currentSong);
+    void onSongPositionChanged(int curSec);
 }
 
-public class NupService extends Service implements MediaPlayer.OnPreparedListener {
+public class NupService extends Service implements MediaPlayer.OnPreparedListener, MediaPlayer.OnCompletionListener {
     private NotificationManager mNotificationManager;
     private MediaPlayer mPlayer;
     private final int mNotificationId = 0;
@@ -38,16 +39,8 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         startForeground(mNotificationId, notification);
 
         mPlayer = new MediaPlayer();
-        /*
-        String url = "http://10.0.0.5:8080/music/virt/v-canyon.mp3";
-        try {
-            mPlayer.setDataSource(url);
-        } catch (java.io.IOException err) {
-            Log.e(this.toString(), "Got exception while setting data source: " + err.toString());
-        }
         mPlayer.setOnPreparedListener(this);
-        mPlayer.prepareAsync();
-        */
+        mPlayer.setOnCompletionListener(this);
     }
 
     @Override
@@ -133,7 +126,6 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
             Log.e(this.toString(), "got exception while setting data source to " + url + ": " + err.toString());
             return;
         }
-        mPlayer.setOnPreparedListener(this);
         mPlayer.prepareAsync();
     }
 
@@ -149,5 +141,11 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
                 mObserver.onPauseStateChanged(mPaused);
             }
         }
+    }
+
+    @Override
+    public void onCompletion(MediaPlayer player) {
+        Log.i(this.toString(), "onCompletion");
+        playSongAtIndex(mCurrentSongIndex + 1);
     }
 }

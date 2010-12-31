@@ -27,6 +27,7 @@
           android:id="@+id/artist_label"
           android:layout_width="wrap_content"
           android:layout_height="wrap_content"
+          android:singleLine="true"
           android:text="Artist Name"
           android:textStyle="bold"
           android:textSize="14dp"
@@ -35,6 +36,7 @@
           android:id="@+id/title_label"
           android:layout_width="wrap_content"
           android:layout_height="wrap_content"
+          android:singleLine="true"
           android:text="Track Title"
           android:textStyle="italic"
           android:textSize="14dp"
@@ -43,6 +45,7 @@
           android:id="@+id/album_label"
           android:layout_width="wrap_content"
           android:layout_height="wrap_content"
+          android:singleLine="true"
           android:text="Album Name"
           android:textSize="14dp"
           />
@@ -50,7 +53,8 @@
           android:id="@+id/time_label"
           android:layout_width="wrap_content"
           android:layout_height="wrap_content"
-          android:text="[0:00 / 3:00]"
+          android:singleLine="true"
+          android:text=""
           android:textSize="14dp"
           />
     </LinearLayout>
