@@ -5,7 +5,10 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.net.http.AndroidHttpClient;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -14,10 +17,13 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ImageView;
 import android.widget.TextView;
 import java.io.BufferedReader;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.IOException;
+import java.net.URL;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
@@ -33,6 +39,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
     private Button mPauseButton;
     private TextView mArtistLabel, mTitleLabel, mAlbumLabel, mTimeLabel;
     private EditText mArtistEdit, mTitleEdit, mAlbumEdit;
+    private ImageView mAlbumImageView;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -41,12 +48,11 @@ public class NupActivity extends Activity implements NupServiceObserver {
         setContentView(R.layout.main);
 
         mPauseButton = (Button) findViewById(R.id.pause_button);
-
+        mAlbumImageView = (ImageView) findViewById(R.id.album_image);
         mArtistLabel = (TextView) findViewById(R.id.artist_label);
         mTitleLabel = (TextView) findViewById(R.id.title_label);
         mAlbumLabel = (TextView) findViewById(R.id.album_label);
         mTimeLabel = (TextView) findViewById(R.id.time_label);
-
         mArtistEdit = (EditText) findViewById(R.id.artist_edit_text);
         mTitleEdit = (EditText) findViewById(R.id.title_edit_text);
         mAlbumEdit = (EditText) findViewById(R.id.album_edit_text);
@@ -179,5 +185,14 @@ public class NupActivity extends Activity implements NupServiceObserver {
         mTitleLabel.setText(currentSong.getTitle());
         mAlbumLabel.setText(currentSong.getAlbum());
         mTimeLabel.setText(formatTimeString(0, currentSong.getLengthSec()));
+
+        // FIXME: don't do this on UI thread
+        try {
+            URL imageUrl = new URL("http://localhost:" + mService.getProxyPort() + "/cover/" + currentSong.getCoverFilename());
+            Bitmap bitmap = BitmapFactory.decodeStream((InputStream) imageUrl.getContent());
+            mAlbumImageView.setImageBitmap(bitmap);
+        } catch (IOException err) {
+            Log.e(this.toString(), "unable to load album cover bitmap from file " + currentSong.getCoverFilename() + ": " + err);
+        }
     }
 }
