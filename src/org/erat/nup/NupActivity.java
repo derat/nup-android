@@ -7,8 +7,6 @@ import android.content.Intent;
 import android.content.ServiceConnection;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.net.http.AndroidHttpClient;
-import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.IBinder;
@@ -19,16 +17,12 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
-import java.io.BufferedReader;
 import java.io.InputStream;
-import java.io.InputStreamReader;
 import java.io.IOException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.HttpResponse;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
@@ -88,37 +82,21 @@ public class NupActivity extends Activity implements NupServiceObserver {
         // TODO: Report success/error instead of returning song list.
         @Override
         protected List<Song> doInBackground(String... urls) {
-            final String userAgent = "whatever";
-            AndroidHttpClient client = AndroidHttpClient.newInstance(userAgent);
-            HttpResponse response;
+            List<Song> songs = new ArrayList<Song>();
+            String jsonData;
             try {
-                response = client.execute(new HttpGet(urls[0]));
+                URL url = new URL(urls[0]);
+                InputStream stream = (InputStream) url.getContent();
+                jsonData = Util.getStringFromInputStream(stream);
+                Log.i(this.toString(), "got " + jsonData.length() + "-byte string");
             } catch (IOException err) {
                 Log.e(this.toString(), "query failed");
-                return new ArrayList<Song>();
-            } finally {
-                client.close();
+                return songs;
             }
-            Log.i(this.toString(), "got response from server");
-
-
-            // Yay.
-            StringBuilder sb = new StringBuilder();
-            try {
-                BufferedReader reader = new BufferedReader(new InputStreamReader(response.getEntity().getContent()));
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    sb.append(line);
-                }
-            } catch (IOException err) {
-                return new ArrayList<Song>();
-            }
-            Log.i(this.toString(), "got " + sb.toString().length() + "-byte string");
 
             try {
-                JSONArray jsonSongs = (JSONArray) new JSONTokener(sb.toString()).nextValue();
+                JSONArray jsonSongs = (JSONArray) new JSONTokener(jsonData).nextValue();
                 Log.i(this.toString(), "got " + jsonSongs.length() + " song(s) from server");
-                List<Song> songs = new ArrayList<Song>();
                 for (int i = 0; i < jsonSongs.length(); ++i) {
                     songs.add(new Song(jsonSongs.getJSONObject(i)));
                 }
@@ -128,7 +106,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
                 return songs;
             } catch (org.json.JSONException err) {
                 Log.e(this.toString(), "unable to parse json");
-                return new ArrayList<Song>();
+                return songs;
             }
         }
 
