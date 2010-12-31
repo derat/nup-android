@@ -54,7 +54,7 @@ class LocalProxy implements Runnable {
         public ProxyThread(Socket serverSocket) {
             mServerSocket = serverSocket;
 
-            // From http://www.docjar.com/html/api/org/apache/http/examples/ElementalReverseProxy.java.html.
+            // From Apache's ElementalReverseProxy.java example -- dunno how important any of these are.
             mParams = new BasicHttpParams();
             mParams
                 .setIntParameter(CoreConnectionPNames.SO_TIMEOUT, 5000)
@@ -71,7 +71,7 @@ class LocalProxy implements Runnable {
 
                 HttpRequest request = serverConn.receiveRequestHeader();
                 RequestLine requestLine = request.getRequestLine();
-                Log.i(this.toString(), "got request with method " + requestLine.getMethod() + " and uri " + requestLine.getUri());
+                Log.i(this.toString(), "got " + requestLine.getMethod() + " request for " + requestLine.getUri());
 
                 DefaultHttpClientConnection clientConn = new DefaultHttpClientConnection();
                 Socket clientSocket = new Socket(mRemoteHostname, mRemotePort);
@@ -81,11 +81,11 @@ class LocalProxy implements Runnable {
                 clientConn.flush();
                 HttpResponse response = clientConn.receiveResponseHeader();
                 StatusLine statusLine = response.getStatusLine();
-                Log.i(this.toString(), "got response from remote server with code " + statusLine.getStatusCode() + ": " + statusLine.getReasonPhrase());
+                Log.i(this.toString(), "got " + statusLine.getStatusCode() + " response header from remote server: " + statusLine.getReasonPhrase());
                 serverConn.sendResponseHeader(response);
 
                 clientConn.receiveResponseEntity(response);
-                Log.i(this.toString(), "entity length=" + response.getEntity().getContentLength());
+                Log.i(this.toString(), "got response entity with content-length " + response.getEntity().getContentLength());
                 serverConn.sendResponseEntity(response);
                 serverConn.close();
                 clientConn.close();
