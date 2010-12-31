@@ -167,10 +167,15 @@ public class NupActivity extends Activity implements NupServiceObserver {
         mPauseButton.setText(isPaused ? "Play" : "Pause");
     }
 
+    String formatTimeString(int curSec, int totalSec) {
+        return String.format("[%d:%02d / %d:%02d]", curSec / 60, curSec % 60, totalSec / 60, totalSec % 60);
+    }
+
     @Override
     public void onSongChanged(Song currentSong) {
         mArtistLabel.setText(currentSong.getArtist());
         mTitleLabel.setText(currentSong.getTitle());
         mAlbumLabel.setText(currentSong.getAlbum());
+        mTimeLabel.setText(formatTimeString(0, currentSong.getLengthSec()));
     }
 }
