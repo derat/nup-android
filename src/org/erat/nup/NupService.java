@@ -48,7 +48,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         mPlayer.setOnCompletionListener(this);
 
         try {
-            mProxy = new LocalProxy("10.0.0.5", 8080, false);
+            mProxy = new LocalProxy("10.0.0.5", 8080, false, null, null);
             mProxyThread = new Thread(mProxy);
             mProxyThread.start();
         } catch (IOException err) {

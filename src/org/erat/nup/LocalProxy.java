@@ -1,6 +1,7 @@
 package org.erat.nup;
 
 import android.net.SSLCertificateSocketFactory;
+import android.util.Base64;
 import android.util.Log;
 import java.io.IOException;
 import java.lang.Thread;
@@ -21,15 +22,17 @@ import org.apache.http.RequestLine;
 import org.apache.http.StatusLine;
 
 class LocalProxy implements Runnable {
-    private final String mRemoteHostname;
+    private final String mRemoteHostname, mUsername, mPassword;
     private final int mRemotePort;
     private final boolean mUseSsl;
     private final ServerSocket mServerSocket;
 
-    public LocalProxy(String remoteHostname, int remotePort, boolean useSsl) throws IOException {
+    public LocalProxy(String remoteHostname, int remotePort, boolean useSsl, String username, String password) throws IOException {
         mRemoteHostname = remoteHostname;
         mRemotePort = remotePort;
         mUseSsl = useSsl;
+        mUsername = username;
+        mPassword = password;
 
         mServerSocket = new ServerSocket(0);
         Log.i(this.toString(), "listening on port " + mServerSocket.getLocalPort());
@@ -86,8 +89,12 @@ class LocalProxy implements Runnable {
                 }
                 clientConn.bind(clientSocket, mParams);
 
+                if (mUsername != null && mPassword != null) {
+                    request.addHeader("Authorization", "Basic " + Base64.encodeToString((mUsername + ":" + mPassword).getBytes(), Base64.NO_WRAP));
+                }
                 clientConn.sendRequestHeader(request);
                 clientConn.flush();
+
                 HttpResponse response = clientConn.receiveResponseHeader();
                 StatusLine statusLine = response.getStatusLine();
                 Log.i(this.toString(), "got " + statusLine.getStatusCode() + " response header from remote server: " + statusLine.getReasonPhrase());
