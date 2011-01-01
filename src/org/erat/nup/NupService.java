@@ -11,6 +11,7 @@ import android.os.IBinder;
 import android.util.Log;
 import java.io.IOException;
 import java.lang.Thread;
+import java.util.ArrayList;
 import java.util.List;
 
 interface NupServiceObserver {
@@ -95,7 +96,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         }
     }
 
-    private List<Song> mSongs;
+    private List<Song> mSongs = new ArrayList<Song>();
     private int mCurrentSongIndex;
     private boolean mPaused;
 
