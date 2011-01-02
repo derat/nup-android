@@ -145,6 +145,9 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
 
     public final List<Song> getSongs() { return mSongs; }
     public final int getCurrentSongIndex() { return mCurrentSongIndex; }
+    public final Song getCurrentSong() {
+        return (mCurrentSongIndex >= 0 && mCurrentSongIndex < mSongs.size()) ? mSongs.get(mCurrentSongIndex) : null;
+    }
 
     public synchronized void togglePause() {
         mPaused = !mPaused;

@@ -74,6 +74,10 @@ public class NupActivity extends Activity implements NupServiceObserver {
             Log.d(TAG, "connected to service");
             mService = ((NupService.LocalBinder) service).getService();
             mService.addObserver(NupActivity.this);
+
+            Song song = mService.getCurrentSong();
+            if (song != null)
+                onSongChanged(song);
         }
 
         public void onServiceDisconnected(ComponentName className) {
