@@ -139,11 +139,12 @@ public class NupActivity extends Activity implements NupServiceObserver {
         mService.togglePause();
     }
 
+    public void onPrevButtonClicked(View view) {
+        mService.playSongAtIndex(mService.getCurrentSongIndex() - 1);
+    }
+
     public void onNextButtonClicked(View view) {
-        // FIXME: not threadsafe
-        int index = mService.getCurrentSongIndex();
-        if (index + 1 < mService.getSongs().size())
-            mService.playSongAtIndex(index + 1);
+        mService.playSongAtIndex(mService.getCurrentSongIndex() + 1);
     }
 
     @Override

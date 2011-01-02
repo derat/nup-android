@@ -126,7 +126,6 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
 
     public synchronized void playSongAtIndex(int index) {
         if (index < 0 || index >= mSongs.size()) {
-            Log.e(this.toString(), "ignoring request to play song " + index + " (" + mSongs.size() + " in playlist)");
             return;
         }
 
