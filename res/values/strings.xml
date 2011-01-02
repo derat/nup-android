@@ -13,6 +13,7 @@
     <string name="search">Search</string>
     <string name="server_url">Server URL</string>
     <string name="server_url_description">Location of music server, e.g. \"https://www.example.org:1234/\".</string>
+    <string name="substring">Substring</string>
     <string name="title">Title</string>
     <string name="username">Username</string>
     <string name="username_description">Used for HTTP basic authentication, or blank if auth isn\'t needed.</string>

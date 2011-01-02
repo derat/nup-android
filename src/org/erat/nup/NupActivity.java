@@ -16,6 +16,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
+import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -35,9 +36,10 @@ public class NupActivity extends Activity implements NupServiceObserver {
     private NupService mService;
 
     private Button mPauseButton;
+    private ImageView mAlbumImageView;
     private TextView mArtistLabel, mTitleLabel, mAlbumLabel, mTimeLabel;
     private EditText mArtistEdit, mTitleEdit, mAlbumEdit;
-    private ImageView mAlbumImageView;
+    private CheckBox mSubstringCheckbox;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -54,6 +56,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
         mArtistEdit = (EditText) findViewById(R.id.artist_edit_text);
         mTitleEdit = (EditText) findViewById(R.id.title_edit_text);
         mAlbumEdit = (EditText) findViewById(R.id.album_edit_text);
+        mSubstringCheckbox = (CheckBox) findViewById(R.id.substring_checkbox);
 
         Intent serviceIntent = new Intent(this, NupService.class);
         startService(serviceIntent);
@@ -135,11 +138,15 @@ public class NupActivity extends Activity implements NupServiceObserver {
                     params.add(param);
                 }
             }
+            public void addBoolParam(CheckBox view, String paramName) {
+                params.add(paramName + "=" + (view.isChecked() ? "1" : "0"));
+            }
         }
         QueryBuilder builder = new QueryBuilder();
         builder.addStringParam(mArtistEdit, "artist");
         builder.addStringParam(mTitleEdit, "title");
         builder.addStringParam(mAlbumEdit, "album");
+        builder.addBoolParam(mSubstringCheckbox, "substring");
         new SendSearchRequestTask().execute("http://localhost:" + mService.getProxyPort() + "/query?" + TextUtils.join("&", builder.params));
     }
 
