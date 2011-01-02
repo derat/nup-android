@@ -31,7 +31,7 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 
 public class NupActivity extends Activity implements NupServiceObserver {
-    private static final String TAG = "LocalProxy";
+    private static final String TAG = "NupActivity";
     private NupService mService;
 
     private Button mPauseButton;
@@ -82,46 +82,43 @@ public class NupActivity extends Activity implements NupServiceObserver {
         }
     };
 
-    class SendSearchRequestTask extends AsyncTask<String, Void, List<Song>> {
-        // TODO: Report success/error instead of returning song list.
+    class SendSearchRequestTask extends AsyncTask<String, Void, String> {
         @Override
-        protected List<Song> doInBackground(String... urls) {
-            List<Song> songs = new ArrayList<Song>();
+        protected String doInBackground(String... urls) {
             String jsonData;
             try {
                 URL url = new URL(urls[0]);
                 InputStream stream = (InputStream) url.getContent();
                 jsonData = Util.getStringFromInputStream(stream);
                 Log.d(TAG, "got " + jsonData.length() + "-byte string");
-            } catch (IOException err) {
-                Log.e(TAG, "query failed: " + err);
-                return songs;
+            } catch (IOException e) {
+                Log.e(TAG, "query failed: " + e);
+                return "Query failed: " + e.getMessage();
             }
 
             try {
                 JSONArray jsonSongs = (JSONArray) new JSONTokener(jsonData).nextValue();
-                Log.d(TAG, "got " + jsonSongs.length() + " song(s) from server");
+                List<Song> songs = new ArrayList<Song>();
                 for (int i = 0; i < jsonSongs.length(); ++i) {
                     songs.add(new Song(jsonSongs.getJSONObject(i)));
                 }
-                if (mService != null) {
-                    mService.setPlaylist(songs);
-                }
-                return songs;
-            } catch (org.json.JSONException err) {
-                Log.e(TAG, "unable to parse json");
-                return songs;
+                mService.setPlaylist(songs);
+                return "Got " + songs.size() + " song" + (songs.size() == 1 ? "" : "s") + " from server.";
+            } catch (org.json.JSONException e) {
+                Log.e(TAG, "unable to parse json: " + e) ;
+                return "Unable to parse response from server: " + e.getCause();
             }
         }
 
         @Override
-        protected void onPostExecute(List<Song> songs) {
+        protected void onPostExecute(String message) {
+            Toast.makeText(NupActivity.this, message, Toast.LENGTH_LONG).show();
         }
     }
 
     public void onSearchButtonClicked(View view) throws IOException {
         if (!mService.isProxyRunning()) {
-            Toast.makeText(this, "Server must be configured in Preferences.", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Server must be configured in Preferences.", Toast.LENGTH_LONG).show();
             return;
         }
 
@@ -176,8 +173,8 @@ public class NupActivity extends Activity implements NupServiceObserver {
                 URL imageUrl = new URL("http://localhost:" + mService.getProxyPort() + "/cover/" + currentSong.getCoverFilename());
                 Bitmap bitmap = BitmapFactory.decodeStream((InputStream) imageUrl.getContent());
                 mAlbumImageView.setImageBitmap(bitmap);
-            } catch (IOException err) {
-                Log.e(this.toString(), "unable to load album cover bitmap from file " + currentSong.getCoverFilename() + ": " + err);
+            } catch (IOException e) {
+                Log.e(TAG, "unable to load album cover bitmap from file " + currentSong.getCoverFilename() + ": " + e);
             }
         }
     }

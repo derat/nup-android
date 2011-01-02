@@ -24,7 +24,7 @@ interface NupServiceObserver {
 }
 
 public class NupService extends Service implements MediaPlayer.OnPreparedListener, MediaPlayer.OnCompletionListener {
-    private static final String TAG = "LocalProxy";
+    private static final String TAG = "NupService";
     private NotificationManager mNotificationManager;
     private MediaPlayer mPlayer;
     private LocalProxy mProxy;
@@ -52,8 +52,8 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         URI uri;
         try {
             uri = new URI(urlString);
-        } catch (java.net.URISyntaxException err) {
-            Toast.makeText(this, "Unable to parse server URL: " + err.getMessage(), Toast.LENGTH_LONG).show();
+        } catch (java.net.URISyntaxException e) {
+            Toast.makeText(this, "Unable to parse server URL: " + e.getMessage(), Toast.LENGTH_LONG).show();
             return;
         }
         boolean useSsl = false;
@@ -61,10 +61,10 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
 
         String scheme = uri.getScheme();
 
-        if (scheme == null || scheme == "http") {
+        if (scheme == null || scheme.equals("http")) {
             if (port < 0)
                 port = 80;
-        } else if (scheme == "https") {
+        } else if (scheme.equals("https")) {
             useSsl = true;
             if (port < 0)
                 port = 443;
@@ -78,8 +78,8 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
             mProxyThread = new Thread(mProxy);
             mProxyThread.start();
             mProxyRunning = true;
-        } catch (IOException err) {
-            Log.wtf(TAG, "creating proxy failed: " + err);
+        } catch (IOException e) {
+            Log.wtf(TAG, "creating proxy failed: " + e);
         }
     }
 
@@ -178,8 +178,8 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         mPlayer.reset();
         try {
             mPlayer.setDataSource(url);
-        } catch (IOException err) {
-            Log.e(TAG, "got exception while setting data source to " + url + ": " + err.toString());
+        } catch (IOException e) {
+            Log.e(TAG, "got exception while setting data source to " + url + ": " + e.toString());
             return;
         }
         mPlayer.prepareAsync();

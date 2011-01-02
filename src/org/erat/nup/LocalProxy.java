@@ -15,6 +15,7 @@ import org.apache.http.HttpRequest;
 import org.apache.http.HttpResponse;
 import org.apache.http.impl.DefaultHttpClientConnection;
 import org.apache.http.impl.DefaultHttpServerConnection;
+import org.apache.http.message.BasicHttpResponse;
 import org.apache.http.params.BasicHttpParams;
 import org.apache.http.params.CoreConnectionPNames;
 import org.apache.http.params.HttpParams;
@@ -49,8 +50,8 @@ class LocalProxy implements Runnable {
                 Thread thread = new ProxyThread(socket);
                 thread.setDaemon(true);
                 thread.start();
-            } catch (IOException err) {
-                Log.e(TAG, "got IO error while handling connection: " + err);
+            } catch (IOException e) {
+                Log.e(TAG, "got IO error while handling connection: " + e);
             }
         }
     }
@@ -71,45 +72,90 @@ class LocalProxy implements Runnable {
                 .setBooleanParameter(CoreConnectionPNames.TCP_NODELAY, true);
         }
 
+        private void reportError(DefaultHttpServerConnection conn, HttpRequest request, String message) {
+            BasicHttpResponse response = new BasicHttpResponse(request.getProtocolVersion(), 500, message);
+            try {
+                conn.sendResponseHeader(response);
+            } catch (HttpException e) {
+                // Just trying to report an error; nothing to do if the report fails.
+            } catch (IOException e) {
+            } finally {
+                try {
+                    conn.close();
+                } catch (IOException e) {
+                    // Really?
+                }
+            }
+        }
+
         @Override
         public void run() {
+            DefaultHttpServerConnection serverConn;
+            HttpRequest request;
             try {
-                DefaultHttpServerConnection serverConn = new DefaultHttpServerConnection();
+                serverConn = new DefaultHttpServerConnection();
                 serverConn.bind(mServerSocket, mParams);
-
-                HttpRequest request = serverConn.receiveRequestHeader();
+                request = serverConn.receiveRequestHeader();
                 RequestLine requestLine = request.getRequestLine();
                 Log.d(TAG, "got " + requestLine.getMethod() + " request for " + requestLine.getUri());
+            } catch (HttpException e) {
+                Log.e(TAG, "got HTTP exception while setting up server connection: " + e);
+                return;
+            } catch (IOException e) {
+                Log.e(TAG, "got IO exception while setting up server connection: " + e);
+                return;
+            }
 
-                DefaultHttpClientConnection clientConn = new DefaultHttpClientConnection();
-                Socket clientSocket = new Socket(mRemoteHostname, mRemotePort);
+            DefaultHttpClientConnection clientConn;
+            Socket clientSocket;
+            HttpResponse response;
+            try {
+                clientConn = new DefaultHttpClientConnection();
+                clientSocket = new Socket(mRemoteHostname, mRemotePort);
                 if (mUseSsl) {
+                    // FIXME: Why does the non-insecure version hate my certificate?  Works with https://www.google.com/.
                     //SSLSocketFactory factory = SSLCertificateSocketFactory.getHttpSocketFactory(5000, null);
                     SSLSocketFactory factory = SSLCertificateSocketFactory.getInsecure(5000, null);
                     clientSocket = factory.createSocket(clientSocket, mRemoteHostname, mRemotePort, true);
                 }
                 clientConn.bind(clientSocket, mParams);
 
-                if (mUsername != null && mPassword != null) {
+                if (mUsername != null && !mUsername.isEmpty() && mPassword != null && !mPassword.isEmpty()) {
                     request.addHeader("Authorization", "Basic " + Base64.encodeToString((mUsername + ":" + mPassword).getBytes(), Base64.NO_WRAP));
                 }
                 clientConn.sendRequestHeader(request);
                 clientConn.flush();
-
-                HttpResponse response = clientConn.receiveResponseHeader();
+                response = clientConn.receiveResponseHeader();
                 StatusLine statusLine = response.getStatusLine();
                 Log.d(TAG, "got " + statusLine.getStatusCode() + " response header from remote server: " + statusLine.getReasonPhrase());
-                serverConn.sendResponseHeader(response);
+            } catch (HttpException e) {
+                reportError(serverConn, request, "Got HTTP error while connecting to server: " + e.getMessage());
+                return;
+            } catch (IOException e) {
+                reportError(serverConn, request, "Got IO error while connecting to server: " + e.getMessage());
+                return;
+            }
 
+            try {
+                serverConn.sendResponseHeader(response);
                 clientConn.receiveResponseEntity(response);
                 Log.d(TAG, "got response entity with content-length " + response.getEntity().getContentLength());
                 serverConn.sendResponseEntity(response);
+            } catch (IOException e) {
+                Log.e(TAG, "got IO exception while proxying request: " + e);
+            } catch (HttpException e) {
+                Log.e(TAG, "got HTTP exception while proxying request: " + e);
+            }
+
+            try {
                 serverConn.close();
+            } catch (IOException e) {
+                Log.e(TAG, "got IO exception while closing server connection: " + e);
+            }
+            try {
                 clientConn.close();
-            } catch (IOException err) {
-                Log.e(TAG, "got IO exception while proxying request: " + err);
-            } catch (HttpException err) {
-                Log.e(TAG, "got HTTP exception while proxying request: " + err);
+            } catch (IOException e) {
+                Log.e(TAG, "got IO exception while closing client connection: " + e);
             }
         }
     }
