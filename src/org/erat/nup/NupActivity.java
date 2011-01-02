@@ -19,6 +19,7 @@ import android.widget.Button;
 import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 import java.io.InputStream;
 import java.io.IOException;
 import java.net.URL;
@@ -30,6 +31,7 @@ import org.json.JSONObject;
 import org.json.JSONTokener;
 
 public class NupActivity extends Activity implements NupServiceObserver {
+    private static final String TAG = "LocalProxy";
     private NupService mService;
 
     private Button mPauseButton;
@@ -39,7 +41,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        Log.i(this.toString(), "activity created");
+        Log.d(TAG, "activity created");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.main);
 
@@ -60,7 +62,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
 
     @Override
     protected void onDestroy() {
-        Log.i(this.toString(), "activity destroyed");
+        Log.d(TAG, "activity destroyed");
         super.onDestroy();
         if (mService != null)
             mService.removeObserver(this);
@@ -69,13 +71,13 @@ public class NupActivity extends Activity implements NupServiceObserver {
 
     private ServiceConnection mConnection = new ServiceConnection() {
         public void onServiceConnected(ComponentName className, IBinder service) {
-            Log.i(this.toString(), "connected to service");
+            Log.d(TAG, "connected to service");
             mService = ((NupService.LocalBinder) service).getService();
             mService.addObserver(NupActivity.this);
         }
 
         public void onServiceDisconnected(ComponentName className) {
-            Log.i(this.toString(), "disconnected from service");
+            Log.d(TAG, "disconnected from service");
             mService = null;
         }
     };
@@ -90,15 +92,15 @@ public class NupActivity extends Activity implements NupServiceObserver {
                 URL url = new URL(urls[0]);
                 InputStream stream = (InputStream) url.getContent();
                 jsonData = Util.getStringFromInputStream(stream);
-                Log.i(this.toString(), "got " + jsonData.length() + "-byte string");
+                Log.d(TAG, "got " + jsonData.length() + "-byte string");
             } catch (IOException err) {
-                Log.e(this.toString(), "query failed: " + err);
+                Log.e(TAG, "query failed: " + err);
                 return songs;
             }
 
             try {
                 JSONArray jsonSongs = (JSONArray) new JSONTokener(jsonData).nextValue();
-                Log.i(this.toString(), "got " + jsonSongs.length() + " song(s) from server");
+                Log.d(TAG, "got " + jsonSongs.length() + " song(s) from server");
                 for (int i = 0; i < jsonSongs.length(); ++i) {
                     songs.add(new Song(jsonSongs.getJSONObject(i)));
                 }
@@ -107,7 +109,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
                 }
                 return songs;
             } catch (org.json.JSONException err) {
-                Log.e(this.toString(), "unable to parse json");
+                Log.e(TAG, "unable to parse json");
                 return songs;
             }
         }
@@ -118,6 +120,11 @@ public class NupActivity extends Activity implements NupServiceObserver {
     }
 
     public void onSearchButtonClicked(View view) throws IOException {
+        if (!mService.isProxyRunning()) {
+            Toast.makeText(this, "Server must be configured in Preferences.", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
         class QueryBuilder {
             public List<String> params = new ArrayList<String>();
             public void addStringParam(EditText view, String paramName) throws java.io.UnsupportedEncodingException {
@@ -164,12 +171,14 @@ public class NupActivity extends Activity implements NupServiceObserver {
         mTimeLabel.setText(formatTimeString(0, currentSong.getLengthSec()));
 
         // FIXME: don't do this on UI thread
-        try {
-            URL imageUrl = new URL("http://localhost:" + mService.getProxyPort() + "/cover/" + currentSong.getCoverFilename());
-            Bitmap bitmap = BitmapFactory.decodeStream((InputStream) imageUrl.getContent());
-            mAlbumImageView.setImageBitmap(bitmap);
-        } catch (IOException err) {
-            Log.e(this.toString(), "unable to load album cover bitmap from file " + currentSong.getCoverFilename() + ": " + err);
+        if (mService.isProxyRunning()) {
+            try {
+                URL imageUrl = new URL("http://localhost:" + mService.getProxyPort() + "/cover/" + currentSong.getCoverFilename());
+                Bitmap bitmap = BitmapFactory.decodeStream((InputStream) imageUrl.getContent());
+                mAlbumImageView.setImageBitmap(bitmap);
+            } catch (IOException err) {
+                Log.e(this.toString(), "unable to load album cover bitmap from file " + currentSong.getCoverFilename() + ": " + err);
+            }
         }
     }
 

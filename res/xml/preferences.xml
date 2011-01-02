@@ -2,19 +2,19 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
   <PreferenceCategory android:title="Server info">
     <EditTextPreference
-        android:key="server_url_pref"
+        android:key="server_url"
         android:title="@string/server_url"
         android:dialogMessage="@string/server_url_description"
         android:singleLine="true"
         />
     <EditTextPreference
-        android:key="username_pref"
+        android:key="username"
         android:title="@string/username"
         android:dialogMessage="@string/username_description"
         android:singleLine="true"
         />
     <EditTextPreference
-        android:key="password_pref"
+        android:key="password"
         android:title="@string/password"
         android:password="true"
         android:singleLine="true"

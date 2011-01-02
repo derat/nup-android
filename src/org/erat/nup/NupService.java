@@ -5,12 +5,16 @@ import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.media.MediaPlayer;
+import android.preference.PreferenceManager;
 import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
+import android.widget.Toast;
 import java.io.IOException;
 import java.lang.Thread;
+import java.net.URI;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -20,12 +24,15 @@ interface NupServiceObserver {
 }
 
 public class NupService extends Service implements MediaPlayer.OnPreparedListener, MediaPlayer.OnCompletionListener {
+    private static final String TAG = "LocalProxy";
     private NotificationManager mNotificationManager;
     private MediaPlayer mPlayer;
     private LocalProxy mProxy;
     private Thread mProxyThread;
     private final int mNotificationId = 0;
+    private boolean mProxyRunning = false;
 
+    public boolean isProxyRunning() { return mProxyRunning; }
     public int getProxyPort() { return mProxy.getPort(); }
 
     public class LocalBinder extends Binder {
@@ -34,9 +41,51 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         }
     }
 
+    public void initProxy() {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        String urlString = prefs.getString("server_url", "");
+        if (urlString.isEmpty()) {
+            Toast.makeText(this, "You must enter a server URL in Preferences.", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        URI uri;
+        try {
+            uri = new URI(urlString);
+        } catch (java.net.URISyntaxException err) {
+            Toast.makeText(this, "Unable to parse server URL: " + err.getMessage(), Toast.LENGTH_LONG).show();
+            return;
+        }
+        boolean useSsl = false;
+        int port = uri.getPort();
+
+        String scheme = uri.getScheme();
+
+        if (scheme == null || scheme == "http") {
+            if (port < 0)
+                port = 80;
+        } else if (scheme == "https") {
+            useSsl = true;
+            if (port < 0)
+                port = 443;
+        } else {
+            Toast.makeText(this, "Unknown server URL scheme \"" + scheme + "\" (should be \"http\" or \"https\").", Toast.LENGTH_LONG).show();
+            return;
+        }
+
+        try {
+            mProxy = new LocalProxy(uri.getHost(), port, useSsl, prefs.getString("username", ""), prefs.getString("password", ""));
+            mProxyThread = new Thread(mProxy);
+            mProxyThread.start();
+            mProxyRunning = true;
+        } catch (IOException err) {
+            Log.wtf(TAG, "creating proxy failed: " + err);
+        }
+    }
+
     @Override
     public void onCreate() {
-        Log.i(this.toString(), "service created");
+        Log.d(TAG, "service created");
         mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         Notification notification = new Notification(R.drawable.icon, "Playing a song", System.currentTimeMillis());
         PendingIntent contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0);
@@ -48,24 +97,18 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         mPlayer.setOnPreparedListener(this);
         mPlayer.setOnCompletionListener(this);
 
-        try {
-            mProxy = new LocalProxy("10.0.0.5", 8080, false, null, null);
-            mProxyThread = new Thread(mProxy);
-            mProxyThread.start();
-        } catch (IOException err) {
-            Log.wtf(this.toString(), "creating proxy failed: " + err);
-        }
+        initProxy();
     }
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.i(this.toString(), "received start id " + startId + ": " + intent);
+        Log.d(TAG, "received start id " + startId + ": " + intent);
         return START_STICKY;
     }
 
     @Override
     public void onDestroy() {
-        Log.i(this.toString(), "service destroyed");
+        Log.d(TAG, "service destroyed");
         mNotificationManager.cancel(mNotificationId);
         mPlayer.stop();
     }
@@ -82,7 +125,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     public void addObserver(NupServiceObserver observer) {
         synchronized(mObserverLock) {
             if (mObserver != null) {
-                Log.wtf(this.toString(), "tried to add observer while one is already registered");
+                Log.wtf(TAG, "tried to add observer while one is already registered");
             }
             mObserver = observer;
         }
@@ -90,7 +133,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     public void removeObserver(NupServiceObserver observer) {
         synchronized(mObserverLock) {
             if (mObserver != observer) {
-                Log.wtf(this.toString(), "tried to remove non-registered observer");
+                Log.wtf(TAG, "tried to remove non-registered observer");
             }
             mObserver = null;
         }
@@ -136,7 +179,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         try {
             mPlayer.setDataSource(url);
         } catch (IOException err) {
-            Log.e(this.toString(), "got exception while setting data source to " + url + ": " + err.toString());
+            Log.e(TAG, "got exception while setting data source to " + url + ": " + err.toString());
             return;
         }
         mPlayer.prepareAsync();
@@ -144,7 +187,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
 
     @Override
     public void onPrepared(MediaPlayer player) {
-        Log.i(this.toString(), "onPrepared");
+        Log.d(TAG, "onPrepared");
         mPaused = false;
         mPlayer.start();
 
@@ -158,7 +201,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
 
     @Override
     public void onCompletion(MediaPlayer player) {
-        Log.i(this.toString(), "onCompletion");
+        Log.d(TAG, "onCompletion");
         playSongAtIndex(mCurrentSongIndex + 1);
     }
 }

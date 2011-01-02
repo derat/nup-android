@@ -22,6 +22,7 @@ import org.apache.http.RequestLine;
 import org.apache.http.StatusLine;
 
 class LocalProxy implements Runnable {
+    private static final String TAG = "LocalProxy";
     private final String mRemoteHostname, mUsername, mPassword;
     private final int mRemotePort;
     private final boolean mUseSsl;
@@ -35,7 +36,7 @@ class LocalProxy implements Runnable {
         mPassword = password;
 
         mServerSocket = new ServerSocket(0);
-        Log.i(this.toString(), "listening on port " + mServerSocket.getLocalPort());
+        Log.i(TAG, "listening on port " + mServerSocket.getLocalPort());
     }
 
     public int getPort() { return mServerSocket.getLocalPort(); }
@@ -49,7 +50,7 @@ class LocalProxy implements Runnable {
                 thread.setDaemon(true);
                 thread.start();
             } catch (IOException err) {
-                Log.e(this.toString(), "got IO error while handling connection: " + err);
+                Log.e(TAG, "got IO error while handling connection: " + err);
             }
         }
     }
@@ -78,7 +79,7 @@ class LocalProxy implements Runnable {
 
                 HttpRequest request = serverConn.receiveRequestHeader();
                 RequestLine requestLine = request.getRequestLine();
-                Log.i(this.toString(), "got " + requestLine.getMethod() + " request for " + requestLine.getUri());
+                Log.d(TAG, "got " + requestLine.getMethod() + " request for " + requestLine.getUri());
 
                 DefaultHttpClientConnection clientConn = new DefaultHttpClientConnection();
                 Socket clientSocket = new Socket(mRemoteHostname, mRemotePort);
@@ -97,18 +98,18 @@ class LocalProxy implements Runnable {
 
                 HttpResponse response = clientConn.receiveResponseHeader();
                 StatusLine statusLine = response.getStatusLine();
-                Log.i(this.toString(), "got " + statusLine.getStatusCode() + " response header from remote server: " + statusLine.getReasonPhrase());
+                Log.d(TAG, "got " + statusLine.getStatusCode() + " response header from remote server: " + statusLine.getReasonPhrase());
                 serverConn.sendResponseHeader(response);
 
                 clientConn.receiveResponseEntity(response);
-                Log.i(this.toString(), "got response entity with content-length " + response.getEntity().getContentLength());
+                Log.d(TAG, "got response entity with content-length " + response.getEntity().getContentLength());
                 serverConn.sendResponseEntity(response);
                 serverConn.close();
                 clientConn.close();
             } catch (IOException err) {
-                Log.e(this.toString(), "got IO exception while proxying request: " + err);
+                Log.e(TAG, "got IO exception while proxying request: " + err);
             } catch (HttpException err) {
-                Log.e(this.toString(), "got HTTP exception while proxying request: " + err);
+                Log.e(TAG, "got HTTP exception while proxying request: " + err);
             }
         }
     }
