@@ -1,4 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">nup</string>
+    <string name="button_next">Next</string>
+    <string name="button_pause">Pause</string>
+    <string name="button_search">Search</string>
+    <string name="search_label_artist">Artist</string>
+    <string name="search_label_title">Title</string>
+    <string name="search_label_album">Album</string>
 </resources>

@@ -29,7 +29,6 @@
           android:layout_width="wrap_content"
           android:layout_height="wrap_content"
           android:singleLine="true"
-          android:text="Artist Name"
           android:textStyle="bold"
           android:textSize="14dp"
           />
@@ -38,7 +37,6 @@
           android:layout_width="wrap_content"
           android:layout_height="wrap_content"
           android:singleLine="true"
-          android:text="Track Title"
           android:textStyle="italic"
           android:textSize="14dp"
           />
@@ -47,7 +45,6 @@
           android:layout_width="wrap_content"
           android:layout_height="wrap_content"
           android:singleLine="true"
-          android:text="Album Name"
           android:textSize="14dp"
           />
       <TextView
@@ -64,7 +61,7 @@
   <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="Artist"
+      android:text="@string/search_label_artist"
       />
   <EditText
       android:id="@+id/artist_edit_text"
@@ -75,7 +72,7 @@
   <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="Title"
+      android:text="@string/search_label_title"
       />
   <EditText
       android:id="@+id/title_edit_text"
@@ -86,7 +83,7 @@
   <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="Album"
+      android:text="@string/search_label_album"
       />
   <EditText
       android:id="@+id/album_edit_text"
@@ -105,7 +102,7 @@
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
         android:layout_weight="0.25"
-        android:text="Search"
+        android:text="@string/button_search"
         android:onClick="onSearchButtonClicked"
         />
     <Button
@@ -113,7 +110,7 @@
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
         android:layout_weight="0.25"
-        android:text="Pause"
+        android:text="@string/button_pause"
         android:onClick="onPauseButtonClicked"
         />
     <Button
@@ -121,7 +118,7 @@
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
         android:layout_weight="0.25"
-        android:text="Next"
+        android:text="@string/button_next"
         android:onClick="onNextButtonClicked"
         />
     <Button
