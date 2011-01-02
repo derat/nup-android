@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+  <PreferenceCategory android:title="Server info">
+    <EditTextPreference
+        android:key="server_url_pref"
+        android:title="@string/server_url"
+        android:dialogMessage="@string/server_url_description"
+        android:singleLine="true"
+        />
+    <EditTextPreference
+        android:key="username_pref"
+        android:title="@string/username"
+        android:dialogMessage="@string/username_description"
+        android:singleLine="true"
+        />
+    <EditTextPreference
+        android:key="password_pref"
+        android:title="@string/password"
+        android:password="true"
+        android:singleLine="true"
+        />
+  </PreferenceCategory>
+</PreferenceScreen>

@@ -183,6 +183,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
         case R.id.preferences_menu_item:
+            startActivity(new Intent(this, NupPreferenceActivity.class));
             return true;
         case R.id.quit_menu_item:
             stopService(new Intent(this, NupService.class));
