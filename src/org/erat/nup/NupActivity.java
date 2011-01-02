@@ -39,7 +39,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
     private ImageView mAlbumImageView;
     private TextView mArtistLabel, mTitleLabel, mAlbumLabel, mTimeLabel;
     private EditText mArtistEdit, mTitleEdit, mAlbumEdit;
-    private CheckBox mSubstringCheckbox;
+    private CheckBox mShuffleCheckbox, mSubstringCheckbox;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -56,6 +56,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
         mArtistEdit = (EditText) findViewById(R.id.artist_edit_text);
         mTitleEdit = (EditText) findViewById(R.id.title_edit_text);
         mAlbumEdit = (EditText) findViewById(R.id.album_edit_text);
+        mShuffleCheckbox = (CheckBox) findViewById(R.id.shuffle_checkbox);
         mSubstringCheckbox = (CheckBox) findViewById(R.id.substring_checkbox);
 
         Intent serviceIntent = new Intent(this, NupService.class);
@@ -146,6 +147,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
         builder.addStringParam(mArtistEdit, "artist");
         builder.addStringParam(mTitleEdit, "title");
         builder.addStringParam(mAlbumEdit, "album");
+        builder.addBoolParam(mShuffleCheckbox, "shuffle");
         builder.addBoolParam(mSubstringCheckbox, "substring");
         new SendSearchRequestTask().execute("http://localhost:" + mService.getProxyPort() + "/query?" + TextUtils.join("&", builder.params));
     }

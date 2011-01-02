@@ -122,12 +122,26 @@
       android:layout_height="wrap_content"
       android:singleLine="true"
       />
-  <CheckBox
-      android:id="@+id/substring_checkbox"
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="@string/substring"
-      />
+  <LinearLayout
+    android:orientation="horizontal"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    >
+    <CheckBox
+        android:id="@+id/substring_checkbox"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_weight="0.5"
+        android:text="@string/substring"
+        />
+    <CheckBox
+        android:id="@+id/shuffle_checkbox"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_weight="0.5"
+        android:text="@string/shuffle"
+        />
+  </LinearLayout>
 
   <Button
       android:id="@+id/search_button"
