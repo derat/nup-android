@@ -61,7 +61,7 @@
   <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="@string/search_label_artist"
+      android:text="@string/artist"
       />
   <EditText
       android:id="@+id/artist_edit_text"
@@ -72,7 +72,7 @@
   <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="@string/search_label_title"
+      android:text="@string/title"
       />
   <EditText
       android:id="@+id/title_edit_text"
@@ -83,7 +83,7 @@
   <TextView
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
-      android:text="@string/search_label_album"
+      android:text="@string/album"
       />
   <EditText
       android:id="@+id/album_edit_text"
@@ -101,32 +101,25 @@
         android:id="@+id/search_button"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="0.25"
-        android:text="@string/button_search"
+        android:layout_weight="0.33"
+        android:text="@string/search"
         android:onClick="onSearchButtonClicked"
         />
     <Button
         android:id="@+id/pause_button"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="0.25"
-        android:text="@string/button_pause"
+        android:layout_weight="0.33"
+        android:text="@string/pause"
         android:onClick="onPauseButtonClicked"
         />
     <Button
         android:id="@+id/next_button"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="0.25"
-        android:text="@string/button_next"
+        android:layout_weight="0.33"
+        android:text="@string/next"
         android:onClick="onNextButtonClicked"
-        />
-    <Button
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:layout_weight="0.25"
-        android:text="Exit"
-        android:onClick="onExitButtonClicked"
         />
   </LinearLayout>
 </LinearLayout>

@@ -12,6 +12,8 @@ import android.os.Bundle;
 import android.os.IBinder;
 import android.text.TextUtils;
 import android.util.Log;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
@@ -144,11 +146,6 @@ public class NupActivity extends Activity implements NupServiceObserver {
             mService.playSongAtIndex(index + 1);
     }
 
-    public void onExitButtonClicked(View view) {
-        stopService(new Intent(this, NupService.class));
-        finish();
-    }
-
     @Override
     public void onPauseStateChanged(boolean isPaused) {
         mPauseButton.setText(isPaused ? "Play" : "Pause");
@@ -172,6 +169,26 @@ public class NupActivity extends Activity implements NupServiceObserver {
             mAlbumImageView.setImageBitmap(bitmap);
         } catch (IOException err) {
             Log.e(this.toString(), "unable to load album cover bitmap from file " + currentSong.getCoverFilename() + ": " + err);
+        }
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.main_menu, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+        case R.id.preferences_menu_item:
+            return true;
+        case R.id.quit_menu_item:
+            stopService(new Intent(this, NupService.class));
+            finish();
+            return true;
+        default:
+            return super.onOptionsItemSelected(item);
         }
     }
 }
