@@ -11,11 +11,13 @@ import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
+import android.view.ContextMenu;
 import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -49,7 +51,9 @@ public class NupActivity extends Activity implements NupServiceObserver {
         mTitleLabel = (TextView) findViewById(R.id.title_label);
         mAlbumLabel = (TextView) findViewById(R.id.album_label);
         mTimeLabel = (TextView) findViewById(R.id.time_label);
+
         mPlaylistView = (ListView) findViewById(R.id.playlist);
+        registerForContextMenu(mPlaylistView);
 
         Intent serviceIntent = new Intent(this, NupService.class);
         startService(serviceIntent);
@@ -107,7 +111,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
 
     @Override
     public void onPauseStateChanged(boolean isPaused) {
-        mPauseButton.setText(isPaused ? "Play" : "Pause");
+        mPauseButton.setText(getString(isPaused ? R.string.pause : R.string.play));
     }
 
     String formatTimeString(int curSec, int totalSec) {
@@ -203,5 +207,22 @@ public class NupActivity extends Activity implements NupServiceObserver {
             ((TextView) view.findViewById(R.id.title)).setText(song.getTitle());
             return view;
         }
+    }
+
+    @Override
+    public void onCreateContextMenu(ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
+        if (view.getId() == R.id.playlist) {
+            AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) menuInfo;
+            Song song = mService.getSongs().get(info.position);
+            menu.setHeaderTitle(song.getArtist() + " - " + song.getTitle());
+            menu.add(getString(R.string.play));
+        }
+    }
+
+    @Override
+    public boolean onContextItemSelected(MenuItem item) {
+        AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
+        mService.playSongAtIndex(info.position);
+        return true;
     }
 }
