@@ -94,36 +94,37 @@ public class NupActivity extends Activity implements NupServiceObserver {
     };
 
     class SendSearchRequestTask extends AsyncTask<String, Void, String> {
+        String nMessage;
+
         @Override
         protected String doInBackground(String... urls) {
-            String jsonData;
             try {
                 URL url = new URL(urls[0]);
                 InputStream stream = (InputStream) url.getContent();
-                jsonData = Util.getStringFromInputStream(stream);
-                Log.d(TAG, "got " + jsonData.length() + "-byte string");
+                return Util.getStringFromInputStream(stream);
             } catch (IOException e) {
-                Log.e(TAG, "query failed: " + e);
-                return "Query failed: " + e.getMessage();
-            }
-
-            try {
-                JSONArray jsonSongs = (JSONArray) new JSONTokener(jsonData).nextValue();
-                List<Song> songs = new ArrayList<Song>();
-                for (int i = 0; i < jsonSongs.length(); ++i) {
-                    songs.add(new Song(jsonSongs.getJSONObject(i)));
-                }
-                mService.setPlaylist(songs);
-                return "Got " + songs.size() + " song" + (songs.size() == 1 ? "" : "s") + " from server.";
-            } catch (org.json.JSONException e) {
-                Log.e(TAG, "unable to parse json: " + e) ;
-                return "Unable to parse response from server: " + e.getCause();
+                nMessage = "Query failed: " + e.getMessage();
+                return "";
             }
         }
 
         @Override
-        protected void onPostExecute(String message) {
-            Toast.makeText(NupActivity.this, message, Toast.LENGTH_LONG).show();
+        protected void onPostExecute(String response) {
+            if (!response.isEmpty()) {
+                try {
+                    JSONArray jsonSongs = (JSONArray) new JSONTokener(response).nextValue();
+                    List<Song> songs = new ArrayList<Song>();
+                    for (int i = 0; i < jsonSongs.length(); ++i) {
+                        songs.add(new Song(jsonSongs.getJSONObject(i)));
+                    }
+                    mService.setPlaylist(songs);
+                    nMessage = "Got " + songs.size() + " song" + (songs.size() == 1 ? "" : "s") + " from server.";
+                } catch (org.json.JSONException e) {
+                    nMessage = "Unable to parse response from server: " + e.getCause();
+                }
+            }
+
+            Toast.makeText(NupActivity.this, nMessage, Toast.LENGTH_LONG).show();
         }
     }
 
@@ -184,6 +185,12 @@ public class NupActivity extends Activity implements NupServiceObserver {
         mTimeLabel.setText(formatTimeString(0, currentSong.getLengthSec()));
         if (currentSong.getCoverBitmap() != null)
             mAlbumImageView.setImageBitmap(currentSong.getCoverBitmap());
+        // FIXME: clear image view otherwise
+    }
+
+    @Override
+    public void onCoverLoaded(Song currentSong) {
+        mAlbumImageView.setImageBitmap(currentSong.getCoverBitmap());
     }
 
     @Override

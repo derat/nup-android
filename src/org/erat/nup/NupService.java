@@ -13,6 +13,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.MediaPlayer;
 import android.preference.PreferenceManager;
+import android.os.AsyncTask;
 import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
@@ -29,13 +30,15 @@ import java.util.List;
 interface NupServiceObserver {
     void onPauseStateChanged(boolean isPaused);
     void onSongChanged(Song currentSong);
+    void onCoverLoaded(Song currentSong);
 }
 
-public class NupService extends Service implements MediaPlayer.OnPreparedListener, MediaPlayer.OnCompletionListener {
+public class NupService extends Service implements MediaPlayer.OnPreparedListener, MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListener {
     private static final String TAG = "NupService";
 
     private MediaPlayer mPlayer;
     private boolean mPlayerPrepared = false;
+    private Object mPlayerLock = new Object();
 
     private LocalProxy mProxy;
     private Thread mProxyThread;
@@ -123,6 +126,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         mPlayer = new MediaPlayer();
         mPlayer.setOnPreparedListener(this);
         mPlayer.setOnCompletionListener(this);
+        mPlayer.setOnErrorListener(this);
 
         initProxy();
     }
@@ -137,8 +141,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     public void onDestroy() {
         Log.d(TAG, "service destroyed");
         mNotificationManager.cancel(mNotificationId);
-        if (mPlayerPrepared)
-            mPlayer.stop();
+        mPlayer.reset();
     }
 
     @Override
@@ -178,14 +181,15 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     }
 
     public synchronized void togglePause() {
-        if (!mPlayerPrepared)
-            return;
-
-        mPaused = !mPaused;
-        if (mPaused) {
-            mPlayer.pause();
-        } else {
-            mPlayer.start();
+        synchronized(mPlayerLock) {
+            if (!mPlayerPrepared)
+                return;
+            mPaused = !mPaused;
+            if (mPaused) {
+                mPlayer.pause();
+            } else {
+                mPlayer.start();
+            }
         }
 
         synchronized(mObserverLock) {
@@ -206,46 +210,88 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
             return;
         }
 
-        mCurrentSongIndex = index;
-        Song song = mSongs.get(mCurrentSongIndex);
+        Song song = mSongs.get(index);
         String url = "http://localhost:" + mProxy.getPort() + "/music/" + song.getFilename();
-        mPlayer.reset();
-        mPlayerPrepared = false;
-        try {
-            mPlayer.setDataSource(url);
-        } catch (IOException e) {
-            Log.e(TAG, "got exception while setting data source to " + url + ": " + e.toString());
-            return;
+
+        synchronized(mPlayerLock) {
+            mPlayer.reset();
+            mPlayerPrepared = false;
+            try {
+                mPlayer.setDataSource(url);
+            } catch (IOException e) {
+                Log.e(TAG, "got exception while setting data source to " + url + ": " + e.toString());
+                return;
+            }
+            try {
+                mPlayer.prepareAsync();
+            } catch (java.lang.IllegalStateException e) {
+                Log.e(TAG, "got illegal state exception which preparing player: " + e.toString());
+                return;
+            }
         }
-        mPlayer.prepareAsync();
+
+        mCurrentSongIndex = index;
+        synchronized(mObserverLock) {
+            if (mObserver != null) {
+                mObserver.onSongChanged(song);
+            }
+        }
+        new CoverFetcherTask(this).execute(song);
+    }
+
+    class CoverFetcherTask extends AsyncTask<Song, Void, Song> {
+        private final NupService mService;
+        CoverFetcherTask(NupService service) {
+            mService = service;
+        }
+
+        @Override
+        protected Song doInBackground(Song... songs) {
+            Song song = songs[0];
+            song.setCoverBitmap(null);
+            try {
+                URL coverUrl = new URL("http://localhost:" + mProxy.getPort() + "/cover/" + song.getCoverFilename());
+                Bitmap bitmap = BitmapFactory.decodeStream((InputStream) coverUrl.getContent());
+                song.setCoverBitmap(bitmap);
+            } catch (IOException e) {
+                Log.e(TAG, "unable to load album cover " + song.getCoverFilename() + ": " + e);
+            }
+            return song;
+        }
+
+        @Override
+        protected void onPostExecute(Song song) {
+            mService.onCoverFetchDone(song);
+        }
+    }
+
+    public void onCoverFetchDone(Song song) {
+        Song currentSong = getCurrentSong();
+        if (song == getCurrentSong()) {
+            // We need to update our notification even if the fetch failed.
+            updateNotification(song.getArtist(), song.getTitle(), song.getAlbum(), song.getCoverBitmap());
+            if (song.getCoverBitmap() != null) {
+                synchronized(mObserverLock) {
+                    if (mObserver != null) {
+                        mObserver.onCoverLoaded(song);
+                    }
+                }
+            }
+        }
     }
 
     @Override
     public void onPrepared(MediaPlayer player) {
         Log.d(TAG, "onPrepared");
 
-        // FIXME: shouldn't be doing this here
-        Song song = getCurrentSong();
-        if (song.getCoverBitmap() == null) {
-            try {
-                URL imageUrl = new URL("http://localhost:" + mProxy.getPort() + "/cover/" + song.getCoverFilename());
-                Bitmap bitmap = BitmapFactory.decodeStream((InputStream) imageUrl.getContent());
-                song.setCoverBitmap(bitmap);
-            } catch (IOException e) {
-                Log.e(TAG, "unable to load album cover bitmap from file " + song.getCoverFilename() + ": " + e);
-            }
+        synchronized(mPlayerLock) {
+            mPaused = false;
+            mPlayerPrepared = true;
+            mPlayer.start();
         }
 
-        updateNotification(song.getArtist(), song.getTitle(), song.getAlbum(), song.getCoverBitmap());
-
-        mPaused = false;
-        mPlayerPrepared = true;
-        mPlayer.start();
-
-        // FIXME: notify on track change instead of on prepare
         synchronized(mObserverLock) {
             if (mObserver != null) {
-                mObserver.onSongChanged(song);
                 mObserver.onPauseStateChanged(mPaused);
             }
         }
@@ -255,5 +301,12 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     public void onCompletion(MediaPlayer player) {
         Log.d(TAG, "onCompletion");
         playSongAtIndex(mCurrentSongIndex + 1);
+    }
+
+    @Override
+    public boolean onError(MediaPlayer mp, int what, int extra) {
+        Toast.makeText(this, "MediaPlayer reported a vague, not-very-useful error: what=" + what + " extra=" + extra, Toast.LENGTH_LONG).show();
+        // Return false so the completion listener will get called.
+        return false;
     }
 }
