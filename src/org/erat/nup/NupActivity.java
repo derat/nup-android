@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.ArrayList;
-import java.util.List;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
@@ -113,7 +112,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
             if (!response.isEmpty()) {
                 try {
                     JSONArray jsonSongs = (JSONArray) new JSONTokener(response).nextValue();
-                    List<Song> songs = new ArrayList<Song>();
+                    ArrayList<Song> songs = new ArrayList<Song>();
                     for (int i = 0; i < jsonSongs.length(); ++i) {
                         songs.add(new Song(jsonSongs.getJSONObject(i)));
                     }
@@ -135,7 +134,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
         }
 
         class QueryBuilder {
-            public List<String> params = new ArrayList<String>();
+            public ArrayList<String> params = new ArrayList<String>();
             public void addStringParam(EditText view, String paramName) throws java.io.UnsupportedEncodingException {
                 String value = view.getText().toString().trim();
                 if (!value.isEmpty()) {

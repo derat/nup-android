@@ -25,7 +25,7 @@ import java.lang.Thread;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.List;
+import java.util.HashMap;
 
 interface NupServiceObserver {
     void onPauseStateChanged(boolean isPaused);
@@ -49,6 +49,12 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     private NotificationManager mNotificationManager;
     private final int mNotificationId = 0;
     private RemoteViews mNotificationView;
+
+    private ArrayList<Song> mSongs = new ArrayList<Song>();
+    private int mCurrentSongIndex = -1;
+    private boolean mPaused = false;
+
+    private HashMap coverCache = new HashMap();
 
     public class LocalBinder extends Binder {
         NupService getService() {
@@ -165,11 +171,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         }
     }
 
-    private List<Song> mSongs = new ArrayList<Song>();
-    private int mCurrentSongIndex;
-    private boolean mPaused;
-
-    public final List<Song> getSongs() { return mSongs; }
+    public final ArrayList<Song> getSongs() { return mSongs; }
     public final int getCurrentSongIndex() { return mCurrentSongIndex; }
     public final Song getCurrentSong() {
         return (mCurrentSongIndex >= 0 && mCurrentSongIndex < mSongs.size()) ? mSongs.get(mCurrentSongIndex) : null;
@@ -194,7 +196,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         }
     }
 
-    public synchronized void setPlaylist(List<Song> songs) {
+    public synchronized void setPlaylist(ArrayList<Song> songs) {
         mSongs = songs;
         if (songs.size() > 0)
             playSongAtIndex(0);
@@ -228,12 +230,17 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         }
 
         mCurrentSongIndex = index;
+        if (coverCache.containsKey(song.getCoverFilename())) {
+            song.setCoverBitmap((Bitmap) coverCache.get(song.getCoverFilename()));
+            updateNotification(song.getArtist(), song.getTitle(), song.getAlbum(), song.getCoverBitmap());
+        } else {
+            new CoverFetcherTask(this).execute(song);
+        }
         synchronized(mObserverLock) {
             if (mObserver != null) {
                 mObserver.onSongChanged(song);
             }
         }
-        new CoverFetcherTask(this).execute(song);
     }
 
     class CoverFetcherTask extends AsyncTask<Song, Void, Song> {
@@ -264,6 +271,9 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     }
 
     public void onCoverFetchDone(Song song) {
+        if (song.getCoverBitmap() != null)
+            coverCache.put(song.getCoverFilename(), song.getCoverBitmap());
+
         Song currentSong = getCurrentSong();
         if (song == getCurrentSong()) {
             // We need to update our notification even if the fetch failed.
