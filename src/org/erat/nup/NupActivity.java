@@ -14,11 +14,15 @@ import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
+import android.widget.BaseAdapter;
 import android.widget.Button;
 import android.widget.ImageView;
+import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
 import java.io.IOException;
+import java.util.ArrayList;
 
 public class NupActivity extends Activity implements NupServiceObserver {
     private static final String TAG = "NupActivity";
@@ -27,6 +31,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
     private Button mPauseButton;
     private ImageView mAlbumImageView;
     private TextView mArtistLabel, mTitleLabel, mAlbumLabel, mTimeLabel;
+    private ListView mPlaylistView;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -40,6 +45,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
         mTitleLabel = (TextView) findViewById(R.id.title_label);
         mAlbumLabel = (TextView) findViewById(R.id.album_label);
         mTimeLabel = (TextView) findViewById(R.id.time_label);
+        mPlaylistView = (ListView) findViewById(R.id.playlist);
 
         Intent serviceIntent = new Intent(this, NupService.class);
         startService(serviceIntent);
@@ -110,6 +116,11 @@ public class NupActivity extends Activity implements NupServiceObserver {
     }
 
     @Override
+    public void onPlaylistChanged(ArrayList<Song> songs) {
+        mPlaylistView.setAdapter(new SongListAdapter(this, songs));
+    }
+
+    @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.main_menu, menu);
         return true;
@@ -134,6 +145,30 @@ public class NupActivity extends Activity implements NupServiceObserver {
             return true;
         default:
             return super.onOptionsItemSelected(item);
+        }
+    }
+
+    private class SongListAdapter extends BaseAdapter {
+        private final Context mContext;
+        private final ArrayList<Song> mSongs;
+
+        public SongListAdapter(Context context, ArrayList<Song> songs) {
+            mContext = context;
+            mSongs = songs;
+        }
+
+        @Override
+        public int getCount() { return mSongs.size(); }
+        @Override
+        public Object getItem(int position) { return position; }
+        @Override
+        public long getItemId(int position) { return position; }
+
+        @Override
+        public View getView(int position, View convertView, ViewGroup parent) {
+            TextView view = (convertView == null) ? new TextView(mContext) : (TextView) convertView;
+            view.setText(mSongs.get(position).getTitle());
+            return view;
         }
     }
 }

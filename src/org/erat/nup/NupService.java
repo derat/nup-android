@@ -31,6 +31,7 @@ interface NupServiceObserver {
     void onPauseStateChanged(boolean isPaused);
     void onSongChanged(Song currentSong);
     void onCoverLoaded(Song currentSong);
+    void onPlaylistChanged(ArrayList<Song> songs);
 }
 
 public class NupService extends Service implements MediaPlayer.OnPreparedListener, MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListener {
@@ -198,6 +199,11 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
 
     public synchronized void setPlaylist(ArrayList<Song> songs) {
         mSongs = songs;
+        synchronized(mObserverLock) {
+            if (mObserver != null) {
+                mObserver.onPlaylistChanged(mSongs);
+            }
+        }
         if (songs.size() > 0)
             playSongAtIndex(0);
     }
