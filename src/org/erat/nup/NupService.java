@@ -120,7 +120,8 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         Log.d(TAG, "service destroyed");
         mNotificationManager.cancel(NOTIFICATION_ID);
         stopSongPositionTimer();
-        mPlayer.release();
+        if (mPlayer != null)
+            mPlayer.release();
     }
 
     @Override

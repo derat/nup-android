@@ -60,9 +60,17 @@ public class NupActivity extends Activity implements NupServiceObserver {
     protected void onDestroy() {
         Log.d(TAG, "activity destroyed");
         super.onDestroy();
-        if (mService != null)
+
+        boolean stopService = false;
+        if (mService != null) {
+            // Shut down the service as well if the playlist is empty.
+            if (mService.getSongs().size() == 0)
+                stopService = true;
             mService.removeObserver(this);
+        }
         unbindService(mConnection);
+        if (stopService)
+            stopService(new Intent(this, NupService.class));
     }
 
     private ServiceConnection mConnection = new ServiceConnection() {
