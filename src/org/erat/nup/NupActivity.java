@@ -111,7 +111,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
 
     @Override
     public void onPauseStateChanged(boolean isPaused) {
-        mPauseButton.setText(getString(isPaused ? R.string.pause : R.string.play));
+        mPauseButton.setText(getString(isPaused ? R.string.play : R.string.pause));
     }
 
     String formatTimeString(int curSec, int totalSec) {
