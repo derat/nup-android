@@ -14,6 +14,8 @@ import android.os.IBinder;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
+import android.widget.ArrayAdapter;
+import android.widget.AutoCompleteTextView;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.Toast;
@@ -22,6 +24,8 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
@@ -30,8 +34,12 @@ public class NupSearchActivity extends Activity {
     private static final String TAG = "NupSearchActivity";
     private NupService mService;
 
-    private EditText mArtistEdit, mTitleEdit, mAlbumEdit;
+    private AutoCompleteTextView mArtistEdit, mAlbumEdit;
+    private EditText mTitleEdit;
     private CheckBox mShuffleCheckbox, mSubstringCheckbox;
+
+    // Points from (lowercased) artist String to ArrayList of String album names.
+    private HashMap mAlbumMap = new HashMap();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -39,11 +47,25 @@ public class NupSearchActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.search);
 
-        mArtistEdit = (EditText) findViewById(R.id.artist_edit_text);
+        mArtistEdit = (AutoCompleteTextView) findViewById(R.id.artist_edit_text);
         mTitleEdit = (EditText) findViewById(R.id.title_edit_text);
-        mAlbumEdit = (EditText) findViewById(R.id.album_edit_text);
+        mAlbumEdit = (AutoCompleteTextView) findViewById(R.id.album_edit_text);
         mShuffleCheckbox = (CheckBox) findViewById(R.id.shuffle_checkbox);
         mSubstringCheckbox = (CheckBox) findViewById(R.id.substring_checkbox);
+
+        // When the album field gets the focus, set its suggestions based on the currently-entered artist.
+        mAlbumEdit.setOnFocusChangeListener(new View.OnFocusChangeListener() {
+            @Override
+            public void onFocusChange(View v, boolean hasFocus) {
+                if (hasFocus) {
+                    String artist = mArtistEdit.getText().toString().toLowerCase();
+                    ArrayList<String> albums = new ArrayList<String>();
+                    if (mAlbumMap.containsKey(artist))
+                        albums = (ArrayList<String>) mAlbumMap.get(artist);
+                    mAlbumEdit.setAdapter(new ArrayAdapter<String>(NupSearchActivity.this, android.R.layout.simple_dropdown_item_1line, albums));
+                }
+            }
+        });
 
         bindService(new Intent(this, NupService.class), mConnection, 0);
     }
@@ -59,6 +81,7 @@ public class NupSearchActivity extends Activity {
         public void onServiceConnected(ComponentName className, IBinder service) {
             Log.d(TAG, "connected to service");
             mService = ((NupService.LocalBinder) service).getService();
+            new GetContentsTask().execute("http://localhost:" + mService.getProxyPort() + "/contents");
         }
 
         public void onServiceDisconnected(ComponentName className) {
@@ -66,6 +89,43 @@ public class NupSearchActivity extends Activity {
             mService = null;
         }
     };
+
+    class GetContentsTask extends AsyncTask<String, Void, String> {
+        @Override
+        protected String doInBackground(String... urls) {
+            try {
+                URL url = new URL(urls[0]);
+                InputStream stream = (InputStream) url.getContent();
+                return Util.getStringFromInputStream(stream);
+            } catch (IOException e) {
+                return "";
+            }
+        }
+
+        @Override
+        protected void onPostExecute(String response) {
+            if (response.isEmpty())
+                return;
+
+            try {
+                JSONObject jsonArtistMap = (JSONObject) new JSONTokener(response).nextValue();
+                ArrayList<String> artists = new ArrayList<String>();
+                for (Iterator<String> it = jsonArtistMap.keys(); it.hasNext(); ) {
+                    String artist = it.next();
+                    artists.add(artist);
+
+                    JSONArray jsonAlbums = jsonArtistMap.getJSONArray(artist);
+                    ArrayList<String> albums = new ArrayList<String>();
+                    for (int i = 0; i < jsonAlbums.length(); ++i) {
+                        albums.add(jsonAlbums.getString(i));
+                    }
+                    mAlbumMap.put(artist.toLowerCase(), albums);
+                }
+                mArtistEdit.setAdapter(new ArrayAdapter<String>(NupSearchActivity.this, android.R.layout.simple_dropdown_item_1line, artists));
+            } catch (org.json.JSONException e) {
+            }
+        }
+    }
 
     class SendSearchRequestTask extends AsyncTask<String, Void, String> {
         String nMessage;
