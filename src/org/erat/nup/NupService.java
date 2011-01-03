@@ -30,43 +30,116 @@ import java.util.ArrayList;
 import java.util.HashMap;
 
 interface NupServiceObserver {
+    // Invoked when the current song is paused or unpaused.
     void onPauseStateChanged(boolean isPaused);
+
+    // Invoked when the current song changes.
     void onSongChanged(Song currentSong);
+
+    // Invoked when a cover bitmap is successfully loaded for the current song.
     void onCoverLoaded(Song currentSong);
+
+    // Invoked when a change is made to the current playlist.
     void onPlaylistChanged(ArrayList<Song> songs);
 
-    // Invoked periodically with the current position and total length of the current song.
+    // Invoked frequently during playback with the current position and total length of the current song.
     void onSongPositionChanged(int positionMs, int durationMs);
 }
 
 public class NupService extends Service implements MediaPlayer.OnPreparedListener, MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListener {
     private static final String TAG = "NupService";
 
+    private static final int NOTIFICATION_ID = 0;
+
+    // Plays the currently-selected song.  On song change, we throw out the old one and create a new one,
+    // which seems non-ideal but avoids a bunch of issues with invalid state changes that seem to be caused by
+    // prepareAsync().
     private MediaPlayer mPlayer;
+
+    // Is mPlayer currently in the "prepared" (that is, ready-to-play) state?
+    // See http://developer.android.com/reference/android/media/MediaPlayer.html.
     private boolean mPlayerPrepared = false;
+
+    // Is playback currently paused?
+    private boolean mPaused = false;
+
+    // Protects access to mPlayer, mPlayerPrepared, and mPaused.
     private Object mPlayerLock = new Object();
 
+    // Listens on a local port and proxies HTTP requests to a remote web server.
+    // Needed since MediaPlayer doesn't support HTTP authentication.
     private LocalProxy mProxy;
+
+    // Thread where mProxy runs.
     private Thread mProxyThread;
+
+    // Is the proxy currently configured and running?
     private boolean mProxyRunning = false;
-    public boolean isProxyRunning() { return mProxyRunning; }
-    public int getProxyPort() { return mProxy.getPort(); }
 
     private NotificationManager mNotificationManager;
-    private final int mNotificationId = 0;
-    private RemoteViews mNotificationView;
 
+    // Current playlist.
     private ArrayList<Song> mSongs = new ArrayList<Song>();
+
+    // Index of the song in mSongs that's being played.
     private int mCurrentSongIndex = -1;
-    private boolean mPaused = false;
 
     private final IBinder mBinder = new LocalBinder();
 
+    // Currently-registered observer, or null if none is registered (i.e. the activity isn't running).
     private NupServiceObserver mObserver;
+
+    // Protects access to mObserver.
     private Object mObserverLock = new Object();
 
+    // Points from cover filename Strings to previously-fetched Bitmaps.
+    // TODO: Limit the growth of this or switch it to a real LRU cache or something.
     private HashMap coverCache = new HashMap();
+
     private Handler mHandler = new Handler();
+
+    @Override
+    public void onCreate() {
+        Log.d(TAG, "service created");
+
+        mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        Notification notification = updateNotification("nup", getString(R.string.initial_notification), "", (Bitmap) null);
+        startForeground(NOTIFICATION_ID, notification);
+
+        initProxy();
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.d(TAG, "received start id " + startId + ": " + intent);
+        return START_STICKY;
+    }
+
+    @Override
+    public void onDestroy() {
+        Log.d(TAG, "service destroyed");
+        mNotificationManager.cancel(NOTIFICATION_ID);
+        stopSongPositionTimer();
+        mPlayer.release();
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return mBinder;
+    }
+
+    // Is the proxy available?  Callers must call this before trying to fetch a URL (or even calling getProxyPort()).
+    public boolean isProxyRunning() { return mProxyRunning; }
+
+    // Get the port where the proxy is listening on localhost.
+    public int getProxyPort() { return mProxy.getPort(); }
+
+    public final ArrayList<Song> getSongs() { return mSongs; }
+    public final int getCurrentSongIndex() { return mCurrentSongIndex; }
+
+    public final Song getCurrentSong() {
+        return (mCurrentSongIndex >= 0 && mCurrentSongIndex < mSongs.size()) ? mSongs.get(mCurrentSongIndex) : null;
+    }
 
     public class LocalBinder extends Binder {
         NupService getService() {
@@ -74,6 +147,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         }
     }
 
+    // Attempt to initialize and start the proxy based on the user's settings.
     public void initProxy() {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
         String urlString = prefs.getString("server_url", "");
@@ -116,53 +190,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         }
     }
 
-    private Notification updateNotification(String artist, String title, String album, Bitmap bitmap) {
-        Notification notification = new Notification(R.drawable.icon, artist + " - " + title, System.currentTimeMillis());
-        notification.flags |= (Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR);
-
-        RemoteViews view = new RemoteViews(getPackageName(), R.layout.notification);
-        view.setTextViewText(R.id.notification_artist, artist);
-        view.setTextViewText(R.id.notification_title, title);
-        view.setTextViewText(R.id.notification_album, album);
-        if (bitmap != null)
-            view.setImageViewBitmap(R.id.notification_image, bitmap);
-        notification.contentView = view;
-
-        notification.contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0);
-        mNotificationManager.notify(mNotificationId, notification);
-        return notification;
-    }
-
-    @Override
-    public void onCreate() {
-        Log.d(TAG, "service created");
-
-        mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        Notification notification = updateNotification("nup", getString(R.string.initial_notification), "", (Bitmap) null);
-        startForeground(mNotificationId, notification);
-
-        initProxy();
-    }
-
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d(TAG, "received start id " + startId + ": " + intent);
-        return START_STICKY;
-    }
-
-    @Override
-    public void onDestroy() {
-        Log.d(TAG, "service destroyed");
-        mNotificationManager.cancel(mNotificationId);
-        stopSongPositionTimer();
-        mPlayer.release();
-    }
-
-    @Override
-    public IBinder onBind(Intent intent) {
-        return mBinder;
-    }
-
+    // Register an observer.  Can only been called when no observer is currently registered.
     public void addObserver(NupServiceObserver observer) {
         synchronized(mObserverLock) {
             if (mObserver != null) {
@@ -171,6 +199,8 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
             mObserver = observer;
         }
     }
+
+    // Unregister an observer.
     public void removeObserver(NupServiceObserver observer) {
         synchronized(mObserverLock) {
             if (mObserver != observer) {
@@ -180,13 +210,28 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         }
     }
 
-    public final ArrayList<Song> getSongs() { return mSongs; }
-    public final int getCurrentSongIndex() { return mCurrentSongIndex; }
-    public final Song getCurrentSong() {
-        return (mCurrentSongIndex >= 0 && mCurrentSongIndex < mSongs.size()) ? mSongs.get(mCurrentSongIndex) : null;
+    // Create a new persistent notification displaying information about the current song.
+    private Notification updateNotification(String artist, String title, String album, Bitmap bitmap) {
+        Notification notification = new Notification(R.drawable.icon, artist + " - " + title, System.currentTimeMillis());
+        notification.flags |= (Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR);
+
+        // TODO: Any way to update an existing remote view?  I couldn't find one. :-(
+        RemoteViews view = new RemoteViews(getPackageName(), R.layout.notification);
+        view.setTextViewText(R.id.notification_artist, artist);
+        view.setTextViewText(R.id.notification_title, title);
+        view.setTextViewText(R.id.notification_album, album);
+        if (bitmap != null)
+            view.setImageViewBitmap(R.id.notification_image, bitmap);
+        notification.contentView = view;
+
+        notification.contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0);
+        mNotificationManager.notify(NOTIFICATION_ID, notification);
+        return notification;
     }
 
+    // Toggle whether we're playing the current song or not.
     public synchronized void togglePause() {
+        boolean paused = false;
         synchronized(mPlayerLock) {
             if (!mPlayerPrepared)
                 return;
@@ -198,15 +243,18 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
                 mPlayer.start();
                 startSongPositionTimer();
             }
+            paused = mPaused;
         }
 
         synchronized(mObserverLock) {
             if (mObserver != null) {
-                mObserver.onPauseStateChanged(mPaused);
+                mObserver.onPauseStateChanged(paused);
             }
         }
     }
 
+    // Replace the current playlist with a new one.
+    // Plays the first song in the new list.
     public synchronized void setPlaylist(ArrayList<Song> songs) {
         mSongs = songs;
         synchronized(mObserverLock) {
@@ -218,6 +266,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
             playSongAtIndex(0);
     }
 
+    // Play the song at a particular position in the playlist.
     public synchronized void playSongAtIndex(int index) {
         if (index < 0 || index >= mSongs.size()) {
             return;
@@ -261,6 +310,8 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         }
     }
 
+    // Fetches the cover bitmap for a particular song.
+    // onCoverFetchDone() is called on completion, even if the fetch failed.
     class CoverFetcherTask extends AsyncTask<Song, Void, Song> {
         private final NupService mService;
         CoverFetcherTask(NupService service) {
@@ -288,6 +339,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         }
     }
 
+    // Called by CoverFetcherTask on the UI thread.
     public void onCoverFetchDone(Song song) {
         if (song.getCoverBitmap() != null)
             coverCache.put(song.getCoverFilename(), song.getCoverBitmap());
@@ -306,6 +358,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         }
     }
 
+    // Periodically invoked to notify the observer about the playback position of the current song.
     private Runnable mSongPositionTask = new Runnable() {
         public void run() {
             int positionMs = 0, durationMs = 0;
@@ -324,6 +377,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         }
     };
 
+    // Start running mSongPositionTask.
     private void startSongPositionTimer() {
         synchronized(mPlayerLock) {
             stopSongPositionTimer();
@@ -331,6 +385,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         }
     }
 
+    // Stop running mSongPositionTask.
     private void stopSongPositionTimer() {
         synchronized(mPlayerLock) {
             mHandler.removeCallbacks(mSongPositionTask);
