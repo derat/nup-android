@@ -8,30 +8,17 @@ import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
-import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
-import android.os.AsyncTask;
 import android.os.Bundle;
 import android.os.IBinder;
-import android.text.TextUtils;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.Button;
-import android.widget.CheckBox;
-import android.widget.EditText;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
-import java.io.InputStream;
 import java.io.IOException;
-import java.net.URL;
-import java.net.URLEncoder;
-import java.util.ArrayList;
-import org.json.JSONArray;
-import org.json.JSONObject;
-import org.json.JSONTokener;
 
 public class NupActivity extends Activity implements NupServiceObserver {
     private static final String TAG = "NupActivity";
@@ -40,8 +27,6 @@ public class NupActivity extends Activity implements NupServiceObserver {
     private Button mPauseButton;
     private ImageView mAlbumImageView;
     private TextView mArtistLabel, mTitleLabel, mAlbumLabel, mTimeLabel;
-    private EditText mArtistEdit, mTitleEdit, mAlbumEdit;
-    private CheckBox mShuffleCheckbox, mSubstringCheckbox;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -55,11 +40,6 @@ public class NupActivity extends Activity implements NupServiceObserver {
         mTitleLabel = (TextView) findViewById(R.id.title_label);
         mAlbumLabel = (TextView) findViewById(R.id.album_label);
         mTimeLabel = (TextView) findViewById(R.id.time_label);
-        mArtistEdit = (EditText) findViewById(R.id.artist_edit_text);
-        mTitleEdit = (EditText) findViewById(R.id.title_edit_text);
-        mAlbumEdit = (EditText) findViewById(R.id.album_edit_text);
-        mShuffleCheckbox = (CheckBox) findViewById(R.id.shuffle_checkbox);
-        mSubstringCheckbox = (CheckBox) findViewById(R.id.substring_checkbox);
 
         Intent serviceIntent = new Intent(this, NupService.class);
         startService(serviceIntent);
@@ -91,69 +71,6 @@ public class NupActivity extends Activity implements NupServiceObserver {
             mService = null;
         }
     };
-
-    class SendSearchRequestTask extends AsyncTask<String, Void, String> {
-        String nMessage;
-
-        @Override
-        protected String doInBackground(String... urls) {
-            try {
-                URL url = new URL(urls[0]);
-                InputStream stream = (InputStream) url.getContent();
-                return Util.getStringFromInputStream(stream);
-            } catch (IOException e) {
-                nMessage = "Query failed: " + e.getMessage();
-                return "";
-            }
-        }
-
-        @Override
-        protected void onPostExecute(String response) {
-            if (!response.isEmpty()) {
-                try {
-                    JSONArray jsonSongs = (JSONArray) new JSONTokener(response).nextValue();
-                    ArrayList<Song> songs = new ArrayList<Song>();
-                    for (int i = 0; i < jsonSongs.length(); ++i) {
-                        songs.add(new Song(jsonSongs.getJSONObject(i)));
-                    }
-                    mService.setPlaylist(songs);
-                    nMessage = "Got " + songs.size() + " song" + (songs.size() == 1 ? "" : "s") + " from server.";
-                } catch (org.json.JSONException e) {
-                    nMessage = "Unable to parse response from server: " + e.getCause();
-                }
-            }
-
-            Toast.makeText(NupActivity.this, nMessage, Toast.LENGTH_LONG).show();
-        }
-    }
-
-    public void onSearchButtonClicked(View view) throws IOException {
-        if (!mService.isProxyRunning()) {
-            Toast.makeText(this, "Server must be configured in Preferences.", Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        class QueryBuilder {
-            public ArrayList<String> params = new ArrayList<String>();
-            public void addStringParam(EditText view, String paramName) throws java.io.UnsupportedEncodingException {
-                String value = view.getText().toString().trim();
-                if (!value.isEmpty()) {
-                    String param = paramName + "=" + URLEncoder.encode(value, "UTF-8");
-                    params.add(param);
-                }
-            }
-            public void addBoolParam(CheckBox view, String paramName) {
-                params.add(paramName + "=" + (view.isChecked() ? "1" : "0"));
-            }
-        }
-        QueryBuilder builder = new QueryBuilder();
-        builder.addStringParam(mArtistEdit, "artist");
-        builder.addStringParam(mTitleEdit, "title");
-        builder.addStringParam(mAlbumEdit, "album");
-        builder.addBoolParam(mShuffleCheckbox, "shuffle");
-        builder.addBoolParam(mSubstringCheckbox, "substring");
-        new SendSearchRequestTask().execute("http://localhost:" + mService.getProxyPort() + "/query?" + TextUtils.join("&", builder.params));
-    }
 
     public void onPauseButtonClicked(View view) {
         mService.togglePause();
@@ -201,6 +118,13 @@ public class NupActivity extends Activity implements NupServiceObserver {
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
+        case R.id.search_menu_item:
+            if (!mService.isProxyRunning()) {
+                Toast.makeText(this, "Server must be configured in Preferences.", Toast.LENGTH_LONG).show();
+            } else {
+                startActivity(new Intent(this, NupSearchActivity.class));
+            }
+            return true;
         case R.id.preferences_menu_item:
             startActivity(new Intent(this, NupPreferenceActivity.class));
             return true;
