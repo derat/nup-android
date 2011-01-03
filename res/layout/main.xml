@@ -66,7 +66,7 @@
         android:id="@+id/pause_button"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="0.33"
+        android:layout_weight="1"
         android:text="@string/pause"
         android:onClick="onPauseButtonClicked"
         />
@@ -74,7 +74,7 @@
         android:id="@+id/prev_button"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="0.33"
+        android:layout_weight="1"
         android:text="@string/prev"
         android:onClick="onPrevButtonClicked"
         />
@@ -82,7 +82,7 @@
         android:id="@+id/next_button"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="0.33"
+        android:layout_weight="1"
         android:text="@string/next"
         android:onClick="onNextButtonClicked"
         />

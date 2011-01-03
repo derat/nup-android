@@ -11,6 +11,7 @@ import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.IBinder;
 import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
@@ -166,8 +167,17 @@ public class NupActivity extends Activity implements NupServiceObserver {
 
         @Override
         public View getView(int position, View convertView, ViewGroup parent) {
-            TextView view = (convertView == null) ? new TextView(mContext) : (TextView) convertView;
-            view.setText(mSongs.get(position).getTitle());
+            View view;
+            if (convertView != null) {
+                view = convertView;
+            } else {
+                LayoutInflater inflater = (LayoutInflater) mContext.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+                view = inflater.inflate(R.layout.playlist_row, null);
+            }
+
+            Song song = mSongs.get(position);
+            ((TextView) view.findViewById(R.id.artist)).setText(song.getArtist());
+            ((TextView) view.findViewById(R.id.title)).setText(song.getTitle());
             return view;
         }
     }

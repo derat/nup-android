@@ -46,14 +46,14 @@
         android:id="@+id/substring_checkbox"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_weight="0.5"
+        android:layout_weight="1"
         android:text="@string/substring"
         />
     <CheckBox
         android:id="@+id/shuffle_checkbox"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_weight="0.5"
+        android:layout_weight="1"
         android:text="@string/shuffle"
         />
   </LinearLayout>
