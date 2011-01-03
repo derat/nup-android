@@ -123,11 +123,6 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         Notification notification = updateNotification("nup", getString(R.string.initial_notification), "", (Bitmap) null);
         startForeground(mNotificationId, notification);
 
-        mPlayer = new MediaPlayer();
-        mPlayer.setOnPreparedListener(this);
-        mPlayer.setOnCompletionListener(this);
-        mPlayer.setOnErrorListener(this);
-
         initProxy();
     }
 
@@ -141,7 +136,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     public void onDestroy() {
         Log.d(TAG, "service destroyed");
         mNotificationManager.cancel(mNotificationId);
-        mPlayer.reset();
+        mPlayer.release();
     }
 
     @Override
@@ -214,20 +209,22 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         String url = "http://localhost:" + mProxy.getPort() + "/music/" + song.getFilename();
 
         synchronized(mPlayerLock) {
-            mPlayer.reset();
+            if (mPlayer != null)
+                mPlayer.release();
+
+            mPlayer = new MediaPlayer();
+            mPlayer.setOnPreparedListener(this);
+            mPlayer.setOnCompletionListener(this);
+            mPlayer.setOnErrorListener(this);
             mPlayerPrepared = false;
+
             try {
                 mPlayer.setDataSource(url);
             } catch (IOException e) {
-                Log.e(TAG, "got exception while setting data source to " + url + ": " + e.toString());
+                Toast.makeText(this, "Got exception while setting data source to " + url + ": " + e.toString(), Toast.LENGTH_LONG).show();
                 return;
             }
-            try {
-                mPlayer.prepareAsync();
-            } catch (java.lang.IllegalStateException e) {
-                Log.e(TAG, "got illegal state exception which preparing player: " + e.toString());
-                return;
-            }
+            mPlayer.prepareAsync();
         }
 
         mCurrentSongIndex = index;
@@ -251,7 +248,8 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
             song.setCoverBitmap(null);
             try {
                 URL coverUrl = new URL("http://localhost:" + mProxy.getPort() + "/cover/" + song.getCoverFilename());
-                Bitmap bitmap = BitmapFactory.decodeStream((InputStream) coverUrl.getContent());
+                InputStream stream = (InputStream) coverUrl.getContent();
+                Bitmap bitmap = BitmapFactory.decodeStream(stream);
                 song.setCoverBitmap(bitmap);
             } catch (IOException e) {
                 Log.e(TAG, "unable to load album cover " + song.getCoverFilename() + ": " + e);
