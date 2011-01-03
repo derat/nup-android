@@ -79,6 +79,9 @@ public class NupActivity extends Activity implements NupServiceObserver {
             mService = ((NupService.LocalBinder) service).getService();
             mService.addObserver(NupActivity.this);
 
+            // Get current state from service.
+            ArrayList<Song> songs = mService.getSongs();
+            onPlaylistChanged(songs);
             Song song = mService.getCurrentSong();
             if (song != null)
                 onSongChanged(song);
