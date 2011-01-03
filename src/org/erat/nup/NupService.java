@@ -32,6 +32,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     private static final String TAG = "NupService";
 
     private MediaPlayer mPlayer;
+    private boolean mPlayerPrepared = false;
 
     private LocalProxy mProxy;
     private Thread mProxyThread;
@@ -133,7 +134,8 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     public void onDestroy() {
         Log.d(TAG, "service destroyed");
         mNotificationManager.cancel(mNotificationId);
-        mPlayer.stop();
+        if (mPlayerPrepared)
+            mPlayer.stop();
     }
 
     @Override
@@ -173,6 +175,9 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     }
 
     public synchronized void togglePause() {
+        if (!mPlayerPrepared)
+            return;
+
         mPaused = !mPaused;
         if (mPaused) {
             mPlayer.pause();
@@ -202,6 +207,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         Song song = mSongs.get(mCurrentSongIndex);
         String url = "http://localhost:" + mProxy.getPort() + "/music/" + song.getFilename();
         mPlayer.reset();
+        mPlayerPrepared = false;
         try {
             mPlayer.setDataSource(url);
         } catch (IOException e) {
@@ -230,6 +236,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         updateNotification(song.getArtist(), song.getTitle(), song.getAlbum(), song.getCoverBitmap());
 
         mPaused = false;
+        mPlayerPrepared = true;
         mPlayer.start();
 
         // FIXME: notify on track change instead of on prepare
