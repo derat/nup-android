@@ -195,7 +195,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
         case R.id.preferences_menu_item:
             startActivity(new Intent(this, NupPreferenceActivity.class));
             return true;
-        case R.id.quit_menu_item:
+        case R.id.exit_menu_item:
             stopService(new Intent(this, NupService.class));
             finish();
             return true;

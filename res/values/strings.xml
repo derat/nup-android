@@ -4,13 +4,13 @@
 
     <string name="album">Album</string>
     <string name="artist">Artist</string>
+    <string name="exit">Exit</string>
     <string name="initial_notification">Service started.</string>
     <string name="next">Next</string>
     <string name="password">Password</string>
     <string name="pause">Pause</string>
     <string name="preferences">Preferences</string>
     <string name="prev">Prev</string>
-    <string name="quit">Quit</string>
     <string name="search">Search</string>
     <string name="server_url">Server URL</string>
     <string name="server_url_description">Location of music server, e.g. \"https://www.example.org:1234/\".</string>
