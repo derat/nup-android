@@ -10,8 +10,7 @@ import java.io.IOException;
 import java.lang.Thread;
 import java.net.ServerSocket;
 import java.net.Socket;
-import javax.net.ssl.SSLSocketFactory;
-//import org.apache.http.conn.ssl.SSLSocketFactory;
+import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.HttpException;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
@@ -27,6 +26,7 @@ import org.apache.http.StatusLine;
 
 class LocalProxy implements Runnable {
     private static final String TAG = "LocalProxy";
+    private static final int SSL_TIMEOUT_MS = 5000;
     private final String mRemoteHostname, mUsername, mPassword;
     private final int mRemotePort;
     private final boolean mUseSsl;
@@ -116,9 +116,7 @@ class LocalProxy implements Runnable {
                 clientConn = new DefaultHttpClientConnection();
                 clientSocket = new Socket(mRemoteHostname, mRemotePort);
                 if (mUseSsl) {
-                    // FIXME: Why does the non-insecure version hate my certificate?  Works with https://www.google.com/.
-                    //SSLSocketFactory factory = SSLCertificateSocketFactory.getHttpSocketFactory(5000, null);
-                    SSLSocketFactory factory = SSLCertificateSocketFactory.getInsecure(5000, null);
+                    SSLSocketFactory factory = SSLCertificateSocketFactory.getHttpSocketFactory(SSL_TIMEOUT_MS, null);
                     clientSocket = factory.createSocket(clientSocket, mRemoteHostname, mRemotePort, true);
                 }
                 clientConn.bind(clientSocket, mParams);
