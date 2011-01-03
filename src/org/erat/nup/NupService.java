@@ -1,3 +1,6 @@
+// Copyright 2011 Daniel Erat <dan@erat.org>
+// All rights reserved.
+
 package org.erat.nup;
 
 import android.app.Notification;
