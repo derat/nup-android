@@ -34,6 +34,9 @@ public class NupActivity extends Activity implements NupServiceObserver {
     private TextView mArtistLabel, mTitleLabel, mAlbumLabel, mTimeLabel;
     private ListView mPlaylistView;
 
+    // Last song-position time passed to onSongPositionChanged(), in seconds.
+    private int lastSongPositionSec = -1;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         Log.d(TAG, "activity created");
@@ -109,6 +112,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
         if (currentSong.getCoverBitmap() != null)
             mAlbumImageView.setImageBitmap(currentSong.getCoverBitmap());
         // FIXME: clear image view otherwise
+        lastSongPositionSec = -1;
     }
 
     @Override
@@ -119,6 +123,14 @@ public class NupActivity extends Activity implements NupServiceObserver {
     @Override
     public void onPlaylistChanged(ArrayList<Song> songs) {
         mPlaylistView.setAdapter(new SongListAdapter(this, songs));
+    }
+
+    @Override
+    public void onSongPositionChanged(int positionMs, int durationMs) {
+        int positionSec = positionMs / 1000;
+        if (positionSec == lastSongPositionSec)
+            return;
+        mTimeLabel.setText(formatTimeString(positionSec, durationMs / 1000));
     }
 
     @Override

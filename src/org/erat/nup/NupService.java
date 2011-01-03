@@ -15,12 +15,14 @@ import android.media.MediaPlayer;
 import android.preference.PreferenceManager;
 import android.os.AsyncTask;
 import android.os.Binder;
+import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 import android.widget.RemoteViews;
 import android.widget.Toast;
 import java.io.InputStream;
 import java.io.IOException;
+import java.lang.Runnable;
 import java.lang.Thread;
 import java.net.URI;
 import java.net.URL;
@@ -32,6 +34,9 @@ interface NupServiceObserver {
     void onSongChanged(Song currentSong);
     void onCoverLoaded(Song currentSong);
     void onPlaylistChanged(ArrayList<Song> songs);
+
+    // Invoked periodically with the current position and total length of the current song.
+    void onSongPositionChanged(int positionMs, int durationMs);
 }
 
 public class NupService extends Service implements MediaPlayer.OnPreparedListener, MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListener {
@@ -55,7 +60,13 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     private int mCurrentSongIndex = -1;
     private boolean mPaused = false;
 
+    private final IBinder mBinder = new LocalBinder();
+
+    private NupServiceObserver mObserver;
+    private Object mObserverLock = new Object();
+
     private HashMap coverCache = new HashMap();
+    private Handler mHandler = new Handler();
 
     public class LocalBinder extends Binder {
         NupService getService() {
@@ -143,6 +154,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     public void onDestroy() {
         Log.d(TAG, "service destroyed");
         mNotificationManager.cancel(mNotificationId);
+        stopSongPositionTimer();
         mPlayer.release();
     }
 
@@ -151,10 +163,6 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         return mBinder;
     }
 
-    private final IBinder mBinder = new LocalBinder();
-
-    private NupServiceObserver mObserver;
-    private Object mObserverLock = new Object();
     public void addObserver(NupServiceObserver observer) {
         synchronized(mObserverLock) {
             if (mObserver != null) {
@@ -185,8 +193,10 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
             mPaused = !mPaused;
             if (mPaused) {
                 mPlayer.pause();
+                stopSongPositionTimer();
             } else {
                 mPlayer.start();
+                startSongPositionTimer();
             }
         }
 
@@ -217,6 +227,8 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         String url = "http://localhost:" + mProxy.getPort() + "/music/" + song.getFilename();
 
         synchronized(mPlayerLock) {
+            stopSongPositionTimer();
+
             if (mPlayer != null)
                 mPlayer.release();
 
@@ -294,6 +306,37 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         }
     }
 
+    private Runnable mSongPositionTask = new Runnable() {
+        public void run() {
+            int positionMs = 0, durationMs = 0;
+            synchronized(mPlayerLock) {
+                if (!mPlayerPrepared)
+                    return;
+                positionMs = mPlayer.getCurrentPosition();
+                durationMs = mPlayer.getDuration();
+            }
+            synchronized(mObserverLock) {
+                if (mObserver != null) {
+                    mObserver.onSongPositionChanged(positionMs, durationMs);
+                }
+            }
+            mHandler.postDelayed(this, 100);
+        }
+    };
+
+    private void startSongPositionTimer() {
+        synchronized(mPlayerLock) {
+            stopSongPositionTimer();
+            mHandler.post(mSongPositionTask);
+        }
+    }
+
+    private void stopSongPositionTimer() {
+        synchronized(mPlayerLock) {
+            mHandler.removeCallbacks(mSongPositionTask);
+        }
+    }
+
     @Override
     public void onPrepared(MediaPlayer player) {
         Log.d(TAG, "onPrepared");
@@ -302,8 +345,8 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
             mPaused = false;
             mPlayerPrepared = true;
             mPlayer.start();
+            startSongPositionTimer();
         }
-
         synchronized(mObserverLock) {
             if (mObserver != null) {
                 mObserver.onPauseStateChanged(mPaused);
