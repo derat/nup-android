@@ -1,11 +1,13 @@
 package org.erat.nup;
 
+import android.graphics.Bitmap;
 import org.json.JSONObject;
 
 class Song {
     private final String mArtist, mTitle, mAlbum, mFilename, mCoverFilename;
     private final int mLengthSec, mSongId;
     private final double mRating;
+    private Bitmap mCoverBitmap;
 
     public Song(JSONObject json) throws org.json.JSONException {
         mArtist = json.getString("artist");
@@ -25,7 +27,10 @@ class Song {
     public final String getAlbum() { return mAlbum; }
     public final String getFilename() { return mFilename; }
     public final String getCoverFilename() { return mCoverFilename; }
+    public final Bitmap getCoverBitmap() { return mCoverBitmap; }
     public final int getLengthSec() { return mLengthSec; }
     public final int getSongId() { return mSongId; }
     public final double getRating() { return mRating; }
+
+    public void setCoverBitmap(Bitmap bitmap) { mCoverBitmap = bitmap; }
 }

@@ -179,17 +179,8 @@ public class NupActivity extends Activity implements NupServiceObserver {
         mTitleLabel.setText(currentSong.getTitle());
         mAlbumLabel.setText(currentSong.getAlbum());
         mTimeLabel.setText(formatTimeString(0, currentSong.getLengthSec()));
-
-        // FIXME: don't do this on UI thread
-        if (mService.isProxyRunning()) {
-            try {
-                URL imageUrl = new URL("http://localhost:" + mService.getProxyPort() + "/cover/" + currentSong.getCoverFilename());
-                Bitmap bitmap = BitmapFactory.decodeStream((InputStream) imageUrl.getContent());
-                mAlbumImageView.setImageBitmap(bitmap);
-            } catch (IOException e) {
-                Log.e(TAG, "unable to load album cover bitmap from file " + currentSong.getCoverFilename() + ": " + e);
-            }
-        }
+        if (currentSong.getCoverBitmap() != null)
+            mAlbumImageView.setImageBitmap(currentSong.getCoverBitmap());
     }
 
     @Override

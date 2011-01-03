@@ -6,15 +6,20 @@ import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.media.MediaPlayer;
 import android.preference.PreferenceManager;
 import android.os.Binder;
 import android.os.IBinder;
 import android.util.Log;
+import android.widget.RemoteViews;
 import android.widget.Toast;
+import java.io.InputStream;
 import java.io.IOException;
 import java.lang.Thread;
 import java.net.URI;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -25,15 +30,18 @@ interface NupServiceObserver {
 
 public class NupService extends Service implements MediaPlayer.OnPreparedListener, MediaPlayer.OnCompletionListener {
     private static final String TAG = "NupService";
-    private NotificationManager mNotificationManager;
+
     private MediaPlayer mPlayer;
+
     private LocalProxy mProxy;
     private Thread mProxyThread;
-    private final int mNotificationId = 0;
     private boolean mProxyRunning = false;
-
     public boolean isProxyRunning() { return mProxyRunning; }
     public int getProxyPort() { return mProxy.getPort(); }
+
+    private NotificationManager mNotificationManager;
+    private final int mNotificationId = 0;
+    private RemoteViews mNotificationView;
 
     public class LocalBinder extends Binder {
         NupService getService() {
@@ -83,14 +91,29 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         }
     }
 
+    private Notification updateNotification(String artist, String title, String album, Bitmap bitmap) {
+        Notification notification = new Notification(R.drawable.icon, artist + " - " + title, System.currentTimeMillis());
+        notification.flags |= (Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR);
+
+        RemoteViews view = new RemoteViews(getPackageName(), R.layout.notification);
+        view.setTextViewText(R.id.notification_artist, artist);
+        view.setTextViewText(R.id.notification_title, title);
+        view.setTextViewText(R.id.notification_album, album);
+        if (bitmap != null)
+            view.setImageViewBitmap(R.id.notification_image, bitmap);
+        notification.contentView = view;
+
+        notification.contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0);
+        mNotificationManager.notify(mNotificationId, notification);
+        return notification;
+    }
+
     @Override
     public void onCreate() {
         Log.d(TAG, "service created");
+
         mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        Notification notification = new Notification(R.drawable.icon, "Playing a song", System.currentTimeMillis());
-        PendingIntent contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0);
-        notification.setLatestEventInfo(this, "nup", "music player", contentIntent);
-        mNotificationManager.notify(mNotificationId, notification);
+        Notification notification = updateNotification("nup", getString(R.string.initial_notification), "", (Bitmap) null);
         startForeground(mNotificationId, notification);
 
         mPlayer = new MediaPlayer();
@@ -191,12 +214,28 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     @Override
     public void onPrepared(MediaPlayer player) {
         Log.d(TAG, "onPrepared");
+
+        // FIXME: shouldn't be doing this here
+        Song song = getCurrentSong();
+        if (song.getCoverBitmap() == null) {
+            try {
+                URL imageUrl = new URL("http://localhost:" + mProxy.getPort() + "/cover/" + song.getCoverFilename());
+                Bitmap bitmap = BitmapFactory.decodeStream((InputStream) imageUrl.getContent());
+                song.setCoverBitmap(bitmap);
+            } catch (IOException e) {
+                Log.e(TAG, "unable to load album cover bitmap from file " + song.getCoverFilename() + ": " + e);
+            }
+        }
+
+        updateNotification(song.getArtist(), song.getTitle(), song.getAlbum(), song.getCoverBitmap());
+
         mPaused = false;
         mPlayer.start();
 
+        // FIXME: notify on track change instead of on prepare
         synchronized(mObserverLock) {
             if (mObserver != null) {
-                mObserver.onSongChanged(mSongs.get(mCurrentSongIndex));
+                mObserver.onSongChanged(song);
                 mObserver.onPauseStateChanged(mPaused);
             }
         }
