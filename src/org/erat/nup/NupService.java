@@ -11,7 +11,6 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.media.MediaPlayer;
 import android.preference.PreferenceManager;
 import android.os.AsyncTask;
 import android.os.Binder;
@@ -46,25 +45,14 @@ interface NupServiceObserver {
     void onSongPositionChanged(int positionMs, int durationMs);
 }
 
-public class NupService extends Service implements MediaPlayer.OnPreparedListener, MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListener {
+public class NupService extends Service implements PlayerObserver {
     private static final String TAG = "NupService";
 
     private static final int NOTIFICATION_ID = 0;
 
-    // Plays the currently-selected song.  On song change, we throw out the old one and create a new one,
-    // which seems non-ideal but avoids a bunch of issues with invalid state changes that seem to be caused by
-    // prepareAsync().
-    private MediaPlayer mPlayer;
+    private Player mPlayer;
 
-    // Is mPlayer currently in the "prepared" (that is, ready-to-play) state?
-    // See http://developer.android.com/reference/android/media/MediaPlayer.html.
-    private boolean mPlayerPrepared = false;
-
-    // Is playback currently paused?
-    private boolean mPaused = false;
-
-    // Protects access to mPlayer, mPlayerPrepared, and mPaused.
-    private Object mPlayerLock = new Object();
+    private Thread mPlayerThread;
 
     // Listens on a local port and proxies HTTP requests to a remote web server.
     // Needed since MediaPlayer doesn't support HTTP authentication.
@@ -89,9 +77,6 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     // Currently-registered observer, or null if none is registered (i.e. the activity isn't running).
     private NupServiceObserver mObserver;
 
-    // Protects access to mObserver.
-    private Object mObserverLock = new Object();
-
     // Points from cover filename Strings to previously-fetched Bitmaps.
     // TODO: Limit the growth of this or switch it to a real LRU cache or something.
     private HashMap coverCache = new HashMap();
@@ -107,6 +92,10 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         startForeground(NOTIFICATION_ID, notification);
 
         initProxy();
+
+        mPlayer = new Player(this);
+        mPlayerThread = new Thread(mPlayer);
+        mPlayerThread.start();
     }
 
     @Override
@@ -119,9 +108,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     public void onDestroy() {
         Log.d(TAG, "service destroyed");
         mNotificationManager.cancel(NOTIFICATION_ID);
-        stopSongPositionTimer();
-        if (mPlayer != null)
-            mPlayer.release();
+        mPlayer.quit();
     }
 
     @Override
@@ -193,23 +180,27 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     }
 
     // Register an observer.  Can only been called when no observer is currently registered.
-    public void addObserver(NupServiceObserver observer) {
-        synchronized(mObserverLock) {
-            if (mObserver != null) {
-                Log.wtf(TAG, "tried to add observer while one is already registered");
+    public void addObserver(final NupServiceObserver observer) {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (mObserver != null)
+                    Log.wtf(TAG, "tried to add observer while one is already registered");
+                mObserver = observer;
             }
-            mObserver = observer;
-        }
+        });
     }
 
     // Unregister an observer.
-    public void removeObserver(NupServiceObserver observer) {
-        synchronized(mObserverLock) {
-            if (mObserver != observer) {
-                Log.wtf(TAG, "tried to remove non-registered observer");
+    public void removeObserver(final NupServiceObserver observer) {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (mObserver != observer)
+                    Log.wtf(TAG, "tried to remove non-registered observer");
+                mObserver = null;
             }
-            mObserver = null;
-        }
+        });
     }
 
     // Create a new persistent notification displaying information about the current song.
@@ -232,85 +223,41 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     }
 
     // Toggle whether we're playing the current song or not.
-    public synchronized void togglePause() {
-        boolean paused = false;
-        synchronized(mPlayerLock) {
-            if (!mPlayerPrepared)
-                return;
-            mPaused = !mPaused;
-            if (mPaused) {
-                mPlayer.pause();
-                stopSongPositionTimer();
-            } else {
-                mPlayer.start();
-                startSongPositionTimer();
-            }
-            paused = mPaused;
-        }
-
-        synchronized(mObserverLock) {
-            if (mObserver != null) {
-                mObserver.onPauseStateChanged(paused);
-            }
-        }
+    public void togglePause() {
+        mPlayer.togglePause();
     }
 
     // Replace the current playlist with a new one.
     // Plays the first song in the new list.
-    public synchronized void setPlaylist(ArrayList<Song> songs) {
+    public void setPlaylist(ArrayList<Song> songs) {
         mSongs = songs;
         mCurrentSongIndex = -1;
-        synchronized(mObserverLock) {
-            if (mObserver != null) {
-                mObserver.onPlaylistChanged(mSongs);
-            }
-        }
+        if (mObserver != null)
+            mObserver.onPlaylistChanged(mSongs);
         if (songs.size() > 0)
             playSongAtIndex(0);
     }
 
     // Play the song at a particular position in the playlist.
-    public synchronized void playSongAtIndex(int index) {
+    public void playSongAtIndex(int index) {
         if (index < 0 || index >= mSongs.size()) {
             return;
         }
 
+        mCurrentSongIndex = index;
         Song song = mSongs.get(index);
         String url = "http://localhost:" + mProxy.getPort() + "/music/" + song.getFilename();
+        mPlayer.playSong(url);
 
-        synchronized(mPlayerLock) {
-            stopSongPositionTimer();
-
-            if (mPlayer != null)
-                mPlayer.release();
-
-            mPlayer = new MediaPlayer();
-            mPlayer.setOnPreparedListener(this);
-            mPlayer.setOnCompletionListener(this);
-            mPlayer.setOnErrorListener(this);
-            mPlayerPrepared = false;
-
-            try {
-                mPlayer.setDataSource(url);
-            } catch (IOException e) {
-                Toast.makeText(this, "Got exception while setting data source to " + url + ": " + e.toString(), Toast.LENGTH_LONG).show();
-                return;
-            }
-            mPlayer.prepareAsync();
-        }
-
-        mCurrentSongIndex = index;
         if (coverCache.containsKey(song.getCoverFilename())) {
             song.setCoverBitmap((Bitmap) coverCache.get(song.getCoverFilename()));
             updateNotification(song.getArtist(), song.getTitle(), song.getAlbum(), song.getCoverBitmap());
         } else {
             new CoverFetcherTask(this).execute(song);
         }
-        synchronized(mObserverLock) {
-            if (mObserver != null) {
-                mObserver.onSongChanged(song);
-            }
-        }
+
+        if (mObserver != null)
+            mObserver.onSongChanged(song);
     }
 
     // Fetches the cover bitmap for a particular song.
@@ -351,77 +298,50 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         if (song == getCurrentSong()) {
             // We need to update our notification even if the fetch failed.
             updateNotification(song.getArtist(), song.getTitle(), song.getAlbum(), song.getCoverBitmap());
-            if (song.getCoverBitmap() != null) {
-                synchronized(mObserverLock) {
-                    if (mObserver != null) {
-                        mObserver.onCoverLoaded(song);
-                    }
-                }
-            }
+            if (song.getCoverBitmap() != null && mObserver != null)
+                mObserver.onCoverLoaded(song);
         }
     }
 
-    // Periodically invoked to notify the observer about the playback position of the current song.
-    private Runnable mSongPositionTask = new Runnable() {
-        public void run() {
-            int positionMs = 0, durationMs = 0;
-            synchronized(mPlayerLock) {
-                if (!mPlayerPrepared)
-                    return;
-                positionMs = mPlayer.getCurrentPosition();
-                durationMs = mPlayer.getDuration();
+    @Override
+    public void onSongComplete() {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                playSongAtIndex(mCurrentSongIndex + 1);
             }
-            synchronized(mObserverLock) {
-                if (mObserver != null) {
+        });
+    }
+
+    @Override
+    public void onSongPositionChange(final int positionMs, final int durationMs) {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (mObserver != null)
                     mObserver.onSongPositionChanged(positionMs, durationMs);
-                }
             }
-            mHandler.postDelayed(this, 100);
-        }
-    };
-
-    // Start running mSongPositionTask.
-    private void startSongPositionTimer() {
-        synchronized(mPlayerLock) {
-            stopSongPositionTimer();
-            mHandler.post(mSongPositionTask);
-        }
-    }
-
-    // Stop running mSongPositionTask.
-    private void stopSongPositionTimer() {
-        synchronized(mPlayerLock) {
-            mHandler.removeCallbacks(mSongPositionTask);
-        }
+        });
     }
 
     @Override
-    public void onPrepared(MediaPlayer player) {
-        Log.d(TAG, "onPrepared");
-
-        synchronized(mPlayerLock) {
-            mPaused = false;
-            mPlayerPrepared = true;
-            mPlayer.start();
-            startSongPositionTimer();
-        }
-        synchronized(mObserverLock) {
-            if (mObserver != null) {
-                mObserver.onPauseStateChanged(mPaused);
+    public void onPauseToggle(final boolean paused) {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (mObserver != null)
+                    mObserver.onPauseStateChanged(paused);
             }
-        }
+        });
     }
 
     @Override
-    public void onCompletion(MediaPlayer player) {
-        Log.d(TAG, "onCompletion");
-        playSongAtIndex(mCurrentSongIndex + 1);
-    }
-
-    @Override
-    public boolean onError(MediaPlayer mp, int what, int extra) {
-        Toast.makeText(this, "MediaPlayer reported a vague, not-very-useful error: what=" + what + " extra=" + extra, Toast.LENGTH_LONG).show();
-        // Return false so the completion listener will get called.
-        return false;
+    public void onError(final String description) {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(NupService.this, description, Toast.LENGTH_LONG).show();
+            }
+        });
     }
 }
