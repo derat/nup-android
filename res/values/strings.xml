@@ -1,23 +1,32 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">nup</string>
+  <string name="app_name">nup</string>
 
-    <string name="album">Album</string>
-    <string name="artist">Artist</string>
-    <string name="exit">Exit</string>
-    <string name="initial_notification">Service started.</string>
-    <string name="next">Next</string>
-    <string name="password">Password</string>
-    <string name="pause">Pause</string>
-    <string name="play">Play</string>
-    <string name="preferences">Preferences</string>
-    <string name="prev">Prev</string>
-    <string name="search">Search</string>
-    <string name="server_url">Server URL</string>
-    <string name="server_url_description">Location of music server, e.g. \"https://www.example.org:1234/\".</string>
-    <string name="shuffle">Shuffle</string>
-    <string name="substring">Substring</string>
-    <string name="title">Title</string>
-    <string name="username">Username</string>
-    <string name="username_description">Used for HTTP basic authentication, or blank if auth isn\'t needed.</string>
+  <string name="album">Album</string>
+  <string name="artist">Artist</string>
+  <string name="exit">Exit</string>
+  <string name="initial_notification">Service started.</string>
+  <string name="minimum_rating">Minimum rating</string>
+  <string name="next">Next</string>
+  <string name="password">Password</string>
+  <string name="pause">Pause</string>
+  <string name="play">Play</string>
+  <string name="preferences">Preferences</string>
+  <string name="prev">Prev</string>
+  <string name="search">Search</string>
+  <string name="server_url">Server URL</string>
+  <string name="server_url_description">Location of music server, e.g. \"https://www.example.org:1234/\".</string>
+  <string name="shuffle">Shuffle</string>
+  <string name="substring">Substring</string>
+  <string name="title">Title</string>
+  <string name="username">Username</string>
+  <string name="username_description">Used for HTTP basic authentication, or blank if auth isn\'t needed.</string>
+
+  <string-array name="min_rating_array">
+    <item>0.00</item>
+    <item>0.25</item>
+    <item>0.50</item>
+    <item>0.75</item>
+    <item>1.00</item>
+  </string-array>
 </resources>

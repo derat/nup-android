@@ -39,6 +39,7 @@
       android:singleLine="true"
       android:completionThreshold="1"
       />
+
   <LinearLayout
       android:orientation="horizontal"
       android:layout_width="fill_parent"
@@ -57,6 +58,13 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="@string/shuffle"
+        />
+    <Spinner
+        android:id="@+id/min_rating_spinner"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:prompt="@string/minimum_rating"
         />
   </LinearLayout>
 

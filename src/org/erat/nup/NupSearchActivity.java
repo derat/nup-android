@@ -14,10 +14,13 @@ import android.os.IBinder;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.AutoCompleteTextView;
 import android.widget.CheckBox;
 import android.widget.EditText;
+import android.widget.Spinner;
+import android.widget.TextView;
 import android.widget.Toast;
 import java.io.InputStream;
 import java.io.IOException;
@@ -37,9 +40,12 @@ public class NupSearchActivity extends Activity {
     private AutoCompleteTextView mArtistEdit, mAlbumEdit;
     private EditText mTitleEdit;
     private CheckBox mShuffleCheckbox, mSubstringCheckbox;
+    private Spinner mMinRatingSpinner;
 
     // Points from (lowercased) artist String to ArrayList of String album names.
     private HashMap mAlbumMap = new HashMap();
+
+    private String mMinRating = null;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -49,11 +55,9 @@ public class NupSearchActivity extends Activity {
 
         mArtistEdit = (AutoCompleteTextView) findViewById(R.id.artist_edit_text);
         mTitleEdit = (EditText) findViewById(R.id.title_edit_text);
-        mAlbumEdit = (AutoCompleteTextView) findViewById(R.id.album_edit_text);
-        mShuffleCheckbox = (CheckBox) findViewById(R.id.shuffle_checkbox);
-        mSubstringCheckbox = (CheckBox) findViewById(R.id.substring_checkbox);
 
         // When the album field gets the focus, set its suggestions based on the currently-entered artist.
+        mAlbumEdit = (AutoCompleteTextView) findViewById(R.id.album_edit_text);
         mAlbumEdit.setOnFocusChangeListener(new View.OnFocusChangeListener() {
             @Override
             public void onFocusChange(View v, boolean hasFocus) {
@@ -66,6 +70,24 @@ public class NupSearchActivity extends Activity {
                 }
             }
         });
+
+        mMinRatingSpinner = (Spinner) findViewById(R.id.min_rating_spinner);
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this, R.array.min_rating_array, android.R.layout.simple_spinner_item);
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        mMinRatingSpinner.setAdapter(adapter);
+        mMinRatingSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
+            @Override
+            public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
+                NupSearchActivity.this.mMinRating = parent.getItemAtPosition(pos).toString();
+            }
+            @Override
+            public void onNothingSelected(AdapterView<?> parent) {
+                NupSearchActivity.this.mMinRating = null;
+            }
+        });
+
+        mShuffleCheckbox = (CheckBox) findViewById(R.id.shuffle_checkbox);
+        mSubstringCheckbox = (CheckBox) findViewById(R.id.substring_checkbox);
 
         bindService(new Intent(this, NupService.class), mConnection, 0);
     }
@@ -170,23 +192,28 @@ public class NupSearchActivity extends Activity {
     public void onSearchButtonClicked(View view) throws IOException {
         class QueryBuilder {
             public ArrayList<String> params = new ArrayList<String>();
-            public void addStringParam(EditText view, String paramName) throws java.io.UnsupportedEncodingException {
+            public void addTextViewParam(String paramName, TextView view) throws java.io.UnsupportedEncodingException {
                 String value = view.getText().toString().trim();
                 if (!value.isEmpty()) {
                     String param = paramName + "=" + URLEncoder.encode(value, "UTF-8");
                     params.add(param);
                 }
             }
-            public void addBoolParam(CheckBox view, String paramName) {
+            public void addCheckBoxParam(String paramName, CheckBox view) {
                 params.add(paramName + "=" + (view.isChecked() ? "1" : "0"));
+            }
+            public void addStringParam(String paramName, String value) {
+                params.add(paramName + "=" + value);
             }
         }
         QueryBuilder builder = new QueryBuilder();
-        builder.addStringParam(mArtistEdit, "artist");
-        builder.addStringParam(mTitleEdit, "title");
-        builder.addStringParam(mAlbumEdit, "album");
-        builder.addBoolParam(mShuffleCheckbox, "shuffle");
-        builder.addBoolParam(mSubstringCheckbox, "substring");
+        builder.addTextViewParam("artist", mArtistEdit);
+        builder.addTextViewParam("title", mTitleEdit);
+        builder.addTextViewParam("album", mAlbumEdit);
+        builder.addCheckBoxParam("shuffle", mShuffleCheckbox);
+        builder.addCheckBoxParam("substring", mSubstringCheckbox);
+        if (mMinRating != null && !mMinRating.isEmpty())
+            builder.addStringParam("minRating", mMinRating);
         new SendSearchRequestTask().execute("http://localhost:" + mService.getProxyPort() + "/query?" + TextUtils.join("&", builder.params));
     }
 }
