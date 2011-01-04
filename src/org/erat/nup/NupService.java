@@ -258,6 +258,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
     // Plays the first song in the new list.
     public synchronized void setPlaylist(ArrayList<Song> songs) {
         mSongs = songs;
+        mCurrentSongIndex = -1;
         synchronized(mObserverLock) {
             if (mObserver != null) {
                 mObserver.onPlaylistChanged(mSongs);

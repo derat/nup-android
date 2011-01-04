@@ -39,6 +39,8 @@ public class NupActivity extends Activity implements NupServiceObserver {
     // Last song-position time passed to onSongPositionChanged(), in seconds.
     private int lastSongPositionSec = -1;
 
+    private SongListAdapter mSongListAdapter;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         Log.d(TAG, "activity created");
@@ -128,6 +130,9 @@ public class NupActivity extends Activity implements NupServiceObserver {
             mAlbumImageView.setImageBitmap(currentSong.getCoverBitmap());
         // FIXME: clear image view otherwise
         lastSongPositionSec = -1;
+
+        if (mSongListAdapter != null)
+            mSongListAdapter.setCurrentSongIndex(mService.getCurrentSongIndex());
     }
 
     @Override
@@ -137,7 +142,13 @@ public class NupActivity extends Activity implements NupServiceObserver {
 
     @Override
     public void onPlaylistChanged(ArrayList<Song> songs) {
-        mPlaylistView.setAdapter(new SongListAdapter(this, songs));
+        int index = mService.getCurrentSongIndex();
+        if (mSongListAdapter == null) {
+            mSongListAdapter = new SongListAdapter(this, songs, index);
+            mPlaylistView.setAdapter(mSongListAdapter);
+        } else {
+            mSongListAdapter.setSongs(songs, index);
+        }
     }
 
     @Override
@@ -178,11 +189,24 @@ public class NupActivity extends Activity implements NupServiceObserver {
 
     private class SongListAdapter extends BaseAdapter {
         private final Context mContext;
-        private final ArrayList<Song> mSongs;
+        private ArrayList<Song> mSongs;
+        private int mCurrentSongIndex;
 
-        public SongListAdapter(Context context, ArrayList<Song> songs) {
+        public SongListAdapter(Context context, ArrayList<Song> songs, int currentSongIndex) {
             mContext = context;
             mSongs = songs;
+            mCurrentSongIndex = currentSongIndex;
+        }
+
+        public void setSongs(ArrayList<Song> songs, int currentSongIndex) {
+            mSongs = songs;
+            mCurrentSongIndex = currentSongIndex;
+            notifyDataSetChanged();
+        }
+
+        public void setCurrentSongIndex(int currentSongIndex) {
+            mCurrentSongIndex = currentSongIndex;
+            notifyDataSetChanged();
         }
 
         @Override
@@ -205,6 +229,9 @@ public class NupActivity extends Activity implements NupServiceObserver {
             Song song = mSongs.get(position);
             ((TextView) view.findViewById(R.id.artist)).setText(song.getArtist());
             ((TextView) view.findViewById(R.id.title)).setText(song.getTitle());
+
+            boolean currentlyPlaying = (position == mCurrentSongIndex);
+            view.setBackgroundColor(getResources().getColor(currentlyPlaying ? R.color.playlist_highlight_bg : android.R.color.transparent));
             return view;
         }
     }
