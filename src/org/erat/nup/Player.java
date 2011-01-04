@@ -36,6 +36,8 @@ class Player implements Runnable, MediaPlayer.OnPreparedListener, MediaPlayer.On
     // Used to run tasks on our own thread.
     private Handler mHandler;
 
+    private Runnable mLastPlayTask;
+
     Player(PlayerObserver observer) {
         mObserver = observer;
     }
@@ -45,7 +47,6 @@ class Player implements Runnable, MediaPlayer.OnPreparedListener, MediaPlayer.On
         Looper.prepare();
         mHandler = new Handler();
         Looper.loop();
-        // FIXME: need to exit correctly
     }
 
     public void quit() {
@@ -59,8 +60,12 @@ class Player implements Runnable, MediaPlayer.OnPreparedListener, MediaPlayer.On
         });
     }
 
-    public void playSong(final String url) {
-        mHandler.post(new Runnable() {
+    public void playSong(final String url, int delayMs) {
+        if (mLastPlayTask != null)
+            mHandler.removeCallbacks(mLastPlayTask);
+
+        stopPositionTimer();
+        mLastPlayTask = new Runnable() {
             @Override
             public void run() {
                 stopPositionTimer();
@@ -81,7 +86,8 @@ class Player implements Runnable, MediaPlayer.OnPreparedListener, MediaPlayer.On
                 }
                 mMediaPlayer.prepareAsync();
             }
-        });
+        };
+        mHandler.postDelayed(mLastPlayTask, delayMs);
     }
 
     public void togglePause() {

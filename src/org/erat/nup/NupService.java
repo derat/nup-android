@@ -235,19 +235,18 @@ public class NupService extends Service implements PlayerObserver {
         if (mObserver != null)
             mObserver.onPlaylistChanged(mSongs);
         if (songs.size() > 0)
-            playSongAtIndex(0);
+            playSongAtIndex(0, 0);
     }
 
     // Play the song at a particular position in the playlist.
-    public void playSongAtIndex(int index) {
-        if (index < 0 || index >= mSongs.size()) {
+    public void playSongAtIndex(int index, int delayMs) {
+        if (index < 0 || index >= mSongs.size())
             return;
-        }
 
         mCurrentSongIndex = index;
         Song song = mSongs.get(index);
         String url = "http://localhost:" + mProxy.getPort() + "/music/" + song.getFilename();
-        mPlayer.playSong(url);
+        mPlayer.playSong(url, delayMs);
 
         if (coverCache.containsKey(song.getCoverFilename())) {
             song.setCoverBitmap((Bitmap) coverCache.get(song.getCoverFilename()));
@@ -308,7 +307,7 @@ public class NupService extends Service implements PlayerObserver {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                playSongAtIndex(mCurrentSongIndex + 1);
+                playSongAtIndex(mCurrentSongIndex + 1, 0);
             }
         });
     }

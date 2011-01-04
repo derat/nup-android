@@ -29,6 +29,12 @@ import java.util.ArrayList;
 
 public class NupActivity extends Activity implements NupServiceObserver {
     private static final String TAG = "NupActivity";
+
+    // Wait this many milliseconds before switching tracks in response to the Prev and Next buttons.
+    // This avoids requsting a bunch of tracks that we don't want when the user is repeatedly pressing
+    // the button to skip through tracks.
+    private static final int SONG_CHANGE_DELAY_MS = 500;
+
     private NupService mService;
 
     private Button mPauseButton;
@@ -104,11 +110,11 @@ public class NupActivity extends Activity implements NupServiceObserver {
     }
 
     public void onPrevButtonClicked(View view) {
-        mService.playSongAtIndex(mService.getCurrentSongIndex() - 1);
+        mService.playSongAtIndex(mService.getCurrentSongIndex() - 1, SONG_CHANGE_DELAY_MS);
     }
 
     public void onNextButtonClicked(View view) {
-        mService.playSongAtIndex(mService.getCurrentSongIndex() + 1);
+        mService.playSongAtIndex(mService.getCurrentSongIndex() + 1, SONG_CHANGE_DELAY_MS);
     }
 
     @Override
@@ -249,7 +255,7 @@ public class NupActivity extends Activity implements NupServiceObserver {
     @Override
     public boolean onContextItemSelected(MenuItem item) {
         AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
-        mService.playSongAtIndex(info.position);
+        mService.playSongAtIndex(info.position, 0);
         return true;
     }
 }
