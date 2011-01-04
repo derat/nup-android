@@ -184,6 +184,7 @@ public class NupService extends Service implements MediaPlayer.OnPreparedListene
         try {
             mProxy = new LocalProxy(uri.getHost(), port, useSsl, prefs.getString("username", ""), prefs.getString("password", ""));
             mProxyThread = new Thread(mProxy);
+            mProxyThread.setDaemon(true);
             mProxyThread.start();
             mProxyRunning = true;
         } catch (IOException e) {

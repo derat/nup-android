@@ -7,9 +7,11 @@ import android.net.SSLCertificateSocketFactory;
 import android.util.Base64;
 import android.util.Log;
 import java.io.IOException;
-import java.lang.Thread;
+import java.lang.Runnable;
 import java.net.ServerSocket;
 import java.net.Socket;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.HttpException;
 import org.apache.http.HttpHost;
@@ -31,6 +33,7 @@ class LocalProxy implements Runnable {
     private final int mRemotePort;
     private final boolean mUseSsl;
     private final ServerSocket mServerSocket;
+    private final ThreadPoolExecutor mThreadPool;
 
     public LocalProxy(String remoteHostname, int remotePort, boolean useSsl, String username, String password) throws IOException {
         mRemoteHostname = remoteHostname;
@@ -39,6 +42,7 @@ class LocalProxy implements Runnable {
         mUsername = username;
         mPassword = password;
 
+        mThreadPool = (ThreadPoolExecutor) Executors.newCachedThreadPool();
         mServerSocket = new ServerSocket(0);
         Log.i(TAG, "listening on port " + mServerSocket.getLocalPort());
     }
@@ -50,20 +54,19 @@ class LocalProxy implements Runnable {
         while (true) {
             try {
                 Socket socket = mServerSocket.accept();
-                Thread thread = new ProxyThread(socket);
-                thread.setDaemon(true);
-                thread.start();
+                ProxyTask task = new ProxyTask(socket);
+                mThreadPool.submit(task);
             } catch (IOException e) {
                 Log.e(TAG, "got IO error while handling connection: " + e);
             }
         }
     }
 
-    class ProxyThread extends Thread {
+    class ProxyTask implements Runnable {
         private final HttpParams mParams;
         private Socket mServerSocket;
 
-        public ProxyThread(Socket serverSocket) {
+        public ProxyTask(Socket serverSocket) {
             mServerSocket = serverSocket;
 
             // From Apache's ElementalReverseProxy.java example -- dunno how important any of these are.
