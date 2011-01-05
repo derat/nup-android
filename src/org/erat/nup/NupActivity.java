@@ -24,27 +24,37 @@ import android.widget.ImageView;
 import android.widget.ListView;
 import android.widget.TextView;
 import android.widget.Toast;
+
 import java.io.IOException;
 import java.util.ArrayList;
 
-public class NupActivity extends Activity implements NupServiceObserver {
+public class NupActivity extends Activity
+        implements Player.PositionChangeListener,
+                   Player.PauseToggleListener,
+                   Player.PlaybackErrorListener,
+                   NupService.SongChangeListener,
+                   NupService.CoverLoadListener,
+                   NupService.PlaylistChangeListener {
     private static final String TAG = "NupActivity";
 
     // Wait this many milliseconds before switching tracks in response to the Prev and Next buttons.
-    // This avoids requsting a bunch of tracks that we don't want when the user is repeatedly pressing
-    // the button to skip through tracks.
+    // This avoids requsting a bunch of tracks that we don't want when the user is repeatedly
+    // pressing the button to skip through tracks.
     private static final int SONG_CHANGE_DELAY_MS = 500;
 
+    // Persistent service to which we connect.
     private NupService mService;
 
+    // Various UI components.
     private Button mPauseButton;
     private ImageView mAlbumImageView;
     private TextView mArtistLabel, mTitleLabel, mAlbumLabel, mTimeLabel;
     private ListView mPlaylistView;
 
-    // Last song-position time passed to onSongPositionChanged(), in seconds.
+    // Last song-position time passed to onPositionChange(), in seconds.
     private int lastSongPositionSec = -1;
 
+    // Adapts the song listing to mPlaylistView.
     private SongListAdapter mSongListAdapter;
 
     @Override
@@ -78,7 +88,6 @@ public class NupActivity extends Activity implements NupServiceObserver {
             // Shut down the service as well if the playlist is empty.
             if (mService.getSongs().size() == 0)
                 stopService = true;
-            mService.removeObserver(this);
         }
         unbindService(mConnection);
         if (stopService)
@@ -89,14 +98,21 @@ public class NupActivity extends Activity implements NupServiceObserver {
         public void onServiceConnected(ComponentName className, IBinder service) {
             Log.d(TAG, "connected to service");
             mService = ((NupService.LocalBinder) service).getService();
-            mService.addObserver(NupActivity.this);
+
+            mService.setSongChangeListener(NupActivity.this);
+            mService.setCoverLoadListener(NupActivity.this);
+            mService.setPlaylistChangeListener(NupActivity.this);
+
+            mService.getPlayer().setPositionChangeListener(NupActivity.this);
+            mService.getPlayer().setPauseToggleListener(NupActivity.this);
+            mService.getPlayer().setPlaybackErrorListener(NupActivity.this);
 
             // Get current state from service.
             ArrayList<Song> songs = mService.getSongs();
-            onPlaylistChanged(songs);
+            onPlaylistChange(songs);
             Song song = mService.getCurrentSong();
             if (song != null)
-                onSongChanged(song);
+                onSongChange(song);
         }
 
         public void onServiceDisconnected(ComponentName className) {
@@ -117,52 +133,92 @@ public class NupActivity extends Activity implements NupServiceObserver {
         mService.playSongAtIndex(mService.getCurrentSongIndex() + 1, SONG_CHANGE_DELAY_MS);
     }
 
-    @Override
-    public void onPauseStateChanged(boolean isPaused) {
-        mPauseButton.setText(getString(isPaused ? R.string.play : R.string.pause));
-    }
-
+    // Formats a current time and total time as "[0:00 / 0:00]".
     String formatTimeString(int curSec, int totalSec) {
         return String.format("[%d:%02d / %d:%02d]", curSec / 60, curSec % 60, totalSec / 60, totalSec % 60);
     }
 
+    // Implements NupService.SongChangeListener.
     @Override
-    public void onSongChanged(Song currentSong) {
-        mArtistLabel.setText(currentSong.getArtist());
-        mTitleLabel.setText(currentSong.getTitle());
-        mAlbumLabel.setText(currentSong.getAlbum());
-        mTimeLabel.setText(formatTimeString(0, currentSong.getLengthSec()));
-        if (currentSong.getCoverBitmap() != null)
-            mAlbumImageView.setImageBitmap(currentSong.getCoverBitmap());
-        // FIXME: clear image view otherwise
-        lastSongPositionSec = -1;
+    public void onSongChange(final Song currentSong) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                mArtistLabel.setText(currentSong.getArtist());
+                mTitleLabel.setText(currentSong.getTitle());
+                mAlbumLabel.setText(currentSong.getAlbum());
+                mTimeLabel.setText(formatTimeString(0, currentSong.getLengthSec()));
+                if (currentSong.getCoverBitmap() != null)
+                    mAlbumImageView.setImageBitmap(currentSong.getCoverBitmap());
+                // FIXME: clear image view otherwise
+                lastSongPositionSec = -1;
 
-        if (mSongListAdapter != null)
-            mSongListAdapter.setCurrentSongIndex(mService.getCurrentSongIndex());
+                if (mSongListAdapter != null)
+                    mSongListAdapter.setCurrentSongIndex(mService.getCurrentSongIndex());
+            }
+        });
     }
 
+    // Implements NupService.CoverLoadListener.
     @Override
-    public void onCoverLoaded(Song currentSong) {
-        mAlbumImageView.setImageBitmap(currentSong.getCoverBitmap());
+    public void onCoverLoad(final Song currentSong) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                mAlbumImageView.setImageBitmap(currentSong.getCoverBitmap());
+            }
+        });
     }
 
+    // Implements NupService.PlaylistChangeListener.
     @Override
-    public void onPlaylistChanged(ArrayList<Song> songs) {
-        int index = mService.getCurrentSongIndex();
-        if (mSongListAdapter == null) {
-            mSongListAdapter = new SongListAdapter(this, songs, index);
-            mPlaylistView.setAdapter(mSongListAdapter);
-        } else {
-            mSongListAdapter.setSongs(songs, index);
-        }
+    public void onPlaylistChange(final ArrayList<Song> songs) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                int index = mService.getCurrentSongIndex();
+                if (mSongListAdapter == null) {
+                    mSongListAdapter = new SongListAdapter(NupActivity.this, songs, index);
+                    mPlaylistView.setAdapter(mSongListAdapter);
+                } else {
+                    mSongListAdapter.setSongs(songs, index);
+                }
+            }
+        });
     }
 
+    // Implements Player.PositionChangeListener.
     @Override
-    public void onSongPositionChanged(int positionMs, int durationMs) {
-        int positionSec = positionMs / 1000;
-        if (positionSec == lastSongPositionSec)
-            return;
-        mTimeLabel.setText(formatTimeString(positionSec, durationMs / 1000));
+    public void onPositionChange(final int positionMs, final int durationMs) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                int positionSec = positionMs / 1000;
+                if (positionSec == lastSongPositionSec)
+                    return;
+                mTimeLabel.setText(formatTimeString(positionSec, durationMs / 1000));
+            }
+        });
+    }
+
+    // Implements Player.PauseToggleListener.
+    @Override
+    public void onPauseToggle(final boolean isPaused) {
+        runOnUiThread(new Runnable() {
+            public void run() {
+                mPauseButton.setText(getString(isPaused ? R.string.play : R.string.pause));
+            }
+        });
+    }
+
+    // Implements Player.PlaybackErrorListener.
+    @Override
+    public void onPlaybackError(final String description) {
+        runOnUiThread(new Runnable() {
+            public void run() {
+                Toast.makeText(NupActivity.this, description, Toast.LENGTH_LONG).show();
+            }
+        });
     }
 
     @Override

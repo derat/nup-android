@@ -8,26 +8,38 @@ import android.media.MediaPlayer;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
-import java.io.IOException;
 
-interface PlayerObserver {
-    void onSongComplete();
-    void onSongPositionChange(int positionMs, int durationMs);
-    void onPauseToggle(boolean paused);
-    void onError(String description);
-}
+import java.io.IOException;
 
 class Player implements Runnable, MediaPlayer.OnPreparedListener, MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListener {
     private static final String TAG = "Player";
 
+    // Interval between repotrs to mPositionChangeListener.
     private static final int POSITION_CHANGE_REPORT_MS = 100;
 
-    // Observer that gets notified about changes in our state.
-    private final PlayerObserver mObserver;
+    // Listener for completion of the currently-playing song.
+    interface SongCompleteListener {
+        void onSongComplete();
+    }
+
+    // Listener for changes in the playback position of the current song.
+    interface PositionChangeListener {
+        void onPositionChange(int positionMs, int durationMs);
+    }
+
+    // Listener for changes in the pause state.
+    interface PauseToggleListener {
+        void onPauseToggle(boolean paused);
+    }
+
+    // Listener for error messages.
+    interface PlaybackErrorListener {
+        void onPlaybackError(String description);
+    }
 
     // Plays the current song.  On song change, we throw out the old one and create a new one, which seems non-ideal but
     // avoids a bunch of issues with invalid state changes that seem to be caused by prepareAsync().
-    private MediaPlayer mMediaPlayer;;
+    private MediaPlayer mMediaPlayer;
 
     private boolean mPrepared = false;
 
@@ -38,8 +50,24 @@ class Player implements Runnable, MediaPlayer.OnPreparedListener, MediaPlayer.On
 
     private Runnable mLastPlayTask;
 
-    Player(PlayerObserver observer) {
-        mObserver = observer;
+    private SongCompleteListener mSongCompleteListener;
+    private PositionChangeListener mPositionChangeListener;
+    private PauseToggleListener mPauseToggleListener;
+    private PlaybackErrorListener mPlaybackErrorListener;
+
+    Player() {}
+
+    void setSongCompleteListener(SongCompleteListener listener) {
+        mSongCompleteListener = listener;
+    }
+    void setPositionChangeListener(PositionChangeListener listener) {
+        mPositionChangeListener = listener;
+    }
+    void setPauseToggleListener(PauseToggleListener listener) {
+        mPauseToggleListener = listener;
+    }
+    void setPlaybackErrorListener(PlaybackErrorListener listener) {
+        mPlaybackErrorListener = listener;
     }
 
     @Override
@@ -81,7 +109,8 @@ class Player implements Runnable, MediaPlayer.OnPreparedListener, MediaPlayer.On
                 try {
                     mMediaPlayer.setDataSource(url);
                 } catch (final IOException e) {
-                    mObserver.onError("Got exception while setting data source to " + url + ": " + e.toString());
+                    if (mPlaybackErrorListener != null)
+                        mPlaybackErrorListener.onPlaybackError("Got exception while setting data source to " + url + ": " + e.toString());
                     return;
                 }
                 mMediaPlayer.prepareAsync();
@@ -106,7 +135,8 @@ class Player implements Runnable, MediaPlayer.OnPreparedListener, MediaPlayer.On
                     startPositionTimer();
                 }
 
-                mObserver.onPauseToggle(mPaused);
+                if (mPauseToggleListener != null)
+                    mPauseToggleListener.onPauseToggle(mPaused);
             }
         });
     }
@@ -116,7 +146,8 @@ class Player implements Runnable, MediaPlayer.OnPreparedListener, MediaPlayer.On
         public void run() {
             if (!mPrepared)
                 return;
-            mObserver.onSongPositionChange(mMediaPlayer.getCurrentPosition(), mMediaPlayer.getDuration());
+            if (mPositionChangeListener != null)
+                mPositionChangeListener.onPositionChange(mMediaPlayer.getCurrentPosition(), mMediaPlayer.getDuration());
             mHandler.postDelayed(this, POSITION_CHANGE_REPORT_MS);
         }
     };
@@ -148,12 +179,14 @@ class Player implements Runnable, MediaPlayer.OnPreparedListener, MediaPlayer.On
     @Override
     public void onCompletion(MediaPlayer player) {
         Log.d(TAG, "onCompletion");
-        mObserver.onSongComplete();
+        if (mSongCompleteListener != null)
+            mSongCompleteListener.onSongComplete();
     }
 
     @Override
     public boolean onError(MediaPlayer mp, int what, int extra) {
-        mObserver.onError("MediaPlayer reported a vague, not-very-useful error: what=" + what + " extra=" + extra);
+        if (mPlaybackErrorListener != null)
+            mPlaybackErrorListener.onPlaybackError("MediaPlayer reported a vague, not-very-useful error: what=" + what + " extra=" + extra);
         // Return false so the completion listener will get called.
         return false;
     }

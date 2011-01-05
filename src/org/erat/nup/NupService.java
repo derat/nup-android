@@ -11,14 +11,15 @@ import android.content.Intent;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.preference.PreferenceManager;
 import android.os.AsyncTask;
 import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
+import android.preference.PreferenceManager;
 import android.util.Log;
 import android.widget.RemoteViews;
 import android.widget.Toast;
+
 import java.io.InputStream;
 import java.io.IOException;
 import java.lang.Runnable;
@@ -28,30 +29,31 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-interface NupServiceObserver {
-    // Invoked when the current song is paused or unpaused.
-    void onPauseStateChanged(boolean isPaused);
-
-    // Invoked when the current song changes.
-    void onSongChanged(Song currentSong);
-
-    // Invoked when a cover bitmap is successfully loaded for the current song.
-    void onCoverLoaded(Song currentSong);
-
-    // Invoked when a change is made to the current playlist.
-    void onPlaylistChanged(ArrayList<Song> songs);
-
-    // Invoked frequently during playback with the current position and total length of the current song.
-    void onSongPositionChanged(int positionMs, int durationMs);
-}
-
-public class NupService extends Service implements PlayerObserver {
+public class NupService extends Service implements Player.SongCompleteListener {
     private static final String TAG = "NupService";
 
+    // Identifier used for our "currently playing" notification.
     private static final int NOTIFICATION_ID = 0;
 
+    // Listener for changes to a new song.
+    interface SongChangeListener {
+        void onSongChange(Song currentSong);
+    }
+
+    // Listener for the cover bitmap being successfully loaded for the current song.
+    interface CoverLoadListener {
+        void onCoverLoad(Song currentSong);
+    }
+
+    // Listener for changes to the current playlist.
+    interface PlaylistChangeListener {
+        void onPlaylistChange(ArrayList<Song> songs);
+    }
+
+    // Plays songs.
     private Player mPlayer;
 
+    // Thread where mPlayerThread runs.
     private Thread mPlayerThread;
 
     // Listens on a local port and proxies HTTP requests to a remote web server.
@@ -74,14 +76,16 @@ public class NupService extends Service implements PlayerObserver {
 
     private final IBinder mBinder = new LocalBinder();
 
-    // Currently-registered observer, or null if none is registered (i.e. the activity isn't running).
-    private NupServiceObserver mObserver;
-
     // Points from cover filename Strings to previously-fetched Bitmaps.
     // TODO: Limit the growth of this or switch it to a real LRU cache or something.
     private HashMap coverCache = new HashMap();
 
+    // Used to run tasks on our thread.
     private Handler mHandler = new Handler();
+
+    private SongChangeListener mSongChangeListener;
+    private CoverLoadListener mCoverLoadListener;
+    private PlaylistChangeListener mPlaylistChangeListener;
 
     @Override
     public void onCreate() {
@@ -93,9 +97,10 @@ public class NupService extends Service implements PlayerObserver {
 
         initProxy();
 
-        mPlayer = new Player(this);
+        mPlayer = new Player();
         mPlayerThread = new Thread(mPlayer);
         mPlayerThread.start();
+        mPlayer.setSongCompleteListener(this);
     }
 
     @Override
@@ -116,7 +121,8 @@ public class NupService extends Service implements PlayerObserver {
         return mBinder;
     }
 
-    // Is the proxy available?  Callers must call this before trying to fetch a URL (or even calling getProxyPort()).
+    // Is the proxy available?  Callers must call this before trying to fetch a URL (or even calling
+    // getProxyPort()).
     public boolean isProxyRunning() { return mProxyRunning; }
 
     // Get the port where the proxy is listening on localhost.
@@ -125,8 +131,20 @@ public class NupService extends Service implements PlayerObserver {
     public final ArrayList<Song> getSongs() { return mSongs; }
     public final int getCurrentSongIndex() { return mCurrentSongIndex; }
 
+    public Player getPlayer() { return mPlayer; }
+
     public final Song getCurrentSong() {
         return (mCurrentSongIndex >= 0 && mCurrentSongIndex < mSongs.size()) ? mSongs.get(mCurrentSongIndex) : null;
+    }
+
+    public void setSongChangeListener(SongChangeListener listener) {
+        mSongChangeListener = listener;
+    }
+    public void setCoverLoadListener(CoverLoadListener listener) {
+        mCoverLoadListener = listener;
+    }
+    public void setPlaylistChangeListener(PlaylistChangeListener listener) {
+        mPlaylistChangeListener = listener;
     }
 
     public class LocalBinder extends Binder {
@@ -179,30 +197,6 @@ public class NupService extends Service implements PlayerObserver {
         }
     }
 
-    // Register an observer.  Can only been called when no observer is currently registered.
-    public void addObserver(final NupServiceObserver observer) {
-        mHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                if (mObserver != null)
-                    Log.wtf(TAG, "tried to add observer while one is already registered");
-                mObserver = observer;
-            }
-        });
-    }
-
-    // Unregister an observer.
-    public void removeObserver(final NupServiceObserver observer) {
-        mHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                if (mObserver != observer)
-                    Log.wtf(TAG, "tried to remove non-registered observer");
-                mObserver = null;
-            }
-        });
-    }
-
     // Create a new persistent notification displaying information about the current song.
     private Notification updateNotification(String artist, String title, String album, Bitmap bitmap) {
         Notification notification = new Notification(R.drawable.icon, artist + " - " + title, System.currentTimeMillis());
@@ -232,8 +226,8 @@ public class NupService extends Service implements PlayerObserver {
     public void setPlaylist(ArrayList<Song> songs) {
         mSongs = songs;
         mCurrentSongIndex = -1;
-        if (mObserver != null)
-            mObserver.onPlaylistChanged(mSongs);
+        if (mPlaylistChangeListener != null)
+            mPlaylistChangeListener.onPlaylistChange(mSongs);
         if (songs.size() > 0)
             playSongAtIndex(0, 0);
     }
@@ -255,8 +249,8 @@ public class NupService extends Service implements PlayerObserver {
             new CoverFetcherTask(this).execute(song);
         }
 
-        if (mObserver != null)
-            mObserver.onSongChanged(song);
+        if (mSongChangeListener != null)
+            mSongChangeListener.onSongChange(song);
     }
 
     // Fetches the cover bitmap for a particular song.
@@ -297,49 +291,18 @@ public class NupService extends Service implements PlayerObserver {
         if (song == getCurrentSong()) {
             // We need to update our notification even if the fetch failed.
             updateNotification(song.getArtist(), song.getTitle(), song.getAlbum(), song.getCoverBitmap());
-            if (song.getCoverBitmap() != null && mObserver != null)
-                mObserver.onCoverLoaded(song);
+            if (song.getCoverBitmap() != null && mCoverLoadListener != null)
+                mCoverLoadListener.onCoverLoad(song);
         }
     }
 
+    // Implements Player.SongCompleteListener.
     @Override
     public void onSongComplete() {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
                 playSongAtIndex(mCurrentSongIndex + 1, 0);
-            }
-        });
-    }
-
-    @Override
-    public void onSongPositionChange(final int positionMs, final int durationMs) {
-        mHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                if (mObserver != null)
-                    mObserver.onSongPositionChanged(positionMs, durationMs);
-            }
-        });
-    }
-
-    @Override
-    public void onPauseToggle(final boolean paused) {
-        mHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                if (mObserver != null)
-                    mObserver.onPauseStateChanged(paused);
-            }
-        });
-    }
-
-    @Override
-    public void onError(final String description) {
-        mHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                Toast.makeText(NupService.this, description, Toast.LENGTH_LONG).show();
             }
         });
     }

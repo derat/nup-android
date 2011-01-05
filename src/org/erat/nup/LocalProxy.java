@@ -6,12 +6,7 @@ package org.erat.nup;
 import android.net.SSLCertificateSocketFactory;
 import android.util.Base64;
 import android.util.Log;
-import java.io.IOException;
-import java.lang.Runnable;
-import java.net.ServerSocket;
-import java.net.Socket;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ThreadPoolExecutor;
+
 import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.HttpException;
 import org.apache.http.HttpHost;
@@ -25,6 +20,13 @@ import org.apache.http.params.CoreConnectionPNames;
 import org.apache.http.params.HttpParams;
 import org.apache.http.RequestLine;
 import org.apache.http.StatusLine;
+
+import java.io.IOException;
+import java.lang.Runnable;
+import java.net.ServerSocket;
+import java.net.Socket;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ThreadPoolExecutor;
 
 class LocalProxy implements Runnable {
     private static final String TAG = "LocalProxy";
