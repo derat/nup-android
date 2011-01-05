@@ -63,6 +63,9 @@ public class NupService extends Service implements Player.SongCompleteListener {
     // Thread where mProxy runs.
     private Thread mProxyThread;
 
+    private FileCache mFileCache;
+    private Thread mFileCacheThread;
+
     // Is the proxy currently configured and running?
     private boolean mProxyRunning = false;
 
@@ -98,9 +101,13 @@ public class NupService extends Service implements Player.SongCompleteListener {
         initProxy();
 
         mPlayer = new Player();
-        mPlayerThread = new Thread(mPlayer);
+        mPlayerThread = new Thread(mPlayer, "Player");
         mPlayerThread.start();
         mPlayer.setSongCompleteListener(this);
+
+        mFileCache = new FileCache(this);
+        mFileCacheThread = new Thread(mFileCache, "FileCache");
+        mFileCacheThread.start();
     }
 
     @Override
@@ -114,6 +121,7 @@ public class NupService extends Service implements Player.SongCompleteListener {
         Log.d(TAG, "service destroyed");
         mNotificationManager.cancel(NOTIFICATION_ID);
         mPlayer.quit();
+        mFileCache.quit();
     }
 
     @Override
@@ -188,7 +196,7 @@ public class NupService extends Service implements Player.SongCompleteListener {
 
         try {
             mProxy = new LocalProxy(uri.getHost(), port, useSsl, prefs.getString("username", ""), prefs.getString("password", ""));
-            mProxyThread = new Thread(mProxy);
+            mProxyThread = new Thread(mProxy, "LocalProxy");
             mProxyThread.setDaemon(true);
             mProxyThread.start();
             mProxyRunning = true;
@@ -241,6 +249,7 @@ public class NupService extends Service implements Player.SongCompleteListener {
         Song song = mSongs.get(index);
         String url = "http://localhost:" + mProxy.getPort() + "/music/" + song.getFilename();
         mPlayer.playSong(url, delayMs);
+        //mFileCache.downloadFile(url);
 
         if (coverCache.containsKey(song.getCoverFilename())) {
             song.setCoverBitmap((Bitmap) coverCache.get(song.getCoverFilename()));
