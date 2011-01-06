@@ -22,6 +22,12 @@ import android.widget.EditText;
 import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
+
+import org.apache.http.HttpException;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.json.JSONTokener;
+
 import java.io.InputStream;
 import java.io.IOException;
 import java.net.URL;
@@ -29,9 +35,6 @@ import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
-import org.json.JSONArray;
-import org.json.JSONObject;
-import org.json.JSONTokener;
 
 public class NupSearchActivity extends Activity {
     private static final String TAG = "NupSearchActivity";
@@ -103,7 +106,7 @@ public class NupSearchActivity extends Activity {
         public void onServiceConnected(ComponentName className, IBinder service) {
             Log.d(TAG, "connected to service");
             mService = ((NupService.LocalBinder) service).getService();
-            new GetContentsTask().execute("http://localhost:" + mService.getProxyPort() + "/contents");
+            new GetContentsTask().execute();
         }
 
         public void onServiceDisconnected(ComponentName className) {
@@ -112,22 +115,21 @@ public class NupSearchActivity extends Activity {
         }
     };
 
-    class GetContentsTask extends AsyncTask<String, Void, String> {
+    class GetContentsTask extends AsyncTask<Void, Void, String> {
+        // User-friendly description of error, if any, while getting contents.
+        private String[] mError = new String[1];
+
         @Override
-        protected String doInBackground(String... urls) {
-            try {
-                URL url = new URL(urls[0]);
-                InputStream stream = (InputStream) url.getContent();
-                return Util.getStringFromInputStream(stream);
-            } catch (IOException e) {
-                return "";
-            }
+        protected String doInBackground(Void... voidArg) {
+            return Download.downloadString(NupSearchActivity.this, "/contents", null, mError);
         }
 
         @Override
         protected void onPostExecute(String response) {
-            if (response.isEmpty())
+            if (response == null || response.isEmpty()) {
+                Toast.makeText(NupSearchActivity.this, "Unable to get autocomplete data: " + mError[0], Toast.LENGTH_LONG).show();
                 return;
+            }
 
             try {
                 JSONObject jsonArtistMap = (JSONObject) new JSONTokener(response).nextValue();
@@ -145,28 +147,26 @@ public class NupSearchActivity extends Activity {
                 }
                 mArtistEdit.setAdapter(new ArrayAdapter<String>(NupSearchActivity.this, android.R.layout.simple_dropdown_item_1line, artists));
             } catch (org.json.JSONException e) {
+                Toast.makeText(NupSearchActivity.this, "Unable to parse autocomplete data: " + e, Toast.LENGTH_LONG).show();
             }
         }
     }
 
     class SendSearchRequestTask extends AsyncTask<String, Void, String> {
-        String nMessage;
+        // User-friendly description of the error, if any.
+        private String[] mError = new String[1];
 
         @Override
         protected String doInBackground(String... urls) {
-            try {
-                URL url = new URL(urls[0]);
-                InputStream stream = (InputStream) url.getContent();
-                return Util.getStringFromInputStream(stream);
-            } catch (IOException e) {
-                nMessage = "Query failed: " + e.getMessage();
-                return "";
-            }
+            return Download.downloadString(NupSearchActivity.this, urls[0], urls[1], mError);
         }
 
         @Override
         protected void onPostExecute(String response) {
-            if (!response.isEmpty()) {
+            String message;
+            if (response == null || response.isEmpty()) {
+                message = "Query failed: " + mError[0];
+            } else {
                 try {
                     JSONArray jsonSongs = (JSONArray) new JSONTokener(response).nextValue();
                     ArrayList<Song> songs = new ArrayList<Song>();
@@ -175,17 +175,17 @@ public class NupSearchActivity extends Activity {
                     }
                     if (songs.size() > 0) {
                         mService.setPlaylist(songs);
-                        nMessage = "Queued " + songs.size() + " song" + (songs.size() == 1 ? "" : "s") + " from server.";
+                        message = "Queued " + songs.size() + " song" + (songs.size() == 1 ? "" : "s") + " from server.";
                         finish();
                     } else {
-                        nMessage = "No results.";
+                        message = "No results.";
                     }
                 } catch (org.json.JSONException e) {
-                    nMessage = "Unable to parse response from server: " + e.getCause();
+                    message = "Unable to parse response: " + e.getCause();
                 }
             }
 
-            Toast.makeText(NupSearchActivity.this, nMessage, Toast.LENGTH_LONG).show();
+            Toast.makeText(NupSearchActivity.this, message, Toast.LENGTH_LONG).show();
         }
     }
 
@@ -214,6 +214,6 @@ public class NupSearchActivity extends Activity {
         builder.addCheckBoxParam("substring", mSubstringCheckbox);
         if (mMinRating != null && !mMinRating.isEmpty())
             builder.addStringParam("minRating", mMinRating);
-        new SendSearchRequestTask().execute("http://localhost:" + mService.getProxyPort() + "/query?" + TextUtils.join("&", builder.params));
+        new SendSearchRequestTask().execute("/query", TextUtils.join("&", builder.params));
     }
 }

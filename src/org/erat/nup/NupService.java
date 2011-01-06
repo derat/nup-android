@@ -249,7 +249,7 @@ public class NupService extends Service implements Player.SongCompleteListener {
         Song song = mSongs.get(index);
         String url = "http://localhost:" + mProxy.getPort() + "/music/" + song.getFilename();
         mPlayer.playSong(url, delayMs);
-        //mFileCache.downloadFile(url);
+        mFileCache.downloadFile(url, song.getFilename());
 
         if (coverCache.containsKey(song.getCoverFilename())) {
             song.setCoverBitmap((Bitmap) coverCache.get(song.getCoverFilename()));

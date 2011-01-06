@@ -61,7 +61,7 @@ class FileCache implements Runnable {
         });
     }
 
-    public void downloadFile(final String url) {
+    public void downloadFile(final String url, final String destPath) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
@@ -86,8 +86,10 @@ class FileCache implements Runnable {
                     Log.d(TAG, "file at " + url + " has length " + entity.getContentLength());
                     InputStream inputStream = entity.getContent();
 
-                    File file = new File(mMusicDir, uri.getPath().replace("/", "%"));
+                    File file = new File(mMusicDir, destPath);
+                    file.getParentFile().mkdirs();
                     file.createNewFile();
+
                     FileOutputStream outputStream = new FileOutputStream(file);
                     int bytesRead = 0, bytesWritten = 0;
                     byte[] buffer = new byte[BUFFER_SIZE];
