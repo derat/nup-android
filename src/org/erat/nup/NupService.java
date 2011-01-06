@@ -20,6 +20,8 @@ import android.util.Log;
 import android.widget.RemoteViews;
 import android.widget.Toast;
 
+import org.apache.http.HttpException;
+
 import java.io.InputStream;
 import java.io.IOException;
 import java.lang.Runnable;
@@ -249,7 +251,8 @@ public class NupService extends Service implements Player.SongCompleteListener {
         Song song = mSongs.get(index);
         String url = "http://localhost:" + mProxy.getPort() + "/music/" + song.getFilename();
         mPlayer.playSong(url, delayMs);
-        mFileCache.downloadFile(url, song.getFilename());
+        // FIXME: Cache the file to the SD card and play it from there.
+        //mFileCache.downloadFile(url, song.getFilename());
 
         if (coverCache.containsKey(song.getCoverFilename())) {
             song.setCoverBitmap((Bitmap) coverCache.get(song.getCoverFilename()));
@@ -275,12 +278,13 @@ public class NupService extends Service implements Player.SongCompleteListener {
             Song song = songs[0];
             song.setCoverBitmap(null);
             try {
-                URL coverUrl = new URL("http://localhost:" + mProxy.getPort() + "/cover/" + song.getCoverFilename());
-                InputStream stream = (InputStream) coverUrl.getContent();
-                Bitmap bitmap = BitmapFactory.decodeStream(stream);
+                DownloadRequest request = new DownloadRequest(NupService.this, "/cover/" + song.getCoverFilename(), null);
+                DownloadResult result = Download.startDownload(request);
+                Bitmap bitmap = BitmapFactory.decodeStream(result.getStream());
                 song.setCoverBitmap(bitmap);
+            } catch (DownloadRequest.PrefException e) {
+            } catch (HttpException e) {
             } catch (IOException e) {
-                Log.e(TAG, "unable to load album cover " + song.getCoverFilename() + ": " + e);
             }
             return song;
         }
