@@ -4,16 +4,10 @@
 package org.erat.nup;
 
 import android.content.Context;
-import android.net.http.AndroidHttpClient;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
-
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.HttpEntity;
-import org.apache.http.HttpResponse;
-import org.apache.http.HttpStatus;
 
 import java.io.File;
 import java.io.FileOutputStream;
@@ -25,12 +19,18 @@ import java.net.URI;
 class FileCache implements Runnable {
     static private final String TAG = "FileCache";
 
-    static private final String USER_AGENT = "nup";
-
     static private final int BUFFER_SIZE = 8 * 1024;
 
+    interface DownloadListener {
+        void onDownloadAbort(String destPath);
+        void onDownloadComplete(String destPath);
+        void onDownloadProgress(String destPath, long numReceivedBytes);
+    }
+
+    // Application context.
     private final Context mContext;
 
+    // Directory where we write music files.
     private final File mMusicDir;
 
     // Used to run tasks on our own thread.
@@ -61,48 +61,58 @@ class FileCache implements Runnable {
         });
     }
 
-    public void downloadFile(final String url, final String destPath) {
+    public void downloadFile(final String urlPath, final String destPath, final DownloadListener listener) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                URI uri;
+                DownloadRequest request;
                 try {
-                    uri = new URI(url);
-                } catch (java.net.URISyntaxException e) {
-                    Log.e(TAG, "unable to parse URL " + url + ": " + e);
+                    request = new DownloadRequest(mContext, urlPath, null);
+                } catch (DownloadRequest.PrefException e) {
+                    listener.onDownloadAbort(destPath);
                     return;
                 }
 
-                HttpGet request = new HttpGet(uri);
-                AndroidHttpClient client = AndroidHttpClient.newInstance(USER_AGENT);
+                DownloadResult result;
                 try {
-                    HttpResponse response = client.execute(request);
-                    int statusCode = response.getStatusLine().getStatusCode();
-                    if (statusCode != HttpStatus.SC_OK) {
-                        Log.d(TAG, "got non-200 status code " + statusCode + " while downloading " + url);
-                        return;
-                    }
-                    HttpEntity entity = response.getEntity();
-                    Log.d(TAG, "file at " + url + " has length " + entity.getContentLength());
-                    InputStream inputStream = entity.getContent();
+                    result = Download.startDownload(request);
+                } catch (org.apache.http.HttpException e) {
+                    listener.onDownloadAbort(destPath);
+                    return;
+                } catch (IOException e) {
+                    listener.onDownloadAbort(destPath);
+                    return;
+                }
 
-                    File file = new File(mMusicDir, destPath);
-                    file.getParentFile().mkdirs();
+                File file = new File(mMusicDir, destPath);
+                file.getParentFile().mkdirs();
+                try {
                     file.createNewFile();
+                } catch (IOException e) {
+                    listener.onDownloadAbort(destPath);
+                    return;
+                }
 
-                    FileOutputStream outputStream = new FileOutputStream(file);
-                    int bytesRead = 0, bytesWritten = 0;
-                    byte[] buffer = new byte[BUFFER_SIZE];
-                    while ((bytesRead = inputStream.read(buffer)) != -1) {
+                FileOutputStream outputStream;
+                try {
+                    outputStream = new FileOutputStream(file);
+                } catch (java.io.FileNotFoundException e) {
+                    listener.onDownloadAbort(destPath);
+                    return;
+                }
+
+                int bytesRead = 0, bytesWritten = 0;
+                byte[] buffer = new byte[BUFFER_SIZE];
+                try {
+                    while ((bytesRead = result.getStream().read(buffer)) != -1) {
                         outputStream.write(buffer, 0, bytesRead);
                         bytesWritten += bytesRead;
                     }
-                    Log.d(TAG, "wrote " + bytesWritten + " bytes to " + file.getAbsolutePath());
                 } catch (IOException e) {
-                    Log.d(TAG, "got IO exception while downloading " + url + ": " + e);
-                } finally {
-                    client.close();
+                    listener.onDownloadAbort(destPath);
+                    return;
                 }
+                Log.d(TAG, "wrote " + bytesWritten + " bytes to " + file.getAbsolutePath());
             }
         });
     }
