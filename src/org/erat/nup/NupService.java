@@ -31,7 +31,7 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
 
-public class NupService extends Service implements Player.SongCompleteListener {
+public class NupService extends Service implements Player.SongCompleteListener, FileCache.DownloadListener {
     private static final String TAG = "NupService";
 
     // Identifier used for our "currently playing" notification.
@@ -251,8 +251,9 @@ public class NupService extends Service implements Player.SongCompleteListener {
         Song song = mSongs.get(index);
         String url = "http://localhost:" + mProxy.getPort() + "/music/" + song.getFilename();
         mPlayer.playSong(url, delayMs);
+
         // FIXME: Cache the file to the SD card and play it from there.
-        //mFileCache.downloadFile(url, song.getFilename());
+        //mFileCache.downloadFile("/music/" + song.getFilename(), song.getFilename(), this);
 
         if (coverCache.containsKey(song.getCoverFilename())) {
             song.setCoverBitmap((Bitmap) coverCache.get(song.getCoverFilename()));
@@ -318,5 +319,23 @@ public class NupService extends Service implements Player.SongCompleteListener {
                 playSongAtIndex(mCurrentSongIndex + 1, 0);
             }
         });
+    }
+
+    // Implements FileCache.DownloadListener.
+    @Override
+    public void onDownloadFail(int handle) {
+        Log.d(TAG, "got notification that download " + handle + " failed");
+    }
+
+    // Implements FileCache.DownloadListener.
+    @Override
+    public void onDownloadComplete(int handle) {
+        Log.d(TAG, "got notification that download " + handle + " is complete");
+    }
+
+    // Implements FileCache.DownloadListener.
+    @Override
+    public void onDownloadProgress(int handle, long numReceivedBytes) {
+        Log.d(TAG, "got notification that download " + handle + " is at " + numReceivedBytes + " bytes");
     }
 }

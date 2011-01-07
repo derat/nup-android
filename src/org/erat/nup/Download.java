@@ -99,6 +99,8 @@ class DownloadRequest {
 
 // Encapsulates the response to a download attempt.
 class DownloadResult {
+    private static final String TAG = "DownloadResult";
+
     // HTTP status code returned by the server.
     private final int mStatusCode;
 
@@ -127,8 +129,12 @@ class DownloadResult {
     public InputStream getStream() { return mStream; }
 
     // Must be called once the result has been read to close the connection to the server.
-    public void close() throws IOException {
-        mConn.close();
+    public void close() {
+        try {
+            mConn.close();
+        } catch (IOException e) {
+            Log.e(TAG, "got IO exception while closing connection");
+        }
     }
 }
 

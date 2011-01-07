@@ -15,6 +15,8 @@ import java.io.InputStream;
 import java.io.IOException;
 import java.lang.Runnable;
 import java.net.URI;
+import java.util.HashSet;
+import java.util.Set;
 
 class FileCache implements Runnable {
     static private final String TAG = "FileCache";
@@ -22,9 +24,9 @@ class FileCache implements Runnable {
     static private final int BUFFER_SIZE = 8 * 1024;
 
     interface DownloadListener {
-        void onDownloadAbort(String destPath);
-        void onDownloadComplete(String destPath);
-        void onDownloadProgress(String destPath, long numReceivedBytes);
+        void onDownloadFail(int handle);
+        void onDownloadComplete(int handle);
+        void onDownloadProgress(int handle, long numReceivedBytes);
     }
 
     // Application context.
@@ -36,6 +38,10 @@ class FileCache implements Runnable {
     // Used to run tasks on our own thread.
     private Handler mHandler;
 
+    private Set mHandles = new HashSet();
+
+    private int mNextHandle = 1;
+
     FileCache(Context context) {
         mContext = context;
 
@@ -44,6 +50,9 @@ class FileCache implements Runnable {
             Log.e(TAG, "media has state " + state + "; we need " + Environment.MEDIA_MOUNTED);
 
         mMusicDir = mContext.getExternalFilesDir(Environment.DIRECTORY_MUSIC);
+
+        // FIXME: Remove this once done with testing.
+        clear();
     }
 
     public void run() {
@@ -61,15 +70,42 @@ class FileCache implements Runnable {
         });
     }
 
-    public void downloadFile(final String urlPath, final String destPath, final DownloadListener listener) {
+    public void abortDownload(int handle) {
+        synchronized(mHandles) {
+            if (!mHandles.contains(handle)) {
+                Log.e(TAG, "tried to abort nonexistent download " + handle);
+                return;
+            }
+            mHandles.remove(handle);
+            Log.d(TAG, "canceled download " + handle);
+        }
+    }
+
+    private boolean isDownloadCanceled(int handle) {
+        synchronized(mHandles) {
+            return !mHandles.contains(handle);
+        }
+    }
+
+    public int downloadFile(final String urlPath, final String destPath, final DownloadListener listener) {
+        final int handle;
+        synchronized(mHandles) {
+            handle = mNextHandle++;
+            mHandles.add(handle);
+            Log.d(TAG, "posting download " + handle + " (" + urlPath + " -> " + destPath + ")");
+        }
+
         mHandler.post(new Runnable() {
             @Override
             public void run() {
+                if (isDownloadCanceled(handle))
+                    return;
+
                 DownloadRequest request;
                 try {
                     request = new DownloadRequest(mContext, urlPath, null);
                 } catch (DownloadRequest.PrefException e) {
-                    listener.onDownloadAbort(destPath);
+                    listener.onDownloadFail(handle);
                     return;
                 }
 
@@ -77,10 +113,15 @@ class FileCache implements Runnable {
                 try {
                     result = Download.startDownload(request);
                 } catch (org.apache.http.HttpException e) {
-                    listener.onDownloadAbort(destPath);
+                    listener.onDownloadFail(handle);
                     return;
                 } catch (IOException e) {
-                    listener.onDownloadAbort(destPath);
+                    listener.onDownloadFail(handle);
+                    return;
+                }
+
+                if (isDownloadCanceled(handle)) {
+                    result.close();
                     return;
                 }
 
@@ -89,7 +130,8 @@ class FileCache implements Runnable {
                 try {
                     file.createNewFile();
                 } catch (IOException e) {
-                    listener.onDownloadAbort(destPath);
+                    result.close();
+                    listener.onDownloadFail(handle);
                     return;
                 }
 
@@ -97,24 +139,38 @@ class FileCache implements Runnable {
                 try {
                     outputStream = new FileOutputStream(file);
                 } catch (java.io.FileNotFoundException e) {
-                    listener.onDownloadAbort(destPath);
+                    result.close();
+                    file.delete();
+                    listener.onDownloadFail(handle);
                     return;
                 }
 
-                int bytesRead = 0, bytesWritten = 0;
-                byte[] buffer = new byte[BUFFER_SIZE];
                 try {
+                    int bytesRead = 0, bytesWritten = 0;
+                    byte[] buffer = new byte[BUFFER_SIZE];
                     while ((bytesRead = result.getStream().read(buffer)) != -1) {
+                        if (isDownloadCanceled(handle)) {
+                            result.close();
+                            file.delete();
+                            return;
+                        }
                         outputStream.write(buffer, 0, bytesRead);
                         bytesWritten += bytesRead;
                     }
+                    Log.d(TAG, "finished download " + handle + " (" + bytesWritten + " bytes to " + file.getAbsolutePath() + ")");
                 } catch (IOException e) {
-                    listener.onDownloadAbort(destPath);
+                    result.close();
+                    file.delete();
+                    listener.onDownloadFail(handle);
                     return;
                 }
-                Log.d(TAG, "wrote " + bytesWritten + " bytes to " + file.getAbsolutePath());
+
+                result.close();
+                listener.onDownloadComplete(handle);
             }
         });
+
+        return handle;
     }
 
     public void clear() {
