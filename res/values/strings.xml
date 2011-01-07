@@ -11,11 +11,11 @@
   <string name="password">Password</string>
   <string name="pause">Pause</string>
   <string name="play">Play</string>
-  <string name="preferences">Preferences</string>
   <string name="prev">Prev</string>
   <string name="search">Search</string>
   <string name="server_url">Server URL</string>
   <string name="server_url_description">Location of music server, e.g. \"https://www.example.org:1234/\".</string>
+  <string name="settings">Settings</string>
   <string name="shuffle">Shuffle</string>
   <string name="substring">Substring</string>
   <string name="title">Title</string>

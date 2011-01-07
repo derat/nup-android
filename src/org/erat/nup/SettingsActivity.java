@@ -9,13 +9,13 @@ import android.preference.PreferenceActivity;
 import android.preference.PreferenceManager;
 import android.os.Bundle;
 
-public class NupPreferenceActivity extends PreferenceActivity implements Preference.OnPreferenceChangeListener {
+public class SettingsActivity extends PreferenceActivity implements Preference.OnPreferenceChangeListener {
     SharedPreferences mPrefs;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        addPreferencesFromResource(R.xml.preferences);
+        addPreferencesFromResource(R.xml.settings);
 
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
 

@@ -36,8 +36,8 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 
-public class NupSearchActivity extends Activity {
-    private static final String TAG = "NupSearchActivity";
+public class SearchActivity extends Activity {
+    private static final String TAG = "SearchActivity";
     private NupService mService;
 
     private AutoCompleteTextView mArtistEdit, mAlbumEdit;
@@ -69,7 +69,7 @@ public class NupSearchActivity extends Activity {
                     ArrayList<String> albums = new ArrayList<String>();
                     if (mAlbumMap.containsKey(artist))
                         albums = (ArrayList<String>) mAlbumMap.get(artist);
-                    mAlbumEdit.setAdapter(new ArrayAdapter<String>(NupSearchActivity.this, android.R.layout.simple_dropdown_item_1line, albums));
+                    mAlbumEdit.setAdapter(new ArrayAdapter<String>(SearchActivity.this, android.R.layout.simple_dropdown_item_1line, albums));
                 }
             }
         });
@@ -81,11 +81,11 @@ public class NupSearchActivity extends Activity {
         mMinRatingSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
             @Override
             public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
-                NupSearchActivity.this.mMinRating = parent.getItemAtPosition(pos).toString();
+                SearchActivity.this.mMinRating = parent.getItemAtPosition(pos).toString();
             }
             @Override
             public void onNothingSelected(AdapterView<?> parent) {
-                NupSearchActivity.this.mMinRating = null;
+                SearchActivity.this.mMinRating = null;
             }
         });
 
@@ -121,13 +121,13 @@ public class NupSearchActivity extends Activity {
 
         @Override
         protected String doInBackground(Void... voidArg) {
-            return Download.downloadString(NupSearchActivity.this, "/contents", null, mError);
+            return Download.downloadString(SearchActivity.this, "/contents", null, mError);
         }
 
         @Override
         protected void onPostExecute(String response) {
             if (response == null || response.isEmpty()) {
-                Toast.makeText(NupSearchActivity.this, "Unable to get autocomplete data: " + mError[0], Toast.LENGTH_LONG).show();
+                Toast.makeText(SearchActivity.this, "Unable to get autocomplete data: " + mError[0], Toast.LENGTH_LONG).show();
                 return;
             }
 
@@ -145,9 +145,9 @@ public class NupSearchActivity extends Activity {
                     }
                     mAlbumMap.put(artist.toLowerCase(), albums);
                 }
-                mArtistEdit.setAdapter(new ArrayAdapter<String>(NupSearchActivity.this, android.R.layout.simple_dropdown_item_1line, artists));
+                mArtistEdit.setAdapter(new ArrayAdapter<String>(SearchActivity.this, android.R.layout.simple_dropdown_item_1line, artists));
             } catch (org.json.JSONException e) {
-                Toast.makeText(NupSearchActivity.this, "Unable to parse autocomplete data: " + e, Toast.LENGTH_LONG).show();
+                Toast.makeText(SearchActivity.this, "Unable to parse autocomplete data: " + e, Toast.LENGTH_LONG).show();
             }
         }
     }
@@ -158,7 +158,7 @@ public class NupSearchActivity extends Activity {
 
         @Override
         protected String doInBackground(String... urls) {
-            return Download.downloadString(NupSearchActivity.this, urls[0], urls[1], mError);
+            return Download.downloadString(SearchActivity.this, urls[0], urls[1], mError);
         }
 
         @Override
@@ -185,7 +185,7 @@ public class NupSearchActivity extends Activity {
                 }
             }
 
-            Toast.makeText(NupSearchActivity.this, message, Toast.LENGTH_LONG).show();
+            Toast.makeText(SearchActivity.this, message, Toast.LENGTH_LONG).show();
         }
     }
 
