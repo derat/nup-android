@@ -50,7 +50,7 @@ class DownloadRequest {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
 
         // Build a URI based on the server pref.
-        String server = prefs.getString("server_url", "");
+        String server = prefs.getString(NupPreferences.SERVER_URL, "");
         if (server.isEmpty())
             throw new PrefException("Server URL is not configured");
 
@@ -87,8 +87,8 @@ class DownloadRequest {
         // TODO: Set User-Agent to something reasonable.
 
         // Add Authorization header if username and password prefs are set.
-        String username = prefs.getString("username", "");
-        String password = prefs.getString("password", "");
+        String username = prefs.getString(NupPreferences.USERNAME, "");
+        String password = prefs.getString(NupPreferences.PASSWORD, "");
         if (!username.isEmpty() && !password.isEmpty())
             mHttpRequest.addHeader("Authorization", "Basic " + Base64.encodeToString((username + ":" + password).getBytes(), Base64.NO_WRAP));
     }

@@ -2,12 +2,14 @@
 <PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
   <PreferenceCategory android:title="Server info">
     <EditTextPreference
+        android:id="@+id/server_url"
         android:key="server_url"
         android:title="@string/server_url"
         android:dialogMessage="@string/server_url_description"
         android:singleLine="true"
         />
     <EditTextPreference
+        android:id="@+id/username"
         android:key="username"
         android:title="@string/username"
         android:dialogMessage="@string/username_description"
