@@ -7,6 +7,7 @@ import android.content.Context;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 import android.util.Log;
 
 import java.io.File;
@@ -15,13 +16,20 @@ import java.io.InputStream;
 import java.io.IOException;
 import java.lang.Runnable;
 import java.net.URI;
+import java.util.Date;
 import java.util.HashSet;
-import java.util.Set;
 
 class FileCache implements Runnable {
     static private final String TAG = "FileCache";
 
     static private final int BUFFER_SIZE = 8 * 1024;
+
+    // We download this many initial bytes as quickly as we can.
+    static private final int INITIAL_BYTES = 128 * 1024;
+
+    static private final int MAX_BYTES_PER_SECOND = 128 * 1024;
+
+    static private final int PROGRESS_REPORT_BYTES = 64 * 1024;
 
     interface DownloadListener {
         void onDownloadFail(int handle);
@@ -38,7 +46,7 @@ class FileCache implements Runnable {
     // Used to run tasks on our own thread.
     private Handler mHandler;
 
-    private Set mHandles = new HashSet();
+    private HashSet mHandles = new HashSet();
 
     private int mNextHandle = 1;
 
@@ -70,6 +78,10 @@ class FileCache implements Runnable {
         });
     }
 
+    public File getLocalFile(String urlPath) {
+        return new File(mMusicDir, urlPath.replace("/", "_"));
+    }
+
     public void abortDownload(int handle) {
         synchronized(mHandles) {
             if (!mHandles.contains(handle)) {
@@ -87,12 +99,12 @@ class FileCache implements Runnable {
         }
     }
 
-    public int downloadFile(final String urlPath, final String destPath, final DownloadListener listener) {
+    public int downloadFile(final String urlPath, final DownloadListener listener) {
         final int handle;
         synchronized(mHandles) {
             handle = mNextHandle++;
             mHandles.add(handle);
-            Log.d(TAG, "posting download " + handle + " (" + urlPath + " -> " + destPath + ")");
+            Log.d(TAG, "posting download " + handle + " of " + urlPath);
         }
 
         mHandler.post(new Runnable() {
@@ -125,7 +137,7 @@ class FileCache implements Runnable {
                     return;
                 }
 
-                File file = new File(mMusicDir, destPath);
+                File file = getLocalFile(urlPath);
                 file.getParentFile().mkdirs();
                 try {
                     file.createNewFile();
@@ -146,18 +158,38 @@ class FileCache implements Runnable {
                 }
 
                 try {
+                    Date startDate = new Date();
                     int bytesRead = 0, bytesWritten = 0;
+                    int lastReportBytes = 0;
                     byte[] buffer = new byte[BUFFER_SIZE];
+
+                    Date then = new Date();
                     while ((bytesRead = result.getStream().read(buffer)) != -1) {
                         if (isDownloadCanceled(handle)) {
                             result.close();
                             file.delete();
                             return;
                         }
+
                         outputStream.write(buffer, 0, bytesRead);
                         bytesWritten += bytesRead;
+
+                        if (bytesWritten >= lastReportBytes + PROGRESS_REPORT_BYTES) {
+                            listener.onDownloadProgress(handle, bytesWritten);
+                            lastReportBytes = bytesWritten;
+                        }
+
+                        Date now = new Date();
+                        long elapsedMs = now.getTime() - then.getTime();
+                        long expectedMs = (long) (bytesRead / (float) MAX_BYTES_PER_SECOND * 1000);
+                        if (elapsedMs < expectedMs)
+                            SystemClock.sleep(expectedMs - elapsedMs);
+
+                        then = new Date();
                     }
-                    Log.d(TAG, "finished download " + handle + " (" + bytesWritten + " bytes to " + file.getAbsolutePath() + ")");
+                    Date endDate = new Date();
+                    Log.d(TAG, "finished download " + handle + " (" + bytesWritten + " bytes to " +
+                          file.getAbsolutePath() + " in " + (endDate.getTime() - startDate.getTime()) + " ms)");
                 } catch (IOException e) {
                     result.close();
                     file.delete();

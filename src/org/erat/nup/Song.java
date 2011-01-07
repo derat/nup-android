@@ -25,15 +25,17 @@ class Song {
     }
 
     // Yay.
-    public final String getArtist() { return mArtist; }
-    public final String getTitle() { return mTitle; }
-    public final String getAlbum() { return mAlbum; }
-    public final String getFilename() { return mFilename; }
-    public final String getCoverFilename() { return mCoverFilename; }
-    public final Bitmap getCoverBitmap() { return mCoverBitmap; }
-    public final int getLengthSec() { return mLengthSec; }
-    public final int getSongId() { return mSongId; }
-    public final double getRating() { return mRating; }
+    public String getArtist() { return mArtist; }
+    public String getTitle() { return mTitle; }
+    public String getAlbum() { return mAlbum; }
+    public String getFilename() { return mFilename; }
+    public String getCoverFilename() { return mCoverFilename; }
+    public Bitmap getCoverBitmap() { return mCoverBitmap; }
+    public int getLengthSec() { return mLengthSec; }
+    public int getSongId() { return mSongId; }
+    public double getRating() { return mRating; }
+
+    public String getUrlPath() { return "/music/" + mFilename; }
 
     public void setCoverBitmap(Bitmap bitmap) { mCoverBitmap = bitmap; }
 }

@@ -68,6 +68,9 @@ public class NupService extends Service implements Player.SongCompleteListener, 
     private FileCache mFileCache;
     private Thread mFileCacheThread;
 
+    private int mCurrentFileCacheHandle = -1;
+    private boolean mWaitingForFileCache = false;
+
     // Is the proxy currently configured and running?
     private boolean mProxyRunning = false;
 
@@ -249,11 +252,11 @@ public class NupService extends Service implements Player.SongCompleteListener, 
 
         mCurrentSongIndex = index;
         Song song = mSongs.get(index);
-        String url = "http://localhost:" + mProxy.getPort() + "/music/" + song.getFilename();
-        mPlayer.playSong(url, delayMs);
 
-        // FIXME: Cache the file to the SD card and play it from there.
-        //mFileCache.downloadFile("/music/" + song.getFilename(), song.getFilename(), this);
+        if (mCurrentFileCacheHandle != -1)
+            mFileCache.abortDownload(mCurrentFileCacheHandle);
+        mCurrentFileCacheHandle = mFileCache.downloadFile(song.getUrlPath(), this);
+        mWaitingForFileCache = true;
 
         if (coverCache.containsKey(song.getCoverFilename())) {
             song.setCoverBitmap((Bitmap) coverCache.get(song.getCoverFilename()));
@@ -323,19 +326,49 @@ public class NupService extends Service implements Player.SongCompleteListener, 
 
     // Implements FileCache.DownloadListener.
     @Override
-    public void onDownloadFail(int handle) {
-        Log.d(TAG, "got notification that download " + handle + " failed");
+    public void onDownloadFail(final int handle) {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                Log.d(TAG, "got notification that download " + handle + " failed");
+                if (handle == mCurrentFileCacheHandle) {
+                    mCurrentFileCacheHandle = -1;
+                    mWaitingForFileCache = false;
+                }
+            }
+        });
     }
 
     // Implements FileCache.DownloadListener.
     @Override
-    public void onDownloadComplete(int handle) {
-        Log.d(TAG, "got notification that download " + handle + " is complete");
+    public void onDownloadComplete(final int handle) {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                Log.d(TAG, "got notification that download " + handle + " is complete");
+                if (handle == mCurrentFileCacheHandle) {
+                    if (mWaitingForFileCache) {
+                        mWaitingForFileCache = false;
+                        mPlayer.playSong(mFileCache.getLocalFile(getCurrentSong().getUrlPath()).getAbsolutePath(), 0);
+                    }
+                    mCurrentFileCacheHandle = -1;
+                }
+            }
+        });
     }
 
     // Implements FileCache.DownloadListener.
     @Override
-    public void onDownloadProgress(int handle, long numReceivedBytes) {
-        Log.d(TAG, "got notification that download " + handle + " is at " + numReceivedBytes + " bytes");
+    public void onDownloadProgress(final int handle, final long numReceivedBytes) {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (handle == mCurrentFileCacheHandle && mWaitingForFileCache && numReceivedBytes > 100000) {
+                    Log.d(TAG, "got notification that download " + handle + " is at " + numReceivedBytes + " bytes; playing");
+                    mWaitingForFileCache = false;
+                    mPlayer.playSong(mFileCache.getLocalFile(getCurrentSong().getUrlPath()).getAbsolutePath(), 0);
+                }
+            }
+        });
     }
 }
