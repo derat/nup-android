@@ -231,11 +231,7 @@ public class NupActivity extends Activity
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
         case R.id.search_menu_item:
-            if (!mService.isProxyRunning()) {
-                Toast.makeText(this, "Server must be configured in Preferences.", Toast.LENGTH_LONG).show();
-            } else {
-                startActivity(new Intent(this, NupSearchActivity.class));
-            }
+            startActivity(new Intent(this, NupSearchActivity.class));
             return true;
         case R.id.preferences_menu_item:
             startActivity(new Intent(this, NupPreferenceActivity.class));

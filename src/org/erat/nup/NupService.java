@@ -58,21 +58,11 @@ public class NupService extends Service implements Player.SongCompleteListener, 
     // Thread where mPlayerThread runs.
     private Thread mPlayerThread;
 
-    // Listens on a local port and proxies HTTP requests to a remote web server.
-    // Needed since MediaPlayer doesn't support HTTP authentication.
-    private LocalProxy mProxy;
-
-    // Thread where mProxy runs.
-    private Thread mProxyThread;
-
     private FileCache mFileCache;
     private Thread mFileCacheThread;
 
     private int mCurrentFileCacheHandle = -1;
     private boolean mWaitingForFileCache = false;
-
-    // Is the proxy currently configured and running?
-    private boolean mProxyRunning = false;
 
     private NotificationManager mNotificationManager;
 
@@ -103,8 +93,6 @@ public class NupService extends Service implements Player.SongCompleteListener, 
         Notification notification = updateNotification("nup", getString(R.string.initial_notification), "", (Bitmap) null);
         startForeground(NOTIFICATION_ID, notification);
 
-        initProxy();
-
         mPlayer = new Player();
         mPlayerThread = new Thread(mPlayer, "Player");
         mPlayerThread.start();
@@ -134,13 +122,6 @@ public class NupService extends Service implements Player.SongCompleteListener, 
         return mBinder;
     }
 
-    // Is the proxy available?  Callers must call this before trying to fetch a URL (or even calling
-    // getProxyPort()).
-    public boolean isProxyRunning() { return mProxyRunning; }
-
-    // Get the port where the proxy is listening on localhost.
-    public int getProxyPort() { return mProxy.getPort(); }
-
     public final ArrayList<Song> getSongs() { return mSongs; }
     public final int getCurrentSongIndex() { return mCurrentSongIndex; }
 
@@ -163,50 +144,6 @@ public class NupService extends Service implements Player.SongCompleteListener, 
     public class LocalBinder extends Binder {
         NupService getService() {
             return NupService.this;
-        }
-    }
-
-    // Attempt to initialize and start the proxy based on the user's settings.
-    public void initProxy() {
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(this);
-        String urlString = prefs.getString("server_url", "");
-        if (urlString.isEmpty()) {
-            Toast.makeText(this, "You must enter a server URL in Preferences.", Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        URI uri;
-        try {
-            uri = new URI(urlString);
-        } catch (java.net.URISyntaxException e) {
-            Toast.makeText(this, "Unable to parse server URL: " + e.getMessage(), Toast.LENGTH_LONG).show();
-            return;
-        }
-        boolean useSsl = false;
-        int port = uri.getPort();
-
-        String scheme = uri.getScheme();
-
-        if (scheme == null || scheme.equals("http")) {
-            if (port < 0)
-                port = 80;
-        } else if (scheme.equals("https")) {
-            useSsl = true;
-            if (port < 0)
-                port = 443;
-        } else {
-            Toast.makeText(this, "Unknown server URL scheme \"" + scheme + "\" (should be \"http\" or \"https\").", Toast.LENGTH_LONG).show();
-            return;
-        }
-
-        try {
-            mProxy = new LocalProxy(uri.getHost(), port, useSsl, prefs.getString("username", ""), prefs.getString("password", ""));
-            mProxyThread = new Thread(mProxy, "LocalProxy");
-            mProxyThread.setDaemon(true);
-            mProxyThread.start();
-            mProxyRunning = true;
-        } catch (IOException e) {
-            Log.wtf(TAG, "creating proxy failed: " + e);
         }
     }
 
