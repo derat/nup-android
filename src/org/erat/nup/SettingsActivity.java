@@ -8,6 +8,7 @@ import android.preference.Preference;
 import android.preference.PreferenceActivity;
 import android.preference.PreferenceManager;
 import android.os.Bundle;
+import android.widget.Toast;
 
 public class SettingsActivity extends PreferenceActivity implements Preference.OnPreferenceChangeListener {
     SharedPreferences mPrefs;
@@ -31,7 +32,16 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
     @Override
     public boolean onPreferenceChange(Preference pref, Object value) {
         if (pref.getKey().equals(NupPreferences.SERVER_URL)) {
-            findPreference(NupPreferences.SERVER_URL).setSummary((String) value);
+            // Validate the URL now to avoid heartbreak later.
+            String strValue = (String) value;
+            try {
+                if (!strValue.isEmpty())
+                    DownloadRequest.parseServerUrlIntoUri(strValue, null, null);
+            } catch (DownloadRequest.PrefException e) {
+                Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG).show();
+                return false;
+            }
+            findPreference(NupPreferences.SERVER_URL).setSummary(strValue);
             return true;
         } else if (pref.getKey().equals(NupPreferences.USERNAME)) {
             findPreference(NupPreferences.USERNAME).setSummary((String) value);

@@ -50,7 +50,23 @@ class DownloadRequest {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
 
         // Build a URI based on the server pref.
-        String server = prefs.getString(NupPreferences.SERVER_URL, "");
+        mUri = parseServerUrlIntoUri(prefs.getString(NupPreferences.SERVER_URL, ""), path, query);
+
+        // When mUri is used to construct the request, we send the full URI in the request, like "GET http://...".
+        // This seems to make the server sad in some cases -- it fails to parse the query parameters.
+        // Just passing the path and query as a string avoids this; we'll just send "GET /path?query" instead.
+        mHttpRequest = new HttpGet(path + (query != null ? "?" + query : ""));
+        mHttpRequest.addHeader("Host", mUri.getHost() + ":" + mUri.getPort());
+        // TODO: Set User-Agent to something reasonable.
+
+        // Add Authorization header if username and password prefs are set.
+        String username = prefs.getString(NupPreferences.USERNAME, "");
+        String password = prefs.getString(NupPreferences.PASSWORD, "");
+        if (!username.isEmpty() && !password.isEmpty())
+            mHttpRequest.addHeader("Authorization", "Basic " + Base64.encodeToString((username + ":" + password).getBytes(), Base64.NO_WRAP));
+    }
+
+    public static URI parseServerUrlIntoUri(String server, String path, String query) throws PrefException {
         if (server.isEmpty())
             throw new PrefException("Server URL is not configured");
 
@@ -73,24 +89,14 @@ class DownloadRequest {
         }
 
         // Now build the real URI.
+        URI uri;
         try {
-            mUri = new URI(scheme, null, serverUri.getHost(), port, path, query, null);
+            uri = new URI(scheme, null, serverUri.getHost(), port, path, query, null);
         } catch (URISyntaxException e) {
-            throw new RuntimeException("Unable to parse URL: " + e.getMessage());
+            throw new PrefException("Unable to parse URL: " + e.getMessage());
         }
 
-        // When mUri is used to construct the request, we send the full URI in the request, like "GET http://...".
-        // This seems to make the server sad in some cases -- it fails to parse the query parameters.
-        // Just passing the path and query as a string avoids this; we'll just send "GET /path?query" instead.
-        mHttpRequest = new HttpGet(path + (query != null ? "?" + query : ""));
-        mHttpRequest.addHeader("Host", mUri.getHost() + ":" + mUri.getPort());
-        // TODO: Set User-Agent to something reasonable.
-
-        // Add Authorization header if username and password prefs are set.
-        String username = prefs.getString(NupPreferences.USERNAME, "");
-        String password = prefs.getString(NupPreferences.PASSWORD, "");
-        if (!username.isEmpty() && !password.isEmpty())
-            mHttpRequest.addHeader("Authorization", "Basic " + Base64.encodeToString((username + ":" + password).getBytes(), Base64.NO_WRAP));
+        return uri;
     }
 
     public final HttpRequest getHttpRequest() { return mHttpRequest; }
