@@ -27,7 +27,7 @@ class FileCache implements Runnable {
     // We download this many initial bytes as quickly as we can.
     static private final int INITIAL_BYTES = 128 * 1024;
 
-    static private final int MAX_BYTES_PER_SECOND = 128 * 1024;
+    static private final int MAX_BYTES_PER_SECOND = 512 * 1024;
 
     static private final int PROGRESS_REPORT_BYTES = 64 * 1024;
 
@@ -58,9 +58,6 @@ class FileCache implements Runnable {
             Log.e(TAG, "media has state " + state + "; we need " + Environment.MEDIA_MOUNTED);
 
         mMusicDir = mContext.getExternalFilesDir(Environment.DIRECTORY_MUSIC);
-
-        // FIXME: Remove this once done with testing.
-        clear();
     }
 
     public void run() {
@@ -93,9 +90,9 @@ class FileCache implements Runnable {
         }
     }
 
-    private boolean isDownloadCanceled(int handle) {
+    private boolean isDownloadActive(int handle) {
         synchronized(mHandles) {
-            return !mHandles.contains(handle);
+            return mHandles.contains(handle);
         }
     }
 
@@ -110,7 +107,7 @@ class FileCache implements Runnable {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                if (isDownloadCanceled(handle))
+                if (!isDownloadActive(handle))
                     return;
 
                 DownloadRequest request;
@@ -132,7 +129,7 @@ class FileCache implements Runnable {
                     return;
                 }
 
-                if (isDownloadCanceled(handle)) {
+                if (!isDownloadActive(handle)) {
                     result.close();
                     return;
                 }
@@ -163,9 +160,8 @@ class FileCache implements Runnable {
                     int lastReportBytes = 0;
                     byte[] buffer = new byte[BUFFER_SIZE];
 
-                    Date then = new Date();
                     while ((bytesRead = result.getStream().read(buffer)) != -1) {
-                        if (isDownloadCanceled(handle)) {
+                        if (!isDownloadActive(handle)) {
                             result.close();
                             file.delete();
                             return;
@@ -180,12 +176,10 @@ class FileCache implements Runnable {
                         }
 
                         Date now = new Date();
-                        long elapsedMs = now.getTime() - then.getTime();
-                        long expectedMs = (long) (bytesRead / (float) MAX_BYTES_PER_SECOND * 1000);
+                        long elapsedMs = now.getTime() - startDate.getTime();
+                        long expectedMs = (long) (bytesWritten / (float) MAX_BYTES_PER_SECOND * 1000);
                         if (elapsedMs < expectedMs)
                             SystemClock.sleep(expectedMs - elapsedMs);
-
-                        then = new Date();
                     }
                     Date endDate = new Date();
                     Log.d(TAG, "finished download " + handle + " (" + bytesWritten + " bytes to " +
