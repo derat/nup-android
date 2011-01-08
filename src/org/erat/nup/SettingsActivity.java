@@ -11,6 +11,8 @@ import android.os.Bundle;
 import android.widget.Toast;
 
 public class SettingsActivity extends PreferenceActivity implements Preference.OnPreferenceChangeListener {
+    private static final String TAG = "SettingsActivity";
+
     SharedPreferences mPrefs;
 
     @Override
@@ -27,6 +29,9 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
         pref = findPreference(NupPreferences.USERNAME);
         pref.setOnPreferenceChangeListener(this);
         pref.setSummary(mPrefs.getString(NupPreferences.USERNAME, ""));
+
+        pref = findPreference(NupPreferences.CLEAR_CACHE);
+        pref.setSummary(getString(R.string.cache_size, NupActivity.getService().getCacheDataBytes() / (double) (1024 * 1024)));
     }
 
     @Override

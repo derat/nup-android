@@ -292,6 +292,15 @@ public class NupService extends Service implements Player.SongCompleteListener, 
         }
     }
 
+    public long getCacheDataBytes() {
+        return mFileCache.getDataBytes();
+    }
+
+    public void clearCache() {
+        // FIXME: need to abort current downloads, i guess
+        mFileCache.clear();
+    }
+
     // Implements Player.SongCompleteListener.
     @Override
     public void onSongComplete() {

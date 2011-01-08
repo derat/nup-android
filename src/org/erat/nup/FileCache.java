@@ -200,6 +200,13 @@ class FileCache implements Runnable {
         return handle;
     }
 
+    public long getDataBytes() {
+        long size = 0;
+        for (File file : mMusicDir.listFiles())
+            size += file.length();
+        return size;
+    }
+
     public void clear() {
         for (File file : mMusicDir.listFiles())
             file.delete();
