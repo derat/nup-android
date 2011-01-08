@@ -160,6 +160,10 @@ public class NupActivity extends Activity
         mService.playSongAtIndex(mCurrentSongIndex);
     }
 
+    public void onSearchButtonClicked(View view) {
+        startActivity(new Intent(this, SearchActivity.class));
+    }
+
     // Formats a current time and total time as "[0:00 / 0:00]".
     private String formatTimeString(int curSec, int totalSec) {
         return String.format("[%d:%02d / %d:%02d]", curSec / 60, curSec % 60, totalSec / 60, totalSec % 60);
@@ -171,10 +175,9 @@ public class NupActivity extends Activity
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                if (index == mCurrentSongIndex && song == getCurrentSong())
-                    return;
+                if (song != getCurrentSong())
+                    updateSongDisplay(song);
 
-                updateSongDisplay(song);
                 mCurrentSongIndex = index;
                 mSongListAdapter.notifyDataSetChanged();
             }
@@ -202,6 +205,7 @@ public class NupActivity extends Activity
                 mSongs = songs;
                 mCurrentSongIndex = mService.getCurrentSongIndex();
                 updateSongDisplay(getCurrentSong());
+                findViewById(R.id.playlist_heading).setVisibility(mSongs.isEmpty() ? View.INVISIBLE : View.VISIBLE);
                 mSongListAdapter.notifyDataSetChanged();
             }
         });
@@ -268,9 +272,6 @@ public class NupActivity extends Activity
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
-        case R.id.search_menu_item:
-            startActivity(new Intent(this, SearchActivity.class));
-            return true;
         case R.id.settings_menu_item:
             startActivity(new Intent(this, SettingsActivity.class));
             return true;
