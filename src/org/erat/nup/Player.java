@@ -88,6 +88,21 @@ class Player implements Runnable, MediaPlayer.OnPreparedListener, MediaPlayer.On
         });
     }
 
+    public void abort() {
+        if (mLastPlayTask != null)
+            mHandler.removeCallbacks(mLastPlayTask);
+
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                stopPositionTimer();
+                if (mMediaPlayer != null)
+                    mMediaPlayer.release();
+                mPrepared = false;
+            }
+        });
+    }
+
     public void playSong(final String url, int delayMs) {
         if (mLastPlayTask != null)
             mHandler.removeCallbacks(mLastPlayTask);

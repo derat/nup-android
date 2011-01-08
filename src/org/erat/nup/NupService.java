@@ -22,6 +22,7 @@ import android.widget.Toast;
 
 import org.apache.http.HttpException;
 
+import java.io.File;
 import java.io.InputStream;
 import java.io.IOException;
 import java.lang.Runnable;
@@ -197,10 +198,17 @@ public class NupService extends Service implements Player.SongCompleteListener, 
         mCurrentSongIndex = index;
         Song song = mSongs.get(index);
 
-        if (mCurrentFileCacheHandle != -1)
-            mFileCache.abortDownload(mCurrentFileCacheHandle);
-        mCurrentFileCacheHandle = mFileCache.downloadFile(song.getUrlPath(), this);
-        mWaitingForFileCache = true;
+        mPlayer.abort();
+        File cacheFile = mFileCache.getLocalFile(getCurrentSong().getUrlPath());
+        if (cacheFile.exists()) {
+            Log.d(TAG, "file " + getCurrentSong().getUrlPath() + " already in cache; playing");
+            mPlayer.playSong(cacheFile.getAbsolutePath(), delayMs);
+        } else {
+            if (mCurrentFileCacheHandle != -1)
+                mFileCache.abortDownload(mCurrentFileCacheHandle);
+            mCurrentFileCacheHandle = mFileCache.downloadFile(song.getUrlPath(), this);
+            mWaitingForFileCache = true;
+        }
 
         if (coverCache.containsKey(song.getCoverFilename())) {
             song.setCoverBitmap((Bitmap) coverCache.get(song.getCoverFilename()));
