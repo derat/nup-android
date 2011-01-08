@@ -48,14 +48,10 @@ class Player implements Runnable, MediaPlayer.OnPreparedListener, MediaPlayer.On
     // Used to run tasks on our own thread.
     private Handler mHandler;
 
-    private Runnable mLastPlayTask;
-
     private SongCompleteListener mSongCompleteListener;
     private PositionChangeListener mPositionChangeListener;
     private PauseToggleListener mPauseToggleListener;
     private PlaybackErrorListener mPlaybackErrorListener;
-
-    Player() {}
 
     void setSongCompleteListener(SongCompleteListener listener) {
         mSongCompleteListener = listener;
@@ -78,20 +74,16 @@ class Player implements Runnable, MediaPlayer.OnPreparedListener, MediaPlayer.On
     }
 
     public void quit() {
+        abort();
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                if (mMediaPlayer != null)
-                    mMediaPlayer.release();
                 Looper.myLooper().quit();
             }
         });
     }
 
     public void abort() {
-        if (mLastPlayTask != null)
-            mHandler.removeCallbacks(mLastPlayTask);
-
         mHandler.post(new Runnable() {
             @Override
             public void run() {
@@ -103,23 +95,15 @@ class Player implements Runnable, MediaPlayer.OnPreparedListener, MediaPlayer.On
         });
     }
 
-    public void playSong(final String url, int delayMs) {
-        if (mLastPlayTask != null)
-            mHandler.removeCallbacks(mLastPlayTask);
-
-        stopPositionTimer();
-        mLastPlayTask = new Runnable() {
+    public void playFile(final String url) {
+        abort();
+        mHandler.post(new Runnable() {
             @Override
             public void run() {
-                stopPositionTimer();
-                if (mMediaPlayer != null)
-                    mMediaPlayer.release();
-
                 mMediaPlayer = new MediaPlayer();
                 mMediaPlayer.setOnPreparedListener(Player.this);
                 mMediaPlayer.setOnCompletionListener(Player.this);
                 mMediaPlayer.setOnErrorListener(Player.this);
-                mPrepared = false;
 
                 try {
                     mMediaPlayer.setDataSource(url);
@@ -130,8 +114,7 @@ class Player implements Runnable, MediaPlayer.OnPreparedListener, MediaPlayer.On
                 }
                 mMediaPlayer.prepareAsync();
             }
-        };
-        mHandler.postDelayed(mLastPlayTask, delayMs);
+        });
     }
 
     public void togglePause() {

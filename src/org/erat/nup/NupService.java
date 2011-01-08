@@ -31,6 +31,7 @@ import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 
 public class NupService extends Service implements Player.SongCompleteListener, FileCache.DownloadListener {
@@ -85,7 +86,10 @@ public class NupService extends Service implements Player.SongCompleteListener, 
 
     // Points from cover filename Strings to previously-fetched Bitmaps.
     // TODO: Limit the growth of this or switch it to a real LRU cache or something.
-    private HashMap coverCache = new HashMap();
+    private HashMap mCoverCache = new HashMap();
+
+    // Songs whose covers are currently being fetched.
+    private HashSet mSongCoverFetches = new HashSet();
 
     // Used to run tasks on our thread.
     private Handler mHandler = new Handler();
@@ -188,38 +192,53 @@ public class NupService extends Service implements Player.SongCompleteListener, 
         if (mPlaylistChangeListener != null)
             mPlaylistChangeListener.onPlaylistChange(mSongs);
         if (songs.size() > 0)
-            playSongAtIndex(0, 0);
+            playSongAtIndex(0);
     }
 
     // Play the song at a particular position in the playlist.
-    public void playSongAtIndex(int index, int delayMs) {
+    public void playSongAtIndex(int index) {
         if (index < 0 || index >= mSongs.size())
             return;
 
         mCurrentSongIndex = index;
-        Song song = mSongs.get(index);
+        Song song = getCurrentSong();
 
-        mPlayer.abort();
         File cacheFile = mFileCache.getLocalFile(getCurrentSong().getUrlPath());
         if (cacheFile.exists()) {
             Log.d(TAG, "file " + getCurrentSong().getUrlPath() + " already in cache; playing");
-            mPlayer.playSong(cacheFile.getAbsolutePath(), delayMs);
+            mPlayer.playFile(cacheFile.getAbsolutePath());
         } else {
+            mPlayer.abort();
             if (mCurrentFileCacheHandle != -1)
                 mFileCache.abortDownload(mCurrentFileCacheHandle);
             mCurrentFileCacheHandle = mFileCache.downloadFile(song.getUrlPath(), this);
             mWaitingForFileCache = true;
         }
 
-        if (coverCache.containsKey(song.getCoverFilename())) {
-            song.setCoverBitmap((Bitmap) coverCache.get(song.getCoverFilename()));
+        // Update the notification now if we already have the cover.  We'll update it when the fetch
+        // task finishes otherwise.
+        if (fetchCoverForSongIfMissing(song))
             updateNotification(song.getArtist(), song.getTitle(), song.getAlbum(), song.getCoverBitmap());
-        } else {
-            new CoverFetcherTask(this).execute(song);
-        }
 
         if (mSongChangeListener != null)
             mSongChangeListener.onSongChange(song, mCurrentSongIndex);
+    }
+
+    // Returns true if the cover is already loaded and false if we started a task to fetch it.
+    public boolean fetchCoverForSongIfMissing(Song song) {
+        if (song.getCoverBitmap() != null)
+            return true;
+
+        if (mCoverCache.containsKey(song.getCoverFilename())) {
+            song.setCoverBitmap((Bitmap) mCoverCache.get(song.getCoverFilename()));
+            return true;
+        }
+
+        if (!mSongCoverFetches.contains(song)) {
+            mSongCoverFetches.add(song);
+            new CoverFetcherTask(this).execute(song);
+        }
+        return false;
     }
 
     // Fetches the cover bitmap for a particular song.
@@ -254,15 +273,17 @@ public class NupService extends Service implements Player.SongCompleteListener, 
 
     // Called by CoverFetcherTask on the UI thread.
     public void onCoverFetchDone(Song song) {
-        if (song.getCoverBitmap() != null)
-            coverCache.put(song.getCoverFilename(), song.getCoverBitmap());
+        mSongCoverFetches.remove(song);
 
-        Song currentSong = getCurrentSong();
-        if (song == getCurrentSong()) {
-            // We need to update our notification even if the fetch failed.
-            updateNotification(song.getArtist(), song.getTitle(), song.getAlbum(), song.getCoverBitmap());
-            if (song.getCoverBitmap() != null && mCoverLoadListener != null)
+        if (song.getCoverBitmap() != null) {
+            mCoverCache.put(song.getCoverFilename(), song.getCoverBitmap());
+            if (mCoverLoadListener != null)
                 mCoverLoadListener.onCoverLoad(song);
+        }
+
+        // We need to update our notification even if the fetch failed.
+        if (song == getCurrentSong()) {
+            updateNotification(song.getArtist(), song.getTitle(), song.getAlbum(), song.getCoverBitmap());
         }
     }
 
@@ -272,7 +293,7 @@ public class NupService extends Service implements Player.SongCompleteListener, 
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                playSongAtIndex(mCurrentSongIndex + 1, 0);
+                playSongAtIndex(mCurrentSongIndex + 1);
             }
         });
     }
@@ -302,7 +323,7 @@ public class NupService extends Service implements Player.SongCompleteListener, 
                 if (handle == mCurrentFileCacheHandle) {
                     if (mWaitingForFileCache) {
                         mWaitingForFileCache = false;
-                        mPlayer.playSong(mFileCache.getLocalFile(getCurrentSong().getUrlPath()).getAbsolutePath(), 0);
+                        mPlayer.playFile(mFileCache.getLocalFile(getCurrentSong().getUrlPath()).getAbsolutePath());
                     }
                     mCurrentFileCacheHandle = -1;
                 }
@@ -324,7 +345,7 @@ public class NupService extends Service implements Player.SongCompleteListener, 
                         Log.d(TAG, "download " + handle + " is at " + receivedBytes + " bytes out of " + totalBytes + " total " +
                               "and is estimated to finish in " + remainingMs + " ms; playing");
                         mWaitingForFileCache = false;
-                        mPlayer.playSong(mFileCache.getLocalFile(getCurrentSong().getUrlPath()).getAbsolutePath(), 0);
+                        mPlayer.playFile(mFileCache.getLocalFile(getCurrentSong().getUrlPath()).getAbsolutePath());
                     }
                 }
             }

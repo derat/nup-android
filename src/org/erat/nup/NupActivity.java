@@ -147,7 +147,7 @@ public class NupActivity extends Activity
         mCurrentSongIndex--;
         updateSongDisplay(getCurrentSong());
         // FIXME: set up a timer here
-        mService.playSongAtIndex(mCurrentSongIndex, 0);
+        mService.playSongAtIndex(mCurrentSongIndex);
     }
 
     public void onNextButtonClicked(View view) {
@@ -157,7 +157,7 @@ public class NupActivity extends Activity
         mCurrentSongIndex++;
         updateSongDisplay(getCurrentSong());
         // FIXME: set up a timer here
-        mService.playSongAtIndex(mCurrentSongIndex, SONG_CHANGE_DELAY_MS);
+        mService.playSongAtIndex(mCurrentSongIndex);
     }
 
     // Formats a current time and total time as "[0:00 / 0:00]".
@@ -252,6 +252,9 @@ public class NupActivity extends Activity
             mAlbumImageView.setImageBitmap(song.getCoverBitmap());
         // FIXME: clear image view otherwise
 
+        if (song != null && song.getCoverBitmap() == null)
+            mService.fetchCoverForSongIfMissing(song);
+
         // Update the time in response to the next position change we get.
         lastSongPositionSec = -1;
     }
@@ -322,7 +325,7 @@ public class NupActivity extends Activity
     @Override
     public boolean onContextItemSelected(MenuItem item) {
         AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
-        mService.playSongAtIndex(info.position, 0);
+        mService.playSongAtIndex(info.position);
         return true;
     }
 }
