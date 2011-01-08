@@ -31,6 +31,7 @@ import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 
 public class NupService extends Service implements Player.SongCompleteListener, FileCache.DownloadListener {
     private static final String TAG = "NupService";
@@ -47,17 +48,17 @@ public class NupService extends Service implements Player.SongCompleteListener, 
 
     // Listener for changes to a new song.
     interface SongChangeListener {
-        void onSongChange(Song currentSong);
+        void onSongChange(Song song, int index);
     }
 
-    // Listener for the cover bitmap being successfully loaded for the current song.
+    // Listener for the cover bitmap being successfully loaded for a song.
     interface CoverLoadListener {
-        void onCoverLoad(Song currentSong);
+        void onCoverLoad(Song song);
     }
 
     // Listener for changes to the current playlist.
     interface PlaylistChangeListener {
-        void onPlaylistChange(ArrayList<Song> songs);
+        void onPlaylistChange(List<Song> songs);
     }
 
     // Plays songs.
@@ -75,7 +76,7 @@ public class NupService extends Service implements Player.SongCompleteListener, 
     private NotificationManager mNotificationManager;
 
     // Current playlist.
-    private ArrayList<Song> mSongs = new ArrayList<Song>();
+    private List<Song> mSongs = new ArrayList<Song>();
 
     // Index of the song in mSongs that's being played.
     private int mCurrentSongIndex = -1;
@@ -130,7 +131,7 @@ public class NupService extends Service implements Player.SongCompleteListener, 
         return mBinder;
     }
 
-    public final ArrayList<Song> getSongs() { return mSongs; }
+    public final List<Song> getSongs() { return mSongs; }
     public final int getCurrentSongIndex() { return mCurrentSongIndex; }
 
     public Player getPlayer() { return mPlayer; }
@@ -181,7 +182,7 @@ public class NupService extends Service implements Player.SongCompleteListener, 
 
     // Replace the current playlist with a new one.
     // Plays the first song in the new list.
-    public void setPlaylist(ArrayList<Song> songs) {
+    public void setPlaylist(List<Song> songs) {
         mSongs = songs;
         mCurrentSongIndex = -1;
         if (mPlaylistChangeListener != null)
@@ -218,7 +219,7 @@ public class NupService extends Service implements Player.SongCompleteListener, 
         }
 
         if (mSongChangeListener != null)
-            mSongChangeListener.onSongChange(song);
+            mSongChangeListener.onSongChange(song, mCurrentSongIndex);
     }
 
     // Fetches the cover bitmap for a particular song.

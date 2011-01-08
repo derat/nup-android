@@ -27,6 +27,7 @@ import android.widget.Toast;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.List;
 
 public class NupActivity extends Activity
         implements Player.PositionChangeListener,
@@ -54,8 +55,14 @@ public class NupActivity extends Activity
     // Last song-position time passed to onPositionChange(), in seconds.
     private int lastSongPositionSec = -1;
 
+    // Songs in the current playlist.
+    private List<Song> mSongs = new ArrayList<Song>();
+
+    // Position in mSongs of the song that we're currently displaying.
+    private int mCurrentSongIndex = -1;
+
     // Adapts the song listing to mPlaylistView.
-    private SongListAdapter mSongListAdapter;
+    private SongListAdapter mSongListAdapter = new SongListAdapter();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -72,6 +79,7 @@ public class NupActivity extends Activity
 
         mPlaylistView = (ListView) findViewById(R.id.playlist);
         registerForContextMenu(mPlaylistView);
+        mPlaylistView.setAdapter(mSongListAdapter);
 
         Intent serviceIntent = new Intent(this, NupService.class);
         startService(serviceIntent);
@@ -108,11 +116,7 @@ public class NupActivity extends Activity
             mService.getPlayer().setPlaybackErrorListener(NupActivity.this);
 
             // Get current state from service.
-            ArrayList<Song> songs = mService.getSongs();
-            onPlaylistChange(songs);
-            Song song = mService.getCurrentSong();
-            if (song != null)
-                onSongChange(song);
+            onPlaylistChange(mService.getSongs());
         }
 
         public void onServiceDisconnected(ComponentName className) {
@@ -125,68 +129,80 @@ public class NupActivity extends Activity
         return NupActivity.mService;
     }
 
+    private Song getCurrentSong() {
+        if (mCurrentSongIndex >= 0 && mCurrentSongIndex < mSongs.size())
+            return mSongs.get(mCurrentSongIndex);
+        else
+            return null;
+    }
+
     public void onPauseButtonClicked(View view) {
         mService.togglePause();
     }
 
     public void onPrevButtonClicked(View view) {
-        mService.playSongAtIndex(mService.getCurrentSongIndex() - 1, SONG_CHANGE_DELAY_MS);
+        if (mCurrentSongIndex <= 0)
+            return;
+
+        mCurrentSongIndex--;
+        updateSongDisplay(getCurrentSong());
+        // FIXME: set up a timer here
+        mService.playSongAtIndex(mCurrentSongIndex, 0);
     }
 
     public void onNextButtonClicked(View view) {
-        mService.playSongAtIndex(mService.getCurrentSongIndex() + 1, SONG_CHANGE_DELAY_MS);
+        if (mCurrentSongIndex >= mSongs.size() - 1)
+            return;
+
+        mCurrentSongIndex++;
+        updateSongDisplay(getCurrentSong());
+        // FIXME: set up a timer here
+        mService.playSongAtIndex(mCurrentSongIndex, SONG_CHANGE_DELAY_MS);
     }
 
     // Formats a current time and total time as "[0:00 / 0:00]".
-    String formatTimeString(int curSec, int totalSec) {
+    private String formatTimeString(int curSec, int totalSec) {
         return String.format("[%d:%02d / %d:%02d]", curSec / 60, curSec % 60, totalSec / 60, totalSec % 60);
     }
 
     // Implements NupService.SongChangeListener.
     @Override
-    public void onSongChange(final Song currentSong) {
+    public void onSongChange(final Song song, final int index) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                mArtistLabel.setText(currentSong.getArtist());
-                mTitleLabel.setText(currentSong.getTitle());
-                mAlbumLabel.setText(currentSong.getAlbum());
-                mTimeLabel.setText(formatTimeString(0, currentSong.getLengthSec()));
-                if (currentSong.getCoverBitmap() != null)
-                    mAlbumImageView.setImageBitmap(currentSong.getCoverBitmap());
-                // FIXME: clear image view otherwise
-                lastSongPositionSec = -1;
+                if (index == mCurrentSongIndex && song == getCurrentSong())
+                    return;
 
-                if (mSongListAdapter != null)
-                    mSongListAdapter.setCurrentSongIndex(mService.getCurrentSongIndex());
+                updateSongDisplay(song);
+                mCurrentSongIndex = index;
+                mSongListAdapter.notifyDataSetChanged();
             }
         });
     }
 
     // Implements NupService.CoverLoadListener.
     @Override
-    public void onCoverLoad(final Song currentSong) {
+    public void onCoverLoad(final Song song) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                mAlbumImageView.setImageBitmap(currentSong.getCoverBitmap());
+                if (song == getCurrentSong())
+                    mAlbumImageView.setImageBitmap(song.getCoverBitmap());
             }
         });
     }
 
     // Implements NupService.PlaylistChangeListener.
     @Override
-    public void onPlaylistChange(final ArrayList<Song> songs) {
+    public void onPlaylistChange(final List<Song> songs) {
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                int index = mService.getCurrentSongIndex();
-                if (mSongListAdapter == null) {
-                    mSongListAdapter = new SongListAdapter(NupActivity.this, songs, index);
-                    mPlaylistView.setAdapter(mSongListAdapter);
-                } else {
-                    mSongListAdapter.setSongs(songs, index);
-                }
+                mSongs = songs;
+                mCurrentSongIndex = mService.getCurrentSongIndex();
+                updateSongDisplay(getCurrentSong());
+                mSongListAdapter.notifyDataSetChanged();
             }
         });
     }
@@ -225,6 +241,21 @@ public class NupActivity extends Activity
         });
     }
 
+    // Update the onscreen information about the current song.
+    private void updateSongDisplay(Song song) {
+        mArtistLabel.setText(song != null ? song.getArtist() : "");
+        mTitleLabel.setText(song != null ? song.getTitle() : "");
+        mAlbumLabel.setText(song != null ? song.getAlbum() : "");
+        mTimeLabel.setText(song != null ? formatTimeString(0, song.getLengthSec()) : "");
+
+        if (song != null && song.getCoverBitmap() != null)
+            mAlbumImageView.setImageBitmap(song.getCoverBitmap());
+        // FIXME: clear image view otherwise
+
+        // Update the time in response to the next position change we get.
+        lastSongPositionSec = -1;
+    }
+
     @Override
     public boolean onCreateOptionsMenu(Menu menu) {
         getMenuInflater().inflate(R.menu.main_menu, menu);
@@ -249,28 +280,8 @@ public class NupActivity extends Activity
         }
     }
 
+    // Adapts our information about the current playlist and song for the song list view.
     private class SongListAdapter extends BaseAdapter {
-        private final Context mContext;
-        private ArrayList<Song> mSongs;
-        private int mCurrentSongIndex;
-
-        public SongListAdapter(Context context, ArrayList<Song> songs, int currentSongIndex) {
-            mContext = context;
-            mSongs = songs;
-            mCurrentSongIndex = currentSongIndex;
-        }
-
-        public void setSongs(ArrayList<Song> songs, int currentSongIndex) {
-            mSongs = songs;
-            mCurrentSongIndex = currentSongIndex;
-            notifyDataSetChanged();
-        }
-
-        public void setCurrentSongIndex(int currentSongIndex) {
-            mCurrentSongIndex = currentSongIndex;
-            notifyDataSetChanged();
-        }
-
         @Override
         public int getCount() { return mSongs.size(); }
         @Override
@@ -284,7 +295,7 @@ public class NupActivity extends Activity
             if (convertView != null) {
                 view = convertView;
             } else {
-                LayoutInflater inflater = (LayoutInflater) mContext.getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+                LayoutInflater inflater = (LayoutInflater) getSystemService(Context.LAYOUT_INFLATER_SERVICE);
                 view = inflater.inflate(R.layout.playlist_row, null);
             }
 
@@ -302,7 +313,7 @@ public class NupActivity extends Activity
     public void onCreateContextMenu(ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
         if (view.getId() == R.id.playlist) {
             AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) menuInfo;
-            Song song = mService.getSongs().get(info.position);
+            Song song = mSongs.get(info.position);
             menu.setHeaderTitle(song.getArtist() + " - " + song.getTitle());
             menu.add(getString(R.string.play));
         }

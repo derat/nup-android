@@ -28,6 +28,7 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.List;
 import java.util.HashMap;
 import java.util.Iterator;
 
@@ -39,7 +40,7 @@ public class SearchActivity extends Activity {
     private CheckBox mShuffleCheckbox, mSubstringCheckbox;
     private Spinner mMinRatingSpinner;
 
-    // Points from (lowercased) artist String to ArrayList of String album names.
+    // Points from (lowercased) artist String to List of String album names.
     private HashMap mAlbumMap = new HashMap();
 
     private String mMinRating = null;
@@ -60,9 +61,9 @@ public class SearchActivity extends Activity {
             public void onFocusChange(View v, boolean hasFocus) {
                 if (hasFocus) {
                     String artist = mArtistEdit.getText().toString().toLowerCase();
-                    ArrayList<String> albums = new ArrayList<String>();
+                    List<String> albums = new ArrayList<String>();
                     if (mAlbumMap.containsKey(artist))
-                        albums = (ArrayList<String>) mAlbumMap.get(artist);
+                        albums = (List<String>) mAlbumMap.get(artist);
                     mAlbumEdit.setAdapter(new ArrayAdapter<String>(SearchActivity.this, android.R.layout.simple_dropdown_item_1line, albums));
                 }
             }
@@ -113,13 +114,13 @@ public class SearchActivity extends Activity {
 
             try {
                 JSONObject jsonArtistMap = (JSONObject) new JSONTokener(response).nextValue();
-                ArrayList<String> artists = new ArrayList<String>();
+                List<String> artists = new ArrayList<String>();
                 for (Iterator<String> it = jsonArtistMap.keys(); it.hasNext(); ) {
                     String artist = it.next();
                     artists.add(artist);
 
                     JSONArray jsonAlbums = jsonArtistMap.getJSONArray(artist);
-                    ArrayList<String> albums = new ArrayList<String>();
+                    List<String> albums = new ArrayList<String>();
                     for (int i = 0; i < jsonAlbums.length(); ++i) {
                         albums.add(jsonAlbums.getString(i));
                     }
@@ -149,7 +150,7 @@ public class SearchActivity extends Activity {
             } else {
                 try {
                     JSONArray jsonSongs = (JSONArray) new JSONTokener(response).nextValue();
-                    ArrayList<Song> songs = new ArrayList<Song>();
+                    List<Song> songs = new ArrayList<Song>();
                     for (int i = 0; i < jsonSongs.length(); ++i) {
                         songs.add(new Song(jsonSongs.getJSONObject(i)));
                     }
@@ -171,7 +172,7 @@ public class SearchActivity extends Activity {
 
     public void onSearchButtonClicked(View view) throws IOException {
         class QueryBuilder {
-            public ArrayList<String> params = new ArrayList<String>();
+            public List<String> params = new ArrayList<String>();
             public void addTextViewParam(String paramName, TextView view) throws java.io.UnsupportedEncodingException {
                 String value = view.getText().toString().trim();
                 if (!value.isEmpty()) {
