@@ -224,6 +224,11 @@ public class NupService extends Service implements Player.SongCompleteListener, 
             mSongChangeListener.onSongChange(song, mCurrentSongIndex);
     }
 
+    // Stop playing the current song, if any.
+    public void stopPlaying() {
+        mPlayer.abort();
+    }
+
     // Returns true if the cover is already loaded and false if we started a task to fetch it.
     public boolean fetchCoverForSongIfMissing(Song song) {
         if (song.getCoverBitmap() != null)

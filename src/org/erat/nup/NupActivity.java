@@ -9,6 +9,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 import android.view.ContextMenu;
@@ -30,12 +31,12 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class NupActivity extends Activity
-        implements Player.PositionChangeListener,
-                   Player.PauseToggleListener,
-                   Player.PlaybackErrorListener,
-                   NupService.SongChangeListener,
-                   NupService.CoverLoadListener,
-                   NupService.PlaylistChangeListener {
+                         implements Player.PositionChangeListener,
+                                    Player.PauseToggleListener,
+                                    Player.PlaybackErrorListener,
+                                    NupService.SongChangeListener,
+                                    NupService.CoverLoadListener,
+                                    NupService.PlaylistChangeListener {
     private static final String TAG = "NupActivity";
 
     // Wait this many milliseconds before switching tracks in response to the Prev and Next buttons.
@@ -46,13 +47,14 @@ public class NupActivity extends Activity
     // Persistent service to which we connect.
     private static NupService mService;
 
-    // Various UI components.
+    // UI components that we update dynamically.
     private Button mPauseButton;
     private ImageView mAlbumImageView;
     private TextView mArtistLabel, mTitleLabel, mAlbumLabel, mTimeLabel;
     private ListView mPlaylistView;
 
     // Last song-position time passed to onPositionChange(), in seconds.
+    // Used to rate-limit how often we update the display so we only do it on integral changes.
     private int lastSongPositionSec = -1;
 
     // Songs in the current playlist.
@@ -63,6 +65,17 @@ public class NupActivity extends Activity
 
     // Adapts the song listing to mPlaylistView.
     private SongListAdapter mSongListAdapter = new SongListAdapter();
+
+    // Used to run tasks on our thread.
+    private Handler mHandler = new Handler();
+
+    // Task that tells the service to play our currently-selected song.
+    private Runnable mPlaySongTask = new Runnable() {
+        @Override
+        public void run() {
+            mService.playSongAtIndex(mCurrentSongIndex);
+        }
+    };
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -129,13 +142,6 @@ public class NupActivity extends Activity
         return NupActivity.mService;
     }
 
-    private Song getCurrentSong() {
-        if (mCurrentSongIndex >= 0 && mCurrentSongIndex < mSongs.size())
-            return mSongs.get(mCurrentSongIndex);
-        else
-            return null;
-    }
-
     public void onPauseButtonClicked(View view) {
         mService.togglePause();
     }
@@ -144,20 +150,18 @@ public class NupActivity extends Activity
         if (mCurrentSongIndex <= 0)
             return;
 
-        mCurrentSongIndex--;
-        updateSongDisplay(getCurrentSong());
-        // FIXME: set up a timer here
-        mService.playSongAtIndex(mCurrentSongIndex);
+        mService.stopPlaying();
+        updateCurrentSongIndex(mCurrentSongIndex - 1);
+        schedulePlaySongTask(SONG_CHANGE_DELAY_MS);
     }
 
     public void onNextButtonClicked(View view) {
         if (mCurrentSongIndex >= mSongs.size() - 1)
             return;
 
-        mCurrentSongIndex++;
-        updateSongDisplay(getCurrentSong());
-        // FIXME: set up a timer here
-        mService.playSongAtIndex(mCurrentSongIndex);
+        mService.stopPlaying();
+        updateCurrentSongIndex(mCurrentSongIndex + 1);
+        schedulePlaySongTask(SONG_CHANGE_DELAY_MS);
     }
 
     public void onSearchButtonClicked(View view) {
@@ -170,11 +174,7 @@ public class NupActivity extends Activity
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                if (song != getCurrentSong())
-                    updateSongDisplay(song);
-
-                mCurrentSongIndex = index;
-                mSongListAdapter.notifyDataSetChanged();
+                updateCurrentSongIndex(index);
             }
         });
     }
@@ -198,10 +198,8 @@ public class NupActivity extends Activity
             @Override
             public void run() {
                 mSongs = songs;
-                mCurrentSongIndex = mService.getCurrentSongIndex();
-                updateSongDisplay(getCurrentSong());
                 findViewById(R.id.playlist_heading).setVisibility(mSongs.isEmpty() ? View.INVISIBLE : View.VISIBLE);
-                mSongListAdapter.notifyDataSetChanged();
+                updateCurrentSongIndex(mService.getCurrentSongIndex());
             }
         });
     }
@@ -321,7 +319,26 @@ public class NupActivity extends Activity
     @Override
     public boolean onContextItemSelected(MenuItem item) {
         AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
-        mService.playSongAtIndex(info.position);
+        updateCurrentSongIndex(info.position);
+        schedulePlaySongTask(0);
         return true;
+    }
+
+    private Song getCurrentSong() {
+        if (mCurrentSongIndex >= 0 && mCurrentSongIndex < mSongs.size())
+            return mSongs.get(mCurrentSongIndex);
+        else
+            return null;
+    }
+
+    private void updateCurrentSongIndex(int index) {
+        mCurrentSongIndex = index;
+        updateSongDisplay(getCurrentSong());
+        mSongListAdapter.notifyDataSetChanged();
+    }
+
+    private void schedulePlaySongTask(int delayMs) {
+        mHandler.removeCallbacks(mPlaySongTask);
+        mHandler.postDelayed(mPlaySongTask, delayMs);
     }
 }
