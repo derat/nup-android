@@ -43,7 +43,7 @@ public class NupActivity extends Activity
     private static final int SONG_CHANGE_DELAY_MS = 500;
 
     // Persistent service to which we connect.
-    private NupService mService;
+    private static NupService mService;
 
     // Various UI components.
     private Button mPauseButton;
@@ -120,6 +120,10 @@ public class NupActivity extends Activity
             mService = null;
         }
     };
+
+    public static NupService getService() {
+        return NupActivity.mService;
+    }
 
     public void onPauseButtonClicked(View view) {
         mService.togglePause();

@@ -4,13 +4,8 @@
 package org.erat.nup;
 
 import android.app.Activity;
-import android.content.ComponentName;
-import android.content.Context;
-import android.content.Intent;
-import android.content.ServiceConnection;
 import android.os.AsyncTask;
 import android.os.Bundle;
-import android.os.IBinder;
 import android.text.TextUtils;
 import android.util.Log;
 import android.view.View;
@@ -38,7 +33,6 @@ import java.util.Iterator;
 
 public class SearchActivity extends Activity {
     private static final String TAG = "SearchActivity";
-    private NupService mService;
 
     private AutoCompleteTextView mArtistEdit, mAlbumEdit;
     private EditText mTitleEdit;
@@ -92,28 +86,14 @@ public class SearchActivity extends Activity {
         mShuffleCheckbox = (CheckBox) findViewById(R.id.shuffle_checkbox);
         mSubstringCheckbox = (CheckBox) findViewById(R.id.substring_checkbox);
 
-        bindService(new Intent(this, NupService.class), mConnection, 0);
+        new GetContentsTask().execute();
     }
 
     @Override
     protected void onDestroy() {
         Log.d(TAG, "activity destroyed");
         super.onDestroy();
-        unbindService(mConnection);
     }
-
-    private ServiceConnection mConnection = new ServiceConnection() {
-        public void onServiceConnected(ComponentName className, IBinder service) {
-            Log.d(TAG, "connected to service");
-            mService = ((NupService.LocalBinder) service).getService();
-            new GetContentsTask().execute();
-        }
-
-        public void onServiceDisconnected(ComponentName className) {
-            Log.d(TAG, "disconnected from service");
-            mService = null;
-        }
-    };
 
     class GetContentsTask extends AsyncTask<Void, Void, String> {
         // User-friendly description of error, if any, while getting contents.
@@ -174,7 +154,7 @@ public class SearchActivity extends Activity {
                         songs.add(new Song(jsonSongs.getJSONObject(i)));
                     }
                     if (songs.size() > 0) {
-                        mService.setPlaylist(songs);
+                        NupActivity.getService().setPlaylist(songs);
                         message = "Queued " + songs.size() + " song" + (songs.size() == 1 ? "" : "s") + " from server.";
                         finish();
                     } else {
