@@ -19,4 +19,9 @@ class Util {
         }
         return sb.toString();
     }
+
+    // Formats a current time and total time as "[0:00 / 0:00]".
+    public static String formatTimeString(int curSec, int totalSec) {
+        return String.format("[%d:%02d / %d:%02d]", curSec / 60, curSec % 60, totalSec / 60, totalSec % 60);
+    }
 }

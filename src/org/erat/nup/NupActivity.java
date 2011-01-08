@@ -164,11 +164,6 @@ public class NupActivity extends Activity
         startActivity(new Intent(this, SearchActivity.class));
     }
 
-    // Formats a current time and total time as "[0:00 / 0:00]".
-    private String formatTimeString(int curSec, int totalSec) {
-        return String.format("[%d:%02d / %d:%02d]", curSec / 60, curSec % 60, totalSec / 60, totalSec % 60);
-    }
-
     // Implements NupService.SongChangeListener.
     @Override
     public void onSongChange(final Song song, final int index) {
@@ -220,7 +215,7 @@ public class NupActivity extends Activity
                 int positionSec = positionMs / 1000;
                 if (positionSec == lastSongPositionSec)
                     return;
-                mTimeLabel.setText(formatTimeString(positionSec, durationMs / 1000));
+                mTimeLabel.setText(Util.formatTimeString(positionSec, durationMs / 1000));
             }
         });
     }
@@ -250,7 +245,7 @@ public class NupActivity extends Activity
         mArtistLabel.setText(song != null ? song.getArtist() : "");
         mTitleLabel.setText(song != null ? song.getTitle() : "");
         mAlbumLabel.setText(song != null ? song.getAlbum() : "");
-        mTimeLabel.setText(song != null ? formatTimeString(0, song.getLengthSec()) : "");
+        mTimeLabel.setText(song != null ? Util.formatTimeString(0, song.getLengthSec()) : "");
 
         if (song != null && song.getCoverBitmap() != null)
             mAlbumImageView.setImageBitmap(song.getCoverBitmap());
