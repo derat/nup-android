@@ -247,7 +247,8 @@ public class NupActivity extends Activity
 
         if (song != null && song.getCoverBitmap() != null)
             mAlbumImageView.setImageBitmap(song.getCoverBitmap());
-        // FIXME: clear image view otherwise
+        else
+            mAlbumImageView.setVisibility(View.INVISIBLE);
 
         if (song != null && song.getCoverBitmap() == null)
             mService.fetchCoverForSongIfMissing(song);

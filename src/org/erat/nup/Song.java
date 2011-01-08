@@ -13,11 +13,11 @@ class Song {
     private Bitmap mCoverBitmap;
 
     public Song(JSONObject json) throws org.json.JSONException {
-        mArtist = json.getString("artist");
-        mTitle = json.getString("title");
-        mAlbum = json.getString("album");
+        mArtist = !json.isNull("artist") ? json.getString("artist") : "";
+        mTitle = !json.isNull("title") ? json.getString("title") : "";
+        mAlbum = !json.isNull("album") ? json.getString("album") : "";
         mFilename = json.getString("filename");
-        mCoverFilename = json.getString("cover");
+        mCoverFilename = !json.isNull("cover") ? json.getString("cover") : "";
         mLengthSec = json.getInt("length");
         mSongId = json.getInt("songId");
         mRating = json.getDouble("rating");

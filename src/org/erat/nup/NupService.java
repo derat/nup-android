@@ -17,6 +17,7 @@ import android.os.Handler;
 import android.os.IBinder;
 import android.preference.PreferenceManager;
 import android.util.Log;
+import android.view.View;
 import android.widget.RemoteViews;
 import android.widget.Toast;
 
@@ -103,7 +104,7 @@ public class NupService extends Service implements Player.SongCompleteListener, 
         Log.d(TAG, "service created");
 
         mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        Notification notification = updateNotification("nup", getString(R.string.initial_notification), "", (Bitmap) null);
+        Notification notification = updateNotification("nup", getString(R.string.initial_notification), null, (Bitmap) null);
         startForeground(NOTIFICATION_ID, notification);
 
         mPlayer = new Player();
@@ -167,11 +168,27 @@ public class NupService extends Service implements Player.SongCompleteListener, 
 
         // TODO: Any way to update an existing remote view?  I couldn't find one. :-(
         RemoteViews view = new RemoteViews(getPackageName(), R.layout.notification);
-        view.setTextViewText(R.id.notification_artist, artist);
-        view.setTextViewText(R.id.notification_title, title);
-        view.setTextViewText(R.id.notification_album, album);
+
+        if (artist != null && !artist.isEmpty())
+            view.setTextViewText(R.id.notification_artist, artist);
+        else
+            view.setViewVisibility(R.id.notification_artist, View.GONE);
+
+        if (title != null && !title.isEmpty())
+            view.setTextViewText(R.id.notification_title, title);
+        else
+            view.setViewVisibility(R.id.notification_title, View.GONE);
+
+        if (album != null && !album.isEmpty())
+            view.setTextViewText(R.id.notification_album, album);
+        else
+            view.setViewVisibility(R.id.notification_album, View.GONE);
+
         if (bitmap != null)
             view.setImageViewBitmap(R.id.notification_image, bitmap);
+        else
+            view.setViewVisibility(R.id.notification_image, View.GONE);
+
         notification.contentView = view;
 
         notification.contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0);
