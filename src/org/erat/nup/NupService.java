@@ -37,6 +37,13 @@ public class NupService extends Service implements Player.SongCompleteListener, 
     // Identifier used for our "currently playing" notification.
     private static final int NOTIFICATION_ID = 0;
 
+    // Don't start playing a song until we have at least this many bytes of it.
+    private static final long MIN_BYTES_BEFORE_PLAYING = 64 * 1024;
+
+    // Don't start playing a song until we think we'll finish downloading the whole file at the current rate
+    // sooner than this many milliseconds before the song would end (whew).
+    private static final long EXTRA_BUFFER_MS = 10 * 1000;
+
     // Listener for changes to a new song.
     interface SongChangeListener {
         void onSongChange(Song currentSong);
@@ -296,14 +303,20 @@ public class NupService extends Service implements Player.SongCompleteListener, 
 
     // Implements FileCache.DownloadListener.
     @Override
-    public void onDownloadProgress(final int handle, final long numReceivedBytes) {
+    public void onDownloadProgress(final int handle, final long receivedBytes, final long totalBytes, final long elapsedMs) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                if (handle == mCurrentFileCacheHandle && mWaitingForFileCache && numReceivedBytes > 100000) {
-                    Log.d(TAG, "got notification that download " + handle + " is at " + numReceivedBytes + " bytes; playing");
-                    mWaitingForFileCache = false;
-                    mPlayer.playSong(mFileCache.getLocalFile(getCurrentSong().getUrlPath()).getAbsolutePath(), 0);
+                if (handle == mCurrentFileCacheHandle && mWaitingForFileCache) {
+                    Song song = getCurrentSong();
+                    double bytesPerMs = (double) receivedBytes / elapsedMs;
+                    long remainingMs = (long) ((totalBytes - receivedBytes) / bytesPerMs);
+                    if (receivedBytes >= MIN_BYTES_BEFORE_PLAYING && remainingMs + EXTRA_BUFFER_MS <= song.getLengthSec() * 1000) {
+                        Log.d(TAG, "download " + handle + " is at " + receivedBytes + " bytes out of " + totalBytes + " total " +
+                              "and is estimated to finish in " + remainingMs + " ms; playing");
+                        mWaitingForFileCache = false;
+                        mPlayer.playSong(mFileCache.getLocalFile(getCurrentSong().getUrlPath()).getAbsolutePath(), 0);
+                    }
                 }
             }
         });

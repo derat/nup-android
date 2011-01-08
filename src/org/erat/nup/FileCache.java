@@ -34,7 +34,7 @@ class FileCache implements Runnable {
     interface DownloadListener {
         void onDownloadFail(int handle);
         void onDownloadComplete(int handle);
-        void onDownloadProgress(int handle, long numReceivedBytes);
+        void onDownloadProgress(int handle, long receivedBytes, long totalBytes, long elapsedMs);
     }
 
     // Application context.
@@ -170,13 +170,14 @@ class FileCache implements Runnable {
                         outputStream.write(buffer, 0, bytesRead);
                         bytesWritten += bytesRead;
 
+                        Date now = new Date();
+                        long elapsedMs = now.getTime() - startDate.getTime();
+
                         if (bytesWritten >= lastReportBytes + PROGRESS_REPORT_BYTES) {
-                            listener.onDownloadProgress(handle, bytesWritten);
+                            listener.onDownloadProgress(handle, bytesWritten, result.getContentLength(), elapsedMs);
                             lastReportBytes = bytesWritten;
                         }
 
-                        Date now = new Date();
-                        long elapsedMs = now.getTime() - startDate.getTime();
                         long expectedMs = (long) (bytesWritten / (float) MAX_BYTES_PER_SECOND * 1000);
                         if (elapsedMs < expectedMs)
                             SystemClock.sleep(expectedMs - elapsedMs);
