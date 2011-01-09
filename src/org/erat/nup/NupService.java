@@ -424,8 +424,9 @@ public class NupService extends Service
                 if (positionMs > mCurrentSongLastPositionMs &&
                     positionMs <= mCurrentSongLastPositionMs + MAX_POSITION_REPORT_MS) {
                     mCurrentSongPlayedMs += (positionMs - mCurrentSongLastPositionMs);
+                    Song song = getCurrentSong();
                     if (!mReportedCurrentSong &&
-                        (mCurrentSongPlayedMs >= durationMs / 2 ||
+                        (mCurrentSongPlayedMs >= Math.max(durationMs, song.getLengthSec() * 1000) / 2 ||
                          mCurrentSongPlayedMs >= REPORT_PLAYBACK_THRESHOLD_MS)) {
                         new ReportPlayedTask(getCurrentSong(), mCurrentSongStartDate).execute();
                         mReportedCurrentSong = true;

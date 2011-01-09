@@ -214,7 +214,9 @@ public class NupActivity extends Activity
                 int positionSec = positionMs / 1000;
                 if (positionSec == lastSongPositionSec)
                     return;
-                mTimeLabel.setText(Util.formatTimeString(positionSec, durationMs / 1000));
+                // MediaPlayer appears to get confused sometimes and report things like 0:01.
+                int durationSec = Math.max(durationMs / 1000, getCurrentSong().getLengthSec());
+                mTimeLabel.setText(Util.formatTimeString(positionSec, durationSec));
             }
         });
     }
