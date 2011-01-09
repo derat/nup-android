@@ -185,8 +185,10 @@ public class NupActivity extends Activity
         runOnUiThread(new Runnable() {
             @Override
             public void run() {
-                if (song == getCurrentSong())
+                if (song == getCurrentSong()) {
+                    mAlbumImageView.setVisibility(View.VISIBLE);
                     mAlbumImageView.setImageBitmap(song.getCoverBitmap());
+                }
             }
         });
     }
@@ -245,10 +247,12 @@ public class NupActivity extends Activity
         mAlbumLabel.setText(song != null ? song.getAlbum() : "");
         mTimeLabel.setText(song != null ? Util.formatTimeString(0, song.getLengthSec()) : "");
 
-        if (song != null && song.getCoverBitmap() != null)
+        if (song != null && song.getCoverBitmap() != null) {
+            mAlbumImageView.setVisibility(View.VISIBLE);
             mAlbumImageView.setImageBitmap(song.getCoverBitmap());
-        else
+        } else {
             mAlbumImageView.setVisibility(View.INVISIBLE);
+        }
 
         if (song != null && song.getCoverBitmap() == null)
             mService.fetchCoverForSongIfMissing(song);
