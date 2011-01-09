@@ -313,10 +313,16 @@ public class NupService extends Service
                 DownloadRequest request = new DownloadRequest(NupService.this, DownloadRequest.Method.GET, "/cover/" + song.getCoverFilename(), null);
                 DownloadResult result = Download.startDownload(request);
                 Bitmap bitmap = BitmapFactory.decodeStream(result.getStream());
+                if (bitmap == null)
+                    Log.e(TAG, "unable to create bitmap from " + song.getCoverFilename());
                 song.setCoverBitmap(bitmap);
+                result.close();
             } catch (DownloadRequest.PrefException e) {
+                Log.e(TAG, "got pref exception while downloading " + song.getCoverFilename() + ": " + e);
             } catch (HttpException e) {
+                Log.e(TAG, "got HTTP exception while downloading " + song.getCoverFilename() + ": " + e);
             } catch (IOException e) {
+                Log.e(TAG, "got IO exception while downloading " + song.getCoverFilename() + ": " + e);
             }
             return song;
         }
@@ -338,9 +344,8 @@ public class NupService extends Service
         }
 
         // We need to update our notification even if the fetch failed.
-        if (song == getCurrentSong()) {
+        if (song == getCurrentSong())
             updateNotification(song.getArtist(), song.getTitle(), song.getAlbum(), song.getCoverBitmap());
-        }
     }
 
     // Reports that we've played a song.
@@ -359,9 +364,11 @@ public class NupService extends Service
             Log.d(TAG, "reporting song " + mSong.getSongId() + " started at " + mStartDate);
             try {
                 DownloadRequest request = new DownloadRequest(NupService.this, DownloadRequest.Method.POST, "/report_played", null);
-                request.addHeader("Content-type", "application/x-www-form-urlencoded");
                 String body = "songId=" + mSong.getSongId() + "&startTime=" + (mStartDate.getTime() / 1000);
-                request.setBody(new ByteArrayInputStream(body.getBytes()));
+                request.setBody(new ByteArrayInputStream(body.getBytes()), body.length());
+                request.setHeader("Content-Type", "application/x-www-form-urlencoded");
+                request.setHeader("Content-Length", Long.toString(body.length()));
+
                 DownloadResult result = Download.startDownload(request);
                 if (result.getStatusCode() != 200)
                     mError = "Got " + result.getStatusCode() + " response while reporting played song: " + result.getReason();
@@ -419,7 +426,7 @@ public class NupService extends Service
                     mCurrentSongPlayedMs += (positionMs - mCurrentSongLastPositionMs);
                     if (!mReportedCurrentSong &&
                         (mCurrentSongPlayedMs >= durationMs / 2 ||
-                         mCurrentSongPlayedMs > REPORT_PLAYBACK_THRESHOLD_MS)) {
+                         mCurrentSongPlayedMs >= REPORT_PLAYBACK_THRESHOLD_MS)) {
                         new ReportPlayedTask(getCurrentSong(), mCurrentSongStartDate).execute();
                         mReportedCurrentSong = true;
                     }

@@ -73,7 +73,7 @@ class DownloadRequest {
         String username = prefs.getString(NupPreferences.USERNAME, "");
         String password = prefs.getString(NupPreferences.PASSWORD, "");
         if (!username.isEmpty() && !password.isEmpty())
-            mHttpRequest.addHeader("Authorization", "Basic " + Base64.encodeToString((username + ":" + password).getBytes(), Base64.NO_WRAP));
+            mHttpRequest.setHeader("Authorization", "Basic " + Base64.encodeToString((username + ":" + password).getBytes(), Base64.NO_WRAP));
     }
 
     public static URI parseServerUrlIntoUri(String server, String path, String query) throws PrefException {
@@ -113,17 +113,18 @@ class DownloadRequest {
     public HttpRequest getHttpRequest() { return mHttpRequest; }
     public URI getUri() { return mUri; }
 
-    // Add an additional HTTP header.
-    public void addHeader(String name, String value) {
-        mHttpRequest.addHeader(name, value);
+    // Add an additional HTTP header (replacing it if it's already present).
+    public void setHeader(String name, String value) {
+        mHttpRequest.setHeader(name, value);
     }
 
     // Set the body for us to send to the server.
-    public void setBody(InputStream stream) {
+    public void setBody(InputStream stream, long contentLength) {
         if (mMethod != Method.POST)
             throw new RuntimeException("attempting to set body on non-POST HTTP request");
         BasicHttpEntity entity = new BasicHttpEntity();
         entity.setContent(stream);
+        entity.setContentLength(contentLength);
         ((HttpPost) mHttpRequest).setEntity(entity);
     }
 }
@@ -171,13 +172,13 @@ class DownloadResult {
 
 class Download {
     private static final String TAG = "Download";
-    private static final int SSL_TIMEOUT_MS = 5000;
+    private static final int TIMEOUT_MS = 10000;
 
     public static DownloadResult startDownload(DownloadRequest req) throws HttpException, IOException {
         // TODO: from Apache's ElementalReverseProxy.java example -- dunno how important any of these are for us.
         HttpParams params = new BasicHttpParams();
         params
-            .setIntParameter(CoreConnectionPNames.SO_TIMEOUT, 5000)
+            .setIntParameter(CoreConnectionPNames.SO_TIMEOUT, TIMEOUT_MS)
             .setIntParameter(CoreConnectionPNames.SOCKET_BUFFER_SIZE, 8 * 1024)
             .setBooleanParameter(CoreConnectionPNames.STALE_CONNECTION_CHECK, false)
             .setBooleanParameter(CoreConnectionPNames.TCP_NODELAY, true);
@@ -187,7 +188,7 @@ class Download {
         Socket socket = new Socket(uri.getHost(), uri.getPort());
         if (uri.getScheme().equals("https")) {
             // Wrap an SSL socket around the non-SSL one.
-            SSLSocketFactory factory = SSLCertificateSocketFactory.getHttpSocketFactory(SSL_TIMEOUT_MS, null);
+            SSLSocketFactory factory = SSLCertificateSocketFactory.getHttpSocketFactory(TIMEOUT_MS, null);
             try {
                 socket = factory.createSocket(socket, uri.getHost(), uri.getPort(), true);
             } catch (IOException e) {
