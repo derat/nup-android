@@ -11,6 +11,7 @@ import android.util.Base64;
 import android.util.Log;
 
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPost;
 import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.entity.BasicHttpEntity;
 import org.apache.http.HttpException;
@@ -35,6 +36,11 @@ import java.net.URISyntaxException;
 // Also does a lot of preparation like looking up server URL and authorization preferences
 // and constructing the HTTP request.
 class DownloadRequest {
+    public enum Method {
+        GET,
+        POST
+    }
+
     // Thrown when the request couldn't be constructed because some preferences that we need
     // are either unset or incorrect.
     public static class PrefException extends Exception {
@@ -43,11 +49,14 @@ class DownloadRequest {
         }
     }
 
+    private Method mMethod;
     private HttpRequest mHttpRequest;
     private URI mUri;
+    private String mBody;
 
-    DownloadRequest(Context context, String path, String query) throws PrefException {
+    DownloadRequest(Context context, Method method, String path, String query) throws PrefException {
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        mMethod = method;
 
         // Build a URI based on the server pref.
         mUri = parseServerUrlIntoUri(prefs.getString(NupPreferences.SERVER_URL, ""), path, query);
@@ -55,7 +64,8 @@ class DownloadRequest {
         // When mUri is used to construct the request, we send the full URI in the request, like "GET http://...".
         // This seems to make the server sad in some cases -- it fails to parse the query parameters.
         // Just passing the path and query as a string avoids this; we'll just send "GET /path?query" instead.
-        mHttpRequest = new HttpGet(path + (query != null ? "?" + query : ""));
+        String pathQuery = path + (query != null ? "?" + query : "");
+        mHttpRequest = (method == Method.GET) ? new HttpGet(pathQuery) : new HttpPost(pathQuery);
         mHttpRequest.addHeader("Host", mUri.getHost() + ":" + mUri.getPort());
         // TODO: Set User-Agent to something reasonable.
 
@@ -99,8 +109,23 @@ class DownloadRequest {
         return uri;
     }
 
-    public final HttpRequest getHttpRequest() { return mHttpRequest; }
-    public final URI getUri() { return mUri; }
+    public Method getMethod() { return mMethod; }
+    public HttpRequest getHttpRequest() { return mHttpRequest; }
+    public URI getUri() { return mUri; }
+
+    // Add an additional HTTP header.
+    public void addHeader(String name, String value) {
+        mHttpRequest.addHeader(name, value);
+    }
+
+    // Set the body for us to send to the server.
+    public void setBody(InputStream stream) {
+        if (mMethod != Method.POST)
+            throw new RuntimeException("attempting to set body on non-POST HTTP request");
+        BasicHttpEntity entity = new BasicHttpEntity();
+        entity.setContent(stream);
+        ((HttpPost) mHttpRequest).setEntity(entity);
+    }
 }
 
 // Encapsulates the response to a download attempt.
@@ -182,6 +207,8 @@ class Download {
         // We pass through exceptions while trying not to leak the socket.
         try {
             conn.sendRequestHeader(req.getHttpRequest());
+            if (req.getMethod() == DownloadRequest.Method.POST)
+                conn.sendRequestEntity((HttpPost) req.getHttpRequest());
             conn.flush();
 
             HttpResponse response = conn.receiveResponseHeader();
@@ -204,7 +231,7 @@ class Download {
 
     public static String downloadString(Context context, String path, String query, String[] error) {
         try {
-            DownloadRequest request = new DownloadRequest(context, path, query);
+            DownloadRequest request = new DownloadRequest(context, DownloadRequest.Method.GET, path, query);
             DownloadResult result = startDownload(request);
             if (result.getStatusCode() != 200) {
                 error[0] = "Got " + result.getStatusCode() + " status code from server (" + result.getReason() + ")";

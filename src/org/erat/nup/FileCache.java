@@ -112,7 +112,7 @@ class FileCache implements Runnable {
 
                 DownloadRequest request;
                 try {
-                    request = new DownloadRequest(mContext, urlPath, null);
+                    request = new DownloadRequest(mContext, DownloadRequest.Method.GET, urlPath, null);
                 } catch (DownloadRequest.PrefException e) {
                     listener.onDownloadFail(handle);
                     return;

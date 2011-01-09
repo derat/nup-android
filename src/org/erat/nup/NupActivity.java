@@ -123,10 +123,9 @@ public class NupActivity extends Activity
             mService.setSongChangeListener(NupActivity.this);
             mService.setCoverLoadListener(NupActivity.this);
             mService.setPlaylistChangeListener(NupActivity.this);
-
-            mService.getPlayer().setPositionChangeListener(NupActivity.this);
-            mService.getPlayer().setPauseToggleListener(NupActivity.this);
-            mService.getPlayer().setPlaybackErrorListener(NupActivity.this);
+            mService.setPositionChangeListener(NupActivity.this);
+            mService.setPauseToggleListener(NupActivity.this);
+            mService.setPlaybackErrorListener(NupActivity.this);
 
             // Get current state from service.
             onPlaylistChange(mService.getSongs());

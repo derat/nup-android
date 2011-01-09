@@ -23,6 +23,7 @@ import android.widget.Toast;
 
 import org.apache.http.HttpException;
 
+import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.io.IOException;
@@ -31,11 +32,15 @@ import java.lang.Thread;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
-public class NupService extends Service implements Player.SongCompleteListener, FileCache.DownloadListener {
+public class NupService extends Service
+                        implements Player.SongCompleteListener,
+                                   Player.PositionChangeListener,
+                                   FileCache.DownloadListener {
     private static final String TAG = "NupService";
 
     // Identifier used for our "currently playing" notification.
@@ -47,6 +52,13 @@ public class NupService extends Service implements Player.SongCompleteListener, 
     // Don't start playing a song until we think we'll finish downloading the whole file at the current rate
     // sooner than this many milliseconds before the song would end (whew).
     private static final long EXTRA_BUFFER_MS = 10 * 1000;
+
+    // If we receive a playback position report with a timestamp more than this many milliseconds beyond the last
+    // on we received, we assume that something has gone wrong and ignore it.
+    private static final long MAX_POSITION_REPORT_MS = 1000;
+
+    // Report a song if we've played it for this many milliseconds.
+    private static final long REPORT_PLAYBACK_THRESHOLD_MS = 240 * 1000;
 
     // Listener for changes to a new song.
     interface SongChangeListener {
@@ -83,6 +95,18 @@ public class NupService extends Service implements Player.SongCompleteListener, 
     // Index of the song in mSongs that's being played.
     private int mCurrentSongIndex = -1;
 
+    // Time at which we started playing the current song.
+    private Date mCurrentSongStartDate;
+
+    // Last playback position we were notified about for the current song.
+    private long mCurrentSongLastPositionMs = 0;
+
+    // Total time during which we've played the current song, in milliseconds.
+    private long mCurrentSongPlayedMs = 0;
+
+    // Have we reported the fact that we've played the current song?
+    private boolean mReportedCurrentSong = false;
+
     private final IBinder mBinder = new LocalBinder();
 
     // Points from cover filename Strings to previously-fetched Bitmaps.
@@ -98,6 +122,7 @@ public class NupService extends Service implements Player.SongCompleteListener, 
     private SongChangeListener mSongChangeListener;
     private CoverLoadListener mCoverLoadListener;
     private PlaylistChangeListener mPlaylistChangeListener;
+    private Player.PositionChangeListener mPositionChangeListener;
 
     @Override
     public void onCreate() {
@@ -111,6 +136,7 @@ public class NupService extends Service implements Player.SongCompleteListener, 
         mPlayerThread = new Thread(mPlayer, "Player");
         mPlayerThread.start();
         mPlayer.setSongCompleteListener(this);
+        mPlayer.setPositionChangeListener(this);
 
         mFileCache = new FileCache(this);
         mFileCacheThread = new Thread(mFileCache, "FileCache");
@@ -139,8 +165,6 @@ public class NupService extends Service implements Player.SongCompleteListener, 
     public final List<Song> getSongs() { return mSongs; }
     public final int getCurrentSongIndex() { return mCurrentSongIndex; }
 
-    public Player getPlayer() { return mPlayer; }
-
     public final Song getCurrentSong() {
         return (mCurrentSongIndex >= 0 && mCurrentSongIndex < mSongs.size()) ? mSongs.get(mCurrentSongIndex) : null;
     }
@@ -153,6 +177,15 @@ public class NupService extends Service implements Player.SongCompleteListener, 
     }
     public void setPlaylistChangeListener(PlaylistChangeListener listener) {
         mPlaylistChangeListener = listener;
+    }
+    public void setPositionChangeListener(Player.PositionChangeListener listener) {
+        mPositionChangeListener = listener;
+    }
+    void setPauseToggleListener(Player.PauseToggleListener listener) {
+        mPlayer.setPauseToggleListener(listener);
+    }
+    void setPlaybackErrorListener(Player.PlaybackErrorListener listener) {
+        mPlayer.setPlaybackErrorListener(listener);
     }
 
     public class LocalBinder extends Binder {
@@ -220,10 +253,16 @@ public class NupService extends Service implements Player.SongCompleteListener, 
         mCurrentSongIndex = index;
         Song song = getCurrentSong();
 
+        mCurrentSongStartDate = null;
+        mCurrentSongLastPositionMs = 0;
+        mCurrentSongPlayedMs = 0;
+        mReportedCurrentSong = false;
+
         File cacheFile = mFileCache.getLocalFile(getCurrentSong().getUrlPath());
         if (cacheFile.exists()) {
             Log.d(TAG, "file " + getCurrentSong().getUrlPath() + " already in cache; playing");
             mPlayer.playFile(cacheFile.getAbsolutePath());
+            mCurrentSongStartDate = new Date();
         } else {
             mPlayer.abort();
             if (mCurrentFileCacheHandle != -1)
@@ -258,7 +297,7 @@ public class NupService extends Service implements Player.SongCompleteListener, 
 
         if (!mSongCoverFetches.contains(song)) {
             mSongCoverFetches.add(song);
-            new CoverFetcherTask(this).execute(song);
+            new CoverFetcherTask().execute(song);
         }
         return false;
     }
@@ -266,17 +305,12 @@ public class NupService extends Service implements Player.SongCompleteListener, 
     // Fetches the cover bitmap for a particular song.
     // onCoverFetchDone() is called on completion, even if the fetch failed.
     class CoverFetcherTask extends AsyncTask<Song, Void, Song> {
-        private final NupService mService;
-        CoverFetcherTask(NupService service) {
-            mService = service;
-        }
-
         @Override
         protected Song doInBackground(Song... songs) {
             Song song = songs[0];
             song.setCoverBitmap(null);
             try {
-                DownloadRequest request = new DownloadRequest(NupService.this, "/cover/" + song.getCoverFilename(), null);
+                DownloadRequest request = new DownloadRequest(NupService.this, DownloadRequest.Method.GET, "/cover/" + song.getCoverFilename(), null);
                 DownloadResult result = Download.startDownload(request);
                 Bitmap bitmap = BitmapFactory.decodeStream(result.getStream());
                 song.setCoverBitmap(bitmap);
@@ -289,7 +323,7 @@ public class NupService extends Service implements Player.SongCompleteListener, 
 
         @Override
         protected void onPostExecute(Song song) {
-            mService.onCoverFetchDone(song);
+            NupService.this.onCoverFetchDone(song);
         }
     }
 
@@ -309,6 +343,48 @@ public class NupService extends Service implements Player.SongCompleteListener, 
         }
     }
 
+    // Reports that we've played a song.
+    class ReportPlayedTask extends AsyncTask<Void, Void, Void> {
+        private final Song mSong;
+        private final Date mStartDate;
+        private String mError;
+
+        public ReportPlayedTask(Song song, Date startDate) {
+            mSong = song;
+            mStartDate = startDate;
+        }
+
+        @Override
+        protected Void doInBackground(Void... voidArg) {
+            Log.d(TAG, "reporting song " + mSong.getSongId() + " started at " + mStartDate);
+            try {
+                DownloadRequest request = new DownloadRequest(NupService.this, DownloadRequest.Method.POST, "/report_played", null);
+                request.addHeader("Content-type", "application/x-www-form-urlencoded");
+                String body = "songId=" + mSong.getSongId() + "&startTime=" + (mStartDate.getTime() / 1000);
+                request.setBody(new ByteArrayInputStream(body.getBytes()));
+                DownloadResult result = Download.startDownload(request);
+                if (result.getStatusCode() != 200)
+                    mError = "Got " + result.getStatusCode() + " response while reporting played song: " + result.getReason();
+                result.close();
+            } catch (DownloadRequest.PrefException e) {
+                mError = "Got preferences error while reporting played song: " + e;
+            } catch (HttpException e) {
+                mError = "Got HTTP error while reporting played song: " + e;
+            } catch (IOException e) {
+                mError = "Got IO error while reporting played song: " + e;
+            }
+            return null;
+        }
+
+        @Override
+        protected void onPostExecute(Void voidArg) {
+            if (mError != null) {
+                Log.e(TAG, "got error while reporting song: " + mError);
+                Toast.makeText(NupService.this, mError, Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
     public long getCacheDataBytes() {
         return mFileCache.getDataBytes();
     }
@@ -325,6 +401,30 @@ public class NupService extends Service implements Player.SongCompleteListener, 
             @Override
             public void run() {
                 playSongAtIndex(mCurrentSongIndex + 1);
+            }
+        });
+    }
+
+    // Implements Player.PositionChangeListener.
+    @Override
+    public void onPositionChange(final int positionMs, final int durationMs) {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (mPositionChangeListener != null)
+                    mPositionChangeListener.onPositionChange(positionMs, durationMs);
+
+                if (positionMs > mCurrentSongLastPositionMs &&
+                    positionMs <= mCurrentSongLastPositionMs + MAX_POSITION_REPORT_MS) {
+                    mCurrentSongPlayedMs += (positionMs - mCurrentSongLastPositionMs);
+                    if (!mReportedCurrentSong &&
+                        (mCurrentSongPlayedMs >= durationMs / 2 ||
+                         mCurrentSongPlayedMs > REPORT_PLAYBACK_THRESHOLD_MS)) {
+                        new ReportPlayedTask(getCurrentSong(), mCurrentSongStartDate).execute();
+                        mReportedCurrentSong = true;
+                    }
+                }
+                mCurrentSongLastPositionMs = positionMs;
             }
         });
     }
@@ -355,6 +455,7 @@ public class NupService extends Service implements Player.SongCompleteListener, 
                     if (mWaitingForFileCache) {
                         mWaitingForFileCache = false;
                         mPlayer.playFile(mFileCache.getLocalFile(getCurrentSong().getUrlPath()).getAbsolutePath());
+                        mCurrentSongStartDate = new Date();
                     }
                     mCurrentFileCacheHandle = -1;
                 }
@@ -377,6 +478,7 @@ public class NupService extends Service implements Player.SongCompleteListener, 
                               "and is estimated to finish in " + remainingMs + " ms; playing");
                         mWaitingForFileCache = false;
                         mPlayer.playFile(mFileCache.getLocalFile(getCurrentSong().getUrlPath()).getAbsolutePath());
+                        mCurrentSongStartDate = new Date();
                     }
                 }
             }
