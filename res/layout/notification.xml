@@ -11,7 +11,7 @@
       android:paddingBottom="3dp"
       android:src="@drawable/icon"
       android:adjustViewBounds="true"
-      android:scaleType="fitXY"
+      android:scaleType="centerInside"
       />
   <LinearLayout
       android:orientation="vertical"
