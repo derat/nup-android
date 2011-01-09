@@ -5,10 +5,10 @@
     android:layout_height="fill_parent"
     >
   <ImageView android:id="@+id/notification_image"
-      android:layout_width="60dp"
-      android:layout_height="60dp"
+      android:layout_width="57dp"
+      android:layout_height="57dp"
       android:paddingTop="3dp"
-      android:paddingBottom="3dp"
+      android:paddingLeft="3dp"
       android:src="@drawable/icon"
       android:adjustViewBounds="true"
       android:scaleType="centerInside"
