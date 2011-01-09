@@ -47,7 +47,7 @@ public class NupService extends Service
     private static final int NOTIFICATION_ID = 0;
 
     // Don't start playing a song until we have at least this many bytes of it.
-    private static final long MIN_BYTES_BEFORE_PLAYING = 64 * 1024;
+    private static final long MIN_BYTES_BEFORE_PLAYING = 128 * 1024;
 
     // Don't start playing a song until we think we'll finish downloading the whole file at the current rate
     // sooner than this many milliseconds before the song would end (whew).
