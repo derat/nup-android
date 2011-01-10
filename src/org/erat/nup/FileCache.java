@@ -27,7 +27,7 @@ class FileCache implements Runnable {
     // We download this many initial bytes as quickly as we can.
     static private final int INITIAL_BYTES = 128 * 1024;
 
-    static private final int MAX_BYTES_PER_SECOND = 512 * 1024;
+    static private final int MAX_BYTES_PER_SECOND = 128 * 1024;
 
     static private final int PROGRESS_REPORT_BYTES = 64 * 1024;
 
@@ -67,6 +67,9 @@ class FileCache implements Runnable {
     }
 
     public void quit() {
+        synchronized(mHandles) {
+            mHandles.clear();
+        }
         mHandler.post(new Runnable() {
             @Override
             public void run() {

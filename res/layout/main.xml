@@ -20,7 +20,7 @@
         />
     <LinearLayout
         android:orientation="vertical"
-        android:layout_width="wrap_content"
+        android:layout_width="fill_parent"
         android:layout_height="wrap_content"
         >
       <TextView
@@ -46,14 +46,30 @@
           android:singleLine="true"
           android:textSize="14dp"
           />
-      <TextView
-          android:id="@+id/time_label"
-          android:layout_width="wrap_content"
+      <LinearLayout
+          android:orientation="horizontal"
+          android:layout_width="fill_parent"
           android:layout_height="wrap_content"
-          android:singleLine="true"
-          android:text=""
-          android:textSize="14dp"
-          />
+          >
+        <TextView
+            android:id="@+id/time_label"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:singleLine="true"
+            android:text=""
+            android:textSize="14dp"
+            />
+        <TextView
+            android:id="@+id/download_status_label"
+            android:layout_width="fill_parent"
+            android:layout_height="wrap_content"
+            android:singleLine="true"
+            android:gravity="right"
+            android:text=""
+            android:textSize="14dp"
+            android:textColor="@color/download_status_fg"
+            />
+      </LinearLayout>
     </LinearLayout>
   </LinearLayout>
 

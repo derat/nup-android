@@ -36,7 +36,8 @@ public class NupActivity extends Activity
                                     Player.PlaybackErrorListener,
                                     NupService.SongChangeListener,
                                     NupService.CoverLoadListener,
-                                    NupService.PlaylistChangeListener {
+                                    NupService.PlaylistChangeListener,
+                                    NupService.DownloadListener {
     private static final String TAG = "NupActivity";
 
     // Wait this many milliseconds before switching tracks in response to the Prev and Next buttons.
@@ -50,7 +51,7 @@ public class NupActivity extends Activity
     // UI components that we update dynamically.
     private Button mPauseButton;
     private ImageView mAlbumImageView;
-    private TextView mArtistLabel, mTitleLabel, mAlbumLabel, mTimeLabel;
+    private TextView mArtistLabel, mTitleLabel, mAlbumLabel, mTimeLabel, mDownloadStatusLabel;
     private ListView mPlaylistView;
 
     // Last song-position time passed to onPositionChange(), in seconds.
@@ -89,6 +90,7 @@ public class NupActivity extends Activity
         mTitleLabel = (TextView) findViewById(R.id.title_label);
         mAlbumLabel = (TextView) findViewById(R.id.album_label);
         mTimeLabel = (TextView) findViewById(R.id.time_label);
+        mDownloadStatusLabel = (TextView) findViewById(R.id.download_status_label);
 
         mPlaylistView = (ListView) findViewById(R.id.playlist);
         registerForContextMenu(mPlaylistView);
@@ -124,6 +126,7 @@ public class NupActivity extends Activity
             mService.setCoverLoadListener(NupActivity.this);
             mService.setPlaylistChangeListener(NupActivity.this);
             mService.setPositionChangeListener(NupActivity.this);
+            mService.setDownloadListener(NupActivity.this);
             mService.setPauseToggleListener(NupActivity.this);
             mService.setPlaybackErrorListener(NupActivity.this);
 
@@ -169,27 +172,17 @@ public class NupActivity extends Activity
 
     // Implements NupService.SongChangeListener.
     @Override
-    public void onSongChange(final Song song, final int index) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                updateCurrentSongIndex(index);
-            }
-        });
+    public void onSongChange(Song song, int index) {
+        updateCurrentSongIndex(index);
     }
 
     // Implements NupService.CoverLoadListener.
     @Override
-    public void onCoverLoad(final Song song) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                if (song == getCurrentSong()) {
-                    mAlbumImageView.setVisibility(View.VISIBLE);
-                    mAlbumImageView.setImageBitmap(song.getCoverBitmap());
-                }
-            }
-        });
+    public void onCoverLoad(Song song) {
+        if (song == getCurrentSong()) {
+            mAlbumImageView.setVisibility(View.VISIBLE);
+            mAlbumImageView.setImageBitmap(song.getCoverBitmap());
+        }
     }
 
     // Implements NupService.PlaylistChangeListener.
@@ -203,6 +196,24 @@ public class NupActivity extends Activity
                 updateCurrentSongIndex(mService.getCurrentSongIndex());
             }
         });
+    }
+
+    // Implements NupService.DownloadListener.
+    @Override
+    public void onDownloadProgress(Song song, long receivedBytes, long totalBytes) {
+        if (song == getCurrentSong()) {
+            mDownloadStatusLabel.setText(
+                String.format("%.2f of %.1f MB",
+                              (double) receivedBytes / (1024 * 1024),
+                              (double) totalBytes / (1024 * 1024)));
+        }
+    }
+
+    // Implements NupService.DownloadListener.
+    @Override
+    public void onDownloadComplete(Song song) {
+        if (song == getCurrentSong())
+            mDownloadStatusLabel.setText("");
     }
 
     // Implements Player.PositionChangeListener.
@@ -247,6 +258,7 @@ public class NupActivity extends Activity
         mTitleLabel.setText(song != null ? song.getTitle() : "");
         mAlbumLabel.setText(song != null ? song.getAlbum() : "");
         mTimeLabel.setText(song != null ? Util.formatTimeString(0, song.getLengthSec()) : "");
+        mDownloadStatusLabel.setText("");
 
         if (song != null && song.getCoverBitmap() != null) {
             mAlbumImageView.setVisibility(View.VISIBLE);

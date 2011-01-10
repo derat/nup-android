@@ -75,6 +75,12 @@ public class NupService extends Service
         void onPlaylistChange(List<Song> songs);
     }
 
+    // Listener for progress in download a song.
+    interface DownloadListener {
+        void onDownloadProgress(Song song, long receivedBytes, long totalBytes);
+        void onDownloadComplete(Song song);
+    }
+
     // Plays songs.
     private Player mPlayer;
 
@@ -122,6 +128,7 @@ public class NupService extends Service
     private SongChangeListener mSongChangeListener;
     private CoverLoadListener mCoverLoadListener;
     private PlaylistChangeListener mPlaylistChangeListener;
+    private DownloadListener mDownloadListener;
     private Player.PositionChangeListener mPositionChangeListener;
 
     @Override
@@ -177,6 +184,9 @@ public class NupService extends Service
     }
     public void setPlaylistChangeListener(PlaylistChangeListener listener) {
         mPlaylistChangeListener = listener;
+    }
+    public void setDownloadListener(DownloadListener listener) {
+        mDownloadListener = listener;
     }
     public void setPositionChangeListener(Player.PositionChangeListener listener) {
         mPositionChangeListener = listener;
@@ -466,6 +476,8 @@ public class NupService extends Service
                         mCurrentSongStartDate = new Date();
                     }
                     mCurrentFileCacheHandle = -1;
+                    if (mDownloadListener != null)
+                        mDownloadListener.onDownloadComplete(getCurrentSong());
                 }
             }
         });
@@ -477,17 +489,21 @@ public class NupService extends Service
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                if (handle == mCurrentFileCacheHandle && mWaitingForFileCache) {
+                if (handle == mCurrentFileCacheHandle) {
                     Song song = getCurrentSong();
-                    double bytesPerMs = (double) receivedBytes / elapsedMs;
-                    long remainingMs = (long) ((totalBytes - receivedBytes) / bytesPerMs);
-                    if (receivedBytes >= MIN_BYTES_BEFORE_PLAYING && remainingMs + EXTRA_BUFFER_MS <= song.getLengthSec() * 1000) {
-                        Log.d(TAG, "download " + handle + " is at " + receivedBytes + " bytes out of " + totalBytes + " total " +
-                              "and is estimated to finish in " + remainingMs + " ms; playing");
-                        mWaitingForFileCache = false;
-                        mPlayer.playFile(mFileCache.getLocalFile(getCurrentSong().getUrlPath()).getAbsolutePath());
-                        mCurrentSongStartDate = new Date();
+                    if (mWaitingForFileCache) {
+                        double bytesPerMs = (double) receivedBytes / elapsedMs;
+                        long remainingMs = (long) ((totalBytes - receivedBytes) / bytesPerMs);
+                        if (receivedBytes >= MIN_BYTES_BEFORE_PLAYING && remainingMs + EXTRA_BUFFER_MS <= song.getLengthSec() * 1000) {
+                            Log.d(TAG, "download " + handle + " is at " + receivedBytes + " bytes out of " + totalBytes + " total " +
+                                  "and is estimated to finish in " + remainingMs + " ms; playing");
+                            mWaitingForFileCache = false;
+                            mPlayer.playFile(mFileCache.getLocalFile(getCurrentSong().getUrlPath()).getAbsolutePath());
+                            mCurrentSongStartDate = new Date();
+                        }
                     }
+                    if (mDownloadListener != null)
+                        mDownloadListener.onDownloadProgress(song, receivedBytes, totalBytes);
                 }
             }
         });
