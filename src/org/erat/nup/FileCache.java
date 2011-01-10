@@ -27,7 +27,7 @@ class FileCache implements Runnable {
     // We download this many initial bytes as quickly as we can.
     static private final int INITIAL_BYTES = 128 * 1024;
 
-    static private final int MAX_BYTES_PER_SECOND = 128 * 1024;
+    static private final int MAX_BYTES_PER_SECOND = 0;
 
     static private final int PROGRESS_REPORT_BYTES = 64 * 1024;
 
@@ -181,9 +181,11 @@ class FileCache implements Runnable {
                             lastReportBytes = bytesWritten;
                         }
 
-                        long expectedMs = (long) (bytesWritten / (float) MAX_BYTES_PER_SECOND * 1000);
-                        if (elapsedMs < expectedMs)
-                            SystemClock.sleep(expectedMs - elapsedMs);
+                        if (MAX_BYTES_PER_SECOND > 0) {
+                            long expectedMs = (long) (bytesWritten / (float) MAX_BYTES_PER_SECOND * 1000);
+                            if (elapsedMs < expectedMs)
+                                SystemClock.sleep(expectedMs - elapsedMs);
+                        }
                     }
                     Date endDate = new Date();
                     Log.d(TAG, "finished download " + handle + " (" + bytesWritten + " bytes to " +
