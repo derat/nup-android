@@ -20,16 +20,16 @@ import java.util.Date;
 import java.util.HashSet;
 
 class FileCache implements Runnable {
-    static private final String TAG = "FileCache";
+    private static final String TAG = "FileCache";
 
-    static private final int BUFFER_SIZE = 8 * 1024;
+    private static final int BUFFER_SIZE = 8 * 1024;
 
     // We download this many initial bytes as quickly as we can.
-    static private final int INITIAL_BYTES = 128 * 1024;
+    private static final int INITIAL_BYTES = 128 * 1024;
 
-    static private final int MAX_BYTES_PER_SECOND = 0;
+    private static final int MAX_BYTES_PER_SECOND = 0;
 
-    static private final int PROGRESS_REPORT_BYTES = 64 * 1024;
+    private static final int PROGRESS_REPORT_BYTES = 64 * 1024;
 
     interface DownloadListener {
         void onDownloadFail(int handle);
