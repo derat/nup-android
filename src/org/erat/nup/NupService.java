@@ -16,6 +16,8 @@ import android.os.Binder;
 import android.os.Handler;
 import android.os.IBinder;
 import android.preference.PreferenceManager;
+import android.telephony.PhoneStateListener;
+import android.telephony.TelephonyManager;
 import android.util.Log;
 import android.view.View;
 import android.widget.RemoteViews;
@@ -125,6 +127,18 @@ public class NupService extends Service
     // Used to run tasks on our thread.
     private Handler mHandler = new Handler();
 
+    // Pause when phone calls arrive.
+    private PhoneStateListener mPhoneStateListener = new PhoneStateListener() {
+        @Override
+        public void onCallStateChanged(int state, String incomingNumber) {
+            // I don't want to know who's calling.  Why isn't there a more-limited permission?
+            if (state == TelephonyManager.CALL_STATE_RINGING) {
+                mPlayer.pause();
+                Toast.makeText(NupService.this, "Paused for incoming call.", Toast.LENGTH_SHORT).show();
+            }
+        }
+    };
+
     private SongChangeListener mSongChangeListener;
     private CoverLoadListener mCoverLoadListener;
     private PlaylistChangeListener mPlaylistChangeListener;
@@ -138,6 +152,9 @@ public class NupService extends Service
         mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         Notification notification = updateNotification("nup", getString(R.string.initial_notification), null, (Bitmap) null);
         startForeground(NOTIFICATION_ID, notification);
+
+        ((TelephonyManager) getSystemService(TELEPHONY_SERVICE)).listen(
+            mPhoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
 
         mPlayer = new Player();
         mPlayerThread = new Thread(mPlayer, "Player");

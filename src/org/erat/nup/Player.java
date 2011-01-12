@@ -117,6 +117,22 @@ class Player implements Runnable, MediaPlayer.OnPreparedListener, MediaPlayer.On
         });
     }
 
+    public void pause() {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                if (!mPrepared || mPaused)
+                    return;
+
+                mPaused = true;
+                mMediaPlayer.pause();
+                stopPositionTimer();
+                if (mPauseToggleListener != null)
+                    mPauseToggleListener.onPauseToggle(mPaused);
+            }
+        });
+    }
+
     public void togglePause() {
         mHandler.post(new Runnable() {
             @Override
