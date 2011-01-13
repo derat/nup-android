@@ -566,7 +566,7 @@ public class NupService extends Service
         if (mCurrentDownloadId != -1)
             return false;
 
-        if (mCurrentSongIndex > mSongs.size() - 1)
+        if (mCurrentSongIndex >= mSongs.size() - 1)
             return false;
 
         Song song = mSongs.get(mCurrentSongIndex + 1);
