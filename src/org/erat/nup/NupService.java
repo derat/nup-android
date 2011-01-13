@@ -293,9 +293,18 @@ public class NupService extends Service
             Log.d(TAG, "file " + getCurrentSong().getUrlPath() + " already downloaded; playing");
             mPlayer.playFile(cacheEntry.getLocalFilename());
             mCurrentSongStartDate = new Date();
+
+            // If we're downloading some other song (maybe we were downloading the
+            // previously-being-played song), abort it.
+            if (mCurrentDownloadId != -1 && mCurrentDownloadId != cacheEntry.getId()) {
+                mCache.abortDownload(mCurrentDownloadId);
+                mCurrentDownloadId = -1;
+            }
+
+            maybeDownloadNextSong();
         } else {
-            // Otherwise, start downloding it if we've never tried downloading it before,
-            // or if we have but it's not already being downloaded.
+            // Otherwise, start downloading it if we've never tried downloading it before,
+            // or if we have but it's not currently being downloaded.
             mPlayer.abort();
             if (cacheEntry == null || mCurrentDownloadId != cacheEntry.getId()) {
                 if (mCurrentDownloadId != -1)
@@ -304,13 +313,6 @@ public class NupService extends Service
                 mCurrentDownloadId = cacheEntry.getId();
             }
             mWaitingForDownload = true;
-        }
-
-        // If we're downloading some other song (maybe we were downloading the previously-being-played
-        // song, the user hit the "Next" button, and we already had this song fully downloaded), abort it.
-        if (mCurrentDownloadId != -1 && mCurrentDownloadId != cacheEntry.getId()) {
-            mCache.abortDownload(mCurrentDownloadId);
-            mCurrentDownloadId = -1;
         }
 
         // Update the notification now if we already have the cover.  We'll update it when the fetch
@@ -518,6 +520,8 @@ public class NupService extends Service
                 }
                 if (mDownloadListener != null)
                     mDownloadListener.onDownloadComplete(song);
+
+                maybeDownloadNextSong();
             }
         });
     }
@@ -555,5 +559,23 @@ public class NupService extends Service
 
         File file = new File(entry.getLocalFilename());
         return file.exists() && file.length() == entry.getContentLength();
+    }
+
+    // Download the next song if we're not currently downloading anything and if we don't already have it.
+    private boolean maybeDownloadNextSong() {
+        if (mCurrentDownloadId != -1)
+            return false;
+
+        if (mCurrentSongIndex > mSongs.size() - 1)
+            return false;
+
+        Song song = mSongs.get(mCurrentSongIndex + 1);
+        FileCacheEntry entry = mCache.getEntry(song.getUrlPath());
+        if (entry != null && isCacheEntryFullyDownloaded(entry))
+            return false;
+
+        entry = mCache.downloadFile(song.getUrlPath(), this);
+        mCurrentDownloadId = entry.getId();
+        return true;
     }
 }
