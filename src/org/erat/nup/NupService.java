@@ -327,9 +327,12 @@ public class NupService extends Service
         mPlayer.abort();
     }
 
-    // Returns true if the cover is already loaded and false if we started a task to fetch it.
+    // Returns true if the cover is already loaded or can't be loaded and false if we started a task to fetch it.
     public boolean fetchCoverForSongIfMissing(Song song) {
         if (song.getCoverBitmap() != null)
+            return true;
+
+        if (song.getCoverFilename().isEmpty())
             return true;
 
         if (mCoverCache.containsKey(song.getCoverFilename())) {
