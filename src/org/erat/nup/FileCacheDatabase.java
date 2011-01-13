@@ -26,7 +26,7 @@ class FileCacheDatabase {
                     "  LocalFilename VARCHAR(2048) UNIQUE NOT NULL, " +
                     "  ContentLength INTEGER, " +
                     "  ETag VARCHAR(40), " +
-                    "  LastAccessTime INTEGER");
+                    "  LastAccessTime INTEGER)");
                 db.execSQL("CREATE INDEX RemotePath on CacheEntries (RemotePath)");
             }
 
@@ -38,12 +38,40 @@ class FileCacheDatabase {
         };
     }
 
-    public FileCacheEntry getEntryForRemotePath(String remotePath) {
+    public synchronized FileCacheEntry getEntryForRemotePath(String remotePath) {
         Cursor cursor = mOpener.getReadableDatabase().rawQuery(
-            "SELECT LocalFilename, ContentLength, ETag FROM CacheEntries WHERE RemotePath = ?",
+            "SELECT " +
+            "  CacheEntryId, " +
+            "  LocalFilename, " +
+            "  IFNULL(ContentLength, 0), " +
+            "  IFNULL(ETag, '') " +
+            "FROM CacheEntries " +
+            "WHERE RemotePath = ?",
             new String[]{remotePath});
         if (cursor.getCount() == 0)
             return null;
-        return new FileCacheEntry(remotePath, cursor.getString(0), cursor.getLong(1), cursor.getString(2));
+        cursor.moveToFirst();
+        return new FileCacheEntry(cursor.getInt(0), remotePath, cursor.getString(1), cursor.getLong(2), cursor.getString(3));
+    }
+
+    public synchronized int addEntry(String remotePath, String localFilename) {
+        SQLiteDatabase db = mOpener.getWritableDatabase();
+        db.execSQL(
+            "INSERT INTO CacheEntries (RemotePath, LocalFilename) VALUES(?, ?)",
+            new Object[]{remotePath, localFilename});
+        Cursor cursor = db.rawQuery("SELECT last_insert_rowid()", null);
+        cursor.moveToFirst();
+        return cursor.getInt(0);
+    }
+
+    public synchronized void setContentLength(int id, long contentLength) {
+        SQLiteDatabase db = mOpener.getWritableDatabase();
+        db.execSQL(
+            "Update CacheEntries SET ContentLength = ? WHERE CacheEntryId = ?",
+            new Object[]{contentLength, id});
+    }
+
+    public synchronized void clear() {
+        mOpener.getWritableDatabase().execSQL("DELETE FROM CacheEntries");
     }
 }

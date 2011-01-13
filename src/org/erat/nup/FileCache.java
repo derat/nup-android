@@ -32,9 +32,9 @@ class FileCache implements Runnable {
     private static final int PROGRESS_REPORT_BYTES = 64 * 1024;
 
     interface DownloadListener {
-        void onDownloadFail(int handle);
-        void onDownloadComplete(int handle);
-        void onDownloadProgress(int handle, long receivedBytes, long totalBytes, long elapsedMs);
+        void onDownloadFail(FileCacheEntry entry, String reason);
+        void onDownloadProgress(FileCacheEntry entry, long receivedBytes, long elapsedMs);
+        void onDownloadComplete(FileCacheEntry entry);
     }
 
     // Application context.
@@ -46,9 +46,10 @@ class FileCache implements Runnable {
     // Used to run tasks on our own thread.
     private Handler mHandler;
 
-    private HashSet mHandles = new HashSet();
+    // IDs of entries that are currently being downloaded.
+    private HashSet mInProgressIds = new HashSet();
 
-    private int mNextHandle = 1;
+    private FileCacheDatabase mDb;
 
     FileCache(Context context) {
         mContext = context;
@@ -58,6 +59,7 @@ class FileCache implements Runnable {
             Log.e(TAG, "media has state " + state + "; we need " + Environment.MEDIA_MOUNTED);
 
         mMusicDir = mContext.getExternalFilesDir(Environment.DIRECTORY_MUSIC);
+        mDb = new FileCacheDatabase(mContext);
     }
 
     public void run() {
@@ -67,8 +69,8 @@ class FileCache implements Runnable {
     }
 
     public void quit() {
-        synchronized(mHandles) {
-            mHandles.clear();
+        synchronized(mInProgressIds) {
+            mInProgressIds.clear();
         }
         mHandler.post(new Runnable() {
             @Override
@@ -78,46 +80,80 @@ class FileCache implements Runnable {
         });
     }
 
-    public File getLocalFile(String urlPath) {
-        return new File(mMusicDir, urlPath.replace("/", "_"));
+    // Get the entry corresponding to a particular cached URL.
+    // Returns null if the URL isn't cached.
+    public FileCacheEntry getEntry(String urlPath) {
+        return mDb.getEntryForRemotePath(urlPath);
     }
 
-    public void abortDownload(int handle) {
-        synchronized(mHandles) {
-            if (!mHandles.contains(handle)) {
-                Log.e(TAG, "tried to abort nonexistent download " + handle);
+    // Abort a previously-started download.
+    public void abortDownload(int id) {
+        synchronized(mInProgressIds) {
+            if (!mInProgressIds.contains(id)) {
+                Log.e(TAG, "tried to abort nonexistent download " + id);
                 return;
             }
-            mHandles.remove(handle);
-            Log.d(TAG, "canceled download " + handle);
+            mInProgressIds.remove(id);
+            Log.d(TAG, "canceled download " + id);
         }
     }
 
-    private boolean isDownloadActive(int handle) {
-        synchronized(mHandles) {
-            return mHandles.contains(handle);
-        }
+    // Get the total size of all cached data.
+    public long getDataBytes() {
+        long size = 0;
+        for (File file : mMusicDir.listFiles())
+            size += file.length();
+        return size;
     }
 
-    public int downloadFile(final String urlPath, final DownloadListener listener) {
-        final int handle;
-        synchronized(mHandles) {
-            handle = mNextHandle++;
-            mHandles.add(handle);
-            Log.d(TAG, "posting download " + handle + " of " + urlPath);
+    // Clear all cached data.
+    public void clear() {
+        mDb.clear();
+        for (File file : mMusicDir.listFiles())
+            file.delete();
+    }
+
+    // Download a URL to the cache.  Returns the cache entry, or null if the URL is
+    // already being downloaded.
+    public FileCacheEntry downloadFile(final String urlPath, final DownloadListener listener) {
+        final FileCacheEntry entry;
+
+        FileCacheEntry existingEntry = mDb.getEntryForRemotePath(urlPath);
+        if (existingEntry != null) {
+            entry = existingEntry;
+        } else {
+            String localFilename = new File(mMusicDir, urlPath.replace("/", "_")).getAbsolutePath();
+            int id = mDb.addEntry(urlPath, localFilename);
+            entry = mDb.getEntryForRemotePath(urlPath);
         }
 
+        final int id = entry.getId();
+        synchronized(mInProgressIds) {
+            if (mInProgressIds.contains(id))
+                return null;
+            mInProgressIds.add(id);
+        }
+
+        Log.d(TAG, "posting download " + id + " of " + urlPath);
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                if (!isDownloadActive(handle))
+                if (!isDownloadActive(id))
                     return;
 
+                // If the file was already downloaded, report success.
+                File file = new File(entry.getLocalFilename());
+                if (entry.getContentLength() > 0 && file.exists() && file.length() == entry.getContentLength()) {
+                    listener.onDownloadComplete(entry);
+                    return;
+                }
+
+                // TODO: Resume partial downloads.
                 DownloadRequest request;
                 try {
                     request = new DownloadRequest(mContext, DownloadRequest.Method.GET, urlPath, null);
                 } catch (DownloadRequest.PrefException e) {
-                    listener.onDownloadFail(handle);
+                    listener.onDownloadFail(entry, "Invalid server info settings");
                     return;
                 }
 
@@ -125,35 +161,40 @@ class FileCache implements Runnable {
                 try {
                     result = Download.startDownload(request);
                 } catch (org.apache.http.HttpException e) {
-                    listener.onDownloadFail(handle);
+                    listener.onDownloadFail(entry, "Got HTTP error while connecting");
                     return;
                 } catch (IOException e) {
-                    listener.onDownloadFail(handle);
+                    listener.onDownloadFail(entry, "Got IO error while connecting");
                     return;
                 }
 
-                if (!isDownloadActive(handle)) {
+                if (!isDownloadActive(id)) {
                     result.close();
                     return;
                 }
 
-                File file = getLocalFile(urlPath);
-                file.getParentFile().mkdirs();
-                try {
-                    file.createNewFile();
-                } catch (IOException e) {
-                    result.close();
-                    listener.onDownloadFail(handle);
-                    return;
+                // Update the cache entry with the total content size.
+                mDb.setContentLength(id, result.getContentLength());
+                final FileCacheEntry updatedEntry = mDb.getEntryForRemotePath(urlPath);
+
+                if (!file.exists()) {
+                    file.getParentFile().mkdirs();
+                    try {
+                        file.createNewFile();
+                    } catch (IOException e) {
+                        result.close();
+                        listener.onDownloadFail(updatedEntry, "Unable to create local file");
+                        return;
+                    }
                 }
 
                 FileOutputStream outputStream;
                 try {
-                    outputStream = new FileOutputStream(file);
+                    // TODO: Once partial downloads are supported, append instead of overwriting.
+                    outputStream = new FileOutputStream(file, false);
                 } catch (java.io.FileNotFoundException e) {
                     result.close();
-                    file.delete();
-                    listener.onDownloadFail(handle);
+                    listener.onDownloadFail(updatedEntry, "Unable to create output stream to local file");
                     return;
                 }
 
@@ -164,9 +205,8 @@ class FileCache implements Runnable {
                     byte[] buffer = new byte[BUFFER_SIZE];
 
                     while ((bytesRead = result.getStream().read(buffer)) != -1) {
-                        if (!isDownloadActive(handle)) {
+                        if (!isDownloadActive(id)) {
                             result.close();
-                            file.delete();
                             return;
                         }
 
@@ -177,7 +217,7 @@ class FileCache implements Runnable {
                         long elapsedMs = now.getTime() - startDate.getTime();
 
                         if (bytesWritten >= lastReportBytes + PROGRESS_REPORT_BYTES) {
-                            listener.onDownloadProgress(handle, bytesWritten, result.getContentLength(), elapsedMs);
+                            listener.onDownloadProgress(updatedEntry, bytesWritten, elapsedMs);
                             lastReportBytes = bytesWritten;
                         }
 
@@ -188,32 +228,25 @@ class FileCache implements Runnable {
                         }
                     }
                     Date endDate = new Date();
-                    Log.d(TAG, "finished download " + handle + " (" + bytesWritten + " bytes to " +
+                    Log.d(TAG, "finished download " + id + " (" + bytesWritten + " bytes to " +
                           file.getAbsolutePath() + " in " + (endDate.getTime() - startDate.getTime()) + " ms)");
                 } catch (IOException e) {
                     result.close();
-                    file.delete();
-                    listener.onDownloadFail(handle);
+                    listener.onDownloadFail(updatedEntry, "Got IO error while downloading");
                     return;
                 }
 
                 result.close();
-                listener.onDownloadComplete(handle);
+                listener.onDownloadComplete(updatedEntry);
             }
         });
 
-        return handle;
+        return entry;
     }
 
-    public long getDataBytes() {
-        long size = 0;
-        for (File file : mMusicDir.listFiles())
-            size += file.length();
-        return size;
-    }
-
-    public void clear() {
-        for (File file : mMusicDir.listFiles())
-            file.delete();
+    private boolean isDownloadActive(int id) {
+        synchronized(mInProgressIds) {
+            return mInProgressIds.contains(id);
+        }
     }
 }

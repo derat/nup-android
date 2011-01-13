@@ -85,15 +85,17 @@ public class NupService extends Service
 
     // Plays songs.
     private Player mPlayer;
-
-    // Thread where mPlayerThread runs.
     private Thread mPlayerThread;
 
-    private FileCache mFileCache;
-    private Thread mFileCacheThread;
+    // Downloads files.
+    private FileCache mCache;
+    private Thread mCacheThread;
 
-    private int mCurrentFileCacheHandle = -1;
-    private boolean mWaitingForFileCache = false;
+    // ID of the cache entry that's currently being downloaded.
+    private int mCurrentDownloadId = -1;
+
+    // Are we currently waiting for a file to be downloaded before we can play it?
+    private boolean mWaitingForDownload = false;
 
     private NotificationManager mNotificationManager;
 
@@ -162,9 +164,9 @@ public class NupService extends Service
         mPlayer.setSongCompleteListener(this);
         mPlayer.setPositionChangeListener(this);
 
-        mFileCache = new FileCache(this);
-        mFileCacheThread = new Thread(mFileCache, "FileCache");
-        mFileCacheThread.start();
+        mCache = new FileCache(this);
+        mCacheThread = new Thread(mCache, "FileCache");
+        mCacheThread.start();
     }
 
     @Override
@@ -178,7 +180,7 @@ public class NupService extends Service
         Log.d(TAG, "service destroyed");
         mNotificationManager.cancel(NOTIFICATION_ID);
         mPlayer.quit();
-        mFileCache.quit();
+        mCache.quit();
     }
 
     @Override
@@ -285,17 +287,30 @@ public class NupService extends Service
         mCurrentSongPlayedMs = 0;
         mReportedCurrentSong = false;
 
-        File cacheFile = mFileCache.getLocalFile(getCurrentSong().getUrlPath());
-        if (cacheFile.exists()) {
-            Log.d(TAG, "file " + getCurrentSong().getUrlPath() + " already in cache; playing");
-            mPlayer.playFile(cacheFile.getAbsolutePath());
+        // If we've already downloaded the whole file, start playing it.
+        FileCacheEntry cacheEntry = mCache.getEntry(getCurrentSong().getUrlPath());
+        if (cacheEntry != null && isCacheEntryFullyDownloaded(cacheEntry)) {
+            Log.d(TAG, "file " + getCurrentSong().getUrlPath() + " already downloaded; playing");
+            mPlayer.playFile(cacheEntry.getLocalFilename());
             mCurrentSongStartDate = new Date();
         } else {
+            // Otherwise, start downloding it if we've never tried downloading it before,
+            // or if we have but it's not already being downloaded.
             mPlayer.abort();
-            if (mCurrentFileCacheHandle != -1)
-                mFileCache.abortDownload(mCurrentFileCacheHandle);
-            mCurrentFileCacheHandle = mFileCache.downloadFile(song.getUrlPath(), this);
-            mWaitingForFileCache = true;
+            if (cacheEntry == null || mCurrentDownloadId != cacheEntry.getId()) {
+                if (mCurrentDownloadId != -1)
+                    mCache.abortDownload(mCurrentDownloadId);
+                cacheEntry = mCache.downloadFile(song.getUrlPath(), this);
+                mCurrentDownloadId = cacheEntry.getId();
+            }
+            mWaitingForDownload = true;
+        }
+
+        // If we're downloading some other song (maybe we were downloading the previously-being-played
+        // song, the user hit the "Next" button, and we already had this song fully downloaded), abort it.
+        if (mCurrentDownloadId != -1 && mCurrentDownloadId != cacheEntry.getId()) {
+            mCache.abortDownload(mCurrentDownloadId);
+            mCurrentDownloadId = -1;
         }
 
         // Update the notification now if we already have the cover.  We'll update it when the fetch
@@ -420,12 +435,12 @@ public class NupService extends Service
     }
 
     public long getCacheDataBytes() {
-        return mFileCache.getDataBytes();
+        return mCache.getDataBytes();
     }
 
     public void clearCache() {
-        // FIXME: need to abort current downloads, i guess
-        mFileCache.clear();
+        // FIXME: Need to abort current downloads?
+        mCache.clear();
     }
 
     // Implements Player.SongCompleteListener.
@@ -466,14 +481,15 @@ public class NupService extends Service
 
     // Implements FileCache.DownloadListener.
     @Override
-    public void onDownloadFail(final int handle) {
+    public void onDownloadFail(final FileCacheEntry entry, final String reason) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                Log.d(TAG, "got notification that download " + handle + " failed");
-                if (handle == mCurrentFileCacheHandle) {
-                    mCurrentFileCacheHandle = -1;
-                    mWaitingForFileCache = false;
+                Log.d(TAG, "got notification that download " + entry.getId() + " failed: " + reason);
+                Toast.makeText(NupService.this, "Download of " + entry.getRemotePath() + " failed: " + reason, Toast.LENGTH_LONG).show();
+                if (entry.getId() == mCurrentDownloadId) {
+                    mCurrentDownloadId = -1;
+                    mWaitingForDownload = false;
                 }
             }
         });
@@ -481,48 +497,60 @@ public class NupService extends Service
 
     // Implements FileCache.DownloadListener.
     @Override
-    public void onDownloadComplete(final int handle) {
+    public void onDownloadComplete(final FileCacheEntry entry) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                Log.d(TAG, "got notification that download " + handle + " is complete");
-                if (handle == mCurrentFileCacheHandle) {
-                    if (mWaitingForFileCache) {
-                        mWaitingForFileCache = false;
-                        mPlayer.playFile(mFileCache.getLocalFile(getCurrentSong().getUrlPath()).getAbsolutePath());
-                        mCurrentSongStartDate = new Date();
-                    }
-                    mCurrentFileCacheHandle = -1;
-                    if (mDownloadListener != null)
-                        mDownloadListener.onDownloadComplete(getCurrentSong());
+                if (entry.getId() == mCurrentDownloadId)
+                    mCurrentDownloadId = -1;
+
+                Song song = getCurrentSong();
+                if (song == null || !entry.getRemotePath().equals(song.getUrlPath()))
+                    return;
+
+                if (mWaitingForDownload) {
+                    mWaitingForDownload = false;
+                    mPlayer.playFile(entry.getLocalFilename());
+                    mCurrentSongStartDate = new Date();
                 }
+                if (mDownloadListener != null)
+                    mDownloadListener.onDownloadComplete(song);
             }
         });
     }
 
     // Implements FileCache.DownloadListener.
     @Override
-    public void onDownloadProgress(final int handle, final long receivedBytes, final long totalBytes, final long elapsedMs) {
+    public void onDownloadProgress(final FileCacheEntry entry, final long receivedBytes, final long elapsedMs) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                if (handle == mCurrentFileCacheHandle) {
-                    Song song = getCurrentSong();
-                    if (mWaitingForFileCache) {
-                        double bytesPerMs = (double) receivedBytes / elapsedMs;
-                        long remainingMs = (long) ((totalBytes - receivedBytes) / bytesPerMs);
-                        if (receivedBytes >= MIN_BYTES_BEFORE_PLAYING && remainingMs + EXTRA_BUFFER_MS <= song.getLengthSec() * 1000) {
-                            Log.d(TAG, "download " + handle + " is at " + receivedBytes + " bytes out of " + totalBytes + " total " +
-                                  "and is estimated to finish in " + remainingMs + " ms; playing");
-                            mWaitingForFileCache = false;
-                            mPlayer.playFile(mFileCache.getLocalFile(getCurrentSong().getUrlPath()).getAbsolutePath());
-                            mCurrentSongStartDate = new Date();
-                        }
-                    }
-                    if (mDownloadListener != null)
-                        mDownloadListener.onDownloadProgress(song, receivedBytes, totalBytes);
+                Song song = getCurrentSong();
+                if (song == null || !entry.getRemotePath().equals(song.getUrlPath()))
+                    return;
+
+                if (mWaitingForDownload && canPlaySong(entry, receivedBytes, elapsedMs, song.getLengthSec())) {
+                    mWaitingForDownload = false;
+                    mPlayer.playFile(entry.getLocalFilename());
+                    mCurrentSongStartDate = new Date();
                 }
+                if (mDownloadListener != null)
+                    mDownloadListener.onDownloadProgress(song, receivedBytes, entry.getContentLength());
             }
         });
+    }
+
+    private boolean canPlaySong(FileCacheEntry entry, long receivedBytes, long elapsedMs, int songLengthSec) {
+        double bytesPerMs = (double) receivedBytes / elapsedMs;
+        long remainingMs = (long) ((entry.getContentLength() - receivedBytes) / bytesPerMs);
+        return (receivedBytes >= MIN_BYTES_BEFORE_PLAYING && remainingMs + EXTRA_BUFFER_MS <= songLengthSec * 1000);
+    }
+
+    private boolean isCacheEntryFullyDownloaded(FileCacheEntry entry) {
+        if (entry.getContentLength() == 0)
+            return false;
+
+        File file = new File(entry.getLocalFilename());
+        return file.exists() && file.length() == entry.getContentLength();
     }
 }
