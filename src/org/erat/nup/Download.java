@@ -139,26 +139,21 @@ class DownloadResult {
     // Reason accompanying the status code.
     private final String mReason;
 
-    // Length of the resource, per the Content-Length header.
-    private final long mContentLength;
-
-    // Stream for reading the body of the response.
-    private final InputStream mStream;
+    // Data from the server.
+    private final BasicHttpEntity mEntity;
 
     private final DefaultHttpClientConnection mConn;
 
-    DownloadResult(int statusCode, String reason, long contentLength, InputStream stream, DefaultHttpClientConnection conn) {
+    DownloadResult(int statusCode, String reason, BasicHttpEntity entity, DefaultHttpClientConnection conn) {
         mStatusCode = statusCode;
         mReason = reason;
-        mContentLength = contentLength;
-        mStream = stream;
+        mEntity = entity;
         mConn = conn;
     }
 
     public int getStatusCode() { return mStatusCode; }
     public String getReason() { return mReason; }
-    public long getContentLength() { return mContentLength; }
-    public InputStream getStream() { return mStream; }
+    public BasicHttpEntity getEntity() { return mEntity; }
 
     // Must be called once the result has been read to close the connection to the server.
     public void close() {
@@ -218,8 +213,7 @@ class Download {
             BasicHttpEntity entity = (BasicHttpEntity) response.getEntity();
             return new DownloadResult(statusLine.getStatusCode(),
                                       statusLine.getReasonPhrase(),
-                                      entity.getContentLength(),
-                                      entity.getContent(),
+                                      entity,
                                       conn);
         } catch (HttpException e) {
             socket.close();
@@ -238,7 +232,7 @@ class Download {
                 error[0] = "Got " + result.getStatusCode() + " status code from server (" + result.getReason() + ")";
                 return null;
             }
-            String output = Util.getStringFromInputStream(result.getStream());
+            String output = Util.getStringFromInputStream(result.getEntity().getContent());
             result.close();
             return output;
         } catch (DownloadRequest.PrefException e) {

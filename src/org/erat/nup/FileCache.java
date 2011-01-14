@@ -174,7 +174,7 @@ class FileCache implements Runnable {
                 }
 
                 // Update the cache entry with the total content size.
-                mDb.setContentLength(id, result.getContentLength());
+                mDb.setContentLength(id, result.getEntity().getContentLength());
                 final FileCacheEntry updatedEntry = mDb.getEntryForRemotePath(urlPath);
 
                 if (!file.exists()) {
@@ -204,7 +204,8 @@ class FileCache implements Runnable {
                     int lastReportBytes = 0;
                     byte[] buffer = new byte[BUFFER_SIZE];
 
-                    while ((bytesRead = result.getStream().read(buffer)) != -1) {
+                    InputStream inputStream = result.getEntity().getContent();
+                    while ((bytesRead = inputStream.read(buffer)) != -1) {
                         if (!isDownloadActive(id)) {
                             result.close();
                             return;

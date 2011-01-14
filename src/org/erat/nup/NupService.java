@@ -370,7 +370,7 @@ public class NupService extends Service
             try {
                 DownloadRequest request = new DownloadRequest(NupService.this, DownloadRequest.Method.GET, "/cover/" + song.getCoverFilename(), null);
                 DownloadResult result = Download.startDownload(request);
-                Bitmap bitmap = BitmapFactory.decodeStream(result.getStream());
+                Bitmap bitmap = BitmapFactory.decodeStream(result.getEntity().getContent());
                 if (bitmap == null)
                     Log.e(TAG, "unable to create bitmap from " + song.getCoverFilename());
                 song.setCoverBitmap(bitmap);
