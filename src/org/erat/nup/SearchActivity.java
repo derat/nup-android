@@ -28,6 +28,8 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -126,6 +128,17 @@ public class SearchActivity extends Activity {
                     }
                     mAlbumMap.put(artist.toLowerCase(), albums);
                 }
+
+                // Sort the artist list by number of albums.
+                Collections.sort(artists, new Comparator<String>() {
+                    @Override
+                    public int compare(String a, String b) {
+                        int aNum = ((List<String>) mAlbumMap.get(a.toLowerCase())).size();
+                        int bNum = ((List<String>) mAlbumMap.get(b.toLowerCase())).size();
+                        return (aNum == bNum) ? 0 : (aNum > bNum) ? -1 : 1;
+                    }
+                });
+
                 mArtistEdit.setAdapter(new ArrayAdapter<String>(SearchActivity.this, android.R.layout.simple_dropdown_item_1line, artists));
             } catch (org.json.JSONException e) {
                 Toast.makeText(SearchActivity.this, "Unable to parse autocomplete data: " + e, Toast.LENGTH_LONG).show();
