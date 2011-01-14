@@ -4,6 +4,7 @@
 
   <string name="album">Album</string>
   <string name="artist">Artist</string>
+  <string name="browse">Browse</string>
   <string name="cache_size">Current size: %.1f MB</string>
   <string name="clear_cache">Clear cache</string>
   <string name="clear_cache_message">Delete all cached music from the SD card?</string>

@@ -68,11 +68,26 @@
         />
   </LinearLayout>
 
-  <Button
-      android:id="@+id/search_button"
+  <LinearLayout
+      android:orientation="horizontal"
       android:layout_width="fill_parent"
       android:layout_height="wrap_content"
-      android:text="@string/search"
-      android:onClick="onSearchButtonClicked"
-      />
+      >
+    <Button
+        android:id="@+id/search_button"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="@string/search"
+        android:onClick="onSearchButtonClicked"
+        />
+    <Button
+        android:id="@+id/browse_button"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="@string/browse"
+        android:onClick="onBrowseButtonClicked"
+        />
+  </LinearLayout>
 </LinearLayout>

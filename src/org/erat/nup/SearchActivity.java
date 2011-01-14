@@ -4,6 +4,7 @@
 package org.erat.nup;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.text.TextUtils;
@@ -160,6 +161,10 @@ public class SearchActivity extends Activity
         if (mMinRating != null && !mMinRating.isEmpty())
             builder.addStringParam("minRating", mMinRating);
         new SendSearchRequestTask().execute("/query", TextUtils.join("&", builder.params));
+    }
+
+    public void onBrowseButtonClicked(View view) throws IOException {
+        startActivity(new Intent(this, BrowseActivity.class));
     }
 
     @Override
