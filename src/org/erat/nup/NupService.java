@@ -42,6 +42,8 @@ import java.util.List;
 public class NupService extends Service
                         implements Player.SongCompleteListener,
                                    Player.PositionChangeListener,
+                                   Player.PauseToggleListener,
+                                   Player.PlaybackErrorListener,
                                    FileCache.DownloadListener {
     private static final String TAG = "NupService";
 
@@ -109,10 +111,13 @@ public class NupService extends Service
     private Date mCurrentSongStartDate;
 
     // Last playback position we were notified about for the current song.
-    private long mCurrentSongLastPositionMs = 0;
+    private int mCurrentSongLastPositionMs = 0;
 
     // Total time during which we've played the current song, in milliseconds.
     private long mCurrentSongPlayedMs = 0;
+
+    // Is playback currently paused?
+    private boolean mPaused = false;
 
     // Have we reported the fact that we've played the current song?
     private boolean mReportedCurrentSong = false;
@@ -146,6 +151,7 @@ public class NupService extends Service
     private PlaylistChangeListener mPlaylistChangeListener;
     private DownloadListener mDownloadListener;
     private Player.PositionChangeListener mPositionChangeListener;
+    private Player.PauseToggleListener mPauseToggleListener;
 
     @Override
     public void onCreate() {
@@ -163,6 +169,8 @@ public class NupService extends Service
         mPlayerThread.start();
         mPlayer.setSongCompleteListener(this);
         mPlayer.setPositionChangeListener(this);
+        mPlayer.setPauseToggleListener(this);
+        mPlayer.setPlaybackErrorListener(this);
 
         mCache = new FileCache(this);
         mCacheThread = new Thread(mCache, "FileCache");
@@ -188,12 +196,13 @@ public class NupService extends Service
         return mBinder;
     }
 
-    public final List<Song> getSongs() { return mSongs; }
-    public final int getCurrentSongIndex() { return mCurrentSongIndex; }
-
-    public final Song getCurrentSong() {
+    public boolean getPaused() { return mPaused; }
+    public List<Song> getSongs() { return mSongs; }
+    public int getCurrentSongIndex() { return mCurrentSongIndex; }
+    public Song getCurrentSong() {
         return (mCurrentSongIndex >= 0 && mCurrentSongIndex < mSongs.size()) ? mSongs.get(mCurrentSongIndex) : null;
     }
+    public int getCurrentSongLastPositionMs() { return mCurrentSongLastPositionMs; }
 
     public void setSongChangeListener(SongChangeListener listener) {
         mSongChangeListener = listener;
@@ -211,10 +220,7 @@ public class NupService extends Service
         mPositionChangeListener = listener;
     }
     void setPauseToggleListener(Player.PauseToggleListener listener) {
-        mPlayer.setPauseToggleListener(listener);
-    }
-    void setPlaybackErrorListener(Player.PlaybackErrorListener listener) {
-        mPlayer.setPlaybackErrorListener(listener);
+        mPauseToggleListener = listener;
     }
 
     public class LocalBinder extends Binder {
@@ -480,6 +486,24 @@ public class NupService extends Service
                     }
                 }
                 mCurrentSongLastPositionMs = positionMs;
+            }
+        });
+    }
+
+    // Implements Player.PauseToggleListener.
+    @Override
+    public void onPauseToggle(boolean paused) {
+        mPaused = paused;
+        if (mPauseToggleListener != null)
+            mPauseToggleListener.onPauseToggle(paused);
+    }
+
+    // Implements Player.PlaybackErrorListener.
+    @Override
+    public void onPlaybackError(final String description) {
+        mHandler.post(new Runnable() {
+            public void run() {
+                Toast.makeText(NupService.this, description, Toast.LENGTH_LONG).show();
             }
         });
     }

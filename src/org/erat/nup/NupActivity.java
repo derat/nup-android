@@ -33,7 +33,6 @@ import java.util.List;
 public class NupActivity extends Activity
                          implements Player.PositionChangeListener,
                                     Player.PauseToggleListener,
-                                    Player.PlaybackErrorListener,
                                     NupService.SongChangeListener,
                                     NupService.CoverLoadListener,
                                     NupService.PlaylistChangeListener,
@@ -128,10 +127,13 @@ public class NupActivity extends Activity
             mService.setPositionChangeListener(NupActivity.this);
             mService.setDownloadListener(NupActivity.this);
             mService.setPauseToggleListener(NupActivity.this);
-            mService.setPlaybackErrorListener(NupActivity.this);
 
             // Get current state from service.
             onPlaylistChange(mService.getSongs());
+            if (getCurrentSong() != null) {
+                onPauseToggle(mService.getPaused());
+                onPositionChange(mService.getCurrentSongLastPositionMs(), 0);
+            }
         }
 
         public void onServiceDisconnected(ComponentName className) {
@@ -238,16 +240,6 @@ public class NupActivity extends Activity
         runOnUiThread(new Runnable() {
             public void run() {
                 mPauseButton.setText(getString(isPaused ? R.string.play : R.string.pause));
-            }
-        });
-    }
-
-    // Implements Player.PlaybackErrorListener.
-    @Override
-    public void onPlaybackError(final String description) {
-        runOnUiThread(new Runnable() {
-            public void run() {
-                Toast.makeText(NupActivity.this, description, Toast.LENGTH_LONG).show();
             }
         });
     }
