@@ -158,7 +158,12 @@ public class NupService extends Service
         Log.d(TAG, "service created");
 
         mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        Notification notification = updateNotification("nup", getString(R.string.initial_notification), null, (Bitmap) null);
+        Notification notification = new Notification(R.drawable.icon, getString(R.string.startup_notification_message), System.currentTimeMillis());
+        notification.flags |= (Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR);
+        RemoteViews view = new RemoteViews(getPackageName(), R.layout.startup_notification);
+        notification.contentView = view;
+        notification.contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0);
+        mNotificationManager.notify(NOTIFICATION_ID, notification);
         startForeground(NOTIFICATION_ID, notification);
 
         ((TelephonyManager) getSystemService(TELEPHONY_SERVICE)).listen(
