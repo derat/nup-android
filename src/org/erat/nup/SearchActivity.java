@@ -36,6 +36,8 @@ public class SearchActivity extends Activity
                             implements NupService.ContentsLoadListener {
     private static final String TAG = "SearchActivity";
 
+    private static final int BROWSE_REQUEST_CODE = 1;
+
     private AutoCompleteTextView mArtistEdit, mAlbumEdit;
     private EditText mTitleEdit;
     private CheckBox mShuffleCheckbox, mSubstringCheckbox;
@@ -96,6 +98,17 @@ public class SearchActivity extends Activity
     protected void onDestroy() {
         Log.d(TAG, "activity destroyed");
         super.onDestroy();
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == BROWSE_REQUEST_CODE) {
+            if (resultCode == RESULT_OK) {
+                Bundle bundle = data.getExtras();
+                mArtistEdit.setText(bundle.getString(BrowseActivity.BUNDLE_ARTIST));
+                mAlbumEdit.setText(bundle.getString(BrowseActivity.BUNDLE_ALBUM));
+            }
+        }
     }
 
     class SendSearchRequestTask extends AsyncTask<String, Void, String> {
@@ -164,9 +177,10 @@ public class SearchActivity extends Activity
     }
 
     public void onBrowseButtonClicked(View view) throws IOException {
-        startActivity(new Intent(this, BrowseActivity.class));
+        startActivityForResult(new Intent(this, BrowseActivity.class), BROWSE_REQUEST_CODE);
     }
 
+    // Implements NupService.ContentsLoadListener.
     @Override
     public void onContentsLoad() {
         final List<String> artists = NupActivity.getService().getArtists();

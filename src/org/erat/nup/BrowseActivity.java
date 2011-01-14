@@ -4,10 +4,14 @@
 package org.erat.nup;
 
 import android.app.Activity;
+import android.content.Intent;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
+import android.widget.AdapterView;
 import android.widget.ListView;
 import android.widget.SimpleAdapter;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import java.util.ArrayList;
@@ -19,6 +23,9 @@ import java.util.Map;
 
 public class BrowseActivity extends Activity {
     private static final String TAG = "BrowseActivity";
+
+    public static final String BUNDLE_ARTIST = "artist";
+    public static final String BUNDLE_ALBUM = "album";
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -33,6 +40,7 @@ public class BrowseActivity extends Activity {
             return;
         }
 
+        final String artistKey = "artist", albumKey = "album";
         List<HashMap<String, String>> data = new ArrayList<HashMap<String, String>>();
         for (String artist : artists) {
             List<String> albums = NupActivity.getService().getAlbumsByArtist(artist);
@@ -41,8 +49,8 @@ public class BrowseActivity extends Activity {
 
             for (String album : albums) {
                 HashMap<String, String> map = new HashMap<String, String>();
-                map.put("artist", artist);
-                map.put("album", album);
+                map.put(artistKey, artist);
+                map.put(albumKey, album);
                 data.add(map);
             }
         }
@@ -51,10 +59,10 @@ public class BrowseActivity extends Activity {
         Collections.sort(data, new Comparator<HashMap<String, String>>() {
             @Override
             public int compare(HashMap<String, String> a, HashMap<String, String> b) {
-                int comparison = a.get("artist").compareTo(b.get("artist"));
+                int comparison = a.get(artistKey).compareTo(b.get(artistKey));
                 if (comparison != 0)
                     return comparison;
-                return a.get("album").compareTo(b.get("album"));
+                return a.get(albumKey).compareTo(b.get(albumKey));
             }
         });
 
@@ -62,10 +70,28 @@ public class BrowseActivity extends Activity {
             this,
             data,
             R.layout.browse_row,
-            new String[]{"artist", "album"},
+            new String[]{artistKey, albumKey},
             new int[]{R.id.artist, R.id.album});
         ListView view = (ListView) findViewById(R.id.list);
         view.setAdapter(adapter);
+
+        view.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
+            @Override
+            public boolean onItemLongClick(AdapterView parent, View view, int position, long id) {
+                TextView artistView = (TextView) view.findViewById(R.id.artist);
+                TextView albumView = (TextView) view.findViewById(R.id.album);
+
+                Bundle bundle = new Bundle();
+                bundle.putString(BUNDLE_ARTIST, artistView.getText().toString());
+                bundle.putString(BUNDLE_ALBUM, albumView.getText().toString());
+
+                Intent intent = new Intent();
+                intent.putExtras(bundle);
+                setResult(RESULT_OK, intent);
+                finish();
+                return true;
+            }
+        });
     }
 
     @Override
