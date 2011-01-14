@@ -14,6 +14,7 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.conn.ssl.SSLSocketFactory;
 import org.apache.http.entity.BasicHttpEntity;
+import org.apache.http.Header;
 import org.apache.http.HttpException;
 import org.apache.http.HttpHost;
 import org.apache.http.HttpRequest;
@@ -31,6 +32,7 @@ import java.io.IOException;
 import java.net.Socket;
 import java.net.URI;
 import java.net.URISyntaxException;
+import java.util.zip.GZIPInputStream;
 
 // Encapsulates a request to download a particular URL.
 // Also does a lot of preparation like looking up server URL and authorization preferences
@@ -227,12 +229,17 @@ class Download {
     public static String downloadString(Context context, String path, String query, String[] error) {
         try {
             DownloadRequest request = new DownloadRequest(context, DownloadRequest.Method.GET, path, query);
+            request.setHeader("Accept-Encoding", "gzip");
             DownloadResult result = startDownload(request);
             if (result.getStatusCode() != 200) {
                 error[0] = "Got " + result.getStatusCode() + " status code from server (" + result.getReason() + ")";
                 return null;
             }
-            String output = Util.getStringFromInputStream(result.getEntity().getContent());
+            InputStream stream = result.getEntity().getContent();
+            Header encoding = result.getEntity().getContentEncoding();
+            if (encoding != null && encoding.getValue().equals("gzip"))
+                stream = new GZIPInputStream(stream);
+            String output = Util.getStringFromInputStream(stream);
             result.close();
             return output;
         } catch (DownloadRequest.PrefException e) {
