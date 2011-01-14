@@ -28,13 +28,11 @@ import java.io.IOException;
 import java.net.URL;
 import java.net.URLEncoder;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 import java.util.HashMap;
-import java.util.Iterator;
 
-public class SearchActivity extends Activity {
+public class SearchActivity extends Activity
+                            implements NupService.ContentsLoadListener {
     private static final String TAG = "SearchActivity";
 
     private AutoCompleteTextView mArtistEdit, mAlbumEdit;
@@ -62,10 +60,10 @@ public class SearchActivity extends Activity {
             @Override
             public void onFocusChange(View v, boolean hasFocus) {
                 if (hasFocus) {
-                    String artist = mArtistEdit.getText().toString().toLowerCase();
-                    List<String> albums = new ArrayList<String>();
-                    if (mAlbumMap.containsKey(artist))
-                        albums = (List<String>) mAlbumMap.get(artist);
+                    String artist = mArtistEdit.getText().toString();
+                    List<String> albums = NupActivity.getService().getAlbumsByArtist(artist);
+                    if (albums == null)
+                        albums = new ArrayList<String>();
                     mAlbumEdit.setAdapter(new ArrayAdapter<String>(SearchActivity.this, android.R.layout.simple_dropdown_item_1line, albums));
                 }
             }
@@ -89,61 +87,14 @@ public class SearchActivity extends Activity {
         mShuffleCheckbox = (CheckBox) findViewById(R.id.shuffle_checkbox);
         mSubstringCheckbox = (CheckBox) findViewById(R.id.substring_checkbox);
 
-        new GetContentsTask().execute();
+        NupActivity.getService().setContentsLoadListener(this);
+        onContentsLoad();
     }
 
     @Override
     protected void onDestroy() {
         Log.d(TAG, "activity destroyed");
         super.onDestroy();
-    }
-
-    class GetContentsTask extends AsyncTask<Void, Void, String> {
-        // User-friendly description of error, if any, while getting contents.
-        private String[] mError = new String[1];
-
-        @Override
-        protected String doInBackground(Void... voidArg) {
-            return Download.downloadString(SearchActivity.this, "/contents", null, mError);
-        }
-
-        @Override
-        protected void onPostExecute(String response) {
-            if (response == null || response.isEmpty()) {
-                Toast.makeText(SearchActivity.this, "Unable to get autocomplete data: " + mError[0], Toast.LENGTH_LONG).show();
-                return;
-            }
-
-            try {
-                JSONObject jsonArtistMap = (JSONObject) new JSONTokener(response).nextValue();
-                List<String> artists = new ArrayList<String>();
-                for (Iterator<String> it = jsonArtistMap.keys(); it.hasNext(); ) {
-                    String artist = it.next();
-                    artists.add(artist);
-
-                    JSONArray jsonAlbums = jsonArtistMap.getJSONArray(artist);
-                    List<String> albums = new ArrayList<String>();
-                    for (int i = 0; i < jsonAlbums.length(); ++i) {
-                        albums.add(jsonAlbums.getString(i));
-                    }
-                    mAlbumMap.put(artist.toLowerCase(), albums);
-                }
-
-                // Sort the artist list by number of albums.
-                Collections.sort(artists, new Comparator<String>() {
-                    @Override
-                    public int compare(String a, String b) {
-                        int aNum = ((List<String>) mAlbumMap.get(a.toLowerCase())).size();
-                        int bNum = ((List<String>) mAlbumMap.get(b.toLowerCase())).size();
-                        return (aNum == bNum) ? 0 : (aNum > bNum) ? -1 : 1;
-                    }
-                });
-
-                mArtistEdit.setAdapter(new ArrayAdapter<String>(SearchActivity.this, android.R.layout.simple_dropdown_item_1line, artists));
-            } catch (org.json.JSONException e) {
-                Toast.makeText(SearchActivity.this, "Unable to parse autocomplete data: " + e, Toast.LENGTH_LONG).show();
-            }
-        }
     }
 
     class SendSearchRequestTask extends AsyncTask<String, Void, String> {
@@ -209,5 +160,12 @@ public class SearchActivity extends Activity {
         if (mMinRating != null && !mMinRating.isEmpty())
             builder.addStringParam("minRating", mMinRating);
         new SendSearchRequestTask().execute("/query", TextUtils.join("&", builder.params));
+    }
+
+    @Override
+    public void onContentsLoad() {
+        final List<String> artists = NupActivity.getService().getArtists();
+        if (artists != null)
+            mArtistEdit.setAdapter(new ArrayAdapter<String>(SearchActivity.this, android.R.layout.simple_dropdown_item_1line, artists));
     }
 }

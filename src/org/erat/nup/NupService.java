@@ -24,6 +24,9 @@ import android.widget.RemoteViews;
 import android.widget.Toast;
 
 import org.apache.http.HttpException;
+import org.json.JSONArray;
+import org.json.JSONObject;
+import org.json.JSONTokener;
 
 import java.io.ByteArrayInputStream;
 import java.io.File;
@@ -34,9 +37,12 @@ import java.lang.Thread;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 
 public class NupService extends Service
@@ -72,6 +78,11 @@ public class NupService extends Service
     // Listener for the cover bitmap being successfully loaded for a song.
     interface CoverLoadListener {
         void onCoverLoad(Song song);
+    }
+
+    // Listener for the server contents (artists and albums) being loaded.
+    interface ContentsLoadListener {
+        void onContentsLoad();
     }
 
     // Listener for changes to the current playlist.
@@ -131,6 +142,12 @@ public class NupService extends Service
     // Songs whose covers are currently being fetched.
     private HashSet mSongCoverFetches = new HashSet();
 
+    // List of artists, sorted by decreasing number of albums.
+    private List<String> mArtists = new ArrayList<String>();
+
+    // Points from (lowercased) artist String to List of String album names.
+    private HashMap mAlbumMap = new HashMap();
+
     // Used to run tasks on our thread.
     private Handler mHandler = new Handler();
 
@@ -148,6 +165,7 @@ public class NupService extends Service
 
     private SongChangeListener mSongChangeListener;
     private CoverLoadListener mCoverLoadListener;
+    private ContentsLoadListener mContentsLoadListener;
     private PlaylistChangeListener mPlaylistChangeListener;
     private DownloadListener mDownloadListener;
     private Player.PositionChangeListener mPositionChangeListener;
@@ -168,6 +186,9 @@ public class NupService extends Service
 
         ((TelephonyManager) getSystemService(TELEPHONY_SERVICE)).listen(
             mPhoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
+
+        // TODO: Re-fetch after server prefs are changed.
+        new GetContentsTask().execute();
 
         mPlayer = new Player();
         mPlayerThread = new Thread(mPlayer, "Player");
@@ -208,12 +229,17 @@ public class NupService extends Service
         return (mCurrentSongIndex >= 0 && mCurrentSongIndex < mSongs.size()) ? mSongs.get(mCurrentSongIndex) : null;
     }
     public int getCurrentSongLastPositionMs() { return mCurrentSongLastPositionMs; }
+    public List<String> getArtists() { return mArtists; }
+    public List<String> getAlbumsByArtist(String artist) { return (List<String>) mAlbumMap.get(artist.toLowerCase()); }
 
     public void setSongChangeListener(SongChangeListener listener) {
         mSongChangeListener = listener;
     }
     public void setCoverLoadListener(CoverLoadListener listener) {
         mCoverLoadListener = listener;
+    }
+    public void setContentsLoadListener(ContentsLoadListener listener) {
+        mContentsLoadListener = listener;
     }
     public void setPlaylistChangeListener(PlaylistChangeListener listener) {
         mPlaylistChangeListener = listener;
@@ -446,6 +472,61 @@ public class NupService extends Service
             if (mError != null) {
                 Log.e(TAG, "got error while reporting song: " + mError);
                 Toast.makeText(NupService.this, mError, Toast.LENGTH_LONG).show();
+            }
+        }
+    }
+
+    // Fetches artists and albums from the server.
+    class GetContentsTask extends AsyncTask<Void, Void, String> {
+        private static final String TAG = "GetContentsTask";
+
+        // User-friendly description of error, if any, while getting contents.
+        private String[] mError = new String[1];
+
+        @Override
+        protected String doInBackground(Void... voidArg) {
+            return Download.downloadString(NupService.this, "/contents", null, mError);
+        }
+
+        @Override
+        protected void onPostExecute(String response) {
+
+            if (response == null || response.isEmpty()) {
+                Toast.makeText(NupService.this, "Unable to get autocomplete data: " + mError[0], Toast.LENGTH_LONG).show();
+                return;
+            }
+
+            try {
+                JSONObject jsonArtistMap = (JSONObject) new JSONTokener(response).nextValue();
+                mArtists.clear();
+                mAlbumMap.clear();
+                for (Iterator<String> it = jsonArtistMap.keys(); it.hasNext(); ) {
+                    String artist = it.next();
+                    mArtists.add(artist);
+
+                    JSONArray jsonAlbums = jsonArtistMap.getJSONArray(artist);
+                    List<String> albums = new ArrayList<String>();
+                    for (int i = 0; i < jsonAlbums.length(); ++i) {
+                        albums.add(jsonAlbums.getString(i));
+                    }
+                    mAlbumMap.put(artist.toLowerCase(), albums);
+                }
+
+                // Sort the artist list by number of albums.
+                Collections.sort(mArtists, new Comparator<String>() {
+                    @Override
+                    public int compare(String a, String b) {
+                        int aNum = ((List<String>) mAlbumMap.get(a.toLowerCase())).size();
+                        int bNum = ((List<String>) mAlbumMap.get(b.toLowerCase())).size();
+                        return (aNum == bNum) ? 0 : (aNum > bNum) ? -1 : 1;
+                    }
+                });
+
+                Log.d(TAG, "got listing of " + mArtists.size() + " artist(s) from server");
+                if (mContentsLoadListener != null)
+                    mContentsLoadListener.onContentsLoad();
+            } catch (org.json.JSONException e) {
+                Toast.makeText(NupService.this, "Unable to parse autocomplete data: " + e, Toast.LENGTH_LONG).show();
             }
         }
     }
