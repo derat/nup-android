@@ -70,6 +70,9 @@ public class NupService extends Service
     // Report a song if we've played it for this many milliseconds.
     private static final long REPORT_PLAYBACK_THRESHOLD_MS = 240 * 1000;
 
+    // Subdirectory where crash reports are written.
+    private static final String CRASH_SUBDIRECTORY = "crashes";
+
     // Listener for changes to a new song.
     interface SongChangeListener {
         void onSongChange(Song song, int index);
@@ -174,6 +177,7 @@ public class NupService extends Service
     @Override
     public void onCreate() {
         Log.d(TAG, "service created");
+        CrashLogger.register(new File(getExternalFilesDir(null), CRASH_SUBDIRECTORY));
 
         mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         Notification notification = new Notification(R.drawable.icon, getString(R.string.startup_notification_message), System.currentTimeMillis());
@@ -204,17 +208,18 @@ public class NupService extends Service
     }
 
     @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d(TAG, "received start id " + startId + ": " + intent);
-        return START_STICKY;
-    }
-
-    @Override
     public void onDestroy() {
         Log.d(TAG, "service destroyed");
         mNotificationManager.cancel(NOTIFICATION_ID);
         mPlayer.quit();
         mCache.quit();
+        CrashLogger.unregister();
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.d(TAG, "received start id " + startId + ": " + intent);
+        return START_STICKY;
     }
 
     @Override
