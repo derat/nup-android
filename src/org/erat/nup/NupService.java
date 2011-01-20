@@ -436,6 +436,7 @@ public class NupService extends Service
         }
 
         // We need to update our notification even if the fetch failed.
+        // TODO: Some bitmaps appear to result in "bad array lengths" exceptions in android.os.Parcel.readIntArray().
         if (song == getCurrentSong())
             updateNotification(song.getArtist(), song.getTitle(), song.getAlbum(), song.getCoverBitmap());
     }
