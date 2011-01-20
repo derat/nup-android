@@ -14,7 +14,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.IOException;
-import java.lang.Runnable;
 import java.net.URI;
 import java.util.Date;
 import java.util.HashSet;
@@ -27,9 +26,8 @@ class FileCache implements Runnable {
     // We download this many initial bytes as quickly as we can.
     private static final int INITIAL_BYTES = 128 * 1024;
 
+    // Maximum number of bytes that we'll download per second, or 0 to disable throttling.
     private static final int MAX_BYTES_PER_SECOND = 0;
-
-    private static final int PROGRESS_REPORT_BYTES = 64 * 1024;
 
     interface DownloadListener {
         void onDownloadFail(FileCacheEntry entry, String reason);
@@ -62,6 +60,7 @@ class FileCache implements Runnable {
         mDb = new FileCacheDatabase(mContext);
     }
 
+    @Override
     public void run() {
         Looper.prepare();
         mHandler = new Handler();
@@ -198,12 +197,15 @@ class FileCache implements Runnable {
                     return;
                 }
 
+                ProgressReporter reporter = new ProgressReporter(myEntry, listener);
+                Thread reporterThread = new Thread(reporter, "FileCache.ProgressReporter" + id);
+                reporterThread.start();
+
                 try {
                     Date startDate = new Date();
-                    int bytesRead = 0, bytesWritten = 0;
-                    int lastReportBytes = 0;
-                    byte[] buffer = new byte[BUFFER_SIZE];
 
+                    int bytesRead = 0, bytesWritten = 0;
+                    byte[] buffer = new byte[BUFFER_SIZE];
                     InputStream inputStream = result.getEntity().getContent();
                     while ((bytesRead = inputStream.read(buffer)) != -1) {
                         if (!isDownloadActive(id)) {
@@ -216,11 +218,7 @@ class FileCache implements Runnable {
 
                         Date now = new Date();
                         long elapsedMs = now.getTime() - startDate.getTime();
-
-                        if (bytesWritten >= lastReportBytes + PROGRESS_REPORT_BYTES) {
-                            listener.onDownloadProgress(myEntry, bytesWritten, elapsedMs);
-                            lastReportBytes = bytesWritten;
-                        }
+                        reporter.update(bytesWritten, elapsedMs);
 
                         if (MAX_BYTES_PER_SECOND > 0) {
                             long expectedMs = (long) (bytesWritten / (float) MAX_BYTES_PER_SECOND * 1000);
@@ -234,6 +232,12 @@ class FileCache implements Runnable {
                 } catch (IOException e) {
                     handleFailure(myEntry, result, listener, "Got IO error while downloading");
                     return;
+                } finally {
+                    reporter.quit();
+                    try {
+                        reporterThread.join();
+                    } catch (InterruptedException e) {
+                    }
                 }
 
                 handleSuccess(myEntry, result, listener);
@@ -264,6 +268,79 @@ class FileCache implements Runnable {
     private boolean isDownloadActive(int id) {
         synchronized(mInProgressIds) {
             return mInProgressIds.contains(id);
+        }
+    }
+
+    private class ProgressReporter implements Runnable {
+        private static final String TAG = "FileCache.ProgressReporter";
+        private static final long PROGRESS_REPORT_MS = 250;
+
+        private final FileCacheEntry mEntry;
+        private final DownloadListener mListener;
+        private long mBytesWritten = 0;
+        private long mElapsedMs = 0;
+        private Handler mHandler;
+        private Runnable mTask;
+        private Date mLastReportDate;
+        private boolean mShouldQuit = false;
+
+        ProgressReporter(final FileCacheEntry entry, final DownloadListener listener) {
+            mEntry = entry;
+            mListener = listener;
+        }
+
+        @Override
+        public void run() {
+            Looper.prepare();
+            synchronized (this) {
+                if (mShouldQuit)
+                    return;
+                mHandler = new Handler();
+            }
+            Looper.loop();
+        }
+
+        public void quit() {
+            synchronized (this) {
+                // The thread hasn't started looping yet; tell it to exit before starting.
+                if (mHandler == null) {
+                    mShouldQuit = true;
+                    return;
+                }
+            }
+            mHandler.post(new Runnable() {
+                @Override
+                public void run() {
+                    Looper.myLooper().quit();
+                }
+            });
+        }
+
+        public void update(final long bytesWritten, final long elapsedMs) {
+            synchronized (this) {
+                mBytesWritten = bytesWritten;
+                mElapsedMs = elapsedMs;
+
+                if (mHandler != null && mTask == null) {
+                    mTask = new Runnable() {
+                        @Override
+                        public void run() {
+                            synchronized (ProgressReporter.this) {
+                                mListener.onDownloadProgress(mEntry, mBytesWritten, mElapsedMs);
+                                mLastReportDate = new Date();
+                                mTask = null;
+                            }
+                        }
+                    };
+
+                    long delayMs = 0;
+                    if (mLastReportDate != null) {
+                        long timeSinceLastReportMs = new Date().getTime() - mLastReportDate.getTime();
+                        delayMs = Math.max(PROGRESS_REPORT_MS - timeSinceLastReportMs, 0);
+                    }
+                    mHandler.postDelayed(mTask, delayMs);
+                }
+            }
         }
     }
 }

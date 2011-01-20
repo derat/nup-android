@@ -32,8 +32,6 @@ import java.io.ByteArrayInputStream;
 import java.io.File;
 import java.io.InputStream;
 import java.io.IOException;
-import java.lang.Runnable;
-import java.lang.Thread;
 import java.net.URI;
 import java.net.URL;
 import java.util.ArrayList;
@@ -213,6 +211,11 @@ public class NupService extends Service
         mNotificationManager.cancel(NOTIFICATION_ID);
         mPlayer.quit();
         mCache.quit();
+        try {
+            mPlayerThread.join();
+            mCacheThread.join();
+        } catch (InterruptedException e) {
+        }
         CrashLogger.unregister();
     }
 
