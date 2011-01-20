@@ -141,10 +141,13 @@ class FileCache implements Runnable {
                 if (!isDownloadActive(id))
                     return;
 
+                FileCacheEntry myEntry = entry;
+                DownloadResult result = null;
+
                 // If the file was already downloaded, report success.
-                File file = new File(entry.getLocalFilename());
-                if (entry.getContentLength() > 0 && file.exists() && file.length() == entry.getContentLength()) {
-                    listener.onDownloadComplete(entry);
+                File file = new File(myEntry.getLocalFilename());
+                if (myEntry.getContentLength() > 0 && file.exists() && file.length() == myEntry.getContentLength()) {
+                    handleSuccess(myEntry, result, listener);
                     return;
                 }
 
@@ -153,18 +156,17 @@ class FileCache implements Runnable {
                 try {
                     request = new DownloadRequest(mContext, DownloadRequest.Method.GET, urlPath, null);
                 } catch (DownloadRequest.PrefException e) {
-                    listener.onDownloadFail(entry, "Invalid server info settings");
+                    handleFailure(myEntry, result, listener, "Invalid server info settings");
                     return;
                 }
 
-                DownloadResult result;
                 try {
                     result = Download.startDownload(request);
                 } catch (org.apache.http.HttpException e) {
-                    listener.onDownloadFail(entry, "Got HTTP error while connecting");
+                    handleFailure(myEntry, result, listener, "Got HTTP error while connecting");
                     return;
                 } catch (IOException e) {
-                    listener.onDownloadFail(entry, "Got IO error while connecting");
+                    handleFailure(myEntry, result, listener, "Got IO error while connecting");
                     return;
                 }
 
@@ -175,15 +177,14 @@ class FileCache implements Runnable {
 
                 // Update the cache entry with the total content size.
                 mDb.setContentLength(id, result.getEntity().getContentLength());
-                final FileCacheEntry updatedEntry = mDb.getEntryForRemotePath(urlPath);
+                myEntry = mDb.getEntryForRemotePath(urlPath);
 
                 if (!file.exists()) {
                     file.getParentFile().mkdirs();
                     try {
                         file.createNewFile();
                     } catch (IOException e) {
-                        result.close();
-                        listener.onDownloadFail(updatedEntry, "Unable to create local file");
+                        handleFailure(myEntry, result, listener, "Unable to create local file");
                         return;
                     }
                 }
@@ -193,8 +194,7 @@ class FileCache implements Runnable {
                     // TODO: Once partial downloads are supported, append instead of overwriting.
                     outputStream = new FileOutputStream(file, false);
                 } catch (java.io.FileNotFoundException e) {
-                    result.close();
-                    listener.onDownloadFail(updatedEntry, "Unable to create output stream to local file");
+                    handleFailure(myEntry, result, listener, "Unable to create output stream to local file");
                     return;
                 }
 
@@ -218,7 +218,7 @@ class FileCache implements Runnable {
                         long elapsedMs = now.getTime() - startDate.getTime();
 
                         if (bytesWritten >= lastReportBytes + PROGRESS_REPORT_BYTES) {
-                            listener.onDownloadProgress(updatedEntry, bytesWritten, elapsedMs);
+                            listener.onDownloadProgress(myEntry, bytesWritten, elapsedMs);
                             lastReportBytes = bytesWritten;
                         }
 
@@ -232,17 +232,33 @@ class FileCache implements Runnable {
                     Log.d(TAG, "finished download " + id + " (" + bytesWritten + " bytes to " +
                           file.getAbsolutePath() + " in " + (endDate.getTime() - startDate.getTime()) + " ms)");
                 } catch (IOException e) {
-                    result.close();
-                    listener.onDownloadFail(updatedEntry, "Got IO error while downloading");
+                    handleFailure(myEntry, result, listener, "Got IO error while downloading");
                     return;
                 }
 
-                result.close();
-                listener.onDownloadComplete(updatedEntry);
+                handleSuccess(myEntry, result, listener);
             }
         });
 
         return entry;
+    }
+
+    private void handleFailure(FileCacheEntry entry, DownloadResult result, DownloadListener listener, String reason) {
+        if (result != null)
+            result.close();
+        synchronized(mInProgressIds) {
+            mInProgressIds.remove(entry.getId());
+        }
+        listener.onDownloadFail(entry, reason);
+    }
+
+    private void handleSuccess(FileCacheEntry entry, DownloadResult result, DownloadListener listener) {
+        if (result != null)
+            result.close();
+        synchronized(mInProgressIds) {
+            mInProgressIds.remove(entry.getId());
+        }
+        listener.onDownloadComplete(entry);
     }
 
     private boolean isDownloadActive(int id) {
