@@ -145,18 +145,22 @@ class FileCache implements Runnable {
 
                 // If the file was already downloaded, report success.
                 File file = new File(myEntry.getLocalFilename());
-                if (myEntry.getContentLength() > 0 && file.exists() && file.length() == myEntry.getContentLength()) {
+                long existingLength = file.exists() ? file.length() : 0;
+                if (myEntry.getContentLength() > 0 && existingLength == myEntry.getContentLength()) {
                     handleSuccess(myEntry, result, listener);
                     return;
                 }
 
-                // TODO: Resume partial downloads.
                 DownloadRequest request;
                 try {
                     request = new DownloadRequest(mContext, DownloadRequest.Method.GET, urlPath, null);
                 } catch (DownloadRequest.PrefException e) {
                     handleFailure(myEntry, result, listener, "Invalid server info settings");
                     return;
+                }
+                if (existingLength > 0 && existingLength < myEntry.getContentLength()) {
+                    Log.d(TAG, "attempting to resume download at byte " + existingLength);
+                    request.setHeader("Range", new Long(existingLength).toString() + "-");
                 }
 
                 try {
@@ -166,6 +170,12 @@ class FileCache implements Runnable {
                     return;
                 } catch (IOException e) {
                     handleFailure(myEntry, result, listener, "Got IO error while connecting");
+                    return;
+                }
+
+                Log.d(TAG, "got " + result.getStatusCode() + " from server");
+                if (result.getStatusCode() != 200 && result.getStatusCode() != 206) {
+                    handleFailure(myEntry, result, listener, "Got status code " + result.getStatusCode());
                     return;
                 }
 
@@ -190,8 +200,9 @@ class FileCache implements Runnable {
 
                 FileOutputStream outputStream;
                 try {
-                    // TODO: Once partial downloads are supported, append instead of overwriting.
-                    outputStream = new FileOutputStream(file, false);
+                    // TODO: Also check the Content-Range header.
+                    boolean append = (result.getStatusCode() == 206);
+                    outputStream = new FileOutputStream(file, append);
                 } catch (java.io.FileNotFoundException e) {
                     handleFailure(myEntry, result, listener, "Unable to create output stream to local file");
                     return;
@@ -218,7 +229,7 @@ class FileCache implements Runnable {
 
                         Date now = new Date();
                         long elapsedMs = now.getTime() - startDate.getTime();
-                        reporter.update(bytesWritten, elapsedMs);
+                        reporter.update(existingLength + bytesWritten, elapsedMs);
 
                         if (MAX_BYTES_PER_SECOND > 0) {
                             long expectedMs = (long) (bytesWritten / (float) MAX_BYTES_PER_SECOND * 1000);
