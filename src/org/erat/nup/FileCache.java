@@ -31,7 +31,7 @@ class FileCache implements Runnable {
 
     interface DownloadListener {
         void onDownloadFail(FileCacheEntry entry, String reason);
-        void onDownloadProgress(FileCacheEntry entry, long receivedBytes, long elapsedMs);
+        void onDownloadProgress(FileCacheEntry entry, long diskBytes, long receivedBytes, long elapsedMs);
         void onDownloadComplete(FileCacheEntry entry);
     }
 
@@ -185,8 +185,10 @@ class FileCache implements Runnable {
                 }
 
                 // Update the cache entry with the total content size.
-                mDb.setContentLength(id, result.getEntity().getContentLength());
-                myEntry = mDb.getEntryForRemotePath(urlPath);
+                if (existingLength == 0) {
+                    mDb.setContentLength(id, result.getEntity().getContentLength());
+                    myEntry = mDb.getEntryForRemotePath(urlPath);
+                }
 
                 if (!file.exists()) {
                     file.getParentFile().mkdirs();
@@ -229,7 +231,7 @@ class FileCache implements Runnable {
 
                         Date now = new Date();
                         long elapsedMs = now.getTime() - startDate.getTime();
-                        reporter.update(existingLength + bytesWritten, elapsedMs);
+                        reporter.update(existingLength + bytesWritten, bytesWritten, elapsedMs);
 
                         if (MAX_BYTES_PER_SECOND > 0) {
                             long expectedMs = (long) (bytesWritten / (float) MAX_BYTES_PER_SECOND * 1000);
@@ -288,7 +290,8 @@ class FileCache implements Runnable {
 
         private final FileCacheEntry mEntry;
         private final DownloadListener mListener;
-        private long mBytesWritten = 0;
+        private long mDiskBytes = 0;
+        private long mDownloadedBytes = 0;
         private long mElapsedMs = 0;
         private Handler mHandler;
         private Runnable mTask;
@@ -327,9 +330,10 @@ class FileCache implements Runnable {
             });
         }
 
-        public void update(final long bytesWritten, final long elapsedMs) {
+        public void update(final long diskBytes, final long downloadedBytes, final long elapsedMs) {
             synchronized (this) {
-                mBytesWritten = bytesWritten;
+                mDiskBytes = diskBytes;
+                mDownloadedBytes = downloadedBytes;
                 mElapsedMs = elapsedMs;
 
                 if (mHandler != null && mTask == null) {
@@ -337,7 +341,7 @@ class FileCache implements Runnable {
                         @Override
                         public void run() {
                             synchronized (ProgressReporter.this) {
-                                mListener.onDownloadProgress(mEntry, mBytesWritten, mElapsedMs);
+                                mListener.onDownloadProgress(mEntry, mDiskBytes, mDownloadedBytes, mElapsedMs);
                                 mLastReportDate = new Date();
                                 mTask = null;
                             }

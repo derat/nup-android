@@ -647,7 +647,7 @@ public class NupService extends Service
 
     // Implements FileCache.DownloadListener.
     @Override
-    public void onDownloadProgress(final FileCacheEntry entry, final long receivedBytes, final long elapsedMs) {
+    public void onDownloadProgress(final FileCacheEntry entry, final long diskBytes, final long downloadedBytes, final long elapsedMs) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
@@ -655,21 +655,21 @@ public class NupService extends Service
                 if (song == null || !entry.getRemotePath().equals(song.getUrlPath()))
                     return;
 
-                if (mWaitingForDownload && canPlaySong(entry, receivedBytes, elapsedMs, song.getLengthSec())) {
+                if (mWaitingForDownload && canPlaySong(entry, diskBytes, downloadedBytes, elapsedMs, song.getLengthSec())) {
                     mWaitingForDownload = false;
                     mPlayer.playFile(entry.getLocalFilename());
                     mCurrentSongStartDate = new Date();
                 }
                 if (mDownloadListener != null)
-                    mDownloadListener.onDownloadProgress(song, receivedBytes, entry.getContentLength());
+                    mDownloadListener.onDownloadProgress(song, diskBytes, entry.getContentLength());
             }
         });
     }
 
-    private boolean canPlaySong(FileCacheEntry entry, long receivedBytes, long elapsedMs, int songLengthSec) {
-        double bytesPerMs = (double) receivedBytes / elapsedMs;
-        long remainingMs = (long) ((entry.getContentLength() - receivedBytes) / bytesPerMs);
-        return (receivedBytes >= MIN_BYTES_BEFORE_PLAYING && remainingMs + EXTRA_BUFFER_MS <= songLengthSec * 1000);
+    private boolean canPlaySong(FileCacheEntry entry, long diskBytes, long downloadedBytes, long elapsedMs, int songLengthSec) {
+        double bytesPerMs = (double) downloadedBytes / elapsedMs;
+        long remainingMs = (long) ((entry.getContentLength() - diskBytes) / bytesPerMs);
+        return (diskBytes >= MIN_BYTES_BEFORE_PLAYING && remainingMs + EXTRA_BUFFER_MS <= songLengthSec * 1000);
     }
 
     private boolean isCacheEntryFullyDownloaded(FileCacheEntry entry) {
