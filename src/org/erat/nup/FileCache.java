@@ -160,7 +160,7 @@ class FileCache implements Runnable {
                 }
                 if (existingLength > 0 && existingLength < myEntry.getContentLength()) {
                     Log.d(TAG, "attempting to resume download at byte " + existingLength);
-                    request.setHeader("Range", new Long(existingLength).toString() + "-");
+                    request.setHeader("Range", "bytes=" + new Long(existingLength).toString() + "-");
                 }
 
                 try {
