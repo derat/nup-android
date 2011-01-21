@@ -98,6 +98,7 @@ public class SearchActivity extends Activity
     protected void onDestroy() {
         Log.d(TAG, "activity destroyed");
         super.onDestroy();
+        NupActivity.getService().unregisterListener(this);
     }
 
     @Override

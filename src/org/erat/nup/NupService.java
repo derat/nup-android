@@ -152,6 +152,8 @@ public class NupService extends Service
     // Used to run tasks on our thread.
     private Handler mHandler = new Handler();
 
+    private TelephonyManager mTelephonyManager;
+
     // Pause when phone calls arrive.
     private PhoneStateListener mPhoneStateListener = new PhoneStateListener() {
         @Override
@@ -177,6 +179,8 @@ public class NupService extends Service
         Log.d(TAG, "service created");
         CrashLogger.register(new File(getExternalFilesDir(null), CRASH_SUBDIRECTORY));
 
+        mTelephonyManager = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
+
         mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         Notification notification = new Notification(R.drawable.icon, getString(R.string.startup_notification_message), System.currentTimeMillis());
         notification.flags |= (Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR);
@@ -186,8 +190,7 @@ public class NupService extends Service
         mNotificationManager.notify(NOTIFICATION_ID, notification);
         startForeground(NOTIFICATION_ID, notification);
 
-        ((TelephonyManager) getSystemService(TELEPHONY_SERVICE)).listen(
-            mPhoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
+        mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
 
         // TODO: Re-fetch after server prefs are changed.
         new GetContentsTask().execute();
@@ -209,6 +212,7 @@ public class NupService extends Service
     public void onDestroy() {
         Log.d(TAG, "service destroyed");
         mNotificationManager.cancel(NOTIFICATION_ID);
+        mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_NONE);
         mPlayer.quit();
         mCache.quit();
         try {
@@ -260,6 +264,23 @@ public class NupService extends Service
     }
     void setPauseToggleListener(Player.PauseToggleListener listener) {
         mPauseToggleListener = listener;
+    }
+
+    void unregisterListener(Object object) {
+        if (mSongChangeListener == object)
+            mSongChangeListener = null;
+        if (mCoverLoadListener == object)
+            mCoverLoadListener = null;
+        if (mContentsLoadListener == object)
+            mContentsLoadListener = null;
+        if (mPlaylistChangeListener == object)
+            mPlaylistChangeListener = null;
+        if (mDownloadListener == object)
+            mDownloadListener = null;
+        if (mPositionChangeListener == object)
+            mPositionChangeListener = null;
+        if (mPauseToggleListener == object)
+            mPauseToggleListener = null;
     }
 
     public class LocalBinder extends Binder {

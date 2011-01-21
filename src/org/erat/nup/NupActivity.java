@@ -106,6 +106,7 @@ public class NupActivity extends Activity
 
         boolean stopService = false;
         if (mService != null) {
+            mService.unregisterListener(this);
             // Shut down the service as well if the playlist is empty.
             if (mService.getSongs().size() == 0)
                 stopService = true;
