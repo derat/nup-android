@@ -777,7 +777,6 @@ public class NupService extends Service
                 // We already have this one.  Pin it to make sure that it
                 // doesn't get evicted by a later song.
                 mCache.pinId(entry.getId());
-                index++;
                 continue;
             }
 
