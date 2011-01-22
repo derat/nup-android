@@ -26,7 +26,7 @@ class YesNoPreference extends DialogPreference {
             if (NupPreferences.CLEAR_CACHE.equals(getKey())) {
                 // FIXME: shouldn't do this on the UI thread
                 NupActivity.getService().clearCache();
-                setSummary(mContext.getString(R.string.cache_size, NupActivity.getService().getCacheDataBytes() / (double) (1024 * 1024)));
+                setSummary(mContext.getString(R.string.cache_is_empty));
             }
         }
     }

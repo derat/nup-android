@@ -22,12 +22,32 @@
   </PreferenceCategory>
 
   <PreferenceCategory android:title="Cache">
+    <EditTextPreference
+        android:key="cache_size"
+        android:title="@string/cache_size"
+        android:dialogMessage="@string/cache_size_description"
+        android:singleLine="true"
+        />
     <org.erat.nup.YesNoPreference
         android:key="clear_cache"
         android:title="@string/clear_cache"
         android:dialogMessage="@string/clear_cache_message"
         android:dialogTitle="@string/clear_cache"
         android:dialogIcon="@android:drawable/ic_dialog_alert"
+        />
+    <EditTextPreference
+        android:key="songs_to_preload"
+        android:title="@string/songs_to_preload"
+        android:dialogMessage="@string/songs_to_preload_description"
+        android:singleLine="true"
+        android:numeric="integer"
+        />
+    <EditTextPreference
+        android:key="download_rate"
+        android:title="@string/download_rate"
+        android:dialogMessage="@string/download_rate_description"
+        android:singleLine="true"
+        android:numeric="integer"
         />
   </PreferenceCategory>
 </PreferenceScreen>

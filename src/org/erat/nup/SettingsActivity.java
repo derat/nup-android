@@ -30,8 +30,36 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
         pref.setOnPreferenceChangeListener(this);
         pref.setSummary(mPrefs.getString(NupPreferences.USERNAME, ""));
 
+        pref = findPreference(NupPreferences.CACHE_SIZE);
+        pref.setOnPreferenceChangeListener(this);
+        int maxCacheMb = Integer.valueOf(
+            mPrefs.getString(NupPreferences.CACHE_SIZE,
+                             NupPreferences.CACHE_SIZE_DEFAULT));
+        pref.setSummary(getString(R.string.cache_size_value, maxCacheMb));
+
         pref = findPreference(NupPreferences.CLEAR_CACHE);
-        pref.setSummary(getString(R.string.cache_size, NupActivity.getService().getCacheDataBytes() / (double) (1024 * 1024)));
+        long cachedBytes = NupActivity.getService().getCacheDataBytes();
+        pref.setSummary(cachedBytes > 0 ?
+                        getString(R.string.current_cache_size, cachedBytes / (double) (1024 * 1024)) :
+                        getString(R.string.cache_is_empty));
+
+        pref = findPreference(NupPreferences.SONGS_TO_PRELOAD);
+        pref.setOnPreferenceChangeListener(this);
+        int songsToPreload = Integer.valueOf(
+            mPrefs.getString(NupPreferences.SONGS_TO_PRELOAD,
+                             NupPreferences.SONGS_TO_PRELOAD_DEFAULT));
+        pref.setSummary(
+            songsToPreload == 1 ?
+            getString(R.string.songs_to_preload_value_singular, songsToPreload) :
+            getString(R.string.songs_to_preload_value_plural, songsToPreload));
+
+        pref = findPreference(NupPreferences.DOWNLOAD_RATE);
+        pref.setOnPreferenceChangeListener(this);
+        int downloadRate = Integer.valueOf(
+            mPrefs.getString(NupPreferences.DOWNLOAD_RATE, "0"));
+        pref.setSummary(downloadRate == 0 ?
+                        getString(R.string.unlimited) :
+                        getString(R.string.download_rate_value, downloadRate));
     }
 
     @Override
@@ -51,7 +79,44 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
         } else if (pref.getKey().equals(NupPreferences.USERNAME)) {
             findPreference(NupPreferences.USERNAME).setSummary((String) value);
             return true;
+        } else if (pref.getKey().equals(NupPreferences.CACHE_SIZE)) {
+            int intValue = parseNonNegativeInt((String) value);
+            if (intValue < NupPreferences.CACHE_SIZE_MINIMUM) {
+                Toast.makeText(this, getString(R.string.cache_size_invalid, NupPreferences.CACHE_SIZE_MINIMUM), Toast.LENGTH_LONG).show();
+                return false;
+            }
+            findPreference(NupPreferences.CACHE_SIZE).setSummary(
+                getString(R.string.cache_size_value, intValue));
+            return true;
+        } else if (pref.getKey().equals(NupPreferences.SONGS_TO_PRELOAD)) {
+            int intValue = parseNonNegativeInt((String) value);
+            if (intValue < 0)
+                return false;
+            findPreference(NupPreferences.SONGS_TO_PRELOAD).setSummary(
+                intValue == 1 ?
+                getString(R.string.songs_to_preload_value_singular, intValue) :
+                getString(R.string.songs_to_preload_value_plural, intValue));
+            return true;
+        } else if (pref.getKey().equals(NupPreferences.DOWNLOAD_RATE)) {
+            int intValue = parseNonNegativeInt((String) value);
+            if (intValue < 0)
+                return false;
+            findPreference(NupPreferences.DOWNLOAD_RATE).setSummary(
+                intValue == 0 ?
+                getString(R.string.unlimited) :
+                getString(R.string.download_rate_value, intValue));
+            return true;
         }
         return false;
+    }
+
+    // Parse a string containing a integer that should be positive.
+    // -1 is returned if the string can't be parsed.
+    private int parseNonNegativeInt(String strValue) {
+        try {
+            return Integer.parseInt((String) strValue);
+        } catch (NumberFormatException e) {
+            return -1;
+        }
     }
 }
