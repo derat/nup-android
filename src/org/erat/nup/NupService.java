@@ -111,7 +111,10 @@ public class NupService extends Service
     private Thread mCacheThread;
 
     // ID of the cache entry that's currently being downloaded.
-    private int mCurrentDownloadId = -1;
+    private int mDownloadId = -1;
+
+    // Index into |mSongs| of the song that's currently being downloaded.
+    private int mDownloadIndex = -1;
 
     // Are we currently waiting for a file to be downloaded before we can play it?
     private boolean mWaitingForDownload = false;
@@ -121,7 +124,7 @@ public class NupService extends Service
     // Current playlist.
     private List<Song> mSongs = new ArrayList<Song>();
 
-    // Index of the song in mSongs that's being played.
+    // Index of the song in |mSongs| that's being played.
     private int mCurrentSongIndex = -1;
 
     // Time at which we started playing the current song.
@@ -349,8 +352,14 @@ public class NupService extends Service
     public void setPlaylist(List<Song> songs) {
         mSongs = songs;
         mCurrentSongIndex = -1;
+        if (mDownloadId != -1) {
+            mCache.abortDownload(mDownloadId);
+            mDownloadId = -1;
+            mDownloadIndex = -1;
+        }
         if (mPlaylistChangeListener != null)
             mPlaylistChangeListener.onPlaylistChange(mSongs);
+
         if (songs.size() > 0)
             playSongAtIndex(0);
     }
@@ -380,21 +389,23 @@ public class NupService extends Service
             // previously-being-played song), abort it.
             // TODO: This could actually be a future song that we were already
             // downloading and will soon need to start downloading again.
-            if (mCurrentDownloadId != -1 && mCurrentDownloadId != cacheEntry.getId()) {
-                mCache.abortDownload(mCurrentDownloadId);
-                mCurrentDownloadId = -1;
+            if (mDownloadId != -1 && mDownloadId != cacheEntry.getId()) {
+                mCache.abortDownload(mDownloadId);
+                mDownloadId = -1;
+                mDownloadIndex = -1;
             }
 
-            maybeDownloadAnotherSong(cacheEntry);
+            maybeDownloadAnotherSong(mCurrentSongIndex + 1);
         } else {
             // Otherwise, start downloading it if we've never tried downloading it before,
             // or if we have but it's not currently being downloaded.
             mPlayer.abort();
-            if (cacheEntry == null || mCurrentDownloadId != cacheEntry.getId()) {
-                if (mCurrentDownloadId != -1)
-                    mCache.abortDownload(mCurrentDownloadId);
+            if (cacheEntry == null || mDownloadId != cacheEntry.getId()) {
+                if (mDownloadId != -1)
+                    mCache.abortDownload(mDownloadId);
                 cacheEntry = mCache.downloadFile(song.getUrlPath(), this, chooseLocalFilenameForSong(song));
-                mCurrentDownloadId = cacheEntry.getId();
+                mDownloadId = cacheEntry.getId();
+                mDownloadIndex = mCurrentSongIndex;
             }
             mWaitingForDownload = true;
         }
@@ -666,8 +677,9 @@ public class NupService extends Service
             public void run() {
                 Log.d(TAG, "got notification that download " + entry.getId() + " failed: " + reason);
                 Toast.makeText(NupService.this, "Download of " + entry.getRemotePath() + " failed: " + reason, Toast.LENGTH_LONG).show();
-                if (entry.getId() == mCurrentDownloadId) {
-                    mCurrentDownloadId = -1;
+                if (entry.getId() == mDownloadId) {
+                    mDownloadId = -1;
+                    mDownloadIndex = -1;
                     mWaitingForDownload = false;
                 }
             }
@@ -680,8 +692,7 @@ public class NupService extends Service
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                if (entry.getId() == mCurrentDownloadId)
-                    mCurrentDownloadId = -1;
+                Log.d(TAG, "got notification that download " + entry.getId() + " is done");
 
                 Song song = getCurrentSong();
                 if (song != null && entry.getRemotePath().equals(song.getUrlPath())) {
@@ -693,7 +704,12 @@ public class NupService extends Service
                         mDownloadListener.onDownloadComplete(song);
                 }
 
-                maybeDownloadAnotherSong(entry);
+                if (entry.getId() == mDownloadId) {
+                    int nextIndex = mDownloadIndex + 1;
+                    mDownloadId = -1;
+                    mDownloadIndex = -1;
+                    maybeDownloadAnotherSong(nextIndex);
+                }
             }
         });
     }
@@ -743,30 +759,28 @@ public class NupService extends Service
     }
 
     // Try to download the next not-yet-downloaded song in the playlist.
-    private void maybeDownloadAnotherSong(FileCacheEntry completedEntry) {
-        if (mCurrentDownloadId != -1)
+    private void maybeDownloadAnotherSong(int index) {
+        if (mDownloadId != -1)
             return;
 
         final int songsToPreload = Integer.valueOf(
             mPrefs.getString(NupPreferences.SONGS_TO_PRELOAD,
                              NupPreferences.SONGS_TO_PRELOAD_DEFAULT));
 
-        // TODO: Save more state so we don't reiterate through all of the
-        // entries after the current one, maybe.
-        for (int index = mCurrentSongIndex + 1;
-             index < mSongs.size() && index - mCurrentSongIndex <= songsToPreload;
-             index++) {
+        for (; index < mSongs.size() && index - mCurrentSongIndex <= songsToPreload; index++) {
             Song song = mSongs.get(index);
             FileCacheEntry entry = mCache.getEntry(song.getUrlPath());
             if (entry != null && isCacheEntryFullyDownloaded(entry)) {
                 // We already have this one.  Pin it to make sure that it
                 // doesn't get evicted by a later song.
                 mCache.pinId(entry.getId());
+                index++;
                 continue;
             }
 
             entry = mCache.downloadFile(song.getUrlPath(), this, chooseLocalFilenameForSong(song));
-            mCurrentDownloadId = entry.getId();
+            mDownloadId = entry.getId();
+            mDownloadIndex = index;
             mCache.pinId(entry.getId());
             return;
         }
