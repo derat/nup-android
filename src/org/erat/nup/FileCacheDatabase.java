@@ -8,6 +8,10 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 
+import java.util.ArrayList;
+import java.util.Date;
+import java.util.List;
+
 class FileCacheDatabase {
     private static final String TAG = "FileCacheDatabase";
     private static final String DATABASE_NAME = "NupFileCache";
@@ -38,37 +42,67 @@ class FileCacheDatabase {
         };
     }
 
-    public synchronized FileCacheEntry getEntryForRemotePath(String remotePath) {
+    public synchronized FileCacheEntry getEntryById(int id) {
         Cursor cursor = mOpener.getReadableDatabase().rawQuery(
             "SELECT " +
-            "  CacheEntryId, " +
+            "  RemotePath, " +
             "  LocalFilename, " +
             "  IFNULL(ContentLength, 0), " +
             "  IFNULL(ETag, '') " +
             "FROM CacheEntries " +
-            "WHERE RemotePath = ?",
-            new String[]{remotePath});
-        if (cursor.getCount() == 0)
-            return null;
+            "WHERE CacheEntryId = ?",
+            new String[]{Integer.toString(id)});
         cursor.moveToFirst();
-        return new FileCacheEntry(cursor.getInt(0), remotePath, cursor.getString(1), cursor.getLong(2), cursor.getString(3));
+        if (cursor.isAfterLast())
+            return null;
+        return new FileCacheEntry(id, cursor.getString(0), cursor.getString(1), cursor.getLong(2), cursor.getString(3));
+    }
+
+    public synchronized FileCacheEntry getEntryForRemotePath(String remotePath) {
+        Cursor cursor = mOpener.getReadableDatabase().rawQuery(
+            "SELECT CacheEntryId FROM CacheEntries WHERE RemotePath = ?",
+            new String[]{remotePath});
+        cursor.moveToFirst();
+        return cursor.isAfterLast() ? null : getEntryById(cursor.getInt(0));
     }
 
     public synchronized int addEntry(String remotePath, String localFilename) {
         SQLiteDatabase db = mOpener.getWritableDatabase();
         db.execSQL(
-            "INSERT INTO CacheEntries (RemotePath, LocalFilename) VALUES(?, ?)",
-            new Object[]{remotePath, localFilename});
+            "INSERT INTO CacheEntries (RemotePath, LocalFilename, LastAccessTime) VALUES(?, ?, ?)",
+            new Object[]{remotePath, localFilename, new Date().getTime() / 1000});
         Cursor cursor = db.rawQuery("SELECT last_insert_rowid()", null);
         cursor.moveToFirst();
         return cursor.getInt(0);
     }
 
+    public synchronized void removeEntry(int id) {
+        mOpener.getWritableDatabase().execSQL(
+            "DELETE FROM CacheEntries WHERE CacheEntryId = ?", new Object[]{id});
+    }
+
     public synchronized void setContentLength(int id, long contentLength) {
-        SQLiteDatabase db = mOpener.getWritableDatabase();
-        db.execSQL(
+        mOpener.getWritableDatabase().execSQL(
             "Update CacheEntries SET ContentLength = ? WHERE CacheEntryId = ?",
-            new Object[]{contentLength, id});
+            new Object[]{ contentLength, id });
+    }
+
+    public synchronized void updateLastAccessTime(int id) {
+        mOpener.getWritableDatabase().execSQL(
+            "Update CacheEntries SET LastAccessTime = ? WHERE CacheEntryId = ?",
+            new Object[]{ new Date().getTime() / 1000, id });
+    }
+
+    public synchronized List<Integer> getIdsByAge() {
+        Cursor cursor = mOpener.getReadableDatabase().rawQuery(
+            "SELECT CacheEntryId FROM CacheEntries ORDER BY LastAccessTime ASC", null);
+        List<Integer> ids = new ArrayList<Integer>();
+        cursor.moveToFirst();
+        while (!cursor.isAfterLast()) {
+            ids.add(cursor.getInt(0));
+            cursor.moveToNext();
+        }
+        return ids;
     }
 
     public synchronized void clear() {

@@ -4,10 +4,12 @@
 package org.erat.nup;
 
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
 import android.os.SystemClock;
+import android.preference.PreferenceManager;
 import android.util.Log;
 
 import java.io.File;
@@ -17,6 +19,7 @@ import java.io.IOException;
 import java.net.URI;
 import java.util.Date;
 import java.util.HashSet;
+import java.util.List;
 
 class FileCache implements Runnable {
     private static final String TAG = "FileCache";
@@ -40,7 +43,13 @@ class FileCache implements Runnable {
     // IDs of entries that are currently being downloaded.
     private HashSet mInProgressIds = new HashSet();
 
+    // IDs of entries that shouldn't be purged from the cache.
+    private HashSet mPinnedIds = new HashSet();
+
+    // Persistent information about cached items.
     private FileCacheDatabase mDb;
+
+    private SharedPreferences mPrefs;
 
     FileCache(Context context) {
         mContext = context;
@@ -51,6 +60,8 @@ class FileCache implements Runnable {
 
         mMusicDir = mContext.getExternalFilesDir(Environment.DIRECTORY_MUSIC);
         mDb = new FileCacheDatabase(mContext);
+
+        mPrefs = PreferenceManager.getDefaultSharedPreferences(context);
     }
 
     @Override
@@ -113,6 +124,8 @@ class FileCache implements Runnable {
             String localFilename = new File(mMusicDir, urlPath.replace("/", "_")).getAbsolutePath();
             int id = mDb.addEntry(urlPath, localFilename);
             entry = mDb.getEntryForRemotePath(urlPath);
+        } else {
+            mDb.updateLastAccessTime(entry.getId());
         }
 
         final int id = entry.getId();
@@ -125,6 +138,18 @@ class FileCache implements Runnable {
         Log.d(TAG, "posting download " + id + " of " + urlPath);
         mHandler.post(new DownloadTask(entry, listener));
         return entry;
+    }
+
+    public void pinId(int id) {
+        synchronized (mPinnedIds) {
+            mPinnedIds.add(id);
+        }
+    }
+
+    public void unpinId(int id) {
+        synchronized (mPinnedIds) {
+            mPinnedIds.remove(id);
+        }
     }
 
     private class DownloadTask implements Runnable {
@@ -213,6 +238,12 @@ class FileCache implements Runnable {
                 if (existingLength == 0) {
                     mDb.setContentLength(mId, mResult.getEntity().getContentLength());
                     mEntry = mDb.getEntryForRemotePath(mEntry.getRemotePath());
+                }
+
+                // Make space for whatever we're planning to download.
+                if (!makeSpace(mResult.getEntity().getContentLength())) {
+                    handleFailure("Unable to make space for " + mResult.getEntity().getContentLength() + "-byte download");
+                    return;
                 }
 
                 if (!file.exists()) {
@@ -392,5 +423,42 @@ class FileCache implements Runnable {
         synchronized(mInProgressIds) {
             return mInProgressIds.contains(id);
         }
+    }
+
+    // Try to make room for |neededBytes| in the cache.
+    // We delete the least-recently-accessed files first, ignoring ones
+    // that are currently being downloaded or are pinned.
+    synchronized private boolean makeSpace(long neededBytes) {
+        long maxBytes = Long.valueOf(
+            mPrefs.getString(NupPreferences.CACHE_SIZE,
+                             NupPreferences.CACHE_SIZE_DEFAULT)) * 1024 * 1024;
+        long availableBytes = maxBytes - getDataBytes();
+
+        if (neededBytes <= availableBytes)
+            return true;
+
+        Log.d(TAG, "need to make space for " + neededBytes + " bytes (" + availableBytes + " available)");
+        List<Integer> ids = mDb.getIdsByAge();
+        for (int id : ids) {
+            if (neededBytes <= availableBytes)
+                break;
+
+            if (isDownloadActive(id))
+                continue;
+
+            synchronized(mPinnedIds) {
+                if (mPinnedIds.contains(id))
+                    continue;
+            }
+
+            FileCacheEntry entry = mDb.getEntryById(id);
+            File file = new File(entry.getLocalFilename());
+            Log.d(TAG, "deleting " + entry.getLocalFilename() + " (" + file.length() + " bytes)");
+            availableBytes += file.length();
+            file.delete();
+            mDb.removeEntry(id);
+        }
+
+        return neededBytes <= availableBytes;
     }
 }
