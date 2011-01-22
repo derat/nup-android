@@ -626,6 +626,17 @@ public class NupService extends Service
 
     // Implements FileCache.DownloadListener.
     @Override
+    public void onDownloadError(final FileCacheEntry entry, final String reason) {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(NupService.this, "Got retryable error: " + reason, Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    // Implements FileCache.DownloadListener.
+    @Override
     public void onDownloadFail(final FileCacheEntry entry, final String reason) {
         mHandler.post(new Runnable() {
             @Override
