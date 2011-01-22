@@ -27,6 +27,7 @@ import android.widget.TextView;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 
 public class NupActivity extends Activity
@@ -75,6 +76,9 @@ public class NupActivity extends Activity
             mService.playSongAtIndex(mCurrentSongIndex);
         }
     };
+
+    // Maps from SongId to the (int) percentage of the song's length that has been downloaded.
+    private HashMap mDownloadPercentages = new HashMap();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -212,6 +216,7 @@ public class NupActivity extends Activity
             @Override
             public void run() {
                 mSongs = songs;
+                mDownloadPercentages.clear();
                 findViewById(R.id.playlist_heading).setVisibility(mSongs.isEmpty() ? View.INVISIBLE : View.VISIBLE);
                 updateCurrentSongIndex(mService.getCurrentSongIndex());
             }
@@ -227,6 +232,7 @@ public class NupActivity extends Activity
                               (double) receivedBytes / (1024 * 1024),
                               (double) totalBytes / (1024 * 1024)));
         }
+        updateDownloadPercentage(song, (int) Math.round(100.0 * receivedBytes / totalBytes));
     }
 
     // Implements NupService.DownloadListener.
@@ -234,6 +240,7 @@ public class NupActivity extends Activity
     public void onDownloadComplete(Song song) {
         if (song == getCurrentSong())
             mDownloadStatusLabel.setText("");
+        updateDownloadPercentage(song, 100);
     }
 
     // Implements Player.PauseToggleListener.
@@ -312,6 +319,15 @@ public class NupActivity extends Activity
             ((TextView) view.findViewById(R.id.artist)).setText(song.getArtist());
             ((TextView) view.findViewById(R.id.title)).setText(song.getTitle());
 
+            TextView percentView = (TextView) view.findViewById(R.id.percent);
+            Object object = mDownloadPercentages.get(song.getSongId());
+            if (object != null) {
+                percentView.setText((Integer) object + "%");
+                percentView.setVisibility(View.VISIBLE);
+            } else {
+                percentView.setVisibility(View.GONE);
+            }
+
             boolean currentlyPlaying = (position == mCurrentSongIndex);
             view.setBackgroundColor(getResources().getColor(currentlyPlaying ? R.color.playlist_highlight_bg : android.R.color.transparent));
             return view;
@@ -352,5 +368,13 @@ public class NupActivity extends Activity
     private void schedulePlaySongTask(int delayMs) {
         mHandler.removeCallbacks(mPlaySongTask);
         mHandler.postDelayed(mPlaySongTask, delayMs);
+    }
+
+    private void updateDownloadPercentage(Song song, int percent) {
+        Object object = mDownloadPercentages.get(song.getSongId());
+        mDownloadPercentages.put(song.getSongId(), percent);
+        int oldPercent = (object != null) ? (Integer) object : -1;
+        if (oldPercent != percent)
+            mSongListAdapter.notifyDataSetChanged();
     }
 }

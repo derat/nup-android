@@ -700,11 +700,12 @@ public class NupService extends Service
                         mWaitingForDownload = false;
                         playCacheEntry(entry);
                     }
-                    if (mDownloadListener != null)
-                        mDownloadListener.onDownloadComplete(song);
                 }
 
                 if (entry.getId() == mDownloadId) {
+                    if (mDownloadListener != null)
+                        mDownloadListener.onDownloadComplete(mSongs.get(mDownloadIndex));
+
                     int nextIndex = mDownloadIndex + 1;
                     mDownloadId = -1;
                     mDownloadIndex = -1;
@@ -721,15 +722,17 @@ public class NupService extends Service
             @Override
             public void run() {
                 Song song = getCurrentSong();
-                if (song == null || !entry.getRemotePath().equals(song.getUrlPath()))
-                    return;
-
-                if (mWaitingForDownload && canPlaySong(entry, diskBytes, downloadedBytes, elapsedMs, song.getLengthSec())) {
-                    mWaitingForDownload = false;
-                    playCacheEntry(entry);
+                if (song != null && entry.getRemotePath().equals(song.getUrlPath())) {
+                    if (mWaitingForDownload && canPlaySong(entry, diskBytes, downloadedBytes, elapsedMs, song.getLengthSec())) {
+                        mWaitingForDownload = false;
+                        playCacheEntry(entry);
+                    }
                 }
-                if (mDownloadListener != null)
-                    mDownloadListener.onDownloadProgress(song, diskBytes, entry.getContentLength());
+
+                if (entry.getId() == mDownloadId) {
+                    if (mDownloadListener != null)
+                        mDownloadListener.onDownloadProgress(mSongs.get(mDownloadIndex), diskBytes, entry.getContentLength());
+                }
             }
         });
     }
