@@ -148,9 +148,9 @@ class FileCache implements Runnable {
         }
     }
 
-    public void unpinId(int id) {
+    public void clearPinnedIds() {
         synchronized (mPinnedIds) {
-            mPinnedIds.remove(id);
+            mPinnedIds.clear();
         }
     }
 
