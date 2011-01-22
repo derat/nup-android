@@ -118,11 +118,13 @@ class FileCache implements Runnable {
 
     // Download a URL to the cache.  Returns the cache entry, or null if the URL is
     // already being downloaded.
-    public FileCacheEntry downloadFile(final String urlPath, final DownloadListener listener) {
+    public FileCacheEntry downloadFile(String urlPath,
+                                       DownloadListener listener,
+                                       String filenameSuggestion) {
         FileCacheEntry entry = mDb.getEntryForRemotePath(urlPath);
         if (entry == null) {
-            String localFilename = new File(mMusicDir, urlPath.replace("/", "_")).getAbsolutePath();
-            int id = mDb.addEntry(urlPath, localFilename);
+            String localPath = new File(mMusicDir, filenameSuggestion).getAbsolutePath();
+            int id = mDb.addEntry(urlPath, localPath);
             entry = mDb.getEntryForRemotePath(urlPath);
         } else {
             mDb.updateLastAccessTime(entry.getId());
@@ -135,7 +137,7 @@ class FileCache implements Runnable {
             mInProgressIds.add(id);
         }
 
-        Log.d(TAG, "posting download " + id + " of " + urlPath);
+        Log.d(TAG, "posting download " + id + " of " + urlPath + " to " + entry.getLocalPath());
         mHandler.post(new DownloadTask(entry, listener));
         return entry;
     }
@@ -195,7 +197,7 @@ class FileCache implements Runnable {
                 numAttempts++;
 
                 // If the file was already downloaded, report success.
-                File file = new File(mEntry.getLocalFilename());
+                File file = new File(mEntry.getLocalPath());
                 long existingLength = file.exists() ? file.length() : 0;
                 if (mEntry.getContentLength() > 0 && existingLength == mEntry.getContentLength()) {
                     handleSuccess();
@@ -452,8 +454,8 @@ class FileCache implements Runnable {
             }
 
             FileCacheEntry entry = mDb.getEntryById(id);
-            File file = new File(entry.getLocalFilename());
-            Log.d(TAG, "deleting " + entry.getLocalFilename() + " (" + file.length() + " bytes)");
+            File file = new File(entry.getLocalPath());
+            Log.d(TAG, "deleting " + entry.getLocalPath() + " (" + file.length() + " bytes)");
             availableBytes += file.length();
             file.delete();
             mDb.removeEntry(id);

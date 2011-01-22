@@ -15,7 +15,7 @@ import java.util.List;
 class FileCacheDatabase {
     private static final String TAG = "FileCacheDatabase";
     private static final String DATABASE_NAME = "NupFileCache";
-    private static final int DATABASE_VERSION = 1;
+    private static final int DATABASE_VERSION = 2;
 
     private final SQLiteOpenHelper mOpener;
 
@@ -27,7 +27,7 @@ class FileCacheDatabase {
                     "CREATE TABLE CacheEntries (" +
                     "  CacheEntryId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
                     "  RemotePath VARCHAR(2048) UNIQUE NOT NULL, " +
-                    "  LocalFilename VARCHAR(2048) UNIQUE NOT NULL, " +
+                    "  LocalPath VARCHAR(2048) UNIQUE NOT NULL, " +
                     "  ContentLength INTEGER, " +
                     "  ETag VARCHAR(40), " +
                     "  LastAccessTime INTEGER)");
@@ -36,17 +36,29 @@ class FileCacheDatabase {
 
             @Override
             public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-                throw new RuntimeException(
-                    "Got request to upgrade database from " + oldVersion + " to " + newVersion);
+                if (oldVersion == 1 && newVersion == 2) {
+                    // Rename "LocalFilename" column to "LocalPath".
+                    db.execSQL("DROP INDEX IF EXISTS RemotePath");
+                    db.execSQL("ALTER TABLE CacheEntries RENAME TO CacheEntriesTmp");
+                    onCreate(db);
+                    db.execSQL("INSERT INTO CacheEntries SELECT * FROM CacheEntriesTmp");
+                    db.execSQL("DROP TABLE CacheEntriesTmp");
+                } else {
+                    throw new RuntimeException(
+                        "Got request to upgrade database from " + oldVersion + " to " + newVersion);
+                }
             }
         };
+
+        // Make sure that we have a writable database when we try to do the upgrade.
+        mOpener.getWritableDatabase();
     }
 
     public synchronized FileCacheEntry getEntryById(int id) {
         Cursor cursor = mOpener.getReadableDatabase().rawQuery(
             "SELECT " +
             "  RemotePath, " +
-            "  LocalFilename, " +
+            "  LocalPath, " +
             "  IFNULL(ContentLength, 0), " +
             "  IFNULL(ETag, '') " +
             "FROM CacheEntries " +
@@ -66,11 +78,11 @@ class FileCacheDatabase {
         return cursor.isAfterLast() ? null : getEntryById(cursor.getInt(0));
     }
 
-    public synchronized int addEntry(String remotePath, String localFilename) {
+    public synchronized int addEntry(String remotePath, String localPath) {
         SQLiteDatabase db = mOpener.getWritableDatabase();
         db.execSQL(
-            "INSERT INTO CacheEntries (RemotePath, LocalFilename, LastAccessTime) VALUES(?, ?, ?)",
-            new Object[]{remotePath, localFilename, new Date().getTime() / 1000});
+            "INSERT INTO CacheEntries (RemotePath, LocalPath, LastAccessTime) VALUES(?, ?, ?)",
+            new Object[]{remotePath, localPath, new Date().getTime() / 1000});
         Cursor cursor = db.rawQuery("SELECT last_insert_rowid()", null);
         cursor.moveToFirst();
         return cursor.getInt(0);

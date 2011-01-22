@@ -357,7 +357,7 @@ public class NupService extends Service
         FileCacheEntry cacheEntry = mCache.getEntry(getCurrentSong().getUrlPath());
         if (cacheEntry != null && isCacheEntryFullyDownloaded(cacheEntry)) {
             Log.d(TAG, "file " + getCurrentSong().getUrlPath() + " already downloaded; playing");
-            mPlayer.playFile(cacheEntry.getLocalFilename());
+            mPlayer.playFile(cacheEntry.getLocalPath());
             mCurrentSongStartDate = new Date();
 
             // If we're downloading some other song (maybe we were downloading the
@@ -375,7 +375,7 @@ public class NupService extends Service
             if (cacheEntry == null || mCurrentDownloadId != cacheEntry.getId()) {
                 if (mCurrentDownloadId != -1)
                     mCache.abortDownload(mCurrentDownloadId);
-                cacheEntry = mCache.downloadFile(song.getUrlPath(), this);
+                cacheEntry = mCache.downloadFile(song.getUrlPath(), this, getFilenameForSong(song));
                 mCurrentDownloadId = cacheEntry.getId();
             }
             mWaitingForDownload = true;
@@ -666,7 +666,7 @@ public class NupService extends Service
 
                 if (mWaitingForDownload) {
                     mWaitingForDownload = false;
-                    mPlayer.playFile(entry.getLocalFilename());
+                    mPlayer.playFile(entry.getLocalPath());
                     mCurrentSongStartDate = new Date();
                 }
                 if (mDownloadListener != null)
@@ -689,7 +689,7 @@ public class NupService extends Service
 
                 if (mWaitingForDownload && canPlaySong(entry, diskBytes, downloadedBytes, elapsedMs, song.getLengthSec())) {
                     mWaitingForDownload = false;
-                    mPlayer.playFile(entry.getLocalFilename());
+                    mPlayer.playFile(entry.getLocalPath());
                     mCurrentSongStartDate = new Date();
                 }
                 if (mDownloadListener != null)
@@ -708,7 +708,7 @@ public class NupService extends Service
         if (entry.getContentLength() == 0)
             return false;
 
-        File file = new File(entry.getLocalFilename());
+        File file = new File(entry.getLocalPath());
         return file.exists() && file.length() == entry.getContentLength();
     }
 
@@ -725,8 +725,12 @@ public class NupService extends Service
         if (entry != null && isCacheEntryFullyDownloaded(entry))
             return false;
 
-        entry = mCache.downloadFile(song.getUrlPath(), this);
+        entry = mCache.downloadFile(song.getUrlPath(), this, getFilenameForSong(song));
         mCurrentDownloadId = entry.getId();
         return true;
+    }
+
+    private static String getFilenameForSong(Song song) {
+        return String.format("%d.mp3", song.getSongId());
     }
 }
