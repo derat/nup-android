@@ -130,19 +130,28 @@ class FileCache implements Runnable {
     private class DownloadTask implements Runnable {
         private static final String TAG = "FileCache.DownloadTask";
 
+        // Size of buffer used to write data to disk, in bytes.
         private static final int BUFFER_SIZE = 8 * 1024;
-
-        // We download this many initial bytes as quickly as we can.
-        private static final int INITIAL_BYTES = 128 * 1024;
 
         // Maximum number of bytes that we'll download per second, or 0 to disable throttling.
         private static final int MAX_BYTES_PER_SECOND = 0;
 
+        // Maximum number of times that we'll attempt a download without making any progress before we give up.
         private static final int MAX_DOWNLOAD_ATTEMPTS = 3;
 
+        // Cache entry that we're downloading.
         private FileCacheEntry mEntry;
+
+        // The entry's ID.
         private final int mId;
+
+        // Listener for download status.
         private final DownloadListener mListener;
+
+        private DownloadRequest mRequest;
+        private DownloadResult mResult = null;
+
+        private FileOutputStream mOutputStream;
 
         public DownloadTask(FileCacheEntry entry, DownloadListener listener) {
             mEntry = entry;
@@ -159,52 +168,50 @@ class FileCache implements Runnable {
             int numAttempts = 0;
             while (numAttempts < MAX_DOWNLOAD_ATTEMPTS) {
                 numAttempts++;
-                DownloadResult result = null;
 
                 // If the file was already downloaded, report success.
                 File file = new File(mEntry.getLocalFilename());
                 long existingLength = file.exists() ? file.length() : 0;
                 if (mEntry.getContentLength() > 0 && existingLength == mEntry.getContentLength()) {
-                    handleSuccess(mEntry, result, mListener);
+                    handleSuccess();
                     return;
                 }
 
-                DownloadRequest request;
                 try {
-                    request = new DownloadRequest(mContext, DownloadRequest.Method.GET, mEntry.getRemotePath(), null);
+                    mRequest = new DownloadRequest(mContext, DownloadRequest.Method.GET, mEntry.getRemotePath(), null);
                 } catch (DownloadRequest.PrefException e) {
-                    handleFailure(mEntry, result, mListener, "Invalid server info settings");
+                    handleFailure("Invalid server info settings");
                     return;
                 }
                 if (existingLength > 0 && existingLength < mEntry.getContentLength()) {
                     Log.d(TAG, "attempting to resume download at byte " + existingLength);
-                    request.setHeader("Range", "bytes=" + new Long(existingLength).toString() + "-");
+                    mRequest.setHeader("Range", "bytes=" + new Long(existingLength).toString() + "-");
                 }
 
                 try {
-                    result = Download.startDownload(request);
+                    mResult = Download.startDownload(mRequest);
                 } catch (org.apache.http.HttpException e) {
-                    handleError(mEntry, result, mListener, "HTTP error while connecting");
+                    handleError("HTTP error while connecting");
                     continue;
                 } catch (IOException e) {
-                    handleError(mEntry, result, mListener, "IO error while connecting");
+                    handleError("IO error while connecting");
                     continue;
                 }
 
-                Log.d(TAG, "got " + result.getStatusCode() + " from server");
-                if (result.getStatusCode() != 200 && result.getStatusCode() != 206) {
-                    handleFailure(mEntry, result, mListener, "Got status code " + result.getStatusCode());
+                Log.d(TAG, "got " + mResult.getStatusCode() + " from server");
+                if (mResult.getStatusCode() != 200 && mResult.getStatusCode() != 206) {
+                    handleFailure("Got status code " + mResult.getStatusCode());
                     return;
                 }
 
                 if (!isDownloadActive(mId)) {
-                    result.close();
+                    mResult.close();
                     return;
                 }
 
                 // Update the cache entry with the total content size.
                 if (existingLength == 0) {
-                    mDb.setContentLength(mId, result.getEntity().getContentLength());
+                    mDb.setContentLength(mId, mResult.getEntity().getContentLength());
                     mEntry = mDb.getEntryForRemotePath(mEntry.getRemotePath());
                 }
 
@@ -213,18 +220,17 @@ class FileCache implements Runnable {
                     try {
                         file.createNewFile();
                     } catch (IOException e) {
-                        handleFailure(mEntry, result, mListener, "Unable to create local file");
+                        handleFailure("Unable to create local file");
                         return;
                     }
                 }
 
-                FileOutputStream outputStream;
                 try {
                     // TODO: Also check the Content-Range header.
-                    boolean append = (result.getStatusCode() == 206);
-                    outputStream = new FileOutputStream(file, append);
+                    boolean append = (mResult.getStatusCode() == 206);
+                    mOutputStream = new FileOutputStream(file, append);
                 } catch (java.io.FileNotFoundException e) {
-                    handleFailure(mEntry, result, mListener, "Unable to create output stream to local file");
+                    handleFailure("Unable to create output stream to local file");
                     return;
                 }
 
@@ -237,14 +243,14 @@ class FileCache implements Runnable {
 
                     int bytesRead = 0, bytesWritten = 0;
                     byte[] buffer = new byte[BUFFER_SIZE];
-                    InputStream inputStream = result.getEntity().getContent();
+                    InputStream inputStream = mResult.getEntity().getContent();
                     while ((bytesRead = inputStream.read(buffer)) != -1) {
                         if (!isDownloadActive(mId)) {
-                            result.close();
+                            mResult.close();
                             return;
                         }
 
-                        outputStream.write(buffer, 0, bytesRead);
+                        mOutputStream.write(buffer, 0, bytesRead);
                         bytesWritten += bytesRead;
 
                         // Well, we made some progress, at least.  Reset the attempt counter.
@@ -264,7 +270,7 @@ class FileCache implements Runnable {
                     Log.d(TAG, "finished download " + mId + " (" + bytesWritten + " bytes to " +
                           file.getAbsolutePath() + " in " + (endDate.getTime() - startDate.getTime()) + " ms)");
                 } catch (IOException e) {
-                    handleError(mEntry, result, mListener, "IO error while reading body");
+                    handleError("IO error while reading body");
                     continue;
                 } finally {
                     reporter.quit();
@@ -274,37 +280,36 @@ class FileCache implements Runnable {
                     }
                 }
 
-                handleSuccess(mEntry, result, mListener);
+                handleSuccess();
                 return;
             }
 
-            String reason = "Giving up after " + MAX_DOWNLOAD_ATTEMPTS + " attempt" +
-                            (MAX_DOWNLOAD_ATTEMPTS == 1 ? "" : "s") + " without progress";
-            handleFailure(mEntry, null, mListener, reason);
+            handleFailure("Giving up after " + MAX_DOWNLOAD_ATTEMPTS + " attempt" +
+                          (MAX_DOWNLOAD_ATTEMPTS == 1 ? "" : "s") + " without progress");
         }
 
-        private void handleError(FileCacheEntry entry, DownloadResult result, DownloadListener listener, String reason) {
-            if (result != null)
-                result.close();
-            listener.onDownloadError(entry, reason);
+        private void handleError(String reason) {
+            if (mResult != null)
+                mResult.close();
+            mListener.onDownloadError(mEntry, reason);
         }
 
-        private void handleFailure(FileCacheEntry entry, DownloadResult result, DownloadListener listener, String reason) {
-            if (result != null)
-                result.close();
+        private void handleFailure(String reason) {
+            if (mResult != null)
+                mResult.close();
             synchronized(mInProgressIds) {
-                mInProgressIds.remove(entry.getId());
+                mInProgressIds.remove(mId);
             }
-            listener.onDownloadFail(entry, reason);
+            mListener.onDownloadFail(mEntry, reason);
         }
 
-        private void handleSuccess(FileCacheEntry entry, DownloadResult result, DownloadListener listener) {
-            if (result != null)
-                result.close();
+        private void handleSuccess() {
+            if (mResult != null)
+                mResult.close();
             synchronized(mInProgressIds) {
-                mInProgressIds.remove(entry.getId());
+                mInProgressIds.remove(mId);
             }
-            listener.onDownloadComplete(entry);
+            mListener.onDownloadComplete(mEntry);
         }
 
         private class ProgressReporter implements Runnable {
