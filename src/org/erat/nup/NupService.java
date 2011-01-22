@@ -44,8 +44,8 @@ import java.util.Iterator;
 import java.util.List;
 
 public class NupService extends Service
-                        implements Player.SongCompleteListener,
-                                   Player.PositionChangeListener,
+                        implements Player.PlaybackCompleteListener,
+                                   Player.PlaybackPositionChangeListener,
                                    Player.PauseToggleListener,
                                    Player.PlaybackErrorListener,
                                    FileCache.DownloadListener {
@@ -74,6 +74,11 @@ public class NupService extends Service
     // Listener for changes to a new song.
     interface SongChangeListener {
         void onSongChange(Song song, int index);
+    }
+
+    // Listener for progress in the playback of the current song.
+    interface SongPositionChangeListener {
+        void onSongPositionChange(Song song, int positionMs, int durationMs);
     }
 
     // Listener for the cover bitmap being successfully loaded for a song.
@@ -128,6 +133,9 @@ public class NupService extends Service
     // Total time during which we've played the current song, in milliseconds.
     private long mCurrentSongPlayedMs = 0;
 
+    // Local path of the song that's being played.
+    private String mCurrentSongPath;
+
     // Is playback currently paused?
     private boolean mPaused = false;
 
@@ -167,11 +175,11 @@ public class NupService extends Service
     };
 
     private SongChangeListener mSongChangeListener;
+    private SongPositionChangeListener mSongPositionChangeListener;
     private CoverLoadListener mCoverLoadListener;
     private ContentsLoadListener mContentsLoadListener;
     private PlaylistChangeListener mPlaylistChangeListener;
     private DownloadListener mDownloadListener;
-    private Player.PositionChangeListener mPositionChangeListener;
     private Player.PauseToggleListener mPauseToggleListener;
 
     @Override
@@ -198,8 +206,8 @@ public class NupService extends Service
         mPlayer = new Player();
         mPlayerThread = new Thread(mPlayer, "Player");
         mPlayerThread.start();
-        mPlayer.setSongCompleteListener(this);
-        mPlayer.setPositionChangeListener(this);
+        mPlayer.setPlaybackCompleteListener(this);
+        mPlayer.setPlaybackPositionChangeListener(this);
         mPlayer.setPauseToggleListener(this);
         mPlayer.setPlaybackErrorListener(this);
 
@@ -247,6 +255,9 @@ public class NupService extends Service
     public void setSongChangeListener(SongChangeListener listener) {
         mSongChangeListener = listener;
     }
+    public void setSongPositionChangeListener(SongPositionChangeListener listener) {
+        mSongPositionChangeListener = listener;
+    }
     public void setCoverLoadListener(CoverLoadListener listener) {
         mCoverLoadListener = listener;
     }
@@ -259,9 +270,6 @@ public class NupService extends Service
     public void setDownloadListener(DownloadListener listener) {
         mDownloadListener = listener;
     }
-    public void setPositionChangeListener(Player.PositionChangeListener listener) {
-        mPositionChangeListener = listener;
-    }
     void setPauseToggleListener(Player.PauseToggleListener listener) {
         mPauseToggleListener = listener;
     }
@@ -269,6 +277,8 @@ public class NupService extends Service
     void unregisterListener(Object object) {
         if (mSongChangeListener == object)
             mSongChangeListener = null;
+        if (mSongPositionChangeListener == object)
+            mSongPositionChangeListener = null;
         if (mCoverLoadListener == object)
             mCoverLoadListener = null;
         if (mContentsLoadListener == object)
@@ -277,8 +287,6 @@ public class NupService extends Service
             mPlaylistChangeListener = null;
         if (mDownloadListener == object)
             mDownloadListener = null;
-        if (mPositionChangeListener == object)
-            mPositionChangeListener = null;
         if (mPauseToggleListener == object)
             mPauseToggleListener = null;
     }
@@ -357,8 +365,7 @@ public class NupService extends Service
         FileCacheEntry cacheEntry = mCache.getEntry(getCurrentSong().getUrlPath());
         if (cacheEntry != null && isCacheEntryFullyDownloaded(cacheEntry)) {
             Log.d(TAG, "file " + getCurrentSong().getUrlPath() + " already downloaded; playing");
-            mPlayer.playFile(cacheEntry.getLocalPath());
-            mCurrentSongStartDate = new Date();
+            playCacheEntry(cacheEntry);
 
             // If we're downloading some other song (maybe we were downloading the
             // previously-being-played song), abort it.
@@ -570,9 +577,9 @@ public class NupService extends Service
         mCache.clear();
     }
 
-    // Implements Player.SongCompleteListener.
+    // Implements Player.PlaybackCompleteListener.
     @Override
-    public void onSongComplete() {
+    public void onPlaybackComplete(String path) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
@@ -581,23 +588,26 @@ public class NupService extends Service
         });
     }
 
-    // Implements Player.PositionChangeListener.
+    // Implements Player.PlaybackPositionChangeListener.
     @Override
-    public void onPositionChange(final int positionMs, final int durationMs) {
+    public void onPlaybackPositionChange(final String path, final int positionMs, final int durationMs) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                if (mPositionChangeListener != null)
-                    mPositionChangeListener.onPositionChange(positionMs, durationMs);
+                if (path != mCurrentSongPath)
+                    return;
+
+                Song song = getCurrentSong();
+                if (mSongPositionChangeListener != null)
+                    mSongPositionChangeListener.onSongPositionChange(song, positionMs, durationMs);
 
                 if (positionMs > mCurrentSongLastPositionMs &&
                     positionMs <= mCurrentSongLastPositionMs + MAX_POSITION_REPORT_MS) {
                     mCurrentSongPlayedMs += (positionMs - mCurrentSongLastPositionMs);
-                    Song song = getCurrentSong();
                     if (!mReportedCurrentSong &&
                         (mCurrentSongPlayedMs >= Math.max(durationMs, song.getLengthSec() * 1000) / 2 ||
                          mCurrentSongPlayedMs >= REPORT_PLAYBACK_THRESHOLD_MS)) {
-                        new ReportPlayedTask(getCurrentSong(), mCurrentSongStartDate).execute();
+                        new ReportPlayedTask(song, mCurrentSongStartDate).execute();
                         mReportedCurrentSong = true;
                     }
                 }
@@ -666,8 +676,7 @@ public class NupService extends Service
 
                 if (mWaitingForDownload) {
                     mWaitingForDownload = false;
-                    mPlayer.playFile(entry.getLocalPath());
-                    mCurrentSongStartDate = new Date();
+                    playCacheEntry(entry);
                 }
                 if (mDownloadListener != null)
                     mDownloadListener.onDownloadComplete(song);
@@ -689,8 +698,7 @@ public class NupService extends Service
 
                 if (mWaitingForDownload && canPlaySong(entry, diskBytes, downloadedBytes, elapsedMs, song.getLengthSec())) {
                     mWaitingForDownload = false;
-                    mPlayer.playFile(entry.getLocalPath());
-                    mCurrentSongStartDate = new Date();
+                    playCacheEntry(entry);
                 }
                 if (mDownloadListener != null)
                     mDownloadListener.onDownloadProgress(song, diskBytes, entry.getContentLength());
@@ -704,12 +712,20 @@ public class NupService extends Service
         return (diskBytes >= MIN_BYTES_BEFORE_PLAYING && remainingMs + EXTRA_BUFFER_MS <= songLengthSec * 1000);
     }
 
+    // Is |entry| entirely downloaded?
     private boolean isCacheEntryFullyDownloaded(FileCacheEntry entry) {
         if (entry.getContentLength() == 0)
             return false;
 
         File file = new File(entry.getLocalPath());
         return file.exists() && file.length() == entry.getContentLength();
+    }
+
+    // Play the file where a cache entry is stored.
+    private void playCacheEntry(FileCacheEntry entry) {
+        mCurrentSongPath = entry.getLocalPath();
+        mPlayer.playFile(mCurrentSongPath);
+        mCurrentSongStartDate = new Date();
     }
 
     // Download the next song if we're not currently downloading anything and if we don't already have it.

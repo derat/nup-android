@@ -30,9 +30,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class NupActivity extends Activity
-                         implements Player.PositionChangeListener,
-                                    Player.PauseToggleListener,
+                         implements Player.PauseToggleListener,
                                     NupService.SongChangeListener,
+                                    NupService.SongPositionChangeListener,
                                     NupService.CoverLoadListener,
                                     NupService.PlaylistChangeListener,
                                     NupService.DownloadListener {
@@ -52,7 +52,7 @@ public class NupActivity extends Activity
     private TextView mArtistLabel, mTitleLabel, mAlbumLabel, mTimeLabel, mDownloadStatusLabel;
     private ListView mPlaylistView;
 
-    // Last song-position time passed to onPositionChange(), in seconds.
+    // Last song-position time passed to onSongPositionChange(), in seconds.
     // Used to rate-limit how often we update the display so we only do it on integral changes.
     private int lastSongPositionSec = -1;
 
@@ -122,18 +122,17 @@ public class NupActivity extends Activity
             mService = ((NupService.LocalBinder) service).getService();
 
             mService.setSongChangeListener(NupActivity.this);
+            mService.setSongPositionChangeListener(NupActivity.this);
             mService.setCoverLoadListener(NupActivity.this);
             mService.setPlaylistChangeListener(NupActivity.this);
-            mService.setPositionChangeListener(NupActivity.this);
             mService.setDownloadListener(NupActivity.this);
             mService.setPauseToggleListener(NupActivity.this);
 
             // Get current state from service.
             onPlaylistChange(mService.getSongs());
-            if (getCurrentSong() != null) {
-                onPauseToggle(mService.getPaused());
-                onPositionChange(mService.getCurrentSongLastPositionMs(), 0);
-            }
+            onPauseToggle(mService.getPaused());
+            if (getCurrentSong() != null)
+                onSongPositionChange(mService.getCurrentSong(), mService.getCurrentSongLastPositionMs(), 0);
         }
 
         public void onServiceDisconnected(ComponentName className) {
@@ -178,6 +177,25 @@ public class NupActivity extends Activity
         updateCurrentSongIndex(index);
     }
 
+    // Implements NupService.SongPositionChangeListener.
+    @Override
+    public void onSongPositionChange(final Song song, final int positionMs, final int durationMs) {
+        runOnUiThread(new Runnable() {
+            @Override
+            public void run() {
+                if (song != getCurrentSong())
+                    return;
+
+                int positionSec = positionMs / 1000;
+                if (positionSec == lastSongPositionSec)
+                    return;
+                // MediaPlayer appears to get confused sometimes and report things like 0:01.
+                int durationSec = Math.max(durationMs / 1000, getCurrentSong().getLengthSec());
+                mTimeLabel.setText(Util.formatTimeString(positionSec, durationSec));
+            }
+        });
+    }
+
     // Implements NupService.CoverLoadListener.
     @Override
     public void onCoverLoad(Song song) {
@@ -216,22 +234,6 @@ public class NupActivity extends Activity
     public void onDownloadComplete(Song song) {
         if (song == getCurrentSong())
             mDownloadStatusLabel.setText("");
-    }
-
-    // Implements Player.PositionChangeListener.
-    @Override
-    public void onPositionChange(final int positionMs, final int durationMs) {
-        runOnUiThread(new Runnable() {
-            @Override
-            public void run() {
-                int positionSec = positionMs / 1000;
-                if (positionSec == lastSongPositionSec)
-                    return;
-                // MediaPlayer appears to get confused sometimes and report things like 0:01.
-                int durationSec = Math.max(durationMs / 1000, getCurrentSong().getLengthSec());
-                mTimeLabel.setText(Util.formatTimeString(positionSec, durationSec));
-            }
-        });
     }
 
     // Implements Player.PauseToggleListener.
