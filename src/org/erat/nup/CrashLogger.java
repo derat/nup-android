@@ -31,8 +31,15 @@ public class CrashLogger implements Thread.UncaughtExceptionHandler {
             File file = new File(mDirectory, format.format(new Date()) + ".txt");
             Log.d(TAG, "creating crash file " + file.getAbsolutePath());
             file.createNewFile();
+
             PrintWriter writer = new PrintWriter(file);
             error.printStackTrace(writer);
+
+            Throwable cause = error.getCause();
+            if (cause != null) {
+                writer.print("\n\nCaused by:\n");
+                cause.printStackTrace(writer);
+            }
             writer.close();
         } catch (java.io.FileNotFoundException e) {
             Log.e(TAG, "file not found: " + e);
