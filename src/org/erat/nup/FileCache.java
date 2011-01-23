@@ -181,9 +181,6 @@ class FileCache implements Runnable {
         // Size of buffer used to write data to disk, in bytes.
         private static final int BUFFER_SIZE = 8 * 1024;
 
-        // Maximum number of bytes that we'll download per second, or 0 to disable throttling.
-        private static final int MAX_BYTES_PER_SECOND = 0;
-
         // Maximum number of times that we'll attempt a download without making any progress before we give up.
         private static final int MAX_DOWNLOAD_ATTEMPTS = 3;
 
@@ -284,6 +281,10 @@ class FileCache implements Runnable {
                     return;
                 }
 
+                final long maxBytesPerSecond = Long.valueOf(
+                    mPrefs.getString(NupPreferences.DOWNLOAD_RATE,
+                                     NupPreferences.DOWNLOAD_RATE_DEFAULT)) * 1024;
+
                 ProgressReporter reporter = new ProgressReporter(mEntry);
                 Thread reporterThread = new Thread(reporter, "FileCache.ProgressReporter" + mId);
                 reporterThread.start();
@@ -310,8 +311,8 @@ class FileCache implements Runnable {
                         long elapsedMs = now.getTime() - startDate.getTime();
                         reporter.update(existingLength + bytesWritten, bytesWritten, elapsedMs);
 
-                        if (MAX_BYTES_PER_SECOND > 0) {
-                            long expectedMs = (long) (bytesWritten / (float) MAX_BYTES_PER_SECOND * 1000);
+                        if (maxBytesPerSecond > 0) {
+                            long expectedMs = (long) (bytesWritten / (float) maxBytesPerSecond * 1000);
                             if (elapsedMs < expectedMs)
                                 SystemClock.sleep(expectedMs - elapsedMs);
                         }

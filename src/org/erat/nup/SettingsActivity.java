@@ -56,7 +56,8 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
         pref = findPreference(NupPreferences.DOWNLOAD_RATE);
         pref.setOnPreferenceChangeListener(this);
         int downloadRate = Integer.valueOf(
-            mPrefs.getString(NupPreferences.DOWNLOAD_RATE, "0"));
+            mPrefs.getString(NupPreferences.DOWNLOAD_RATE,
+                             NupPreferences.DOWNLOAD_RATE_DEFAULT));
         pref.setSummary(downloadRate == 0 ?
                         getString(R.string.unlimited) :
                         getString(R.string.download_rate_value, downloadRate));
