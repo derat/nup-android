@@ -24,11 +24,12 @@ import java.util.List;
 class FileCache implements Runnable {
     private static final String TAG = "FileCache";
 
-    interface DownloadListener {
-        void onDownloadError(FileCacheEntry entry, String reason);
-        void onDownloadFail(FileCacheEntry entry, String reason);
-        void onDownloadProgress(FileCacheEntry entry, long diskBytes, long receivedBytes, long elapsedMs);
-        void onDownloadComplete(FileCacheEntry entry);
+    interface Listener {
+        void onCacheDownloadError(FileCacheEntry entry, String reason);
+        void onCacheDownloadFail(FileCacheEntry entry, String reason);
+        void onCacheDownloadProgress(FileCacheEntry entry, long diskBytes, long receivedBytes, long elapsedMs);
+        void onCacheDownloadComplete(FileCacheEntry entry);
+        void onCacheEviction(FileCacheEntry entry);
     }
 
     // Application context.
@@ -51,8 +52,11 @@ class FileCache implements Runnable {
 
     private SharedPreferences mPrefs;
 
-    FileCache(Context context) {
+    private final Listener mListener;
+
+    FileCache(Context context, Listener listener) {
         mContext = context;
+        mListener = listener;
 
         String state = Environment.getExternalStorageState();
         if (!state.equals(Environment.MEDIA_MOUNTED))
@@ -111,16 +115,33 @@ class FileCache implements Runnable {
 
     // Clear all cached data.
     public void clear() {
-        mDb.clear();
-        for (File file : mMusicDir.listFiles())
-            file.delete();
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                synchronized(mInProgressIds) {
+                    mInProgressIds.clear();
+                }
+                clearPinnedIds();
+
+                List<Integer> ids = mDb.getIdsByAge();
+                for (int id : ids) {
+                    FileCacheEntry entry = mDb.getEntryById(id);
+                    mDb.removeEntry(id);
+                    File file = new File(entry.getLocalPath());
+                    file.delete();
+                    mListener.onCacheEviction(entry);
+                }
+
+                // Shouldn't be anything there, but whatever.
+                for (File file : mMusicDir.listFiles())
+                    file.delete();
+            }
+        });
     }
 
     // Download a URL to the cache.  Returns the cache entry, or null if the URL is
     // already being downloaded.
-    public FileCacheEntry downloadFile(String urlPath,
-                                       DownloadListener listener,
-                                       String filenameSuggestion) {
+    public FileCacheEntry downloadFile(String urlPath, String filenameSuggestion) {
         FileCacheEntry entry = mDb.getEntryForRemotePath(urlPath);
         if (entry == null) {
             String localPath = new File(mMusicDir, filenameSuggestion).getAbsolutePath();
@@ -138,7 +159,7 @@ class FileCache implements Runnable {
         }
 
         Log.d(TAG, "posting download " + id + " of " + urlPath + " to " + entry.getLocalPath());
-        mHandler.post(new DownloadTask(entry, listener));
+        mHandler.post(new DownloadTask(entry));
         return entry;
     }
 
@@ -172,18 +193,14 @@ class FileCache implements Runnable {
         // The entry's ID.
         private final int mId;
 
-        // Listener for download status.
-        private final DownloadListener mListener;
-
         private DownloadRequest mRequest;
         private DownloadResult mResult = null;
 
         private FileOutputStream mOutputStream;
 
-        public DownloadTask(FileCacheEntry entry, DownloadListener listener) {
+        public DownloadTask(FileCacheEntry entry) {
             mEntry = entry;
             mId = entry.getId();
-            mListener = listener;
         }
 
         // TODO: This needs to be broken up into smaller pieces.
@@ -267,7 +284,7 @@ class FileCache implements Runnable {
                     return;
                 }
 
-                ProgressReporter reporter = new ProgressReporter(mEntry, mListener);
+                ProgressReporter reporter = new ProgressReporter(mEntry);
                 Thread reporterThread = new Thread(reporter, "FileCache.ProgressReporter" + mId);
                 reporterThread.start();
 
@@ -324,7 +341,7 @@ class FileCache implements Runnable {
         private void handleError(String reason) {
             if (mResult != null)
                 mResult.close();
-            mListener.onDownloadError(mEntry, reason);
+            mListener.onCacheDownloadError(mEntry, reason);
         }
 
         private void handleFailure(String reason) {
@@ -333,7 +350,7 @@ class FileCache implements Runnable {
             synchronized(mInProgressIds) {
                 mInProgressIds.remove(mId);
             }
-            mListener.onDownloadFail(mEntry, reason);
+            mListener.onCacheDownloadFail(mEntry, reason);
         }
 
         private void handleSuccess() {
@@ -342,7 +359,7 @@ class FileCache implements Runnable {
             synchronized(mInProgressIds) {
                 mInProgressIds.remove(mId);
             }
-            mListener.onDownloadComplete(mEntry);
+            mListener.onCacheDownloadComplete(mEntry);
         }
 
         private class ProgressReporter implements Runnable {
@@ -350,7 +367,6 @@ class FileCache implements Runnable {
             private static final long PROGRESS_REPORT_MS = 250;
 
             private final FileCacheEntry mEntry;
-            private final DownloadListener mListener;
             private long mDiskBytes = 0;
             private long mDownloadedBytes = 0;
             private long mElapsedMs = 0;
@@ -359,9 +375,8 @@ class FileCache implements Runnable {
             private Date mLastReportDate;
             private boolean mShouldQuit = false;
 
-            ProgressReporter(final FileCacheEntry entry, final DownloadListener listener) {
+            ProgressReporter(final FileCacheEntry entry) {
                 mEntry = entry;
-                mListener = listener;
             }
 
             @Override
@@ -402,7 +417,7 @@ class FileCache implements Runnable {
                             @Override
                             public void run() {
                                 synchronized (ProgressReporter.this) {
-                                    mListener.onDownloadProgress(mEntry, mDiskBytes, mDownloadedBytes, mElapsedMs);
+                                    mListener.onCacheDownloadProgress(mEntry, mDiskBytes, mDownloadedBytes, mElapsedMs);
                                     mLastReportDate = new Date();
                                     mTask = null;
                                 }
@@ -459,6 +474,7 @@ class FileCache implements Runnable {
             availableBytes += file.length();
             file.delete();
             mDb.removeEntry(id);
+            mListener.onCacheEviction(entry);
         }
 
         return neededBytes <= availableBytes;

@@ -48,7 +48,7 @@ public class NupService extends Service
                                    Player.PlaybackPositionChangeListener,
                                    Player.PauseToggleListener,
                                    Player.PlaybackErrorListener,
-                                   FileCache.DownloadListener {
+                                   FileCache.Listener {
     private static final String TAG = "NupService";
 
     // Identifier used for our "currently playing" notification.
@@ -161,6 +161,12 @@ public class NupService extends Service
     // Points from (lowercased) artist String to List of String album names.
     private HashMap mAlbumMap = new HashMap();
 
+    // Points from song ID to Song.
+    private HashMap mSongIdToSong = new HashMap();
+
+    // Points from cache entry ID to song ID.
+    private HashMap mCacheEntryIdToSongId = new HashMap();
+
     // Used to run tasks on our thread.
     private Handler mHandler = new Handler();
 
@@ -218,7 +224,7 @@ public class NupService extends Service
         mPlayer.setPauseToggleListener(this);
         mPlayer.setPlaybackErrorListener(this);
 
-        mCache = new FileCache(this);
+        mCache = new FileCache(this, this);
         mCacheThread = new Thread(mCache, "FileCache");
         mCacheThread.start();
     }
@@ -364,6 +370,31 @@ public class NupService extends Service
             playSongAtIndex(0);
     }
 
+    public void clearPlaylist() {
+        mSongs.clear();
+        mCurrentSongIndex = -1;
+        if (mDownloadId != -1) {
+            mCache.abortDownload(mDownloadId);
+            mDownloadId = -1;
+            mDownloadIndex = -1;
+        }
+
+        if (mPlaylistChangeListener != null)
+            mPlaylistChangeListener.onPlaylistChange(mSongs);
+    }
+
+    public void appendSongToPlaylist(Song song) {
+        Object obj = mSongIdToSong.get(song.getSongId());
+        if (obj != null)
+            song = (Song) obj;
+        mSongs.add(song);
+
+        if (mPlaylistChangeListener != null)
+            mPlaylistChangeListener.onPlaylistChange(mSongs);
+        if (mCurrentSongIndex == -1)
+            playSongAtIndex(0);
+    }
+
     // Play the song at a particular position in the playlist.
     public void playSongAtIndex(int index) {
         if (index < 0 || index >= mSongs.size())
@@ -403,7 +434,8 @@ public class NupService extends Service
             if (cacheEntry == null || mDownloadId != cacheEntry.getId()) {
                 if (mDownloadId != -1)
                     mCache.abortDownload(mDownloadId);
-                cacheEntry = mCache.downloadFile(song.getUrlPath(), this, chooseLocalFilenameForSong(song));
+                cacheEntry = mCache.downloadFile(song.getUrlPath(), chooseLocalFilenameForSong(song));
+                mCacheEntryIdToSongId.put(cacheEntry.getId(), song.getSongId());
                 mDownloadId = cacheEntry.getId();
                 mDownloadIndex = mCurrentSongIndex;
             }
@@ -658,9 +690,9 @@ public class NupService extends Service
         });
     }
 
-    // Implements FileCache.DownloadListener.
+    // Implements FileCache.Listener.
     @Override
-    public void onDownloadError(final FileCacheEntry entry, final String reason) {
+    public void onCacheDownloadError(final FileCacheEntry entry, final String reason) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
@@ -669,9 +701,9 @@ public class NupService extends Service
         });
     }
 
-    // Implements FileCache.DownloadListener.
+    // Implements FileCache.Listener.
     @Override
-    public void onDownloadFail(final FileCacheEntry entry, final String reason) {
+    public void onCacheDownloadFail(final FileCacheEntry entry, final String reason) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
@@ -686,9 +718,9 @@ public class NupService extends Service
         });
     }
 
-    // Implements FileCache.DownloadListener.
+    // Implements FileCache.Listener.
     @Override
-    public void onDownloadComplete(final FileCacheEntry entry) {
+    public void onCacheDownloadComplete(final FileCacheEntry entry) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
@@ -715,9 +747,9 @@ public class NupService extends Service
         });
     }
 
-    // Implements FileCache.DownloadListener.
+    // Implements FileCache.Listener.
     @Override
-    public void onDownloadProgress(final FileCacheEntry entry, final long diskBytes, final long downloadedBytes, final long elapsedMs) {
+    public void onCacheDownloadProgress(final FileCacheEntry entry, final long diskBytes, final long downloadedBytes, final long elapsedMs) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
@@ -733,6 +765,18 @@ public class NupService extends Service
                     if (mDownloadListener != null)
                         mDownloadListener.onDownloadProgress(mSongs.get(mDownloadIndex), diskBytes, entry.getContentLength());
                 }
+            }
+        });
+    }
+
+    // Implements FileCache.Listener.
+    @Override
+    public void onCacheEviction(final FileCacheEntry entry) {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                Log.d(TAG, "got notification that " + entry.getId() + " has been evicted");
+                mCacheEntryIdToSongId.remove(entry.getId());
             }
         });
     }
@@ -780,7 +824,8 @@ public class NupService extends Service
                 continue;
             }
 
-            entry = mCache.downloadFile(song.getUrlPath(), this, chooseLocalFilenameForSong(song));
+            entry = mCache.downloadFile(song.getUrlPath(), chooseLocalFilenameForSong(song));
+            mCacheEntryIdToSongId.put(entry.getId(), song.getSongId());
             mDownloadId = entry.getId();
             mDownloadIndex = index;
             mCache.pinId(entry.getId());

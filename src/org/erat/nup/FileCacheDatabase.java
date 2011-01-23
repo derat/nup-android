@@ -116,8 +116,4 @@ class FileCacheDatabase {
         }
         return ids;
     }
-
-    public synchronized void clear() {
-        mOpener.getWritableDatabase().execSQL("DELETE FROM CacheEntries");
-    }
 }

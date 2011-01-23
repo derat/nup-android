@@ -129,13 +129,13 @@ public class SearchActivity extends Activity
             } else {
                 try {
                     JSONArray jsonSongs = (JSONArray) new JSONTokener(response).nextValue();
-                    List<Song> songs = new ArrayList<Song>();
-                    for (int i = 0; i < jsonSongs.length(); ++i) {
-                        songs.add(new Song(jsonSongs.getJSONObject(i)));
-                    }
-                    if (songs.size() > 0) {
-                        NupActivity.getService().setPlaylist(songs);
-                        message = "Queued " + songs.size() + " song" + (songs.size() == 1 ? "" : "s") + " from server.";
+                    if (jsonSongs.length() > 0) {
+                        NupActivity.getService().clearPlaylist();
+                        for (int i = 0; i < jsonSongs.length(); ++i)
+                            NupActivity.getService().appendSongToPlaylist(
+                                new Song(jsonSongs.getJSONObject(i)));
+                        message = "Queued " + jsonSongs.length() + " song" +
+                                  (jsonSongs.length() == 1 ? "" : "s") + " from server.";
                         finish();
                     } else {
                         message = "No results.";
