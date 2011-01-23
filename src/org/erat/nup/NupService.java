@@ -44,10 +44,7 @@ import java.util.Iterator;
 import java.util.List;
 
 public class NupService extends Service
-                        implements Player.PlaybackCompleteListener,
-                                   Player.PlaybackPositionChangeListener,
-                                   Player.PauseToggleListener,
-                                   Player.PlaybackErrorListener,
+                        implements Player.Listener,
                                    FileCache.Listener {
     private static final String TAG = "NupService";
 
@@ -207,13 +204,9 @@ public class NupService extends Service
         // TODO: Refetch after server prefs are changed or on failure.
         new GetContentsTask().execute();
 
-        mPlayer = new Player();
+        mPlayer = new Player(this);
         mPlayerThread = new Thread(mPlayer, "Player");
         mPlayerThread.start();
-        mPlayer.setPlaybackCompleteListener(this);
-        mPlayer.setPlaybackPositionChangeListener(this);
-        mPlayer.setPauseToggleListener(this);
-        mPlayer.setPlaybackErrorListener(this);
 
         mCache = new FileCache(this, this);
         mCacheThread = new Thread(mCache, "FileCache");
@@ -591,7 +584,7 @@ public class NupService extends Service
         mCache.clear();
     }
 
-    // Implements Player.PlaybackCompleteListener.
+    // Implements Player.Listener.
     @Override
     public void onPlaybackComplete(String path) {
         mHandler.post(new Runnable() {
@@ -602,7 +595,7 @@ public class NupService extends Service
         });
     }
 
-    // Implements Player.PlaybackPositionChangeListener.
+    // Implements Player.Listener.
     @Override
     public void onPlaybackPositionChange(final String path, final int positionMs, final int durationMs) {
         mHandler.post(new Runnable() {
@@ -630,15 +623,15 @@ public class NupService extends Service
         });
     }
 
-    // Implements Player.PauseToggleListener.
+    // Implements Player.Listener.
     @Override
-    public void onPauseToggle(boolean paused) {
+    public void onPauseStateChange(boolean paused) {
         mPaused = paused;
         if (mSongListener != null)
             mSongListener.onPauseStateChange(paused);
     }
 
-    // Implements Player.PlaybackErrorListener.
+    // Implements Player.Listener.
     @Override
     public void onPlaybackError(final String description) {
         mHandler.post(new Runnable() {
