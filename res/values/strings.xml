@@ -25,6 +25,7 @@
   <string name="pause">Pause</string>
   <string name="play">Play</string>
   <string name="prev">Prev</string>
+  <string name="remove_from_list">Remove from list</string>
   <string name="search">Search</string>
   <string name="server_url">Server URL</string>
   <string name="server_url_description">Location of music server, e.g. \"https://www.example.org:1234/\".</string>

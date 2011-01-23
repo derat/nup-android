@@ -39,6 +39,10 @@ public class NupActivity extends Activity
     // pressing the button to skip through tracks.
     private static final int SONG_CHANGE_DELAY_MS = 500;
 
+    // IDs for items in our context menus.
+    private static final int MENU_ITEM_PLAY = 1;
+    private static final int MENU_ITEM_REMOVE_FROM_LIST = 2;
+
     // Persistent service to which we connect.
     private static NupService mService;
 
@@ -249,21 +253,32 @@ public class NupActivity extends Activity
 
     // Update the onscreen information about the current song.
     private void updateSongDisplay(Song song) {
-        mArtistLabel.setText(song != null ? song.getArtist() : "");
-        mTitleLabel.setText(song != null ? song.getTitle() : "");
-        mAlbumLabel.setText(song != null ? song.getAlbum() : "");
-        mTimeLabel.setText(song != null ? Util.formatTimeString(0, song.getLengthSec()) : "");
-        mDownloadStatusLabel.setText("");
-
-        if (song != null && song.getCoverBitmap() != null) {
-            mAlbumImageView.setVisibility(View.VISIBLE);
-            mAlbumImageView.setImageBitmap(song.getCoverBitmap());
-        } else {
+        if (song == null) {
+            mArtistLabel.setText("");
+            mTitleLabel.setText("");
+            mAlbumLabel.setText("");
+            mTimeLabel.setText("");
+            mDownloadStatusLabel.setText("");
             mAlbumImageView.setVisibility(View.INVISIBLE);
+        } else {
+            mArtistLabel.setText(song.getArtist());
+            mTitleLabel.setText(song.getTitle());
+            mAlbumLabel.setText(song.getAlbum());
+            mTimeLabel.setText(
+                Util.formatTimeString(
+                    (song == mService.getCurrentSong()) ?
+                        mService.getCurrentSongLastPositionMs() / 1000 :
+                        0,
+                    song.getLengthSec()));
+            mDownloadStatusLabel.setText("");
+            if (song.getCoverBitmap() != null) {
+                mAlbumImageView.setVisibility(View.VISIBLE);
+                mAlbumImageView.setImageBitmap(song.getCoverBitmap());
+            } else {
+                mAlbumImageView.setVisibility(View.INVISIBLE);
+                mService.fetchCoverForSongIfMissing(song);
+            }
         }
-
-        if (song != null && song.getCoverBitmap() == null)
-            mService.fetchCoverForSongIfMissing(song);
 
         // Update the time in response to the next position change we get.
         lastSongPositionSec = -1;
@@ -334,16 +349,25 @@ public class NupActivity extends Activity
             AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) menuInfo;
             Song song = mSongs.get(info.position);
             menu.setHeaderTitle(song.getArtist() + " - " + song.getTitle());
-            menu.add(getString(R.string.play));
+            menu.add(0, MENU_ITEM_PLAY, 0, R.string.play);
+            menu.add(0, MENU_ITEM_REMOVE_FROM_LIST, 0, R.string.remove_from_list);
         }
     }
 
     @Override
     public boolean onContextItemSelected(MenuItem item) {
         AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
-        updateCurrentSongIndex(info.position);
-        schedulePlaySongTask(0);
-        return true;
+        switch (item.getItemId()) {
+            case MENU_ITEM_PLAY:
+                updateCurrentSongIndex(info.position);
+                schedulePlaySongTask(0);
+                return true;
+            case MENU_ITEM_REMOVE_FROM_LIST:
+                mService.removeFromPlaylist(info.position);
+                return true;
+            default:
+                return false;
+        }
     }
 
     private Song getCurrentSong() {

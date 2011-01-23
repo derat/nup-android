@@ -350,6 +350,36 @@ public class NupService extends Service
         }
     }
 
+    public void removeFromPlaylist(int index) {
+        if (index < 0 || index >= mSongs.size()) {
+            Log.e(TAG, "ignoring request to remove song at position " + index +
+                  " from " + mSongs.size() + "-length playlist");
+            return;
+        }
+
+        if (index == mDownloadIndex) {
+            mCache.abortDownload(mDownloadId);
+            mDownloadId = -1;
+            mDownloadIndex = -1;
+        }
+
+        if (index == mCurrentSongIndex) {
+            stopPlaying();
+            if (mCurrentSongIndex < mSongs.size() - 1)
+                playSongAtIndex(mCurrentSongIndex + 1);
+            else
+                mCurrentSongIndex = -1;
+        }
+
+        mSongs.remove(index);
+        if (index < mCurrentSongIndex)
+            mCurrentSongIndex--;
+        if (index < mDownloadIndex)
+            mDownloadIndex--;
+        if (mSongListener != null)
+            mSongListener.onPlaylistChange(mSongs);
+    }
+
     // Play the song at a particular position in the playlist.
     public void playSongAtIndex(int index) {
         if (index < 0 || index >= mSongs.size())
@@ -411,6 +441,7 @@ public class NupService extends Service
 
     // Stop playing the current song, if any.
     public void stopPlaying() {
+        mCurrentSongPath = null;
         mPlayer.abort();
     }
 
