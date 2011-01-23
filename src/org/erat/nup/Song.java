@@ -4,9 +4,12 @@
 package org.erat.nup;
 
 import android.graphics.Bitmap;
+
 import org.json.JSONObject;
 
-class Song {
+import java.io.Serializable;
+
+class Song implements Serializable {
     private final String mArtist, mTitle, mAlbum, mFilename, mCoverFilename;
     private final int mLengthSec, mSongId;
     private final double mRating;

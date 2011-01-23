@@ -3,6 +3,8 @@
   <string name="app_name">nup</string>
 
   <string name="album">Album</string>
+  <string name="append">Append</string>
+  <string name="append_all">Append all</string>
   <string name="artist">Artist</string>
   <string name="browse">Browse</string>
   <string name="cache_is_empty">Cache is empty</string>
@@ -26,6 +28,7 @@
   <string name="play">Play</string>
   <string name="prev">Prev</string>
   <string name="remove_from_list">Remove from list</string>
+  <string name="replace_all">Replace all</string>
   <string name="search">Search</string>
   <string name="server_url">Server URL</string>
   <string name="server_url_description">Location of music server, e.g. \"https://www.example.org:1234/\".</string>

@@ -19,14 +19,12 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
-import org.apache.http.HttpException;
 import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
 import java.io.InputStream;
 import java.io.IOException;
-import java.net.URL;
 import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
@@ -37,6 +35,7 @@ public class SearchActivity extends Activity
     private static final String TAG = "SearchActivity";
 
     private static final int BROWSE_REQUEST_CODE = 1;
+    private static final int RESULTS_REQUEST_CODE = 2;
 
     private AutoCompleteTextView mArtistEdit, mAlbumEdit;
     private EditText mTitleEdit;
@@ -48,11 +47,19 @@ public class SearchActivity extends Activity
 
     private String mMinRating = null;
 
+    // Search results received from the server.
+    private ArrayList<Song> mSearchResults = new ArrayList<Song>();
+
+    // Pointer to ourself used SearchResultsActivity to get search results.
+    // (Serializing them and passing them in the intent is hella slow.)
+    private static SearchActivity mSingleton = null;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
         Log.d(TAG, "activity created");
         super.onCreate(savedInstanceState);
         setContentView(R.layout.search);
+        mSingleton = this;
 
         mArtistEdit = (AutoCompleteTextView) findViewById(R.id.artist_edit_text);
         mTitleEdit = (EditText) findViewById(R.id.title_edit_text);
@@ -99,17 +106,25 @@ public class SearchActivity extends Activity
         Log.d(TAG, "activity destroyed");
         super.onDestroy();
         NupActivity.getService().unregisterListener(this);
+        mSingleton = null;
     }
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == BROWSE_REQUEST_CODE) {
             if (resultCode == RESULT_OK) {
-                Bundle bundle = data.getExtras();
-                mArtistEdit.setText(bundle.getString(BrowseActivity.BUNDLE_ARTIST));
-                mAlbumEdit.setText(bundle.getString(BrowseActivity.BUNDLE_ALBUM));
+                mArtistEdit.setText(data.getStringExtra(BrowseActivity.BUNDLE_ARTIST));
+                mAlbumEdit.setText(data.getStringExtra(BrowseActivity.BUNDLE_ALBUM));
             }
+        } else if (requestCode == RESULTS_REQUEST_CODE) {
+            mSearchResults.clear();
+            if (resultCode == RESULT_OK)
+                finish();
         }
+    }
+
+    public static ArrayList<Song> getSearchResults() {
+        return mSingleton.mSearchResults;
     }
 
     class SendSearchRequestTask extends AsyncTask<String, Void, String> {
@@ -130,13 +145,11 @@ public class SearchActivity extends Activity
                 try {
                     JSONArray jsonSongs = (JSONArray) new JSONTokener(response).nextValue();
                     if (jsonSongs.length() > 0) {
-                        NupActivity.getService().clearPlaylist();
+                        mSearchResults.clear();
                         for (int i = 0; i < jsonSongs.length(); ++i)
-                            NupActivity.getService().appendSongToPlaylist(
-                                new Song(jsonSongs.getJSONObject(i)));
-                        message = "Queued " + jsonSongs.length() + " song" +
-                                  (jsonSongs.length() == 1 ? "" : "s") + " from server.";
-                        finish();
+                            mSearchResults.add(new Song(jsonSongs.getJSONObject(i)));
+                        message = "Got " + mSearchResults.size() + " song" + (mSearchResults.size() == 1 ? "" : "s") + " from server.";
+                        startActivityForResult(new Intent(SearchActivity.this, SearchResultsActivity.class), RESULTS_REQUEST_CODE);
                     } else {
                         message = "No results.";
                     }
@@ -144,8 +157,7 @@ public class SearchActivity extends Activity
                     message = "Unable to parse response: " + e.getCause();
                 }
             }
-
-            Toast.makeText(SearchActivity.this, message, Toast.LENGTH_LONG).show();
+            Toast.makeText(SearchActivity.this, message, Toast.LENGTH_SHORT).show();
         }
     }
 
