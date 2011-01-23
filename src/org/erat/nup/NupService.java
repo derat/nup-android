@@ -81,6 +81,11 @@ public class NupService extends Service
         void onSongPositionChange(Song song, int positionMs, int durationMs);
     }
 
+    // Listener for changes to the on-disk size of a song's file.
+    interface SongFileChangeListener {
+        void onSongFileChange(Song song, long availableBytes, long totalBytes);
+    }
+
     // Listener for the cover bitmap being successfully loaded for a song.
     interface CoverLoadListener {
         void onCoverLoad(Song song);
@@ -96,12 +101,6 @@ public class NupService extends Service
         void onPlaylistChange(List<Song> songs);
     }
 
-    // Listener for progress in download a song.
-    interface DownloadListener {
-        void onDownloadProgress(Song song, long receivedBytes, long totalBytes);
-        void onDownloadComplete(Song song);
-    }
-
     // Plays songs.
     private Player mPlayer;
     private Thread mPlayerThread;
@@ -109,6 +108,13 @@ public class NupService extends Service
     // Downloads files.
     private FileCache mCache;
     private Thread mCacheThread;
+
+    // Points from int song ID to Song.
+    // This is the canonical set of songs that we know about.
+    private HashMap mSongIdToSong = new HashMap();
+
+    // Points from int cache entry ID to int song ID.
+    private HashMap mCacheEntryIdToSong = new HashMap();
 
     // ID of the cache entry that's currently being downloaded.
     private int mDownloadId = -1;
@@ -161,12 +167,6 @@ public class NupService extends Service
     // Points from (lowercased) artist String to List of String album names.
     private HashMap mAlbumMap = new HashMap();
 
-    // Points from song ID to Song.
-    private HashMap mSongIdToSong = new HashMap();
-
-    // Points from cache entry ID to song ID.
-    private HashMap mCacheEntryIdToSongId = new HashMap();
-
     // Used to run tasks on our thread.
     private Handler mHandler = new Handler();
 
@@ -188,10 +188,10 @@ public class NupService extends Service
 
     private SongChangeListener mSongChangeListener;
     private SongPositionChangeListener mSongPositionChangeListener;
+    private SongFileChangeListener mSongFileChangeListener;
     private CoverLoadListener mCoverLoadListener;
     private ContentsLoadListener mContentsLoadListener;
     private PlaylistChangeListener mPlaylistChangeListener;
-    private DownloadListener mDownloadListener;
     private Player.PauseToggleListener mPauseToggleListener;
 
     @Override
@@ -280,8 +280,8 @@ public class NupService extends Service
     public void setPlaylistChangeListener(PlaylistChangeListener listener) {
         mPlaylistChangeListener = listener;
     }
-    public void setDownloadListener(DownloadListener listener) {
-        mDownloadListener = listener;
+    public void setSongFileChangeListener(SongFileChangeListener listener) {
+        mSongFileChangeListener = listener;
     }
     void setPauseToggleListener(Player.PauseToggleListener listener) {
         mPauseToggleListener = listener;
@@ -295,14 +295,14 @@ public class NupService extends Service
             mSongChangeListener = null;
         if (mSongPositionChangeListener == object)
             mSongPositionChangeListener = null;
+        if (mSongFileChangeListener == object)
+            mSongFileChangeListener = null;
         if (mCoverLoadListener == object)
             mCoverLoadListener = null;
         if (mContentsLoadListener == object)
             mContentsLoadListener = null;
         if (mPlaylistChangeListener == object)
             mPlaylistChangeListener = null;
-        if (mDownloadListener == object)
-            mDownloadListener = null;
         if (mPauseToggleListener == object)
             mPauseToggleListener = null;
     }
@@ -435,7 +435,7 @@ public class NupService extends Service
                 if (mDownloadId != -1)
                     mCache.abortDownload(mDownloadId);
                 cacheEntry = mCache.downloadFile(song.getUrlPath(), chooseLocalFilenameForSong(song));
-                mCacheEntryIdToSongId.put(cacheEntry.getId(), song.getSongId());
+                mCacheEntryIdToSong.put(cacheEntry.getId(), song);
                 mDownloadId = cacheEntry.getId();
                 mDownloadIndex = mCurrentSongIndex;
             }
@@ -726,18 +726,21 @@ public class NupService extends Service
             public void run() {
                 Log.d(TAG, "got notification that download " + entry.getId() + " is done");
 
-                Song song = getCurrentSong();
-                if (song != null && entry.getRemotePath().equals(song.getUrlPath())) {
-                    if (mWaitingForDownload) {
-                        mWaitingForDownload = false;
-                        playCacheEntry(entry);
-                    }
+                Object obj = mCacheEntryIdToSong.get(entry.getId());
+                if (obj == null)
+                    return;
+
+                Song song = (Song) obj;
+                if (song == getCurrentSong() && mWaitingForDownload) {
+                    mWaitingForDownload = false;
+                    playCacheEntry(entry);
                 }
 
-                if (entry.getId() == mDownloadId) {
-                    if (mDownloadListener != null)
-                        mDownloadListener.onDownloadComplete(mSongs.get(mDownloadIndex));
+                if (mSongFileChangeListener != null)
+                    mSongFileChangeListener.onSongFileChange(
+                        song, entry.getContentLength(), entry.getContentLength());
 
+                if (entry.getId() == mDownloadId) {
                     int nextIndex = mDownloadIndex + 1;
                     mDownloadId = -1;
                     mDownloadIndex = -1;
@@ -753,18 +756,20 @@ public class NupService extends Service
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                Song song = getCurrentSong();
-                if (song != null && entry.getRemotePath().equals(song.getUrlPath())) {
-                    if (mWaitingForDownload && canPlaySong(entry, diskBytes, downloadedBytes, elapsedMs, song.getLengthSec())) {
+                Object obj = mCacheEntryIdToSong.get(entry.getId());
+                if (obj == null)
+                    return;
+
+                Song song = (Song) obj;
+                if (song == getCurrentSong()) {
+                    if (mWaitingForDownload && canPlaySong(entry.getContentLength(), diskBytes, downloadedBytes, elapsedMs, song.getLengthSec())) {
                         mWaitingForDownload = false;
                         playCacheEntry(entry);
                     }
                 }
 
-                if (entry.getId() == mDownloadId) {
-                    if (mDownloadListener != null)
-                        mDownloadListener.onDownloadProgress(mSongs.get(mDownloadIndex), diskBytes, entry.getContentLength());
-                }
+                if (mSongFileChangeListener != null)
+                    mSongFileChangeListener.onSongFileChange(song, diskBytes, entry.getContentLength());
             }
         });
     }
@@ -775,17 +780,23 @@ public class NupService extends Service
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                Log.d(TAG, "got notification that " + entry.getId() + " has been evicted");
-                mCacheEntryIdToSongId.remove(entry.getId());
+                Object obj = mCacheEntryIdToSong.get(entry.getId());
+                if (obj == null)
+                    return;
+
+                Song song = (Song) obj;
+                mCacheEntryIdToSong.remove(entry.getId());
+                if (mSongFileChangeListener != null)
+                    mSongFileChangeListener.onSongFileChange(song, 0, 0);
             }
         });
     }
 
-    // Do we have enough of a cache entry downloaded at a fast enough rate that we'll probably
-    // finish downloading it before we reach the end of the song?
-    private boolean canPlaySong(FileCacheEntry entry, long diskBytes, long downloadedBytes, long elapsedMs, int songLengthSec) {
+    // Do we have enough of a song downloaded at a fast enough rate that we'll probably
+    // finish downloading it before playback reaches the end of the song?
+    private boolean canPlaySong(long totalBytes, long diskBytes, long downloadedBytes, long elapsedMs, int songLengthSec) {
         double bytesPerMs = (double) downloadedBytes / elapsedMs;
-        long remainingMs = (long) ((entry.getContentLength() - diskBytes) / bytesPerMs);
+        long remainingMs = (long) ((totalBytes - diskBytes) / bytesPerMs);
         return (diskBytes >= MIN_BYTES_BEFORE_PLAYING && remainingMs + EXTRA_BUFFER_MS <= songLengthSec * 1000);
     }
 
@@ -825,7 +836,7 @@ public class NupService extends Service
             }
 
             entry = mCache.downloadFile(song.getUrlPath(), chooseLocalFilenameForSong(song));
-            mCacheEntryIdToSongId.put(entry.getId(), song.getSongId());
+            mCacheEntryIdToSong.put(entry.getId(), song);
             mDownloadId = entry.getId();
             mDownloadIndex = index;
             mCache.pinId(entry.getId());

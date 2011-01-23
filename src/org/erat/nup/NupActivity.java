@@ -36,7 +36,7 @@ public class NupActivity extends Activity
                                     NupService.SongPositionChangeListener,
                                     NupService.CoverLoadListener,
                                     NupService.PlaylistChangeListener,
-                                    NupService.DownloadListener {
+                                    NupService.SongFileChangeListener {
     private static final String TAG = "NupActivity";
 
     // Wait this many milliseconds before switching tracks in response to the Prev and Next buttons.
@@ -78,7 +78,7 @@ public class NupActivity extends Activity
     };
 
     // Maps from SongId to the (int) percentage of the song's length that has been downloaded.
-    private HashMap mDownloadPercentages = new HashMap();
+    private HashMap mFilePercentages = new HashMap();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -129,7 +129,7 @@ public class NupActivity extends Activity
             mService.setSongPositionChangeListener(NupActivity.this);
             mService.setCoverLoadListener(NupActivity.this);
             mService.setPlaylistChangeListener(NupActivity.this);
-            mService.setDownloadListener(NupActivity.this);
+            mService.setSongFileChangeListener(NupActivity.this);
             mService.setPauseToggleListener(NupActivity.this);
 
             // Get current state from service.
@@ -216,31 +216,36 @@ public class NupActivity extends Activity
             @Override
             public void run() {
                 mSongs = songs;
-                mDownloadPercentages.clear();
                 findViewById(R.id.playlist_heading).setVisibility(mSongs.isEmpty() ? View.INVISIBLE : View.VISIBLE);
                 updateCurrentSongIndex(mService.getCurrentSongIndex());
             }
         });
     }
 
-    // Implements NupService.DownloadListener.
+    // Implements NupService.SongFileChangeListener.
     @Override
-    public void onDownloadProgress(Song song, long receivedBytes, long totalBytes) {
+    public void onSongFileChange(Song song, long availableBytes, long totalBytes) {
         if (song == getCurrentSong()) {
-            mDownloadStatusLabel.setText(
-                String.format("%.2f of %.1f MB",
-                              (double) receivedBytes / (1024 * 1024),
-                              (double) totalBytes / (1024 * 1024)));
-        }
-        updateDownloadPercentage(song, (int) Math.round(100.0 * receivedBytes / totalBytes));
-    }
+            if (availableBytes == totalBytes) {
+                mDownloadStatusLabel.setText("");
+            } else {
+                mDownloadStatusLabel.setText(
+                    String.format("%.2f of %.1f MB",
+                                  (double) availableBytes / (1024 * 1024),
+                                  (double) totalBytes / (1024 * 1024)));
+            }
 
-    // Implements NupService.DownloadListener.
-    @Override
-    public void onDownloadComplete(Song song) {
-        if (song == getCurrentSong())
-            mDownloadStatusLabel.setText("");
-        updateDownloadPercentage(song, 100);
+        }
+
+        int percent = totalBytes > 0 ? (int) Math.round(100.0 * availableBytes / totalBytes) : -1;
+        Object obj = mFilePercentages.get(song.getSongId());
+        if (percent < 0)
+            mFilePercentages.remove(song.getSongId());
+        else
+            mFilePercentages.put(song.getSongId(), percent);
+        int oldPercent = (obj != null) ? (Integer) obj : -1;
+        if (oldPercent != percent)
+            mSongListAdapter.notifyDataSetChanged();
     }
 
     // Implements Player.PauseToggleListener.
@@ -320,7 +325,7 @@ public class NupActivity extends Activity
             ((TextView) view.findViewById(R.id.title)).setText(song.getTitle());
 
             TextView percentView = (TextView) view.findViewById(R.id.percent);
-            Object object = mDownloadPercentages.get(song.getSongId());
+            Object object = mFilePercentages.get(song.getSongId());
             if (object != null) {
                 percentView.setText((Integer) object + "%");
                 percentView.setVisibility(View.VISIBLE);
@@ -368,13 +373,5 @@ public class NupActivity extends Activity
     private void schedulePlaySongTask(int delayMs) {
         mHandler.removeCallbacks(mPlaySongTask);
         mHandler.postDelayed(mPlaySongTask, delayMs);
-    }
-
-    private void updateDownloadPercentage(Song song, int percent) {
-        Object object = mDownloadPercentages.get(song.getSongId());
-        mDownloadPercentages.put(song.getSongId(), percent);
-        int oldPercent = (object != null) ? (Integer) object : -1;
-        if (oldPercent != percent)
-            mSongListAdapter.notifyDataSetChanged();
     }
 }
