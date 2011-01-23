@@ -58,6 +58,7 @@ public class SearchActivity extends Activity
     public void onCreate(Bundle savedInstanceState) {
         Log.d(TAG, "activity created");
         super.onCreate(savedInstanceState);
+        setTitle(R.string.search);
         setContentView(R.layout.search);
         mSingleton = this;
 

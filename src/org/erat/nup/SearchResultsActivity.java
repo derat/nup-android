@@ -33,6 +33,7 @@ public class SearchResultsActivity extends Activity {
     public void onCreate(Bundle savedInstanceState) {
         Log.d(TAG, "activity created");
         super.onCreate(savedInstanceState);
+        setTitle(R.string.search_results);
         setContentView(R.layout.search_results);
 
         ArrayList<Song> songs = SearchActivity.getSearchResults();

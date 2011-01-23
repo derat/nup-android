@@ -30,6 +30,7 @@ public class BrowseActivity extends Activity {
     public void onCreate(Bundle savedInstanceState) {
         Log.d(TAG, "activity created");
         super.onCreate(savedInstanceState);
+        setTitle(R.string.browse);
         setContentView(R.layout.browse);
 
         List<String> artists = NupActivity.getService().getArtists();
