@@ -89,8 +89,8 @@ class FileCache implements Runnable {
 
     // Get the entry corresponding to a particular cached URL.
     // Returns null if the URL isn't cached.
-    public FileCacheEntry getEntry(String urlPath) {
-        return mDb.getEntryForRemotePath(urlPath);
+    public FileCacheEntry getEntry(String remotePath) {
+        return mDb.getEntryForRemotePath(remotePath);
     }
 
     // Abort a previously-started download.
@@ -141,12 +141,12 @@ class FileCache implements Runnable {
 
     // Download a URL to the cache.  Returns the cache entry, or null if the URL is
     // already being downloaded.
-    public FileCacheEntry downloadFile(String urlPath, String filenameSuggestion) {
-        FileCacheEntry entry = mDb.getEntryForRemotePath(urlPath);
+    public FileCacheEntry downloadFile(String remotePath, String filenameSuggestion) {
+        FileCacheEntry entry = mDb.getEntryForRemotePath(remotePath);
         if (entry == null) {
             String localPath = new File(mMusicDir, filenameSuggestion).getAbsolutePath();
-            int id = mDb.addEntry(urlPath, localPath);
-            entry = mDb.getEntryForRemotePath(urlPath);
+            int id = mDb.addEntry(remotePath, localPath);
+            entry = mDb.getEntryForRemotePath(remotePath);
         } else {
             mDb.updateLastAccessTime(entry.getId());
         }
@@ -158,7 +158,7 @@ class FileCache implements Runnable {
             mInProgressIds.add(id);
         }
 
-        Log.d(TAG, "posting download " + id + " of " + urlPath + " to " + entry.getLocalPath());
+        Log.d(TAG, "posting download " + id + " of " + remotePath + " to " + entry.getLocalPath());
         mHandler.post(new DownloadTask(entry));
         return entry;
     }

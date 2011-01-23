@@ -35,7 +35,7 @@ class Song {
     public int getSongId() { return mSongId; }
     public double getRating() { return mRating; }
 
-    public String getUrlPath() { return "/music/" + mFilename; }
+    public String getRemotePath() { return "/music/" + mFilename; }
 
     public void setCoverBitmap(Bitmap bitmap) { mCoverBitmap = bitmap; }
 }

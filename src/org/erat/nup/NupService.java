@@ -391,6 +391,15 @@ public class NupService extends Service
 
         if (mPlaylistChangeListener != null)
             mPlaylistChangeListener.onPlaylistChange(mSongs);
+
+        FileCacheEntry entry = mCache.getEntry(song.getRemotePath());
+        if (entry != null) {
+            mSongFileChangeListener.onSongFileChange(
+                song,
+                new File(entry.getLocalPath()).length(),
+                entry.getContentLength());
+        }
+
         if (mCurrentSongIndex == -1)
             playSongAtIndex(0);
     }
@@ -411,9 +420,9 @@ public class NupService extends Service
         mCache.clearPinnedIds();
 
         // If we've already downloaded the whole file, start playing it.
-        FileCacheEntry cacheEntry = mCache.getEntry(getCurrentSong().getUrlPath());
+        FileCacheEntry cacheEntry = mCache.getEntry(getCurrentSong().getRemotePath());
         if (cacheEntry != null && isCacheEntryFullyDownloaded(cacheEntry)) {
-            Log.d(TAG, "file " + getCurrentSong().getUrlPath() + " already downloaded; playing");
+            Log.d(TAG, "file " + getCurrentSong().getRemotePath() + " already downloaded; playing");
             playCacheEntry(cacheEntry);
 
             // If we're downloading some other song (maybe we were downloading the
@@ -434,7 +443,7 @@ public class NupService extends Service
             if (cacheEntry == null || mDownloadId != cacheEntry.getId()) {
                 if (mDownloadId != -1)
                     mCache.abortDownload(mDownloadId);
-                cacheEntry = mCache.downloadFile(song.getUrlPath(), chooseLocalFilenameForSong(song));
+                cacheEntry = mCache.downloadFile(song.getRemotePath(), chooseLocalFilenameForSong(song));
                 mCacheEntryIdToSong.put(cacheEntry.getId(), song);
                 mDownloadId = cacheEntry.getId();
                 mDownloadIndex = mCurrentSongIndex;
@@ -827,7 +836,7 @@ public class NupService extends Service
 
         for (; index < mSongs.size() && index - mCurrentSongIndex <= songsToPreload; index++) {
             Song song = mSongs.get(index);
-            FileCacheEntry entry = mCache.getEntry(song.getUrlPath());
+            FileCacheEntry entry = mCache.getEntry(song.getRemotePath());
             if (entry != null && isCacheEntryFullyDownloaded(entry)) {
                 // We already have this one.  Pin it to make sure that it
                 // doesn't get evicted by a later song.
@@ -835,7 +844,7 @@ public class NupService extends Service
                 continue;
             }
 
-            entry = mCache.downloadFile(song.getUrlPath(), chooseLocalFilenameForSong(song));
+            entry = mCache.downloadFile(song.getRemotePath(), chooseLocalFilenameForSong(song));
             mCacheEntryIdToSong.put(entry.getId(), song);
             mDownloadId = entry.getId();
             mDownloadIndex = index;
