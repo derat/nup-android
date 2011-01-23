@@ -137,6 +137,15 @@ public class SearchActivity extends Activity
         // User-friendly description of the error, if any.
         private String[] mError = new String[1];
 
+        // Message that we display onscreen while waiting for the results.
+        private Toast mToast;
+
+        @Override
+        protected void onPreExecute() {
+            mToast = Toast.makeText(SearchActivity.this, "Sending query...", Toast.LENGTH_LONG);
+            mToast.show();
+        }
+
         @Override
         protected String doInBackground(String... urls) {
             return Download.downloadString(SearchActivity.this, urls[0], urls[1], mError);
@@ -154,7 +163,7 @@ public class SearchActivity extends Activity
                         mSearchResults.clear();
                         for (int i = 0; i < jsonSongs.length(); ++i)
                             mSearchResults.add(new Song(jsonSongs.getJSONObject(i)));
-                        message = "Got " + mSearchResults.size() + " song" + (mSearchResults.size() == 1 ? "" : "s") + " from server.";
+                        message = "Got " + mSearchResults.size() + " song" + (mSearchResults.size() == 1 ? "" : "s") + ".";
                         startActivityForResult(new Intent(SearchActivity.this, SearchResultsActivity.class), RESULTS_REQUEST_CODE);
                     } else {
                         message = "No results.";
@@ -163,7 +172,10 @@ public class SearchActivity extends Activity
                     message = "Unable to parse response: " + e.getCause();
                 }
             }
-            Toast.makeText(SearchActivity.this, message, Toast.LENGTH_SHORT).show();
+
+            mToast.setText(message);
+            mToast.setDuration(Toast.LENGTH_SHORT);
+            mToast.show();
         }
     }
 
