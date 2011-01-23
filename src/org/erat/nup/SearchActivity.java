@@ -72,7 +72,12 @@ public class SearchActivity extends Activity
             public void onFocusChange(View v, boolean hasFocus) {
                 if (hasFocus) {
                     String artist = mArtistEdit.getText().toString();
-                    List<String> albums = NupActivity.getService().getAlbumsByArtist(artist);
+                    List<String> albums = null;
+                    if (artist.trim().isEmpty()) {
+                        albums = NupActivity.getService().getAllAlbums();
+                    } else {
+                        albums = NupActivity.getService().getAlbumsByArtist(artist);
+                    }
                     if (albums == null)
                         albums = new ArrayList<String>();
                     mAlbumEdit.setAdapter(new ArrayAdapter<String>(SearchActivity.this, android.R.layout.simple_dropdown_item_1line, albums));

@@ -157,6 +157,9 @@ public class NupService extends Service
     // List of artists, sorted by decreasing number of albums.
     private List<String> mArtists = new ArrayList<String>();
 
+    // List of albums, sorted alphabetically.
+    private List<String> mAlbums = new ArrayList<String>();
+
     // Points from (lowercased) artist String to List of String album names.
     private HashMap mAlbumMap = new HashMap();
 
@@ -248,6 +251,7 @@ public class NupService extends Service
     public int getCurrentSongLastPositionMs() { return mCurrentSongLastPositionMs; }
     public List<String> getArtists() { return mArtists; }
     public List<String> getAlbumsByArtist(String artist) { return (List<String>) mAlbumMap.get(artist.toLowerCase()); }
+    public List<String> getAllAlbums() { return mAlbums; }
 
     public void setSongListener(SongListener listener) {
         mSongListener = listener;
@@ -580,7 +584,9 @@ public class NupService extends Service
             try {
                 JSONObject jsonArtistMap = (JSONObject) new JSONTokener(response).nextValue();
                 mArtists.clear();
+                mAlbums.clear();
                 mAlbumMap.clear();
+                HashSet albumsSet = new HashSet();
                 for (Iterator<String> it = jsonArtistMap.keys(); it.hasNext(); ) {
                     String artist = it.next();
                     mArtists.add(artist);
@@ -589,6 +595,7 @@ public class NupService extends Service
                     List<String> albums = new ArrayList<String>();
                     for (int i = 0; i < jsonAlbums.length(); ++i) {
                         albums.add(jsonAlbums.getString(i));
+                        albumsSet.add(jsonAlbums.getString(i));
                     }
                     mAlbumMap.put(artist.toLowerCase(), albums);
                 }
@@ -603,7 +610,11 @@ public class NupService extends Service
                     }
                 });
 
-                Log.d(TAG, "got listing of " + mArtists.size() + " artist(s) from server");
+                // Add the de-duped albums to the albums list.
+                mAlbums.addAll(albumsSet);
+                Collections.sort(mAlbums);
+
+                Log.d(TAG, "got listing of " + mArtists.size() + " artist(s) and " + mAlbums.size() + " album(s) from server");
                 if (mContentsLoadListener != null)
                     mContentsLoadListener.onContentsLoad();
             } catch (org.json.JSONException e) {
