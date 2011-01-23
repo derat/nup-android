@@ -31,12 +31,7 @@ import java.util.HashMap;
 import java.util.List;
 
 public class NupActivity extends Activity
-                         implements Player.PauseToggleListener,
-                                    NupService.SongChangeListener,
-                                    NupService.SongPositionChangeListener,
-                                    NupService.CoverLoadListener,
-                                    NupService.PlaylistChangeListener,
-                                    NupService.SongFileChangeListener {
+                         implements NupService.SongListener {
     private static final String TAG = "NupActivity";
 
     // Wait this many milliseconds before switching tracks in response to the Prev and Next buttons.
@@ -124,17 +119,11 @@ public class NupActivity extends Activity
         public void onServiceConnected(ComponentName className, IBinder service) {
             Log.d(TAG, "connected to service");
             mService = ((NupService.LocalBinder) service).getService();
-
-            mService.setSongChangeListener(NupActivity.this);
-            mService.setSongPositionChangeListener(NupActivity.this);
-            mService.setCoverLoadListener(NupActivity.this);
-            mService.setPlaylistChangeListener(NupActivity.this);
-            mService.setSongFileChangeListener(NupActivity.this);
-            mService.setPauseToggleListener(NupActivity.this);
+            mService.setSongListener(NupActivity.this);
 
             // Get current state from service.
             onPlaylistChange(mService.getSongs());
-            onPauseToggle(mService.getPaused());
+            onPauseStateChange(mService.getPaused());
             if (getCurrentSong() != null)
                 onSongPositionChange(mService.getCurrentSong(), mService.getCurrentSongLastPositionMs(), 0);
         }
@@ -175,13 +164,13 @@ public class NupActivity extends Activity
         startActivity(new Intent(this, SearchActivity.class));
     }
 
-    // Implements NupService.SongChangeListener.
+    // Implements NupService.SongListener.
     @Override
     public void onSongChange(Song song, int index) {
         updateCurrentSongIndex(index);
     }
 
-    // Implements NupService.SongPositionChangeListener.
+    // Implements NupService.SongListener.
     @Override
     public void onSongPositionChange(final Song song, final int positionMs, final int durationMs) {
         runOnUiThread(new Runnable() {
@@ -200,16 +189,26 @@ public class NupActivity extends Activity
         });
     }
 
-    // Implements NupService.CoverLoadListener.
+    // Implements NupService.SongListener.
     @Override
-    public void onCoverLoad(Song song) {
+    public void onPauseStateChange(final boolean isPaused) {
+        runOnUiThread(new Runnable() {
+            public void run() {
+                mPauseButton.setText(getString(isPaused ? R.string.play : R.string.pause));
+            }
+        });
+    }
+
+    // Implements NupService.SongListener.
+    @Override
+    public void onSongCoverLoad(Song song) {
         if (song == getCurrentSong()) {
             mAlbumImageView.setVisibility(View.VISIBLE);
             mAlbumImageView.setImageBitmap(song.getCoverBitmap());
         }
     }
 
-    // Implements NupService.PlaylistChangeListener.
+    // Implements NupService.SongListener.
     @Override
     public void onPlaylistChange(final List<Song> songs) {
         runOnUiThread(new Runnable() {
@@ -222,7 +221,7 @@ public class NupActivity extends Activity
         });
     }
 
-    // Implements NupService.SongFileChangeListener.
+    // Implements NupService.SongListener.
     @Override
     public void onSongFileChange(Song song, long availableBytes, long totalBytes) {
         if (song == getCurrentSong()) {
@@ -246,16 +245,6 @@ public class NupActivity extends Activity
         int oldPercent = (obj != null) ? (Integer) obj : -1;
         if (oldPercent != percent)
             mSongListAdapter.notifyDataSetChanged();
-    }
-
-    // Implements Player.PauseToggleListener.
-    @Override
-    public void onPauseToggle(final boolean isPaused) {
-        runOnUiThread(new Runnable() {
-            public void run() {
-                mPauseButton.setText(getString(isPaused ? R.string.play : R.string.pause));
-            }
-        });
     }
 
     // Update the onscreen information about the current song.

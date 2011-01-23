@@ -71,34 +71,30 @@ public class NupService extends Service
     // Subdirectory where crash reports are written.
     private static final String CRASH_SUBDIRECTORY = "crashes";
 
-    // Listener for changes to a new song.
-    interface SongChangeListener {
+    interface SongListener {
+        // Invoked when we switch to a new track in the playlist.
         void onSongChange(Song song, int index);
-    }
 
-    // Listener for progress in the playback of the current song.
-    interface SongPositionChangeListener {
+        // Invoked when the playback position in the current song changes.
         void onSongPositionChange(Song song, int positionMs, int durationMs);
-    }
 
-    // Listener for changes to the on-disk size of a song's file.
-    interface SongFileChangeListener {
+        // Invoked when playback is paused or unpaused.
+        void onPauseStateChange(boolean paused);
+
+        // Invoked when the on-disk size of a song changes (because we're
+        // downloading it or it got evicted from the cache).
         void onSongFileChange(Song song, long availableBytes, long totalBytes);
-    }
 
-    // Listener for the cover bitmap being successfully loaded for a song.
-    interface CoverLoadListener {
-        void onCoverLoad(Song song);
+        // Invoked when the cover bitmap for a song is successfully loaded.
+        void onSongCoverLoad(Song song);
+
+        // Invoked when the current set of songs to be played changes.
+        void onPlaylistChange(List<Song> songs);
     }
 
     // Listener for the server contents (artists and albums) being loaded.
     interface ContentsLoadListener {
         void onContentsLoad();
-    }
-
-    // Listener for changes to the current playlist.
-    interface PlaylistChangeListener {
-        void onPlaylistChange(List<Song> songs);
     }
 
     // Plays songs.
@@ -186,13 +182,8 @@ public class NupService extends Service
         }
     };
 
-    private SongChangeListener mSongChangeListener;
-    private SongPositionChangeListener mSongPositionChangeListener;
-    private SongFileChangeListener mSongFileChangeListener;
-    private CoverLoadListener mCoverLoadListener;
+    private SongListener mSongListener;
     private ContentsLoadListener mContentsLoadListener;
-    private PlaylistChangeListener mPlaylistChangeListener;
-    private Player.PauseToggleListener mPauseToggleListener;
 
     @Override
     public void onCreate() {
@@ -265,46 +256,21 @@ public class NupService extends Service
     public List<String> getArtists() { return mArtists; }
     public List<String> getAlbumsByArtist(String artist) { return (List<String>) mAlbumMap.get(artist.toLowerCase()); }
 
-    public void setSongChangeListener(SongChangeListener listener) {
-        mSongChangeListener = listener;
-    }
-    public void setSongPositionChangeListener(SongPositionChangeListener listener) {
-        mSongPositionChangeListener = listener;
-    }
-    public void setCoverLoadListener(CoverLoadListener listener) {
-        mCoverLoadListener = listener;
+    public void setSongListener(SongListener listener) {
+        mSongListener = listener;
     }
     public void setContentsLoadListener(ContentsLoadListener listener) {
         mContentsLoadListener = listener;
-    }
-    public void setPlaylistChangeListener(PlaylistChangeListener listener) {
-        mPlaylistChangeListener = listener;
-    }
-    public void setSongFileChangeListener(SongFileChangeListener listener) {
-        mSongFileChangeListener = listener;
-    }
-    void setPauseToggleListener(Player.PauseToggleListener listener) {
-        mPauseToggleListener = listener;
     }
 
     // Unregister an object that might be registered as one or more of our listeners.
     // Typically called when the object is an activity that's getting destroyed so
     // we'll drop our references to it.
     void unregisterListener(Object object) {
-        if (mSongChangeListener == object)
-            mSongChangeListener = null;
-        if (mSongPositionChangeListener == object)
-            mSongPositionChangeListener = null;
-        if (mSongFileChangeListener == object)
-            mSongFileChangeListener = null;
-        if (mCoverLoadListener == object)
-            mCoverLoadListener = null;
+        if (mSongListener == object)
+            mSongListener = null;
         if (mContentsLoadListener == object)
             mContentsLoadListener = null;
-        if (mPlaylistChangeListener == object)
-            mPlaylistChangeListener = null;
-        if (mPauseToggleListener == object)
-            mPauseToggleListener = null;
     }
 
     public class LocalBinder extends Binder {
@@ -353,23 +319,6 @@ public class NupService extends Service
         mPlayer.togglePause();
     }
 
-    // Replace the current playlist with a new one.
-    // Plays the first song in the new list.
-    public void setPlaylist(List<Song> songs) {
-        mSongs = songs;
-        mCurrentSongIndex = -1;
-        if (mDownloadId != -1) {
-            mCache.abortDownload(mDownloadId);
-            mDownloadId = -1;
-            mDownloadIndex = -1;
-        }
-        if (mPlaylistChangeListener != null)
-            mPlaylistChangeListener.onPlaylistChange(mSongs);
-
-        if (songs.size() > 0)
-            playSongAtIndex(0);
-    }
-
     public void clearPlaylist() {
         mSongs.clear();
         mCurrentSongIndex = -1;
@@ -379,8 +328,8 @@ public class NupService extends Service
             mDownloadIndex = -1;
         }
 
-        if (mPlaylistChangeListener != null)
-            mPlaylistChangeListener.onPlaylistChange(mSongs);
+        if (mSongListener != null)
+            mSongListener.onPlaylistChange(mSongs);
     }
 
     public void appendSongToPlaylist(Song song) {
@@ -389,12 +338,12 @@ public class NupService extends Service
             song = (Song) obj;
         mSongs.add(song);
 
-        if (mPlaylistChangeListener != null)
-            mPlaylistChangeListener.onPlaylistChange(mSongs);
+        if (mSongListener != null)
+            mSongListener.onPlaylistChange(mSongs);
 
         FileCacheEntry entry = mCache.getEntry(song.getRemotePath());
-        if (entry != null) {
-            mSongFileChangeListener.onSongFileChange(
+        if (entry != null && mSongListener != null) {
+            mSongListener.onSongFileChange(
                 song,
                 new File(entry.getLocalPath()).length(),
                 entry.getContentLength());
@@ -459,8 +408,8 @@ public class NupService extends Service
         if (fetchCoverForSongIfMissing(song))
             updateNotification(song.getArtist(), song.getTitle(), song.getAlbum(), song.getCoverBitmap());
 
-        if (mSongChangeListener != null)
-            mSongChangeListener.onSongChange(song, mCurrentSongIndex);
+        if (mSongListener != null)
+            mSongListener.onSongChange(song, mCurrentSongIndex);
     }
 
     // Stop playing the current song, if any.
@@ -525,8 +474,8 @@ public class NupService extends Service
 
         if (song.getCoverBitmap() != null) {
             mCoverCache.put(song.getCoverFilename(), song.getCoverBitmap());
-            if (mCoverLoadListener != null)
-                mCoverLoadListener.onCoverLoad(song);
+            if (mSongListener != null)
+                mSongListener.onSongCoverLoad(song);
         }
 
         // We need to update our notification even if the fetch failed.
@@ -663,8 +612,8 @@ public class NupService extends Service
                     return;
 
                 Song song = getCurrentSong();
-                if (mSongPositionChangeListener != null)
-                    mSongPositionChangeListener.onSongPositionChange(song, positionMs, durationMs);
+                if (mSongListener != null)
+                    mSongListener.onSongPositionChange(song, positionMs, durationMs);
 
                 if (positionMs > mCurrentSongLastPositionMs &&
                     positionMs <= mCurrentSongLastPositionMs + MAX_POSITION_REPORT_MS) {
@@ -685,8 +634,8 @@ public class NupService extends Service
     @Override
     public void onPauseToggle(boolean paused) {
         mPaused = paused;
-        if (mPauseToggleListener != null)
-            mPauseToggleListener.onPauseToggle(paused);
+        if (mSongListener != null)
+            mSongListener.onPauseStateChange(paused);
     }
 
     // Implements Player.PlaybackErrorListener.
@@ -745,8 +694,8 @@ public class NupService extends Service
                     playCacheEntry(entry);
                 }
 
-                if (mSongFileChangeListener != null)
-                    mSongFileChangeListener.onSongFileChange(
+                if (mSongListener != null)
+                    mSongListener.onSongFileChange(
                         song, entry.getContentLength(), entry.getContentLength());
 
                 if (entry.getId() == mDownloadId) {
@@ -777,8 +726,8 @@ public class NupService extends Service
                     }
                 }
 
-                if (mSongFileChangeListener != null)
-                    mSongFileChangeListener.onSongFileChange(song, diskBytes, entry.getContentLength());
+                if (mSongListener != null)
+                    mSongListener.onSongFileChange(song, diskBytes, entry.getContentLength());
             }
         });
     }
@@ -795,8 +744,8 @@ public class NupService extends Service
 
                 Song song = (Song) obj;
                 mCacheEntryIdToSong.remove(entry.getId());
-                if (mSongFileChangeListener != null)
-                    mSongFileChangeListener.onSongFileChange(song, 0, 0);
+                if (mSongListener != null)
+                    mSongListener.onSongFileChange(song, 0, 0);
             }
         });
     }
