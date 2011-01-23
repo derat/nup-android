@@ -24,7 +24,6 @@ class YesNoPreference extends DialogPreference {
         super.onDialogClosed(positiveResult);
         if (positiveResult) {
             if (NupPreferences.CLEAR_CACHE.equals(getKey())) {
-                // FIXME: shouldn't do this on the UI thread
                 NupActivity.getService().clearCache();
                 setSummary(mContext.getString(R.string.cache_is_empty));
             }
