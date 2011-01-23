@@ -321,7 +321,7 @@ public class NupActivity extends Activity
             ((TextView) view.findViewById(R.id.title)).setText(song.getTitle());
 
             TextView percentView = (TextView) view.findViewById(R.id.percent);
-            if (song.getTotalBytes() >= 0) {
+            if (song.getTotalBytes() > 0) {
                 final int percent = (int) Math.round(100.0 * song.getAvailableBytes() / song.getTotalBytes());
                 percentView.setText(percent + "%");
                 percentView.setVisibility(View.VISIBLE);
