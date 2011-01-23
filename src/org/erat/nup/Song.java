@@ -10,7 +10,14 @@ class Song {
     private final String mArtist, mTitle, mAlbum, mFilename, mCoverFilename;
     private final int mLengthSec, mSongId;
     private final double mRating;
-    private Bitmap mCoverBitmap;
+    private Bitmap mCoverBitmap = null;
+
+    // Number of bytes available to us (i.e. what we have on disk).
+    private long mAvailableBytes = 0;
+
+    // Total size of the song, as supplied by the server.
+    // 0 if the song doesn't have a cache entry.
+    private long mTotalBytes = 0;
 
     public Song(JSONObject json) throws org.json.JSONException {
         mArtist = !json.isNull("artist") ? json.getString("artist") : "";
@@ -34,8 +41,12 @@ class Song {
     public int getLengthSec() { return mLengthSec; }
     public int getSongId() { return mSongId; }
     public double getRating() { return mRating; }
-
-    public String getRemotePath() { return "/music/" + mFilename; }
+    public long getAvailableBytes() { return mAvailableBytes; }
+    public long getTotalBytes() { return mTotalBytes; }
 
     public void setCoverBitmap(Bitmap bitmap) { mCoverBitmap = bitmap; }
+    public void setAvailableBytes(long bytes) { mAvailableBytes = bytes; }
+    public void setTotalBytes(long bytes) { mTotalBytes = bytes; }
+
+    public String getRemotePath() { return "/music/" + mFilename; }
 }

@@ -76,9 +76,6 @@ public class NupActivity extends Activity
         }
     };
 
-    // Maps from SongId to the (int) percentage of the song's length that has been downloaded.
-    private HashMap mFilePercentages = new HashMap();
-
     @Override
     public void onCreate(Bundle savedInstanceState) {
         Log.d(TAG, "activity created");
@@ -227,7 +224,10 @@ public class NupActivity extends Activity
 
     // Implements NupService.SongListener.
     @Override
-    public void onSongFileChange(Song song, long availableBytes, long totalBytes) {
+    public void onSongFileSizeChange(Song song) {
+        final long availableBytes = song.getAvailableBytes();
+        final long totalBytes = song.getTotalBytes();
+
         if (song == getCurrentSong()) {
             if (availableBytes == totalBytes) {
                 mDownloadStatusLabel.setText("");
@@ -240,15 +240,7 @@ public class NupActivity extends Activity
 
         }
 
-        int percent = totalBytes > 0 ? (int) Math.round(100.0 * availableBytes / totalBytes) : -1;
-        Object obj = mFilePercentages.get(song.getSongId());
-        if (percent < 0)
-            mFilePercentages.remove(song.getSongId());
-        else
-            mFilePercentages.put(song.getSongId(), percent);
-        int oldPercent = (obj != null) ? (Integer) obj : -1;
-        if (oldPercent != percent)
-            mSongListAdapter.notifyDataSetChanged();
+        mSongListAdapter.notifyDataSetChanged();
     }
 
     // Update the onscreen information about the current song.
@@ -329,9 +321,9 @@ public class NupActivity extends Activity
             ((TextView) view.findViewById(R.id.title)).setText(song.getTitle());
 
             TextView percentView = (TextView) view.findViewById(R.id.percent);
-            Object object = mFilePercentages.get(song.getSongId());
-            if (object != null) {
-                percentView.setText((Integer) object + "%");
+            if (song.getTotalBytes() >= 0) {
+                final int percent = (int) Math.round(100.0 * song.getAvailableBytes() / song.getTotalBytes());
+                percentView.setText(percent + "%");
                 percentView.setVisibility(View.VISIBLE);
             } else {
                 percentView.setVisibility(View.GONE);

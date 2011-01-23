@@ -365,7 +365,7 @@ class FileCache implements Runnable {
 
         private class ProgressReporter implements Runnable {
             private static final String TAG = "FileCache.ProgressReporter";
-            private static final long PROGRESS_REPORT_MS = 250;
+            private static final long PROGRESS_REPORT_MS = 500;
 
             private final FileCacheEntry mEntry;
             private long mDiskBytes = 0;

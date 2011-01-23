@@ -15,4 +15,5 @@ public class NupPreferences {
     public static final String CACHE_SIZE_DEFAULT       = "512";
     public static final int CACHE_SIZE_MINIMUM          = 20;
     public static final String SONGS_TO_PRELOAD_DEFAULT = "1";
+    public static final String DOWNLOAD_RATE_DEFAULT    = "0";
 }

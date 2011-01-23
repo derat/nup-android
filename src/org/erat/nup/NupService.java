@@ -80,7 +80,7 @@ public class NupService extends Service
 
         // Invoked when the on-disk size of a song changes (because we're
         // downloading it or it got evicted from the cache).
-        void onSongFileChange(Song song, long availableBytes, long totalBytes);
+        void onSongFileSizeChange(Song song);
 
         // Invoked when the cover bitmap for a song is successfully loaded.
         void onSongCoverLoad(Song song);
@@ -337,10 +337,9 @@ public class NupService extends Service
         FileCacheEntry entry = mCache.getEntry(song.getRemotePath());
         if (entry != null && mSongListener != null) {
             mCacheEntryIdToSong.put(entry.getId(), song);
-            mSongListener.onSongFileChange(
-                song,
-                new File(entry.getLocalPath()).length(),
-                entry.getContentLength());
+            song.setAvailableBytes(new File(entry.getLocalPath()).length());
+            song.setTotalBytes(entry.getContentLength());
+            mSongListener.onSongFileSizeChange(song);
         }
 
         if (mCurrentSongIndex == -1) {
@@ -717,14 +716,16 @@ public class NupService extends Service
                     return;
 
                 Song song = (Song) obj;
+                song.setAvailableBytes(entry.getContentLength());
+                song.setTotalBytes(entry.getContentLength());
+
                 if (song == getCurrentSong() && mWaitingForDownload) {
                     mWaitingForDownload = false;
                     playCacheEntry(entry);
                 }
 
                 if (mSongListener != null)
-                    mSongListener.onSongFileChange(
-                        song, entry.getContentLength(), entry.getContentLength());
+                    mSongListener.onSongFileSizeChange(song);
 
                 if (entry.getId() == mDownloadId) {
                     int nextIndex = mDownloadIndex + 1;
@@ -747,6 +748,9 @@ public class NupService extends Service
                     return;
 
                 Song song = (Song) obj;
+                song.setAvailableBytes(diskBytes);
+                song.setTotalBytes(entry.getContentLength());
+
                 if (song == getCurrentSong()) {
                     if (mWaitingForDownload && canPlaySong(entry.getContentLength(), diskBytes, downloadedBytes, elapsedMs, song.getLengthSec())) {
                         mWaitingForDownload = false;
@@ -755,7 +759,7 @@ public class NupService extends Service
                 }
 
                 if (mSongListener != null)
-                    mSongListener.onSongFileChange(song, diskBytes, entry.getContentLength());
+                    mSongListener.onSongFileSizeChange(song);
             }
         });
     }
@@ -772,9 +776,11 @@ public class NupService extends Service
                     return;
 
                 Song song = (Song) obj;
+                song.setAvailableBytes(0);
+                song.setTotalBytes(0);
                 mCacheEntryIdToSong.remove(entry.getId());
                 if (mSongListener != null)
-                    mSongListener.onSongFileChange(song, 0, 0);
+                    mSongListener.onSongFileSizeChange(song);
             }
         });
     }
