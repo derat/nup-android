@@ -336,14 +336,18 @@ public class NupService extends Service
 
         FileCacheEntry entry = mCache.getEntry(song.getRemotePath());
         if (entry != null && mSongListener != null) {
+            mCacheEntryIdToSong.put(entry.getId(), song);
             mSongListener.onSongFileChange(
                 song,
                 new File(entry.getLocalPath()).length(),
                 entry.getContentLength());
         }
 
-        if (mCurrentSongIndex == -1)
+        if (mCurrentSongIndex == -1) {
             playSongAtIndex(0);
+        } else if (mDownloadId == -1) {
+            maybeDownloadAnotherSong(mSongs.size() - 1);
+        }
     }
 
     // Play the song at a particular position in the playlist.
@@ -731,6 +735,7 @@ public class NupService extends Service
         mHandler.post(new Runnable() {
             @Override
             public void run() {
+                Log.d(TAG, "got notification that " + entry.getId() + " has been evicted");
                 Object obj = mCacheEntryIdToSong.get(entry.getId());
                 if (obj == null)
                     return;
@@ -769,8 +774,10 @@ public class NupService extends Service
 
     // Try to download the next not-yet-downloaded song in the playlist.
     private void maybeDownloadAnotherSong(int index) {
-        if (mDownloadId != -1)
+        if (mDownloadId != -1) {
+            Log.e(TAG, "aborting prefetch since download " + mDownloadId + " is still in progress");
             return;
+        }
 
         final int songsToPreload = Integer.valueOf(
             mPrefs.getString(NupPreferences.SONGS_TO_PRELOAD,

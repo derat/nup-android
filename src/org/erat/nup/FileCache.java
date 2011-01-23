@@ -470,7 +470,7 @@ class FileCache implements Runnable {
 
             FileCacheEntry entry = mDb.getEntryById(id);
             File file = new File(entry.getLocalPath());
-            Log.d(TAG, "deleting " + entry.getLocalPath() + " (" + file.length() + " bytes)");
+            Log.d(TAG, "deleting " + id + " (" + entry.getLocalPath() + ", " + file.length() + " bytes)");
             availableBytes += file.length();
             file.delete();
             mDb.removeEntry(id);
