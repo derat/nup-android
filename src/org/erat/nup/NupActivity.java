@@ -11,6 +11,7 @@ import android.content.ServiceConnection;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.StrictMode;
 import android.util.Log;
 import android.view.ContextMenu;
 import android.view.LayoutInflater;
@@ -78,8 +79,10 @@ public class NupActivity extends Activity
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        Log.d(TAG, "activity created");
+        //StrictMode.enableDefaults();
         super.onCreate(savedInstanceState);
+
+        Log.d(TAG, "activity created");
         setContentView(R.layout.main);
 
         mPauseButton = (Button) findViewById(R.id.pause_button);

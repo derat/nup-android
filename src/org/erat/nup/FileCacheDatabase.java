@@ -65,9 +65,12 @@ class FileCacheDatabase {
             "WHERE CacheEntryId = ?",
             new String[]{Integer.toString(id)});
         cursor.moveToFirst();
-        if (cursor.isAfterLast())
-            return null;
-        return new FileCacheEntry(id, cursor.getString(0), cursor.getString(1), cursor.getLong(2), cursor.getString(3));
+        FileCacheEntry entry =
+            !cursor.isAfterLast() ?
+            new FileCacheEntry(id, cursor.getString(0), cursor.getString(1), cursor.getLong(2), cursor.getString(3)) :
+            null;
+        cursor.close();
+        return entry;
     }
 
     public synchronized FileCacheEntry getEntryForRemotePath(String remotePath) {
@@ -75,7 +78,9 @@ class FileCacheDatabase {
             "SELECT CacheEntryId FROM CacheEntries WHERE RemotePath = ?",
             new String[]{remotePath});
         cursor.moveToFirst();
-        return cursor.isAfterLast() ? null : getEntryById(cursor.getInt(0));
+        FileCacheEntry entry = cursor.isAfterLast() ? null : getEntryById(cursor.getInt(0));
+        cursor.close();
+        return entry;
     }
 
     public synchronized int addEntry(String remotePath, String localPath) {
@@ -85,7 +90,9 @@ class FileCacheDatabase {
             new Object[]{remotePath, localPath, new Date().getTime() / 1000});
         Cursor cursor = db.rawQuery("SELECT last_insert_rowid()", null);
         cursor.moveToFirst();
-        return cursor.getInt(0);
+        int id = cursor.getInt(0);
+        cursor.close();
+        return id;
     }
 
     public synchronized void removeEntry(int id) {
@@ -114,6 +121,7 @@ class FileCacheDatabase {
             ids.add(cursor.getInt(0));
             cursor.moveToNext();
         }
+        cursor.close();
         return ids;
     }
 }
