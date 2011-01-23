@@ -326,26 +326,27 @@ public class NupService extends Service
     }
 
     public void appendSongToPlaylist(Song song) {
-        Object obj = mSongIdToSong.get(song.getSongId());
-        if (obj != null)
-            song = (Song) obj;
-        mSongs.add(song);
+        List<Song> songs = new ArrayList<Song>();
+        songs.add(song);
+        appendSongsToPlaylist(songs);
+    }
 
-        if (mSongListener != null)
-            mSongListener.onPlaylistChange(mSongs);
+    public void appendSongsToPlaylist(List<Song> songs) {
+        insertSongs(songs, mSongs.size());
+    }
 
-        FileCacheEntry entry = mCache.getEntry(song.getRemotePath());
-        if (entry != null && mSongListener != null) {
-            mCacheEntryIdToSong.put(entry.getId(), song);
-            song.setAvailableBytes(new File(entry.getLocalPath()).length());
-            song.setTotalBytes(entry.getContentLength());
-            mSongListener.onSongFileSizeChange(song);
-        }
+    public void addSongToPlaylistAndPlay(Song song) {
+        List<Song> songs = new ArrayList<Song>();
+        songs.add(song);
+        addSongsToPlaylistAndPlay(songs);
+    }
 
-        if (mCurrentSongIndex == -1) {
-            playSongAtIndex(0);
-        } else if (mDownloadId == -1) {
-            maybeDownloadAnotherSong(mSongs.size() - 1);
+    public void addSongsToPlaylistAndPlay(List<Song> songs) {
+        if (mCurrentSongIndex < 0) {
+            insertSongs(songs, 0);
+        } else {
+            insertSongs(songs, mCurrentSongIndex + 1);
+            playSongAtIndex(mCurrentSongIndex + 1);
         }
     }
 
@@ -783,6 +784,58 @@ public class NupService extends Service
                     mSongListener.onSongFileSizeChange(song);
             }
         });
+    }
+
+    // Insert a list of songs into the playlist at a particular position.
+    // Plays the first one, if no song is already playing.
+    private void insertSongs(List<Song> songs, int index) {
+        if (index < 0 || index > mSongs.size()) {
+            Log.e(TAG, "ignoring request to insert " + songs.size() + " song(s) at index " + index);
+            return;
+        }
+
+        // Songs that we didn't already have.  We track these so we can check
+        // the cache for them later.
+        ArrayList<Song> newSongs = new ArrayList<Song>();
+
+        // Use our own version of each song if we have it already.
+        ArrayList<Song> tmpSongs = new ArrayList<Song>();
+        for (Song song : songs) {
+            Object obj = mSongIdToSong.get(song.getSongId());
+            if (obj != null) {
+                tmpSongs.add((Song) obj);
+            } else {
+                tmpSongs.add(song);
+                newSongs.add(song);
+            }
+        }
+        songs = tmpSongs;
+
+        mSongs.addAll(index, songs);
+        if (mCurrentSongIndex >= 0 && index <= mCurrentSongIndex)
+            mCurrentSongIndex += songs.size();
+        if (mDownloadIndex >= 0 && index <= mDownloadIndex)
+            mDownloadIndex += songs.size();
+
+        if (mSongListener != null)
+            mSongListener.onPlaylistChange(mSongs);
+
+        for (Song song : newSongs) {
+            FileCacheEntry entry = mCache.getEntry(song.getRemotePath());
+            if (entry != null) {
+                mCacheEntryIdToSong.put(entry.getId(), song);
+                song.setAvailableBytes(new File(entry.getLocalPath()).length());
+                song.setTotalBytes(entry.getContentLength());
+                if (mSongListener != null)
+                    mSongListener.onSongFileSizeChange(song);
+            }
+        }
+
+        if (mCurrentSongIndex == -1) {
+            playSongAtIndex(0);
+        } else if (mDownloadId == -1) {
+            maybeDownloadAnotherSong(index);
+        }
     }
 
     // Do we have enough of a song downloaded at a fast enough rate that we'll probably

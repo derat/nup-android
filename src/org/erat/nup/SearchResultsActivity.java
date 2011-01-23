@@ -67,21 +67,21 @@ public class SearchResultsActivity extends Activity {
             AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) menuInfo;
             Song song = SearchActivity.getSearchResults().get(info.position);
             menu.setHeaderTitle(song.getArtist() + " - " + song.getTitle());
-            menu.add(0, MENU_ITEM_APPEND, 0, R.string.append);
             menu.add(0, MENU_ITEM_PLAY, 0, R.string.play);
+            menu.add(0, MENU_ITEM_APPEND, 0, R.string.append);
         }
     }
 
     @Override
     public boolean onContextItemSelected(MenuItem item) {
         AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
-        Song = SearchActivity.getSearchResults().get(info.position);
+        Song song = SearchActivity.getSearchResults().get(info.position);
         switch (item.getItemId()) {
             case MENU_ITEM_APPEND:
                 NupActivity.getService().appendSongToPlaylist(song);
                 return true;
             case MENU_ITEM_PLAY:
-                // FIXME
+                NupActivity.getService().addSongToPlaylistAndPlay(song);
                 return true;
             default:
                 return false;
@@ -89,16 +89,14 @@ public class SearchResultsActivity extends Activity {
     }
 
     public void onAppendButtonClicked(View view) {
-        for (Song song : SearchActivity.getSearchResults())
-            NupActivity.getService().appendSongToPlaylist(song);
+        NupActivity.getService().appendSongsToPlaylist(SearchActivity.getSearchResults());
         setResult(RESULT_OK);
         finish();
     }
 
     public void onReplaceButtonClicked(View view) {
         NupActivity.getService().clearPlaylist();
-        for (Song song : SearchActivity.getSearchResults())
-            NupActivity.getService().appendSongToPlaylist(song);
+        NupActivity.getService().appendSongsToPlaylist(SearchActivity.getSearchResults());
         setResult(RESULT_OK);
         finish();
     }
