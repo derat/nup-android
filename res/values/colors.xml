@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <color name="playlist_download_status_fg">#888</color>
   <color name="playlist_highlight_bg">#333</color>
   <color name="song_download_status_fg">#555</color>
-  <color name="playlist_download_status_fg">#888</color>
+  <color name="song_playback_time_fg">#888</color>
 </resources>

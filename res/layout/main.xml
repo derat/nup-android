@@ -58,6 +58,7 @@
             android:singleLine="true"
             android:text=""
             android:textSize="14dp"
+            android:textColor="@color/song_playback_time_fg"
             />
         <TextView
             android:id="@+id/download_status_label"
