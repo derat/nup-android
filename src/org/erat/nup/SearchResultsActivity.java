@@ -25,8 +25,9 @@ public class SearchResultsActivity extends Activity {
     public static final String SONG_KEY = "songs";
 
     // IDs for items in our context menus.
-    private static final int MENU_ITEM_APPEND = 1;
-    private static final int MENU_ITEM_PLAY = 2;
+    private static final int MENU_ITEM_PLAY = 1;
+    private static final int MENU_ITEM_INSERT = 2;
+    private static final int MENU_ITEM_APPEND = 3;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -68,6 +69,7 @@ public class SearchResultsActivity extends Activity {
             Song song = SearchActivity.getSearchResults().get(info.position);
             menu.setHeaderTitle(song.getArtist() + " - " + song.getTitle());
             menu.add(0, MENU_ITEM_PLAY, 0, R.string.play);
+            menu.add(0, MENU_ITEM_INSERT, 0, R.string.insert);
             menu.add(0, MENU_ITEM_APPEND, 0, R.string.append);
         }
     }
@@ -77,11 +79,14 @@ public class SearchResultsActivity extends Activity {
         AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
         Song song = SearchActivity.getSearchResults().get(info.position);
         switch (item.getItemId()) {
+            case MENU_ITEM_PLAY:
+                NupActivity.getService().addSongToPlaylist(song, true);
+                return true;
+            case MENU_ITEM_INSERT:
+                NupActivity.getService().addSongToPlaylist(song, false);
+                return true;
             case MENU_ITEM_APPEND:
                 NupActivity.getService().appendSongToPlaylist(song);
-                return true;
-            case MENU_ITEM_PLAY:
-                NupActivity.getService().addSongToPlaylistAndPlay(song);
                 return true;
             default:
                 return false;
@@ -90,6 +95,12 @@ public class SearchResultsActivity extends Activity {
 
     public void onAppendButtonClicked(View view) {
         NupActivity.getService().appendSongsToPlaylist(SearchActivity.getSearchResults());
+        setResult(RESULT_OK);
+        finish();
+    }
+
+    public void onInsertButtonClicked(View view) {
+        NupActivity.getService().addSongsToPlaylist(SearchActivity.getSearchResults(), false);
         setResult(RESULT_OK);
         finish();
     }

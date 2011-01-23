@@ -19,6 +19,14 @@
         android:onClick="onAppendButtonClicked"
         />
     <Button
+        android:id="@+id/insert_button"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="@string/insert_all"
+        android:onClick="onInsertButtonClicked"
+        />
+    <Button
         android:id="@+id/replace_button"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"

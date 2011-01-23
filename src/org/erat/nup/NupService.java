@@ -335,18 +335,19 @@ public class NupService extends Service
         insertSongs(songs, mSongs.size());
     }
 
-    public void addSongToPlaylistAndPlay(Song song) {
+    public void addSongToPlaylist(Song song, boolean play) {
         List<Song> songs = new ArrayList<Song>();
         songs.add(song);
-        addSongsToPlaylistAndPlay(songs);
+        addSongsToPlaylist(songs, play);
     }
 
-    public void addSongsToPlaylistAndPlay(List<Song> songs) {
+    public void addSongsToPlaylist(List<Song> songs, boolean play) {
         if (mCurrentSongIndex < 0) {
             insertSongs(songs, 0);
         } else {
             insertSongs(songs, mCurrentSongIndex + 1);
-            playSongAtIndex(mCurrentSongIndex + 1);
+            if (play)
+                playSongAtIndex(mCurrentSongIndex + 1);
         }
     }
 
