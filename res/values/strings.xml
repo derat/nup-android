@@ -8,13 +8,13 @@
   <string name="artist">Artist</string>
   <string name="browse">Browse</string>
   <string name="cache_is_empty">Cache is empty</string>
+  <string name="cache_current_usage">Current usage: %.1f MB</string>
   <string name="cache_size">Cache size</string>
   <string name="cache_size_description">Maximum size of data stored on SD card in MB</string>
   <string name="cache_size_invalid">Cache must be at least %d MB.</string>
   <string name="cache_size_value">%d MB</string>
   <string name="clear_cache">Clear cache</string>
   <string name="clear_cache_message">Delete all cached music from the SD card?</string>
-  <string name="current_cache_size">Current size: %.1f MB</string>
   <string name="download_rate">Download rate</string>
   <string name="download_rate_description">Maximum rate at which music can be downloaded in KB/sec (0 for unlimited)</string>
   <string name="download_rate_value">%d KB/sec</string>

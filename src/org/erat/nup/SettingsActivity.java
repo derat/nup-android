@@ -41,7 +41,7 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
         pref = findPreference(NupPreferences.CLEAR_CACHE);
         long cachedBytes = NupActivity.getService().getCacheDataBytes();
         pref.setSummary(cachedBytes > 0 ?
-                        getString(R.string.current_cache_size, cachedBytes / (double) (1024 * 1024)) :
+                        getString(R.string.cache_current_usage, cachedBytes / (double) (1024 * 1024)) :
                         getString(R.string.cache_is_empty));
 
         pref = findPreference(NupPreferences.SONGS_TO_PRELOAD);
