@@ -233,9 +233,9 @@ public class NupActivity extends Activity
                 mDownloadStatusLabel.setText("");
             } else {
                 mDownloadStatusLabel.setText(
-                    String.format("%.2f of %.1f MB",
-                                  (double) availableBytes / (1024 * 1024),
-                                  (double) totalBytes / (1024 * 1024)));
+                    String.format("%,d of %,d KB",
+                                  Math.round(availableBytes / 1024.0),
+                                  Math.round(totalBytes / 1024.0)));
             }
 
         }
