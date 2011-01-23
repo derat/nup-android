@@ -67,7 +67,7 @@
             android:gravity="right"
             android:text=""
             android:textSize="14dp"
-            android:textColor="@color/download_status_fg"
+            android:textColor="@color/song_download_status_fg"
             />
       </LinearLayout>
     </LinearLayout>
