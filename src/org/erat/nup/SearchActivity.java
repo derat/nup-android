@@ -34,9 +34,11 @@ public class SearchActivity extends Activity
                             implements NupService.ContentsLoadListener {
     private static final String TAG = "SearchActivity";
 
+    // IDs used to identify activities that we start.
     private static final int BROWSE_REQUEST_CODE = 1;
     private static final int RESULTS_REQUEST_CODE = 2;
 
+    // Various parts of our UI.
     private AutoCompleteTextView mArtistEdit, mAlbumEdit;
     private EditText mTitleEdit;
     private CheckBox mShuffleCheckbox, mSubstringCheckbox;
@@ -45,13 +47,16 @@ public class SearchActivity extends Activity
     // Points from (lowercased) artist String to List of String album names.
     private HashMap mAlbumMap = new HashMap();
 
+    // Minimum rating set by |mMinRatingSpinner|.
     private String mMinRating = null;
 
     // Search results received from the server.
     private ArrayList<Song> mSearchResults = new ArrayList<Song>();
 
-    // Pointer to ourself used SearchResultsActivity to get search results.
-    // (Serializing them and passing them in the intent is hella slow.)
+    // Latest search request, if any.
+    private SendSearchRequestTask mSearchRequestTask = null;
+
+    // Pointer to ourself used by SearchResultsActivity to get search results.
     private static SearchActivity mSingleton = null;
 
     @Override
@@ -129,6 +134,8 @@ public class SearchActivity extends Activity
         }
     }
 
+    // Export our latest results for SearchResultsActivity.
+    // (Serializing them and passing them via the intent is hella slow.)
     public static ArrayList<Song> getSearchResults() {
         return mSingleton.mSearchResults;
     }
@@ -153,6 +160,12 @@ public class SearchActivity extends Activity
 
         @Override
         protected void onPostExecute(String response) {
+            // Looks like another request got sent while we were busy.
+            // Give up without doing anything.
+            if (mSearchRequestTask != this)
+                return;
+            mSearchRequestTask = null;
+
             String message;
             if (response == null || response.isEmpty()) {
                 message = "Query failed: " + mError[0];
@@ -196,6 +209,7 @@ public class SearchActivity extends Activity
                 params.add(paramName + "=" + value);
             }
         }
+
         QueryBuilder builder = new QueryBuilder();
         builder.addTextViewParam("artist", mArtistEdit);
         builder.addTextViewParam("title", mTitleEdit);
@@ -204,7 +218,14 @@ public class SearchActivity extends Activity
         builder.addCheckBoxParam("substring", mSubstringCheckbox);
         if (mMinRating != null && !mMinRating.isEmpty())
             builder.addStringParam("minRating", mMinRating);
-        new SendSearchRequestTask().execute("/query", TextUtils.join("&", builder.params));
+
+        // Make a half-hearted attempt to abort the previous request, if there is one.
+        // It's fine if it's already started; it'll abort when the background portion
+        // finishes and onPostExecute() sees that there's a newer task.
+        if (mSearchRequestTask != null)
+            mSearchRequestTask.cancel(false);
+        mSearchRequestTask = new SendSearchRequestTask();
+        mSearchRequestTask.execute("/query", TextUtils.join("&", builder.params));
     }
 
     public void onBrowseButtonClicked(View view) throws IOException {
