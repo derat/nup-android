@@ -3,10 +3,15 @@
   <string name="app_name">nup</string>
 
   <string name="album">Album</string>
+  <string name="albums">Albums</string>
   <string name="append">Append</string>
   <string name="append_all">Append all</string>
   <string name="artist">Artist</string>
+  <string name="artists">Artists</string>
   <string name="browse">Browse</string>
+  <string name="browse_albums">Browse albums</string>
+  <string name="browse_albums_fmt">Browse %s albums</string>
+  <string name="browse_artists">Browse artists</string>
   <string name="cache_is_empty">Cache is empty</string>
   <string name="cache_current_usage">Current usage: %.1f MB</string>
   <string name="cache_size">Cache size</string>

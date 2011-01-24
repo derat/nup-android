@@ -157,8 +157,11 @@ public class NupService extends Service
     // Songs whose covers are currently being fetched.
     private HashSet mSongCoverFetches = new HashSet();
 
-    // List of artists, sorted by decreasing number of albums.
+    // List of artists, sorted alphabetically.
     private List<String> mArtists = new ArrayList<String>();
+
+    // List of artists, sorted by decreasing number of albums.
+    private List<String> mArtistsSortedByNumAlbums = new ArrayList<String>();
 
     // List of albums, sorted alphabetically.
     private List<String> mAlbums = new ArrayList<String>();
@@ -253,6 +256,7 @@ public class NupService extends Service
     }
     public int getCurrentSongLastPositionMs() { return mCurrentSongLastPositionMs; }
     public List<String> getArtists() { return mArtists; }
+    public List<String> getArtistsSortedByNumAlbums() { return mArtistsSortedByNumAlbums; }
     public List<String> getAlbumsByArtist(String artist) { return (List<String>) mAlbumMap.get(artist.toLowerCase()); }
     public List<String> getAllAlbums() { return mAlbums; }
 
@@ -589,6 +593,7 @@ public class NupService extends Service
             try {
                 JSONObject jsonArtistMap = (JSONObject) new JSONTokener(response).nextValue();
                 mArtists.clear();
+                mArtistsSortedByNumAlbums.clear();
                 mAlbums.clear();
                 mAlbumMap.clear();
                 HashSet albumsSet = new HashSet();
@@ -605,8 +610,10 @@ public class NupService extends Service
                     mAlbumMap.put(artist.toLowerCase(), albums);
                 }
 
-                // Sort the artist list by number of albums.
-                Collections.sort(mArtists, new Comparator<String>() {
+                Collections.sort(mArtists);
+
+                mArtistsSortedByNumAlbums.addAll(mArtists);
+                Collections.sort(mArtistsSortedByNumAlbums, new Comparator<String>() {
                     @Override
                     public int compare(String a, String b) {
                         int aNum = ((List<String>) mAlbumMap.get(a.toLowerCase())).size();

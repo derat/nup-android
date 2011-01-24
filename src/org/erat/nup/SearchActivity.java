@@ -120,12 +120,32 @@ public class SearchActivity extends Activity
         mSingleton = null;
     }
 
+    private void resetForm() {
+        mArtistEdit.setText("");
+        mAlbumEdit.setText("");
+        mTitleEdit.setText("");
+        mShuffleCheckbox.setChecked(false);
+        mSubstringCheckbox.setChecked(false);
+        // TODO: Reset min rating spinner.
+    }
+
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == BROWSE_REQUEST_CODE) {
             if (resultCode == RESULT_OK) {
-                mArtistEdit.setText(data.getStringExtra(BrowseActivity.BUNDLE_ARTIST));
-                mAlbumEdit.setText(data.getStringExtra(BrowseActivity.BUNDLE_ALBUM));
+                resetForm();
+
+                String artist = data.getStringExtra(BrowseActivity.BUNDLE_ARTIST);
+                if (artist != null)
+                    mArtistEdit.setText(artist);
+
+                String album = data.getStringExtra(BrowseActivity.BUNDLE_ALBUM);
+                if (album != null)
+                    mAlbumEdit.setText(album);
+
+                // At least one of these should always be set, but whatever...
+                if (artist != null || album != null)
+                    sendQuery();
             }
         } else if (requestCode == RESULTS_REQUEST_CODE) {
             mSearchResults.clear();
@@ -140,7 +160,62 @@ public class SearchActivity extends Activity
         return mSingleton.mSearchResults;
     }
 
-    class SendSearchRequestTask extends AsyncTask<String, Void, String> {
+    public void onSearchButtonClicked(View view) {
+        sendQuery();
+    }
+
+    public void onBrowseButtonClicked(View view) {
+        startActivityForResult(new Intent(this, BrowseActivity.class), BROWSE_REQUEST_CODE);
+    }
+
+    // Implements NupService.ContentsLoadListener.
+    @Override
+    public void onContentsLoad() {
+        final List<String> artists = NupActivity.getService().getArtistsSortedByNumAlbums();
+        if (artists != null)
+            mArtistEdit.setAdapter(new ArrayAdapter<String>(SearchActivity.this, android.R.layout.simple_dropdown_item_1line, artists));
+    }
+
+    private void sendQuery() {
+        class QueryBuilder {
+            public List<String> params = new ArrayList<String>();
+            public void addTextViewParam(String paramName, TextView view) {
+                String value = view.getText().toString().trim();
+                if (!value.isEmpty()) {
+                    try {
+                        String param = paramName + "=" + URLEncoder.encode(value, "UTF-8");
+                        params.add(param);
+                    } catch (java.io.UnsupportedEncodingException e) {
+                    }
+                }
+            }
+            public void addCheckBoxParam(String paramName, CheckBox view) {
+                params.add(paramName + "=" + (view.isChecked() ? "1" : "0"));
+            }
+            public void addStringParam(String paramName, String value) {
+                params.add(paramName + "=" + value);
+            }
+        }
+
+        QueryBuilder builder = new QueryBuilder();
+        builder.addTextViewParam("artist", mArtistEdit);
+        builder.addTextViewParam("title", mTitleEdit);
+        builder.addTextViewParam("album", mAlbumEdit);
+        builder.addCheckBoxParam("shuffle", mShuffleCheckbox);
+        builder.addCheckBoxParam("substring", mSubstringCheckbox);
+        if (mMinRating != null && !mMinRating.isEmpty())
+            builder.addStringParam("minRating", mMinRating);
+
+        // Make a half-hearted attempt to abort the previous request, if there is one.
+        // It's fine if it's already started; it'll abort when the background portion
+        // finishes and onPostExecute() sees that there's a newer task.
+        if (mSearchRequestTask != null)
+            mSearchRequestTask.cancel(false);
+        mSearchRequestTask = new SendSearchRequestTask();
+        mSearchRequestTask.execute("/query", TextUtils.join("&", builder.params));
+    }
+
+    private class SendSearchRequestTask extends AsyncTask<String, Void, String> {
         // User-friendly description of the error, if any.
         private String[] mError = new String[1];
 
@@ -190,53 +265,5 @@ public class SearchActivity extends Activity
             mToast.setDuration(Toast.LENGTH_SHORT);
             mToast.show();
         }
-    }
-
-    public void onSearchButtonClicked(View view) throws IOException {
-        class QueryBuilder {
-            public List<String> params = new ArrayList<String>();
-            public void addTextViewParam(String paramName, TextView view) throws java.io.UnsupportedEncodingException {
-                String value = view.getText().toString().trim();
-                if (!value.isEmpty()) {
-                    String param = paramName + "=" + URLEncoder.encode(value, "UTF-8");
-                    params.add(param);
-                }
-            }
-            public void addCheckBoxParam(String paramName, CheckBox view) {
-                params.add(paramName + "=" + (view.isChecked() ? "1" : "0"));
-            }
-            public void addStringParam(String paramName, String value) {
-                params.add(paramName + "=" + value);
-            }
-        }
-
-        QueryBuilder builder = new QueryBuilder();
-        builder.addTextViewParam("artist", mArtistEdit);
-        builder.addTextViewParam("title", mTitleEdit);
-        builder.addTextViewParam("album", mAlbumEdit);
-        builder.addCheckBoxParam("shuffle", mShuffleCheckbox);
-        builder.addCheckBoxParam("substring", mSubstringCheckbox);
-        if (mMinRating != null && !mMinRating.isEmpty())
-            builder.addStringParam("minRating", mMinRating);
-
-        // Make a half-hearted attempt to abort the previous request, if there is one.
-        // It's fine if it's already started; it'll abort when the background portion
-        // finishes and onPostExecute() sees that there's a newer task.
-        if (mSearchRequestTask != null)
-            mSearchRequestTask.cancel(false);
-        mSearchRequestTask = new SendSearchRequestTask();
-        mSearchRequestTask.execute("/query", TextUtils.join("&", builder.params));
-    }
-
-    public void onBrowseButtonClicked(View view) throws IOException {
-        startActivityForResult(new Intent(this, BrowseActivity.class), BROWSE_REQUEST_CODE);
-    }
-
-    // Implements NupService.ContentsLoadListener.
-    @Override
-    public void onContentsLoad() {
-        final List<String> artists = NupActivity.getService().getArtists();
-        if (artists != null)
-            mArtistEdit.setAdapter(new ArrayAdapter<String>(SearchActivity.this, android.R.layout.simple_dropdown_item_1line, artists));
     }
 }

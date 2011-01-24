@@ -3,100 +3,56 @@
 
 package org.erat.nup;
 
-import android.app.Activity;
+import android.app.ListActivity;
 import android.content.Intent;
 import android.os.Bundle;
-import android.util.Log;
 import android.view.View;
-import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
+import android.widget.ListAdapter;
 import android.widget.ListView;
-import android.widget.SimpleAdapter;
-import android.widget.TextView;
 import android.widget.Toast;
 
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.List;
-
-public class BrowseActivity extends Activity {
-    private static final String TAG = "BrowseActivity";
-
+public class BrowseActivity extends ListActivity {
     public static final String BUNDLE_ARTIST = "artist";
     public static final String BUNDLE_ALBUM = "album";
 
+    private static final int BROWSE_ARTISTS_REQUEST_CODE = 1;
+    private static final int BROWSE_ALBUMS_REQUEST_CODE = 2;
+
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        Log.d(TAG, "activity created");
         super.onCreate(savedInstanceState);
         setTitle(R.string.browse);
-        setContentView(R.layout.browse);
 
-        List<String> artists = NupActivity.getService().getArtists();
-        if (artists == null) {
+        if (NupActivity.getService().getArtists() == null) {
             Toast.makeText(this, "Server contents not loaded.", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
 
-        final String artistKey = "artist", albumKey = "album";
-        List<HashMap<String, String>> data = new ArrayList<HashMap<String, String>>();
-        for (String artist : artists) {
-            List<String> albums = NupActivity.getService().getAlbumsByArtist(artist);
-            if (albums == null)
-                continue;
-
-            for (String album : albums) {
-                HashMap<String, String> map = new HashMap<String, String>();
-                map.put(artistKey, artist);
-                map.put(albumKey, album);
-                data.add(map);
-            }
-        }
-
-        // Sort by (artist, album).
-        Collections.sort(data, new Comparator<HashMap<String, String>>() {
-            @Override
-            public int compare(HashMap<String, String> a, HashMap<String, String> b) {
-                int comparison = a.get(artistKey).compareTo(b.get(artistKey));
-                if (comparison != 0)
-                    return comparison;
-                return a.get(albumKey).compareTo(b.get(albumKey));
-            }
-        });
-
-        SimpleAdapter adapter = new SimpleAdapter(
-            this,
-            data,
-            R.layout.browse_row,
-            new String[]{artistKey, albumKey},
-            new int[]{R.id.artist, R.id.album});
-        ListView view = (ListView) findViewById(R.id.list);
-        view.setAdapter(adapter);
-
-        view.setOnItemLongClickListener(new AdapterView.OnItemLongClickListener() {
-            @Override
-            public boolean onItemLongClick(AdapterView parent, View view, int position, long id) {
-                TextView artistView = (TextView) view.findViewById(R.id.artist);
-                TextView albumView = (TextView) view.findViewById(R.id.album);
-
-                Bundle bundle = new Bundle();
-                bundle.putString(BUNDLE_ARTIST, artistView.getText().toString());
-                bundle.putString(BUNDLE_ALBUM, albumView.getText().toString());
-
-                Intent intent = new Intent();
-                intent.putExtras(bundle);
-                setResult(RESULT_OK, intent);
-                finish();
-                return true;
-            }
-        });
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1);
+        adapter.add(getString(R.string.artists));
+        adapter.add(getString(R.string.albums));
+        setListAdapter(adapter);
     }
 
     @Override
-    protected void onDestroy() {
-        Log.d(TAG, "activity destroyed");
-        super.onDestroy();
+    protected void onListItemClick(ListView listView, View view, int position, long id) {
+        if (position == 0) {
+            startActivityForResult(new Intent(this, BrowseArtistsActivity.class), BROWSE_ARTISTS_REQUEST_CODE);
+        } else if (position == 1) {
+            startActivityForResult(new Intent(this, BrowseAlbumsActivity.class), BROWSE_ALBUMS_REQUEST_CODE);
+        }
+    }
+
+    @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        // Pass the intent back through to SearchActivity.
+        if (resultCode == RESULT_OK &&
+            (requestCode == BROWSE_ARTISTS_REQUEST_CODE ||
+             requestCode == BROWSE_ALBUMS_REQUEST_CODE)) {
+            setResult(RESULT_OK, data);
+            finish();
+        }
     }
 }

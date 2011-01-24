@@ -17,6 +17,8 @@
       </intent-filter>
     </activity>
     <activity android:name=".BrowseActivity" />
+    <activity android:name=".BrowseArtistsActivity" />
+    <activity android:name=".BrowseAlbumsActivity" />
     <activity android:name=".SearchActivity" />
     <activity android:name=".SearchResultsActivity" />
     <activity android:name=".SettingsActivity" />
