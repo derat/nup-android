@@ -164,6 +164,10 @@ public class SearchActivity extends Activity
         sendQuery();
     }
 
+    public void onResetButtonClicked(View view) {
+        resetForm();
+    }
+
     public void onBrowseButtonClicked(View view) {
         startActivityForResult(new Intent(this, BrowseActivity.class), BROWSE_REQUEST_CODE);
     }

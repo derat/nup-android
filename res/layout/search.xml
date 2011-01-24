@@ -1,77 +1,90 @@
 <?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:orientation="vertical"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
     >
-  <TextView
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="@string/artist"
-      />
-  <AutoCompleteTextView
-      android:id="@+id/artist_edit_text"
+  <ScrollView
       android:layout_width="fill_parent"
       android:layout_height="wrap_content"
-      android:singleLine="true"
-      android:completionThreshold="1"
-      />
-  <TextView
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="@string/title"
-      />
-  <EditText
-      android:id="@+id/title_edit_text"
-      android:layout_width="fill_parent"
-      android:layout_height="wrap_content"
-      android:singleLine="true"
-      />
-  <TextView
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:text="@string/album"
-      />
-  <AutoCompleteTextView
-      android:id="@+id/album_edit_text"
-      android:layout_width="fill_parent"
-      android:layout_height="wrap_content"
-      android:singleLine="true"
-      android:completionThreshold="1"
-      />
-
-  <LinearLayout
-      android:orientation="horizontal"
-      android:layout_width="fill_parent"
-      android:layout_height="wrap_content"
+      android:layout_alignParentTop="true"
       >
-    <CheckBox
-        android:id="@+id/substring_checkbox"
-        android:layout_width="wrap_content"
+    <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+        android:orientation="vertical"
+        android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:text="@string/substring"
-        />
-    <CheckBox
-        android:id="@+id/shuffle_checkbox"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:text="@string/shuffle"
-        />
-    <Spinner
-        android:id="@+id/min_rating_spinner"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
-        android:prompt="@string/minimum_rating"
-        />
-  </LinearLayout>
+        >
+      <TextView
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="@string/artist"
+          />
+      <AutoCompleteTextView
+          android:id="@+id/artist_edit_text"
+          android:layout_width="fill_parent"
+          android:layout_height="wrap_content"
+          android:singleLine="true"
+          android:completionThreshold="1"
+          />
+      <TextView
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="@string/title"
+          />
+      <EditText
+          android:id="@+id/title_edit_text"
+          android:layout_width="fill_parent"
+          android:layout_height="wrap_content"
+          android:singleLine="true"
+          />
+      <TextView
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:text="@string/album"
+          />
+      <AutoCompleteTextView
+          android:id="@+id/album_edit_text"
+          android:layout_width="fill_parent"
+          android:layout_height="wrap_content"
+          android:singleLine="true"
+          android:completionThreshold="1"
+          />
+
+      <LinearLayout
+          android:orientation="horizontal"
+          android:layout_width="fill_parent"
+          android:layout_height="wrap_content"
+          >
+        <CheckBox
+            android:id="@+id/substring_checkbox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/substring"
+            />
+        <CheckBox
+            android:id="@+id/shuffle_checkbox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:text="@string/shuffle"
+            />
+        <Spinner
+            android:id="@+id/min_rating_spinner"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:prompt="@string/minimum_rating"
+            />
+      </LinearLayout>
+    </LinearLayout>
+  </ScrollView>
 
   <LinearLayout
       android:orientation="horizontal"
       android:layout_width="fill_parent"
       android:layout_height="wrap_content"
+      android:layout_alignParentBottom="true"
       >
     <Button
         android:id="@+id/search_button"
@@ -82,6 +95,14 @@
         android:onClick="onSearchButtonClicked"
         />
     <Button
+        android:id="@+id/reset_button"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_weight="1"
+        android:text="@string/reset"
+        android:onClick="onResetButtonClicked"
+        />
+    <Button
         android:id="@+id/browse_button"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
@@ -90,4 +111,4 @@
         android:onClick="onBrowseButtonClicked"
         />
   </LinearLayout>
-</LinearLayout>
+</RelativeLayout>
