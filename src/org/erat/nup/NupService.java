@@ -141,6 +141,9 @@ public class NupService extends Service
     // Is playback currently paused?
     private boolean mPaused = false;
 
+    // Are we done playing the current song?
+    private boolean mPlaybackComplete = false;
+
     // Have we reported the fact that we've played the current song?
     private boolean mReportedCurrentSong = false;
 
@@ -347,10 +350,11 @@ public class NupService extends Service
 
     public void addSongsToPlaylist(List<Song> songs, boolean play) {
         if (mCurrentSongIndex < 0) {
+            // This should play automatically.
             insertSongs(songs, 0);
         } else {
-            insertSongs(songs, mCurrentSongIndex + 1);
-            if (play)
+            boolean alreadyPlayed = insertSongs(songs, mCurrentSongIndex + 1);
+            if (play && !alreadyPlayed)
                 playSongAtIndex(mCurrentSongIndex + 1);
         }
     }
@@ -397,6 +401,7 @@ public class NupService extends Service
         mCurrentSongLastPositionMs = 0;
         mCurrentSongPlayedMs = 0;
         mReportedCurrentSong = false;
+        mPlaybackComplete = false;
 
         mCache.clearPinnedIds();
 
@@ -637,7 +642,9 @@ public class NupService extends Service
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                playSongAtIndex(mCurrentSongIndex + 1);
+                mPlaybackComplete = true;
+                if (mCurrentSongIndex < mSongs.size() - 1)
+                    playSongAtIndex(mCurrentSongIndex + 1);
             }
         });
     }
@@ -799,11 +806,12 @@ public class NupService extends Service
     }
 
     // Insert a list of songs into the playlist at a particular position.
-    // Plays the first one, if no song is already playing.
-    private void insertSongs(List<Song> songs, int index) {
+    // Plays the first one, if no song is already playing or if we were previously at the end of the
+    // playlist and we've appended to it.  Returns true if we started playing.
+    private boolean insertSongs(List<Song> songs, int index) {
         if (index < 0 || index > mSongs.size()) {
             Log.e(TAG, "ignoring request to insert " + songs.size() + " song(s) at index " + index);
-            return;
+            return false;
         }
 
         // Songs that we didn't already have.  We track these so we can check
@@ -843,11 +851,21 @@ public class NupService extends Service
             }
         }
 
+        boolean played = false;
         if (mCurrentSongIndex == -1) {
+            // If we didn't have any songs, then start playing the first one we added.
             playSongAtIndex(0);
+            played = true;
+        } else if (mCurrentSongIndex < mSongs.size() - 1 && mPlaybackComplete) {
+            // If we were previously done playing (because we reached the end of the playlist),
+            // then start playing the first song we added.
+            playSongAtIndex(mCurrentSongIndex + 1);
+            played = true;
         } else if (mDownloadId == -1) {
+            // Otherwise, consider downloading the new songs if we're not already downloading something.
             maybeDownloadAnotherSong(index);
         }
+        return played;
     }
 
     // Do we have enough of a song downloaded at a fast enough rate that we'll probably

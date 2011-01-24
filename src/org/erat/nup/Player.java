@@ -42,6 +42,7 @@ class Player implements Runnable,
     // Is |mMediaPlayer| prepared?
     private boolean mPrepared = false;
 
+    // Is playback paused?
     private boolean mPaused = false;
 
     // Path currently being played.
@@ -179,6 +180,12 @@ class Player implements Runnable,
                 mPrepared = true;
                 mMediaPlayer.start();
                 startPositionTimer();
+
+                if (mPaused) {
+                    mPaused = false;
+                    if (mListener != null)
+                        mListener.onPauseStateChange(mPaused);
+                }
             }
         });
     }
