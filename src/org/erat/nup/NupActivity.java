@@ -48,7 +48,7 @@ public class NupActivity extends Activity
     private static NupService mService;
 
     // UI components that we update dynamically.
-    private Button mPauseButton;
+    private Button mPauseButton, mPrevButton, mNextButton;
     private ImageView mAlbumImageView;
     private TextView mArtistLabel, mTitleLabel, mAlbumLabel, mTimeLabel, mDownloadStatusLabel;
     private ListView mPlaylistView;
@@ -86,6 +86,8 @@ public class NupActivity extends Activity
         setContentView(R.layout.main);
 
         mPauseButton = (Button) findViewById(R.id.pause_button);
+        mPrevButton = (Button) findViewById(R.id.prev_button);
+        mNextButton = (Button) findViewById(R.id.next_button);
         mAlbumImageView = (ImageView) findViewById(R.id.album_image);
         mArtistLabel = (TextView) findViewById(R.id.artist_label);
         mTitleLabel = (TextView) findViewById(R.id.title_label);
@@ -376,6 +378,10 @@ public class NupActivity extends Activity
         mCurrentSongIndex = index;
         updateSongDisplay(getCurrentSong());
         mSongListAdapter.notifyDataSetChanged();
+
+        mPrevButton.setEnabled(mCurrentSongIndex > 0);
+        mNextButton.setEnabled(!mSongs.isEmpty() && mCurrentSongIndex < mSongs.size() - 1);
+        mPauseButton.setEnabled(!mSongs.isEmpty());
     }
 
     private void schedulePlaySongTask(int delayMs) {
