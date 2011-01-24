@@ -24,8 +24,9 @@ public class BrowseArtistsActivity extends ListActivity {
         ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1);
         for (String artist : NupActivity.getService().getArtists())
             adapter.add(artist);
-
         setListAdapter(adapter);
+
+        getListView().setFastScrollEnabled(true);
     }
 
     @Override

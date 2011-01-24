@@ -39,6 +39,8 @@ public class BrowseAlbumsActivity extends ListActivity {
         for (String album : mAlbums)
             adapter.add(album);
         setListAdapter(adapter);
+
+        getListView().setFastScrollEnabled(true);
     }
 
     @Override
