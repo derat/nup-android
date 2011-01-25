@@ -8,6 +8,8 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.os.AsyncTask;
+import android.util.Log;
 
 import org.json.JSONArray;
 import org.json.JSONTokener;
@@ -28,11 +30,14 @@ class SongDatabase {
     private static final String INSERT_LAST_UPDATE_TIME_SQL =
         "INSERT INTO LastUpdateTime " +
         "  (Timestamp, MaxLastModified) " +
-        "  VALUES(0, 0)";
+        "  VALUES(-1, -1)";
 
     private final Context mContext;
 
     private final SQLiteOpenHelper mOpener;
+
+    private int mNumSongs = 0;
+    private Date mLastSyncDate = null;
 
     interface SyncProgressListener {
         void onSyncProgress(int numSongs);
@@ -72,9 +77,21 @@ class SongDatabase {
             }
         };
 
+        // Get some info from the database in a background thread.
+        new AsyncTask<Void, Void, Void>() {
+            @Override
+            protected Void doInBackground(Void... args) {
+                refreshStats();
+                return (Void) null;
+            }
+        }.execute((Void) null);
+
         // Make sure that we have a writable database when we try to do the upgrade.
         mOpener.getWritableDatabase();
     }
+
+    public int getNumSongs() { return mNumSongs; }
+    public Date getLastSyncDate() { return mLastSyncDate; }
 
     public boolean syncWithServer(SyncProgressListener listener, String message[]) {
         SQLiteDatabase db = mOpener.getWritableDatabase();
@@ -102,8 +119,10 @@ class SongDatabase {
         while (true) {
             String response = Download.downloadString(
                 mContext, "/songs", String.format("minSongId=%d&minLastModified=%d", maxSongId + 1, minLastModified), message);
-            if (response == null)
+            if (response == null) {
+                db.endTransaction();
                 return false;
+            }
 
             try {
                 JSONArray jsonSongs = (JSONArray) new JSONTokener(response).nextValue();
@@ -145,7 +164,22 @@ class SongDatabase {
         db.setTransactionSuccessful();
         db.endTransaction();
 
-        message[0] = "Synced " + numSongs + " song" + (numSongs == 1 ? "" : "s") + ".";
+        refreshStats();
+        message[0] = "Synchronization complete.";
         return true;
+    }
+
+    private void refreshStats() {
+        SQLiteDatabase db = mOpener.getReadableDatabase();
+        Cursor cursor = db.rawQuery("SELECT Timestamp FROM LastUpdateTime", null);
+        cursor.moveToFirst();
+        mLastSyncDate = (cursor.getInt(0) > -1) ? new Date((long) cursor.getInt(0) * 1000) : null;
+        cursor.close();
+
+        cursor = db.rawQuery("SELECT COUNT(*) FROM Songs", null);
+        cursor.moveToFirst();
+        mNumSongs = cursor.getInt(0);
+        Log.d(TAG, "got " + mNumSongs + " songs");
+        cursor.close();
     }
 }

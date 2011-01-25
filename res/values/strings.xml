@@ -28,6 +28,7 @@
   <string name="insert_all">Insert all</string>
   <string name="minimum_rating">Minimum rating</string>
   <string name="next">Next</string>
+  <string name="never_synced">Never synced</string>
   <string name="password">Password</string>
   <string name="pause">Pause</string>
   <string name="play">Play</string>
@@ -48,7 +49,7 @@
   <string name="startup_notification_message">Service is running.</string>
   <string name="startup_notification_name">nup</string>
   <string name="sync_song_list">Sync song list</string>
-  <string name="sync_song_list_message">Sync the server\'s song list?  This may take a while on a slow connection.</string>
+  <string name="sync_song_list_message">Sync the server\'s song list?\n\nNOTE: Don\'t make changes to the server\'s database while syncing.</string>
   <string name="substring">Substring</string>
   <string name="title">Title</string>
   <string name="unlimited">Unlimited</string>

@@ -31,6 +31,9 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
         pref.setOnPreferenceChangeListener(this);
         pref.setSummary(mPrefs.getString(NupPreferences.USERNAME, ""));
 
+        pref = findPreference(NupPreferences.SYNC_SONG_LIST);
+        ((YesNoPreference) pref).updateSyncMessage();
+
         pref = findPreference(NupPreferences.CACHE_SIZE);
         pref.setOnPreferenceChangeListener(this);
         int maxCacheMb = Integer.valueOf(

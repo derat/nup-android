@@ -24,7 +24,7 @@
         android:title="@string/sync_song_list"
         android:dialogMessage="@string/sync_song_list_message"
         android:dialogTitle="@string/sync_song_list"
-        android:dialogIcon="@android:drawable/ic_dialog_info"
+        android:dialogIcon="@android:drawable/ic_dialog_alert"
         />
   </PreferenceCategory>
 

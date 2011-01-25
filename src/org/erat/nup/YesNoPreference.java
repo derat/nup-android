@@ -11,6 +11,10 @@ import android.preference.DialogPreference;
 import android.util.AttributeSet;
 import android.widget.Toast;
 
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+
 class YesNoPreference extends DialogPreference {
     Context mContext;
 
@@ -36,10 +40,33 @@ class YesNoPreference extends DialogPreference {
         }
     }
 
+    public void updateSyncMessage() {
+        SongDatabase db = NupActivity.getService().getSongDb();
+        if (db.getLastSyncDate() == null) {
+            setSummary(mContext.getString(R.string.never_synced));
+        } else {
+            Calendar lastSyncCal = Calendar.getInstance(), todayCal = Calendar.getInstance();
+            lastSyncCal.setTime(db.getLastSyncDate());
+            todayCal.setTime(new Date());
+            boolean lastSyncWasToday =
+                lastSyncCal.get(Calendar.YEAR) == todayCal.get(Calendar.YEAR) &&
+                lastSyncCal.get(Calendar.MONTH) == todayCal.get(Calendar.MONTH) &&
+                lastSyncCal.get(Calendar.DAY_OF_MONTH) == todayCal.get(Calendar.DAY_OF_MONTH);
+            setSummary(
+                mContext.getResources().getQuantityString(
+                    R.plurals.sync_status_fmt,
+                    db.getNumSongs(),
+                    db.getNumSongs(),
+                    lastSyncWasToday ?
+                        SimpleDateFormat.getTimeInstance().format(db.getLastSyncDate()) :
+                        SimpleDateFormat.getDateInstance().format(db.getLastSyncDate())));
+        }
+    }
+
     private class SyncSongListTask extends AsyncTask<Void, Integer, String>
                                    implements DialogInterface.OnCancelListener,
                                               SongDatabase.SyncProgressListener {
-        private static final String MESSAGE_FMT = "Synced %d songs.";
+        private static final String MESSAGE_FMT = "Downloaded %d songs.";
 
         private ProgressDialog mDialog;
 
@@ -70,6 +97,7 @@ class YesNoPreference extends DialogPreference {
         @Override
         protected void onPostExecute(String message) {
             mDialog.dismiss();
+            updateSyncMessage();
             Toast.makeText(mContext, message, Toast.LENGTH_LONG).show();
         }
 
