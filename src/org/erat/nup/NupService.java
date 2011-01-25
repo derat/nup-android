@@ -102,6 +102,9 @@ public class NupService extends Service
     private FileCache mCache;
     private Thread mCacheThread;
 
+    // Stores a local listing of all of the songs on the server.
+    private SongDatabase mSongDb;
+
     // Points from int song ID to Song.
     // This is the canonical set of songs that we know about.
     private HashMap mSongIdToSong = new HashMap();
@@ -212,6 +215,8 @@ public class NupService extends Service
 
         // TODO: Refetch after server prefs are changed or on failure.
         new GetContentsTask().execute();
+
+        mSongDb = new SongDatabase(this);
 
         mPlayer = new Player(this);
         mPlayerThread = new Thread(mPlayer, "Player");
