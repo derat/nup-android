@@ -335,8 +335,7 @@ class FileCache implements Runnable {
                 return;
             }
 
-            handleFailure("Giving up after " + MAX_DOWNLOAD_ATTEMPTS + " attempt" +
-                          (MAX_DOWNLOAD_ATTEMPTS == 1 ? "" : "s") + " without progress");
+            handleFailure("Giving up after " + MAX_DOWNLOAD_ATTEMPTS + " attempts without progress");
         }
 
         private void handleError(String reason) {

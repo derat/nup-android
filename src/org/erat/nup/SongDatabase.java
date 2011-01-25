@@ -36,6 +36,7 @@ class SongDatabase {
 
     private final SQLiteOpenHelper mOpener;
 
+    private boolean mSummariesLoaded = false;
     private int mNumSongs = 0;
     private Date mLastSyncDate = null;
 
@@ -78,10 +79,12 @@ class SongDatabase {
         };
 
         // Get some info from the database in a background thread.
+        // FIXME: I think that this sometimes isn't finishing until after we've
+        // already displayed SettingsActivity (which is surprising).
         new AsyncTask<Void, Void, Void>() {
             @Override
             protected Void doInBackground(Void... args) {
-                refreshStats();
+                refreshSummaries();
                 return (Void) null;
             }
         }.execute((Void) null);
@@ -90,6 +93,7 @@ class SongDatabase {
         mOpener.getWritableDatabase();
     }
 
+    public boolean getSummariesLoaded() { return mSummariesLoaded; }
     public int getNumSongs() { return mNumSongs; }
     public Date getLastSyncDate() { return mLastSyncDate; }
 
@@ -164,12 +168,12 @@ class SongDatabase {
         db.setTransactionSuccessful();
         db.endTransaction();
 
-        refreshStats();
+        refreshSummaries();
         message[0] = "Synchronization complete.";
         return true;
     }
 
-    private void refreshStats() {
+    private void refreshSummaries() {
         SQLiteDatabase db = mOpener.getReadableDatabase();
         Cursor cursor = db.rawQuery("SELECT Timestamp FROM LastUpdateTime", null);
         cursor.moveToFirst();
@@ -181,5 +185,7 @@ class SongDatabase {
         mNumSongs = cursor.getInt(0);
         Log.d(TAG, "got " + mNumSongs + " songs");
         cursor.close();
+
+        mSummariesLoaded = true;
     }
 }

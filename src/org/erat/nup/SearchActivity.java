@@ -255,7 +255,8 @@ public class SearchActivity extends Activity
                         mSearchResults.clear();
                         for (int i = 0; i < jsonSongs.length(); ++i)
                             mSearchResults.add(new Song(jsonSongs.getJSONObject(i)));
-                        message = "Got " + mSearchResults.size() + " song" + (mSearchResults.size() == 1 ? "" : "s") + ".";
+                        message = getResources().getQuantityString(
+                            R.plurals.search_got_songs_fmt, mSearchResults.size(), mSearchResults.size());
                         startActivityForResult(new Intent(SearchActivity.this, SearchResultsActivity.class), RESULTS_REQUEST_CODE);
                     } else {
                         message = "No results.";

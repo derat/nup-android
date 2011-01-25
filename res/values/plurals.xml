@@ -4,4 +4,8 @@
     <item quantity="one">%1$d song\nLast sync: %2$s</item>
     <item quantity="other">%1$d songs\nLast sync: %2$s</item>
   </plurals>
+  <plurals name="search_got_songs_fmt">
+    <item quantity="one">Got %d song.</item>
+    <item quantity="other">Got %d songs.</item>
+  </plurals>
 </resources>
