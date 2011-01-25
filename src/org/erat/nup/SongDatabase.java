@@ -19,7 +19,16 @@ import java.util.List;
 class SongDatabase {
     private static final String TAG = "SongDatabase";
     private static final String DATABASE_NAME = "NupSongs";
-    private static final int DATABASE_VERSION = 1;
+    private static final int DATABASE_VERSION = 2;
+
+    private static final String CREATE_LAST_UPDATE_TIME_SQL =
+        "CREATE TABLE LastUpdateTime (" +
+        "  Timestamp INTEGER NOT NULL, " +
+        "  MaxLastModified INTEGER NOT NULL)";
+    private static final String INSERT_LAST_UPDATE_TIME_SQL =
+        "INSERT INTO LastUpdateTime " +
+        "  (Timestamp, MaxLastModified) " +
+        "  VALUES(0, 0)";
 
     private final Context mContext;
 
@@ -46,12 +55,20 @@ class SongDatabase {
                     "  Length INTEGER NOT NULL, " +
                     "  Rating FLOAT NOT NULL, " +
                     "  LastModified INTEGER NOT NULL)");
+                db.execSQL(CREATE_LAST_UPDATE_TIME_SQL);
+                db.execSQL(INSERT_LAST_UPDATE_TIME_SQL);
             }
 
             @Override
             public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-                throw new RuntimeException(
-                    "Got request to upgrade database from " + oldVersion + " to " + newVersion);
+                if (oldVersion == 1 && newVersion == 2) {
+                    // Create LastUpdateTime table.
+                    db.execSQL(CREATE_LAST_UPDATE_TIME_SQL);
+                    db.execSQL(INSERT_LAST_UPDATE_TIME_SQL);
+                } else {
+                    throw new RuntimeException(
+                        "Got request to upgrade database from " + oldVersion + " to " + newVersion);
+                }
             }
         };
 
@@ -63,9 +80,28 @@ class SongDatabase {
         SQLiteDatabase db = mOpener.getWritableDatabase();
         db.beginTransaction();
 
-        int minSongId = 0, numSongs = 0;
+        Cursor cursor = db.rawQuery("SELECT MaxLastModified FROM LastUpdateTime", null);
+        cursor.moveToFirst();
+        int maxLastModified = cursor.getInt(0);
+        cursor.close();
+
+        // The server breaks its results up into batches instead of sending us a bunch of songs
+        // at once, so we store the highest song ID that we've seen here so we'll know where to
+        // start in the next request.
+        int maxSongId = 0;
+
+        // FIXME: This is completely braindead:
+        // - If an update, our previous sync, and a second update all happen in the same second
+        //   and in that order, then we'll miss the second update the next time we sync.
+        // - If an update happens to a song with an ID that we've already gone past while we're
+        //   in the middle of an update and then a second update happens to a song with a later
+        //   ID, we'll miss the earlier song.
+        int minLastModified = maxLastModified + 1;
+
+        int numSongs = 0;
         while (true) {
-            String response = Download.downloadString(mContext, "/songs", "minSongId=" + minSongId, message);
+            String response = Download.downloadString(
+                mContext, "/songs", String.format("minSongId=%d&minLastModified=%d", maxSongId + 1, minLastModified), message);
             if (response == null)
                 return false;
 
@@ -88,8 +124,10 @@ class SongDatabase {
                     values.put("Rating", jsonSong.getDouble(8));
                     values.put("LastModified", jsonSong.getInt(9));
                     db.replace("Songs", "", values);
+
                     numSongs++;
-                    minSongId = Math.max(minSongId, jsonSong.getInt(0) + 1);
+                    maxSongId = Math.max(maxSongId, jsonSong.getInt(0));
+                    maxLastModified = Math.max(maxLastModified, jsonSong.getInt(9));
                 }
                 listener.onSyncProgress(numSongs);
             } catch (org.json.JSONException e) {
@@ -98,6 +136,12 @@ class SongDatabase {
                 return false;
             }
         }
+
+        ContentValues values = new ContentValues(2);
+        values.put("Timestamp", new Date().getTime() / 1000);
+        values.put("MaxLastModified", maxLastModified);
+        db.update("LastUpdateTime", values, null, null);
+
         db.setTransactionSuccessful();
         db.endTransaction();
 
