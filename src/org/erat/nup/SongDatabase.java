@@ -3,6 +3,7 @@
 
 package org.erat.nup;
 
+import android.content.ContentValues;
 import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
@@ -60,6 +61,7 @@ class SongDatabase {
 
     public boolean syncWithServer(SyncProgressListener listener, String message[]) {
         SQLiteDatabase db = mOpener.getWritableDatabase();
+        db.beginTransaction();
 
         int minSongId = 0, numSongs = 0;
         while (true) {
@@ -74,30 +76,30 @@ class SongDatabase {
 
                 for (int i = 0; i < jsonSongs.length(); ++i) {
                     JSONArray jsonSong = jsonSongs.getJSONArray(i);
-                    db.execSQL(
-                        "REPLACE INTO Songs " +
-                        "(SongId, Sha1, Filename, Artist, Title, Album, TrackNumber, Length, Rating, LastModified) " +
-                        "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                        new Object[]{
-                            jsonSong.getInt(0),     // SongId
-                            jsonSong.getString(1),  // Sha1
-                            jsonSong.getString(2),  // Filename
-                            jsonSong.getString(3),  // Artist
-                            jsonSong.getString(4),  // Title
-                            jsonSong.getString(5),  // Album
-                            jsonSong.getInt(6),     // TrackNumber
-                            jsonSong.getInt(7),     // Length
-                            jsonSong.getDouble(8),  // Rating
-                            jsonSong.getInt(9)});   // LastModified
+                    ContentValues values = new ContentValues(10);
+                    values.put("SongId", jsonSong.getInt(0));
+                    values.put("Sha1", jsonSong.getString(1));
+                    values.put("Filename", jsonSong.getString(2));
+                    values.put("Artist", jsonSong.getString(3));
+                    values.put("Title", jsonSong.getString(4));
+                    values.put("Album", jsonSong.getString(5));
+                    values.put("TrackNumber", jsonSong.getInt(6));
+                    values.put("Length", jsonSong.getInt(7));
+                    values.put("Rating", jsonSong.getDouble(8));
+                    values.put("LastModified", jsonSong.getInt(9));
+                    db.replace("Songs", "", values);
                     numSongs++;
                     minSongId = Math.max(minSongId, jsonSong.getInt(0) + 1);
                 }
                 listener.onSyncProgress(numSongs);
             } catch (org.json.JSONException e) {
+                db.endTransaction();
                 message[0] = "Couldn't parse response: " + e;
                 return false;
             }
         }
+        db.setTransactionSuccessful();
+        db.endTransaction();
 
         message[0] = "Synced " + numSongs + " song" + (numSongs == 1 ? "" : "s") + ".";
         return true;
