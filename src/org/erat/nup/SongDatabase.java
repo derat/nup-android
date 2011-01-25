@@ -24,6 +24,10 @@ class SongDatabase {
 
     private final SQLiteOpenHelper mOpener;
 
+    interface SyncProgressListener {
+        void onSyncProgress(int numSongs);
+    }
+
     public SongDatabase(Context context) {
         mContext = context;
         mOpener = new SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
@@ -54,7 +58,7 @@ class SongDatabase {
         mOpener.getWritableDatabase();
     }
 
-    public boolean syncDatabase(String message[]) {
+    public boolean syncWithServer(SyncProgressListener listener, String message[]) {
         SQLiteDatabase db = mOpener.getWritableDatabase();
 
         int minSongId = 0, numSongs = 0;
@@ -71,7 +75,7 @@ class SongDatabase {
                 for (int i = 0; i < jsonSongs.length(); ++i) {
                     JSONArray jsonSong = jsonSongs.getJSONArray(i);
                     db.execSQL(
-                        "INSERT INTO Songs " +
+                        "REPLACE INTO Songs " +
                         "(SongId, Sha1, Filename, Artist, Title, Album, TrackNumber, Length, Rating, LastModified) " +
                         "VALUES(?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                         new Object[]{
@@ -88,13 +92,14 @@ class SongDatabase {
                     numSongs++;
                     minSongId = Math.max(minSongId, jsonSong.getInt(0) + 1);
                 }
+                listener.onSyncProgress(numSongs);
             } catch (org.json.JSONException e) {
-                message[0] = "Unable to parse response: " + e;
+                message[0] = "Couldn't parse response: " + e;
                 return false;
             }
         }
 
-        message[0] = "Got " + numSongs + " song" + (numSongs == 1 ? "" : "s");
+        message[0] = "Synced " + numSongs + " song" + (numSongs == 1 ? "" : "s") + ".";
         return true;
     }
 }

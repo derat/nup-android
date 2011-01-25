@@ -264,6 +264,7 @@ public class NupService extends Service
     public List<String> getArtistsSortedByNumAlbums() { return mArtistsSortedByNumAlbums; }
     public List<String> getAlbumsByArtist(String artist) { return (List<String>) mAlbumMap.get(artist.toLowerCase()); }
     public List<String> getAllAlbums() { return mAlbums; }
+    public SongDatabase getSongDb() { return mSongDb; }
 
     public void setSongListener(SongListener listener) {
         mSongListener = listener;
