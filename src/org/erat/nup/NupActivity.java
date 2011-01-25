@@ -327,8 +327,10 @@ public class NupActivity extends Activity
 
             TextView percentView = (TextView) view.findViewById(R.id.percent);
             if (song.getTotalBytes() > 0) {
-                final int percent = (int) Math.round(100.0 * song.getAvailableBytes() / song.getTotalBytes());
-                percentView.setText(percent + "%");
+                if (song.getAvailableBytes() == song.getTotalBytes())
+                    percentView.setText("\u2713");  // CHECK MARK from Dingbats
+                else
+                    percentView.setText((int) Math.round(100.0 * song.getAvailableBytes() / song.getTotalBytes()) + "%");
                 percentView.setVisibility(View.VISIBLE);
             } else {
                 percentView.setVisibility(View.GONE);
