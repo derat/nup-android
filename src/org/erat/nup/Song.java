@@ -22,6 +22,18 @@ class Song implements Serializable {
     // 0 if the song doesn't have a cache entry.
     private long mTotalBytes = 0;
 
+    public Song(String artist, String title, String album, String filename,
+                String coverFilename, int lengthSec, int songId, double rating) {
+        mArtist = artist;
+        mTitle = title;
+        mAlbum = album;
+        mFilename = filename;
+        mCoverFilename = coverFilename;
+        mLengthSec = lengthSec;
+        mSongId = songId;
+        mRating = rating;
+    }
+
     public Song(JSONObject json) throws org.json.JSONException {
         mArtist = !json.isNull("artist") ? json.getString("artist") : "";
         mTitle = !json.isNull("title") ? json.getString("title") : "";

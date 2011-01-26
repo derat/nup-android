@@ -9,6 +9,7 @@ import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.os.AsyncTask;
+import android.text.TextUtils;
 import android.util.Log;
 
 import org.json.JSONArray;
@@ -22,6 +23,8 @@ class SongDatabase {
     private static final String TAG = "SongDatabase";
     private static final String DATABASE_NAME = "NupSongs";
     private static final int DATABASE_VERSION = 3;
+
+    private static final String MAX_QUERY_RESULTS = "250";
 
     private static final String CREATE_LAST_UPDATE_TIME_SQL =
         "CREATE TABLE LastUpdateTime (" +
@@ -112,6 +115,48 @@ class SongDatabase {
     public boolean getSummariesLoaded() { return mSummariesLoaded; }
     public int getNumSongs() { return mNumSongs; }
     public Date getLastSyncDate() { return mLastSyncDate; }
+
+    public List<Song> query(String artist, String title, String album, String minRating, boolean shuffle, boolean substring) {
+        class QueryBuilder {
+            public List<String> selections = new ArrayList<String>();
+            public List<String> selectionArgs = new ArrayList<String>();
+
+            public void add(String selection, String selectionArg, boolean useLike) {
+                if (selectionArg == null || selectionArg == "")
+                    return;
+                selections.add(selection + (useLike ? " LIKE ?" : " = ?"));
+                selectionArgs.add(selectionArg);
+            }
+        }
+        QueryBuilder builder = new QueryBuilder();
+        builder.add("Artist", artist, substring);
+        builder.add("Title", title, substring);
+        builder.add("Album", album, substring);
+        builder.add("MinRating", minRating, false);
+        builder.add("Deleted", "0", false);
+
+        Cursor cursor = mOpener.getReadableDatabase().query(
+            "Songs",
+            TextUtils.split("Artist Title Album Filename Length SongId Rating", " "),
+            TextUtils.join(" AND ", builder.selections),
+            builder.selectionArgs.toArray(new String[]{}),
+            null,  // groupBy
+            null,  // having
+            shuffle ? "RANDOM()" : "Album ASC, TrackNumber ASC",  // orderBy
+            MAX_QUERY_RESULTS);  // limit
+
+        List<Song> songs = new ArrayList<Song>();
+        cursor.moveToFirst();
+        while (!cursor.isAfterLast()) {
+            Song song = new Song(
+                cursor.getString(0), cursor.getString(1), cursor.getString(2), cursor.getString(3),
+                "", cursor.getInt(4), cursor.getInt(5), cursor.getFloat(6));
+            songs.add(song);
+            cursor.moveToNext();
+        }
+        cursor.close();
+        return songs;
+    }
 
     public boolean syncWithServer(SyncProgressListener listener, String message[]) {
         SQLiteDatabase db = mOpener.getWritableDatabase();
