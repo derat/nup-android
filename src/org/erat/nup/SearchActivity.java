@@ -51,10 +51,10 @@ public class SearchActivity extends Activity
     private String mMinRating = null;
 
     // Search results received from the server.
-    private ArrayList<Song> mSearchResults = new ArrayList<Song>();
+    private List<Song> mSearchResults = new ArrayList<Song>();
 
     // Latest search request, if any.
-    private SendSearchRequestTask mSearchRequestTask = null;
+    private QueryTask mQueryTask = null;
 
     // Pointer to ourself used by SearchResultsActivity to get search results.
     private static SearchActivity mSingleton = null;
@@ -156,7 +156,7 @@ public class SearchActivity extends Activity
 
     // Export our latest results for SearchResultsActivity.
     // (Serializing them and passing them via the intent is hella slow.)
-    public static ArrayList<Song> getSearchResults() {
+    public static List<Song> getSearchResults() {
         return mSingleton.mSearchResults;
     }
 
@@ -181,89 +181,61 @@ public class SearchActivity extends Activity
     }
 
     private void sendQuery() {
-        class QueryBuilder {
-            public List<String> params = new ArrayList<String>();
-            public void addTextViewParam(String paramName, TextView view) {
-                String value = view.getText().toString().trim();
-                if (!value.isEmpty()) {
-                    try {
-                        String param = paramName + "=" + URLEncoder.encode(value, "UTF-8");
-                        params.add(param);
-                    } catch (java.io.UnsupportedEncodingException e) {
-                    }
-                }
-            }
-            public void addCheckBoxParam(String paramName, CheckBox view) {
-                params.add(paramName + "=" + (view.isChecked() ? "1" : "0"));
-            }
-            public void addStringParam(String paramName, String value) {
-                params.add(paramName + "=" + value);
-            }
-        }
-
-        QueryBuilder builder = new QueryBuilder();
-        builder.addTextViewParam("artist", mArtistEdit);
-        builder.addTextViewParam("title", mTitleEdit);
-        builder.addTextViewParam("album", mAlbumEdit);
-        builder.addCheckBoxParam("shuffle", mShuffleCheckbox);
-        builder.addCheckBoxParam("substring", mSubstringCheckbox);
-        if (mMinRating != null && !mMinRating.isEmpty())
-            builder.addStringParam("minRating", mMinRating);
+        QueryParams params = new QueryParams();
+        params.artist = mArtistEdit.getText().toString().trim();
+        params.title = mTitleEdit.getText().toString().trim();
+        params.album = mAlbumEdit.getText().toString().trim();
+        params.minRating = mMinRating;
+        params.shuffle = mShuffleCheckbox.isChecked();
+        params.substring = mSubstringCheckbox.isChecked();
 
         // Make a half-hearted attempt to abort the previous request, if there is one.
         // It's fine if it's already started; it'll abort when the background portion
         // finishes and onPostExecute() sees that there's a newer task.
-        if (mSearchRequestTask != null)
-            mSearchRequestTask.cancel(false);
-        mSearchRequestTask = new SendSearchRequestTask();
-        mSearchRequestTask.execute("/query", TextUtils.join("&", builder.params));
+        if (mQueryTask != null)
+            mQueryTask.cancel(false);
+        mQueryTask = new QueryTask();
+        mQueryTask.execute(params);
     }
 
-    private class SendSearchRequestTask extends AsyncTask<String, Void, String> {
-        // User-friendly description of the error, if any.
-        private String[] mError = new String[1];
+    private class QueryParams {
+        public String artist, title, album, minRating;
+        boolean shuffle, substring;
+    }
 
+    private class QueryTask extends AsyncTask<QueryParams, Void, List<Song>> {
         // Message that we display onscreen while waiting for the results.
         private Toast mToast;
 
         @Override
         protected void onPreExecute() {
-            mToast = Toast.makeText(SearchActivity.this, "Sending query...", Toast.LENGTH_LONG);
+            mToast = Toast.makeText(SearchActivity.this, "Querying database...", Toast.LENGTH_LONG);
             mToast.show();
         }
 
         @Override
-        protected String doInBackground(String... urls) {
-            return Download.downloadString(SearchActivity.this, urls[0], urls[1], mError);
+        protected List<Song> doInBackground(QueryParams... params) {
+            return NupActivity.getService().getSongDb().query(
+                params[0].artist, params[0].title, params[0].album, params[0].minRating,
+                params[0].shuffle, params[0].substring);
         }
 
         @Override
-        protected void onPostExecute(String response) {
+        protected void onPostExecute(List<Song> songs) {
             // Looks like another request got sent while we were busy.
             // Give up without doing anything.
-            if (mSearchRequestTask != this)
+            if (mQueryTask != this)
                 return;
-            mSearchRequestTask = null;
+            mQueryTask = null;
 
+            mSearchResults = songs;
             String message;
-            if (response == null || response.isEmpty()) {
-                message = "Query failed: " + mError[0];
+            if (!mSearchResults.isEmpty()) {
+                message = getResources().getQuantityString(
+                    R.plurals.search_got_songs_fmt, mSearchResults.size(), mSearchResults.size());
+                startActivityForResult(new Intent(SearchActivity.this, SearchResultsActivity.class), RESULTS_REQUEST_CODE);
             } else {
-                try {
-                    JSONArray jsonSongs = (JSONArray) new JSONTokener(response).nextValue();
-                    if (jsonSongs.length() > 0) {
-                        mSearchResults.clear();
-                        for (int i = 0; i < jsonSongs.length(); ++i)
-                            mSearchResults.add(new Song(jsonSongs.getJSONObject(i)));
-                        message = getResources().getQuantityString(
-                            R.plurals.search_got_songs_fmt, mSearchResults.size(), mSearchResults.size());
-                        startActivityForResult(new Intent(SearchActivity.this, SearchResultsActivity.class), RESULTS_REQUEST_CODE);
-                    } else {
-                        message = "No results.";
-                    }
-                } catch (org.json.JSONException e) {
-                    message = "Unable to parse response: " + e.getCause();
-                }
+                message = "No results.";
             }
 
             mToast.setText(message);

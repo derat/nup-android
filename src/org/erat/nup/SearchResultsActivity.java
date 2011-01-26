@@ -36,7 +36,7 @@ public class SearchResultsActivity extends Activity {
         setTitle(R.string.search_results);
         setContentView(R.layout.search_results);
 
-        ArrayList<Song> songs = SearchActivity.getSearchResults();
+        List<Song> songs = SearchActivity.getSearchResults();
         final String artistKey = "artist", titleKey = "title";
         List<HashMap<String, String>> data = new ArrayList<HashMap<String, String>>();
         for (Song song : songs) {

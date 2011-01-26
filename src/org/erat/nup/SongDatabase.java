@@ -26,6 +26,19 @@ class SongDatabase {
 
     private static final String MAX_QUERY_RESULTS = "250";
 
+    private static final String CREATE_SONGS_SQL =
+        "CREATE TABLE Songs (" +
+        "  SongId INTEGER PRIMARY KEY NOT NULL, " +
+        "  Sha1 CHAR(40) NOT NULL, " +
+        "  Filename VARCHAR(256) NOT NULL, " +
+        "  Artist VARCHAR(256) NOT NULL, " +
+        "  Title VARCHAR(256) NOT NULL, " +
+        "  Album VARCHAR(256) NOT NULL, " +
+        "  TrackNumber INTEGER NOT NULL, " +
+        "  Length INTEGER NOT NULL, " +
+        "  Rating FLOAT NOT NULL, " +
+        "  Deleted BOOLEAN NOT NULL, " +
+        "  LastModified INTEGER NOT NULL)";
     private static final String CREATE_LAST_UPDATE_TIME_SQL =
         "CREATE TABLE LastUpdateTime (" +
         "  Timestamp INTEGER NOT NULL, " +
@@ -52,25 +65,14 @@ class SongDatabase {
         mOpener = new SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
             @Override
             public void onCreate(SQLiteDatabase db) {
-                db.execSQL(
-                    "CREATE TABLE Songs (" +
-                    "  SongId INTEGER PRIMARY KEY NOT NULL, " +
-                    "  Sha1 CHAR(40) NOT NULL, " +
-                    "  Filename VARCHAR(256) NOT NULL, " +
-                    "  Artist VARCHAR(256) NOT NULL, " +
-                    "  Title VARCHAR(256) NOT NULL, " +
-                    "  Album VARCHAR(256) NOT NULL, " +
-                    "  TrackNumber INTEGER NOT NULL, " +
-                    "  Length INTEGER NOT NULL, " +
-                    "  Rating FLOAT NOT NULL, " +
-                    "  Deleted BOOLEAN NOT NULL, " +
-                    "  LastModified INTEGER NOT NULL)");
+                db.execSQL(CREATE_SONGS_SQL);
                 db.execSQL(CREATE_LAST_UPDATE_TIME_SQL);
                 db.execSQL(INSERT_LAST_UPDATE_TIME_SQL);
             }
 
             @Override
             public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+                Log.d(TAG, "onUpgrade: " + oldVersion + " -> " + newVersion);
                 if (newVersion == 2) {
                     // Version 2: Create LastUpdateTime table.
                     if (oldVersion != 1)
@@ -83,11 +85,11 @@ class SongDatabase {
                     if (oldVersion < 2)
                         onUpgrade(db, oldVersion, newVersion - 1);
                     db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp");
-                    onCreate(db);
+                    db.execSQL(CREATE_SONGS_SQL);
                     db.execSQL(
                         "INSERT INTO Songs " +
-                        "SELECT SongId, Sha1, Filename, Artist, Title, Album, TrackNumber, " +
-                        "       Length, Rating, LastModified " +
+                        "SELECT SongId, Sha1, Filename, Artist, Title, Album, " +
+                        "    TrackNumber, Length, Rating, 0, LastModified " +
                         "FROM SongsTmp");
                     db.execSQL("DROP TABLE SongsTmp");
                 } else {
@@ -121,19 +123,23 @@ class SongDatabase {
             public List<String> selections = new ArrayList<String>();
             public List<String> selectionArgs = new ArrayList<String>();
 
-            public void add(String selection, String selectionArg, boolean useLike) {
-                if (selectionArg == null || selectionArg == "")
+            public void add(String selection, String selectionArg, boolean useLike, boolean substring) {
+                addRaw(selection + (useLike ? " LIKE ?" : " = ?"), selectionArg, substring);
+            }
+
+            public void addRaw(String clause, String selectionArg, boolean substring) {
+                if (selectionArg == null || selectionArg.isEmpty())
                     return;
-                selections.add(selection + (useLike ? " LIKE ?" : " = ?"));
-                selectionArgs.add(selectionArg);
+                selections.add(clause);
+                selectionArgs.add(substring ? "%" + selectionArg + "%" : selectionArg);
             }
         }
         QueryBuilder builder = new QueryBuilder();
-        builder.add("Artist", artist, substring);
-        builder.add("Title", title, substring);
-        builder.add("Album", album, substring);
-        builder.add("MinRating", minRating, false);
-        builder.add("Deleted", "0", false);
+        builder.add("Artist", artist, true, substring);
+        builder.add("Title", title, true, substring);
+        builder.add("Album", album, true, substring);
+        builder.addRaw("Rating >= ?", minRating, false);
+        builder.add("Deleted", "0", false, false);
 
         Cursor cursor = mOpener.getReadableDatabase().query(
             "Songs",
