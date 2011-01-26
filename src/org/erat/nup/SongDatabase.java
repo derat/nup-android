@@ -21,7 +21,7 @@ import java.util.List;
 class SongDatabase {
     private static final String TAG = "SongDatabase";
     private static final String DATABASE_NAME = "NupSongs";
-    private static final int DATABASE_VERSION = 2;
+    private static final int DATABASE_VERSION = 3;
 
     private static final String CREATE_LAST_UPDATE_TIME_SQL =
         "CREATE TABLE LastUpdateTime (" +
@@ -60,6 +60,7 @@ class SongDatabase {
                     "  TrackNumber INTEGER NOT NULL, " +
                     "  Length INTEGER NOT NULL, " +
                     "  Rating FLOAT NOT NULL, " +
+                    "  Deleted BOOLEAN NOT NULL, " +
                     "  LastModified INTEGER NOT NULL)");
                 db.execSQL(CREATE_LAST_UPDATE_TIME_SQL);
                 db.execSQL(INSERT_LAST_UPDATE_TIME_SQL);
@@ -67,10 +68,25 @@ class SongDatabase {
 
             @Override
             public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-                if (oldVersion == 1 && newVersion == 2) {
-                    // Create LastUpdateTime table.
+                if (newVersion == 2) {
+                    // Version 2: Create LastUpdateTime table.
+                    if (oldVersion != 1)
+                        throw new RuntimeException(
+                            "Got request to upgrade database from " + oldVersion + " to " + newVersion);
                     db.execSQL(CREATE_LAST_UPDATE_TIME_SQL);
                     db.execSQL(INSERT_LAST_UPDATE_TIME_SQL);
+                } else if (newVersion == 3) {
+                    // Version 3: Add Songs.Deleted column.
+                    if (oldVersion < 2)
+                        onUpgrade(db, oldVersion, newVersion - 1);
+                    db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp");
+                    onCreate(db);
+                    db.execSQL(
+                        "INSERT INTO Songs " +
+                        "SELECT SongId, Sha1, Filename, Artist, Title, Album, TrackNumber, " +
+                        "       Length, Rating, LastModified " +
+                        "FROM SongsTmp");
+                    db.execSQL("DROP TABLE SongsTmp");
                 } else {
                     throw new RuntimeException(
                         "Got request to upgrade database from " + oldVersion + " to " + newVersion);
@@ -135,7 +151,12 @@ class SongDatabase {
 
                 for (int i = 0; i < jsonSongs.length(); ++i) {
                     JSONArray jsonSong = jsonSongs.getJSONArray(i);
-                    ContentValues values = new ContentValues(10);
+                    if (jsonSong.length() != 11) {
+                        db.endTransaction();
+                        message[0] = "Row " + numSongs + " from server had " + jsonSong.length() + " row(s); expected 11";
+                        return false;
+                    }
+                    ContentValues values = new ContentValues(11);
                     values.put("SongId", jsonSong.getInt(0));
                     values.put("Sha1", jsonSong.getString(1));
                     values.put("Filename", jsonSong.getString(2));
@@ -145,7 +166,8 @@ class SongDatabase {
                     values.put("TrackNumber", jsonSong.getInt(6));
                     values.put("Length", jsonSong.getInt(7));
                     values.put("Rating", jsonSong.getDouble(8));
-                    values.put("LastModified", jsonSong.getInt(9));
+                    values.put("Deleted", jsonSong.getInt(9));
+                    values.put("LastModified", jsonSong.getInt(10));
                     db.replace("Songs", "", values);
 
                     numSongs++;
