@@ -4,6 +4,7 @@
 package org.erat.nup;
 
 import android.graphics.Bitmap;
+import android.net.Uri;
 
 import org.json.JSONObject;
 
@@ -32,17 +33,6 @@ class Song implements Serializable {
         mLengthSec = lengthSec;
         mSongId = songId;
         mRating = rating;
-    }
-
-    public Song(JSONObject json) throws org.json.JSONException {
-        mArtist = !json.isNull("artist") ? json.getString("artist") : "";
-        mTitle = !json.isNull("title") ? json.getString("title") : "";
-        mAlbum = !json.isNull("album") ? json.getString("album") : "";
-        mFilename = json.getString("filename");
-        mCoverFilename = !json.isNull("cover") ? json.getString("cover") : "";
-        mLengthSec = json.getInt("length");
-        mSongId = json.getInt("songId");
-        mRating = json.getDouble("rating");
         // TODO: Tags.
     }
 
@@ -63,5 +53,5 @@ class Song implements Serializable {
     public void setAvailableBytes(long bytes) { mAvailableBytes = bytes; }
     public void setTotalBytes(long bytes) { mTotalBytes = bytes; }
 
-    public String getRemotePath() { return "/music/" + mFilename; }
+    public String getRemotePath() { return "/music/" + Uri.encode(mFilename); }
 }
