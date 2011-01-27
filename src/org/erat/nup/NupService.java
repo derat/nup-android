@@ -105,6 +105,8 @@ public class NupService extends Service
     // Stores a local listing of all of the songs on the server.
     private SongDatabase mSongDb;
 
+    private CoverLoader mCoverLoader;
+
     // Points from int song ID to Song.
     // This is the canonical set of songs that we know about.
     private HashMap mSongIdToSong = new HashMap();
@@ -151,11 +153,6 @@ public class NupService extends Service
     private boolean mReportedCurrentSong = false;
 
     private final IBinder mBinder = new LocalBinder();
-
-    // Points from cover filename Strings to previously-fetched Bitmaps.
-    // TODO: Limit the growth of this or switch it to a real LRU cache or something.
-    // Or hey, use the FileCache class that I've written now.  May be a bit heavyweight, though.
-    private HashMap mCoverCache = new HashMap();
 
     // Songs whose covers are currently being fetched.
     private HashSet mSongCoverFetches = new HashSet();
@@ -217,6 +214,7 @@ public class NupService extends Service
         new GetContentsTask().execute();
 
         mSongDb = new SongDatabase(this);
+        mCoverLoader = new CoverLoader(this);
 
         mPlayer = new Player(this);
         mPlayerThread = new Thread(mPlayer, "Player");
@@ -470,14 +468,6 @@ public class NupService extends Service
         if (song.getCoverBitmap() != null)
             return true;
 
-        if (song.getCoverFilename().isEmpty())
-            return true;
-
-        if (mCoverCache.containsKey(song.getCoverFilename())) {
-            song.setCoverBitmap((Bitmap) mCoverCache.get(song.getCoverFilename()));
-            return true;
-        }
-
         if (!mSongCoverFetches.contains(song)) {
             mSongCoverFetches.add(song);
             new CoverFetcherTask().execute(song);
@@ -491,22 +481,7 @@ public class NupService extends Service
         @Override
         protected Song doInBackground(Song... songs) {
             Song song = songs[0];
-            song.setCoverBitmap(null);
-            try {
-                DownloadRequest request = new DownloadRequest(NupService.this, DownloadRequest.Method.GET, "/cover/" + song.getCoverFilename(), null);
-                DownloadResult result = Download.startDownload(request);
-                Bitmap bitmap = BitmapFactory.decodeStream(result.getEntity().getContent());
-                if (bitmap == null)
-                    Log.e(TAG, "unable to create bitmap from " + song.getCoverFilename());
-                song.setCoverBitmap(bitmap);
-                result.close();
-            } catch (DownloadRequest.PrefException e) {
-                Log.e(TAG, "got pref exception while downloading " + song.getCoverFilename() + ": " + e);
-            } catch (HttpException e) {
-                Log.e(TAG, "got HTTP exception while downloading " + song.getCoverFilename() + ": " + e);
-            } catch (IOException e) {
-                Log.e(TAG, "got IO exception while downloading " + song.getCoverFilename() + ": " + e);
-            }
+            song.setCoverBitmap(mCoverLoader.loadCover(song.getArtist(), song.getAlbum()));
             return song;
         }
 
@@ -520,11 +495,8 @@ public class NupService extends Service
     public void onCoverFetchDone(Song song) {
         mSongCoverFetches.remove(song);
 
-        if (song.getCoverBitmap() != null) {
-            mCoverCache.put(song.getCoverFilename(), song.getCoverBitmap());
-            if (mSongListener != null)
-                mSongListener.onSongCoverLoad(song);
-        }
+        if (song.getCoverBitmap() != null && mSongListener != null)
+            mSongListener.onSongCoverLoad(song);
 
         // We need to update our notification even if the fetch failed.
         // TODO: Some bitmaps appear to result in "bad array lengths" exceptions in android.os.Parcel.readIntArray().

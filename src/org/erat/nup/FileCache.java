@@ -58,6 +58,7 @@ class FileCache implements Runnable {
         mContext = context;
         mListener = listener;
 
+        // FIXME: display a message here
         String state = Environment.getExternalStorageState();
         if (!state.equals(Environment.MEDIA_MOUNTED))
             Log.e(TAG, "media has state " + state + "; we need " + Environment.MEDIA_MOUNTED);

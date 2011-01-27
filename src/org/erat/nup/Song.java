@@ -11,7 +11,7 @@ import org.json.JSONObject;
 import java.io.Serializable;
 
 class Song implements Serializable {
-    private final String mArtist, mTitle, mAlbum, mFilename, mCoverFilename;
+    private final String mArtist, mTitle, mAlbum, mFilename;
     private final int mLengthSec, mSongId;
     private final double mRating;
     private Bitmap mCoverBitmap = null;
@@ -24,12 +24,11 @@ class Song implements Serializable {
     private long mTotalBytes = 0;
 
     public Song(String artist, String title, String album, String filename,
-                String coverFilename, int lengthSec, int songId, double rating) {
+                int lengthSec, int songId, double rating) {
         mArtist = artist;
         mTitle = title;
         mAlbum = album;
         mFilename = filename;
-        mCoverFilename = coverFilename;
         mLengthSec = lengthSec;
         mSongId = songId;
         mRating = rating;
@@ -41,7 +40,6 @@ class Song implements Serializable {
     public String getTitle() { return mTitle; }
     public String getAlbum() { return mAlbum; }
     public String getFilename() { return mFilename; }
-    public String getCoverFilename() { return mCoverFilename; }
     public Bitmap getCoverBitmap() { return mCoverBitmap; }
     public int getLengthSec() { return mLengthSec; }
     public int getSongId() { return mSongId; }
