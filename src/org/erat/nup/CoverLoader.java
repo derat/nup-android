@@ -74,7 +74,7 @@ class CoverLoader {
     }
 
     private File lookForLocalCover(final String artist, final String album) {
-        String filename = (artist + "-" + album + ".jpg").replace('/', '%');
+        String filename = Util.escapeFilename(artist + "-" + album + ".jpg");
         startLoad(filename);
         try {
             File file = new File(mCoverDir, filename);
@@ -87,7 +87,7 @@ class CoverLoader {
         String[] matchingFilenames = mCoverDir.list(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String filename) {
-                if (!filename.matches("^.+-" + album.replace('/', '%') + "\\.jpg$"))
+                if (!filename.endsWith(Util.escapeFilename("-" + album + ".jpg")))
                     return false;
 
                 startLoad(filename);
@@ -103,15 +103,16 @@ class CoverLoader {
 
     private File downloadCover(String artist, String album) {
         String[] error = new String[1];
-        String filename = Download.downloadString(
+        String remoteFilename = Download.downloadString(
             mContext,
             "/find_cover",
             "artist=" + Uri.encode(artist) + "&album=" + Uri.encode(album),
             error);
         // No monkey business.
-        if (filename == null || filename.isEmpty() || filename.contains("/"))
+        if (remoteFilename == null || remoteFilename.isEmpty())
             return null;
 
+        String filename = Util.escapeFilename(remoteFilename);
         startLoad(filename);
 
         boolean success = false;
@@ -130,7 +131,7 @@ class CoverLoader {
             file.createNewFile();
             outputStream = new FileOutputStream(file);
 
-            request = new DownloadRequest(mContext, DownloadRequest.Method.GET, "/cover/" + Uri.encode(filename), null);
+            request = new DownloadRequest(mContext, DownloadRequest.Method.GET, "/cover/" + Uri.encode(remoteFilename), null);
             result = Download.startDownload(request);
             if (result.getStatusCode() != 200)
                 throw new IOException("got status code " + result.getStatusCode());
@@ -142,11 +143,11 @@ class CoverLoader {
                 outputStream.write(buffer, 0, bytesRead);
             success = true;
         } catch (DownloadRequest.PrefException e) {
-            Log.e(TAG, "got pref exception while fetching " + filename + ": " + e);
+            Log.e(TAG, "got pref exception while fetching " + remoteFilename + ": " + e);
         } catch (org.apache.http.HttpException e) {
-            Log.e(TAG, "got HTTP error while fetching " + filename + ": " + e);
+            Log.e(TAG, "got HTTP error while fetching " + remoteFilename + ": " + e);
         } catch (IOException e) {
-            Log.e(TAG, "got IO error while fetching " + filename + ": " + e);
+            Log.e(TAG, "got IO error while fetching " + remoteFilename + ": " + e);
         } finally {
             if (outputStream != null) {
                 try {
