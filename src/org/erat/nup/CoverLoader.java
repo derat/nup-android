@@ -15,6 +15,10 @@ import java.io.FilenameFilter;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.IOException;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
+import java.util.HashSet;
 
 class CoverLoader {
     private static final String TAG = "CoverLoader";
@@ -28,6 +32,15 @@ class CoverLoader {
     // Directory where we write cover images.
     private final File mCoverDir;
 
+    // Guards |mFilesBeingLoaded|.
+    private final Lock mLock = new ReentrantLock();
+
+    // Signalled when a change has been made to |mFilesBeingLoaded|.
+    private final Condition mLoadFinishedCond = mLock.newCondition();
+
+    // Names of cover files that we're currently fetching.
+    private HashSet mFilesBeingLoaded = new HashSet();
+
     public CoverLoader(Context context) {
         mContext = context;
 
@@ -39,35 +52,53 @@ class CoverLoader {
         mCoverDir = new File(mContext.getExternalCacheDir(), "covers");
     }
 
+    // Load the cover for a song's artist and album.  Tries to find it locally
+    // first; then goes to the server.  Returns null if unsuccessful.
     public Bitmap loadCover(String artist, String album) {
         // Ensure that the cover dir exists.
         mCoverDir.mkdirs();
 
-        File coverFile = lookForLocalCover(artist, album);
-        if (coverFile == null)
-            coverFile = downloadCover(artist, album);
+        File file = lookForLocalCover(artist, album);
+        if (file != null) {
+            Log.d(TAG, "found local file " + file.getName());
+        } else {
+            file = downloadCover(artist, album);
+            if (file != null)
+                Log.d(TAG, "fetched remote file " + file.getName());
+        }
 
-        if (coverFile == null || !coverFile.exists())
+        if (file == null || !file.exists())
             return null;
 
-        return BitmapFactory.decodeFile(coverFile.getPath());
+        return BitmapFactory.decodeFile(file.getPath());
     }
 
     private File lookForLocalCover(final String artist, final String album) {
-        File file = new File(mCoverDir, (artist + "-" + album + ".jpg").replace('/', '%'));
-        if (!file.exists()) {
-            String[] matchingFilenames = mCoverDir.list(new FilenameFilter() {
-                @Override
-                public boolean accept(File dir, String filename) {
-                    return filename.matches("^.+-" + album.replace('/', '%') + "\\.jpg$");
-                }
-            });
-            file = (matchingFilenames.length == 1) ?  new File(mCoverDir, matchingFilenames[0]) : null;
+        String filename = (artist + "-" + album + ".jpg").replace('/', '%');
+        startLoad(filename);
+        try {
+            File file = new File(mCoverDir, filename);
+            if (file.exists())
+                return file;
+        } finally {
+            finishLoad(filename);
         }
 
-        if (file != null)
-            Log.d(TAG, "found local cover " + file.getName());
-        return file;
+        String[] matchingFilenames = mCoverDir.list(new FilenameFilter() {
+            @Override
+            public boolean accept(File dir, String filename) {
+                if (!filename.matches("^.+-" + album.replace('/', '%') + "\\.jpg$"))
+                    return false;
+
+                startLoad(filename);
+                try {
+                    return new File(dir, filename).exists();
+                } finally {
+                    finishLoad(filename);
+                }
+            }
+        });
+        return (matchingFilenames.length == 1) ?  new File(mCoverDir, matchingFilenames[0]) : null;
     }
 
     private File downloadCover(String artist, String album) {
@@ -77,61 +108,94 @@ class CoverLoader {
             "/find_cover",
             "artist=" + Uri.encode(artist) + "&album=" + Uri.encode(album),
             error);
-        if (filename == null || filename.isEmpty())
-            return null;
-
         // No monkey business.
-        filename = filename.replace("/", "%");
+        if (filename == null || filename.isEmpty() || filename.contains("/"))
+            return null;
 
+        startLoad(filename);
+
+        boolean success = false;
         File file = new File(mCoverDir, filename);
-        try {
-            file.createNewFile();
-        } catch (IOException e) {
-            Log.e(TAG, "unable to create file " + file.getPath() + ": " + e);
-            return null;
-        }
-
-        FileOutputStream outputStream;
-        try {
-            outputStream = new FileOutputStream(file);
-        } catch (java.io.FileNotFoundException e) {
-            Log.e(TAG, "unable to create output stream " + file.getPath() + ": " + e);
-            return null;
-        }
-
-        Log.d(TAG, "fetching remote cover " + filename);
+        FileOutputStream outputStream = null;
         DownloadRequest request = null;
         DownloadResult result = null;
+
         try {
+            // Check if another thread downloaded it while we were waiting.
+            if (file.exists()) {
+                success = true;
+                return file;
+            }
+
+            file.createNewFile();
+            outputStream = new FileOutputStream(file);
+
             request = new DownloadRequest(mContext, DownloadRequest.Method.GET, "/cover/" + Uri.encode(filename), null);
             result = Download.startDownload(request);
             if (result.getStatusCode() != 200)
-                throw new IOException("got status code " + result.getStatusCode() + " while fetching " + filename);
+                throw new IOException("got status code " + result.getStatusCode());
 
             byte[] buffer = new byte[BUFFER_SIZE];
             InputStream inputStream = result.getEntity().getContent();
             int bytesRead;
             while ((bytesRead = inputStream.read(buffer)) != -1)
                 outputStream.write(buffer, 0, bytesRead);
+            success = true;
         } catch (DownloadRequest.PrefException e) {
-            Log.e(TAG, "got pref exception while downloading " + filename + ": " + e);
-            return null;
+            Log.e(TAG, "got pref exception while fetching " + filename + ": " + e);
         } catch (org.apache.http.HttpException e) {
-            Log.e(TAG, "got http error while downloading " + filename + ": " + e);
-            return null;
+            Log.e(TAG, "got HTTP error while fetching " + filename + ": " + e);
         } catch (IOException e) {
-            Log.e(TAG, "got io error while downloading " + filename + ": " + e);
-            return null;
+            Log.e(TAG, "got IO error while fetching " + filename + ": " + e);
         } finally {
-            try {
-                outputStream.close();
-            } catch (IOException e) {
-                // !@#!@$!@
+            if (outputStream != null) {
+                try {
+                    outputStream.close();
+                } catch (IOException e) {
+                    // !@#!@$!@
+                }
             }
+
             if (result != null)
                 result.close();
+            if (!success && file.exists())
+                file.delete();
+
+            finishLoad(filename);
         }
 
-        return file;
+        return success ? file : null;
+    }
+
+    // Call before checking for the existence of a local cover file and before
+    // starting to download a remote file.  Waits until |filename| isn't in
+    // |mFilesBeingLoaded| and then adds it.  Must be matched by a call to
+    // finishLoad().
+    private void startLoad(String filename) {
+        mLock.lock();
+        try {
+            while (mFilesBeingLoaded.contains(filename))
+                mLoadFinishedCond.await();
+            mFilesBeingLoaded.add(filename);
+        } catch (InterruptedException e) {
+            // !#!@$#!$#!@
+        } finally {
+            mLock.unlock();
+        }
+    }
+
+    // Call after checking for the existence of a local file or after completing
+    // a download (either successfully or unsuccessfully -- if unsuccessful, be
+    // sure to remove the file first so that other threads don't try to use it).
+    private void finishLoad(String filename) {
+        mLock.lock();
+        try {
+            if (!mFilesBeingLoaded.contains(filename))
+                throw new RuntimeException("got report of finished load of unknown file " + filename);
+            mFilesBeingLoaded.remove(filename);
+            mLoadFinishedCond.signal();
+        } finally {
+            mLock.unlock();
+        }
     }
 }
