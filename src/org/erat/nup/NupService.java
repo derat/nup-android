@@ -158,18 +158,6 @@ public class NupService extends Service
     // Songs whose covers are currently being fetched.
     private HashSet mSongCoverFetches = new HashSet();
 
-    // List of artists, sorted alphabetically.
-    private List<String> mArtists = new ArrayList<String>();
-
-    // List of artists, sorted by decreasing number of albums.
-    private List<String> mArtistsSortedByNumAlbums = new ArrayList<String>();
-
-    // List of albums, sorted alphabetically.
-    private List<String> mAlbums = new ArrayList<String>();
-
-    // Points from (lowercased) artist String to List of String album names.
-    private HashMap mAlbumMap = new HashMap();
-
     // Used to run tasks on our thread.
     private Handler mHandler = new Handler();
 
@@ -256,10 +244,6 @@ public class NupService extends Service
         return (mCurrentSongIndex >= 0 && mCurrentSongIndex < mSongs.size()) ? mSongs.get(mCurrentSongIndex) : null;
     }
     public int getCurrentSongLastPositionMs() { return mCurrentSongLastPositionMs; }
-    public List<String> getArtists() { return mArtists; }
-    public List<String> getArtistsSortedByNumAlbums() { return mArtistsSortedByNumAlbums; }
-    public List<String> getAlbumsByArtist(String artist) { return (List<String>) mAlbumMap.get(artist.toLowerCase()); }
-    public List<String> getAllAlbums() { return mAlbums; }
     public SongDatabase getSongDb() { return mSongDb; }
 
     public void setSongListener(SongListener listener) {

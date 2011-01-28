@@ -76,7 +76,7 @@ class SongDatabase {
     private List<String> mArtistsSortedAlphabetically = new ArrayList<String>();
     private List<String> mAlbumsSortedAlphabetically = new ArrayList<String>();
     private List<String> mArtistsSortedByNumSongs = new ArrayList<String>();
-    private HashMap mArtistAlbums = new HashMap();
+    private HashMap<String,List<String>> mArtistAlbums = new HashMap<String,List<String>>();
 
     private Listener mListener = null;
 
@@ -162,8 +162,7 @@ class SongDatabase {
 
     public List<String> getAlbumsByArtist(String artist) {
         String lowerArtist = artist.toLowerCase();
-        return mArtistAlbums.containsKey(lowerArtist) ?
-            (List<String>) mArtistAlbums.get(lowerArtist) : null;
+        return mArtistAlbums.containsKey(lowerArtist) ? mArtistAlbums.get(lowerArtist) : null;
     }
 
     public List<Song> query(String artist, String title, String album, String minRating, boolean shuffle, boolean substring) {

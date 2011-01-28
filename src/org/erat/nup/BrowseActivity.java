@@ -24,12 +24,6 @@ public class BrowseActivity extends ListActivity {
         super.onCreate(savedInstanceState);
         setTitle(R.string.browse);
 
-        if (NupActivity.getService().getArtists() == null) {
-            Toast.makeText(this, "Server contents not loaded.", Toast.LENGTH_SHORT).show();
-            finish();
-            return;
-        }
-
         ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1);
         adapter.add(getString(R.string.artists));
         adapter.add(getString(R.string.albums));
