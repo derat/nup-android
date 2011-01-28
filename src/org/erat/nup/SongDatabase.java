@@ -29,7 +29,7 @@ class SongDatabase {
     public static final String UNKNOWN_ALBUM = "[unknown]";
 
     private static final String DATABASE_NAME = "NupSongs";
-    private static final int DATABASE_VERSION = 3;
+    private static final int DATABASE_VERSION = 4;
 
     private static final String MAX_QUERY_RESULTS = "250";
 
@@ -46,6 +46,17 @@ class SongDatabase {
         "  Rating FLOAT NOT NULL, " +
         "  Deleted BOOLEAN NOT NULL, " +
         "  LastModified INTEGER NOT NULL)";
+    private static final String ADD_SONGS_ARTIST_INDEX_SQL =
+        "CREATE INDEX Artist ON Songs (Artist)";
+    private static final String ADD_SONGS_ALBUM_INDEX_SQL =
+        "CREATE INDEX Album ON Songs (Album)";
+
+    private static final String CREATE_ARTIST_ALBUM_STATS_SQL =
+        "CREATE TABLE ArtistAlbumStats (" +
+        "  Artist VARCHAR(256) NOT NULL, " +
+        "  Album VARCHAR(256) NOT NULL, " +
+        "  NumSongs INTEGER NOT NULL)";
+
     private static final String CREATE_LAST_UPDATE_TIME_SQL =
         "CREATE TABLE LastUpdateTime (" +
         "  Timestamp INTEGER NOT NULL, " +
@@ -84,6 +95,9 @@ class SongDatabase {
             @Override
             public void onCreate(SQLiteDatabase db) {
                 db.execSQL(CREATE_SONGS_SQL);
+                db.execSQL(ADD_SONGS_ARTIST_INDEX_SQL);
+                db.execSQL(ADD_SONGS_ALBUM_INDEX_SQL);
+                db.execSQL(CREATE_ARTIST_ALBUM_STATS_SQL);
                 db.execSQL(CREATE_LAST_UPDATE_TIME_SQL);
                 db.execSQL(INSERT_LAST_UPDATE_TIME_SQL);
             }
@@ -110,6 +124,13 @@ class SongDatabase {
                         "    TrackNumber, Length, Rating, 0, LastModified " +
                         "FROM SongsTmp");
                     db.execSQL("DROP TABLE SongsTmp");
+                } else if (newVersion == 4) {
+                    // Version 4: Create ArtistAlbumStats table and indexes on Songs.Artist and Songs.Album.
+                    if (oldVersion < 3)
+                        onUpgrade(db, oldVersion, newVersion - 1);
+                    db.execSQL(CREATE_ARTIST_ALBUM_STATS_SQL);
+                    db.execSQL(ADD_SONGS_ARTIST_INDEX_SQL);
+                    db.execSQL(ADD_SONGS_ALBUM_INDEX_SQL);
                 } else {
                     throw new RuntimeException(
                         "Got request to upgrade database from " + oldVersion + " to " + newVersion);
@@ -123,10 +144,10 @@ class SongDatabase {
         new AsyncTask<Void, Void, Void>() {
             @Override
             protected Void doInBackground(Void... args) {
-                refreshAggregateData();
+                loadAggregateData(mOpener.getReadableDatabase());
                 return (Void) null;
             }
-        }.execute((Void) null);
+        }.execute();
 
         // Make sure that we have a writable database when we try to do the upgrade.
         mOpener.getWritableDatabase();
@@ -195,86 +216,135 @@ class SongDatabase {
         SQLiteDatabase db = mOpener.getWritableDatabase();
         db.beginTransaction();
 
-        Cursor cursor = db.rawQuery("SELECT MaxLastModified FROM LastUpdateTime", null);
-        cursor.moveToFirst();
-        int maxLastModified = cursor.getInt(0);
-        cursor.close();
+        try {
+            Cursor cursor = db.rawQuery("SELECT MaxLastModified FROM LastUpdateTime", null);
+            cursor.moveToFirst();
+            int maxLastModified = cursor.getInt(0);
+            cursor.close();
 
-        // The server breaks its results up into batches instead of sending us a bunch of songs
-        // at once, so we store the highest song ID that we've seen here so we'll know where to
-        // start in the next request.
-        int maxSongId = 0;
+            // The server breaks its results up into batches instead of sending us a bunch of songs
+            // at once, so we store the highest song ID that we've seen here so we'll know where to
+            // start in the next request.
+            int maxSongId = 0;
 
-        // FIXME: This is completely braindead:
-        // - If an update, our previous sync, and a second update all happen in the same second
-        //   and in that order, then we'll miss the second update the next time we sync.
-        // - If an update happens to a song with an ID that we've already gone past while we're
-        //   in the middle of an update and then a second update happens to a song with a later
-        //   ID, we'll miss the earlier song.
-        int minLastModified = maxLastModified + 1;
+            // FIXME: This is completely braindead:
+            // - If an update, our previous sync, and a second update all happen in the same second
+            //   and in that order, then we'll miss the second update the next time we sync.
+            // - If an update happens to a song with an ID that we've already gone past while we're
+            //   in the middle of an update and then a second update happens to a song with a later
+            //   ID, we'll miss the earlier song.
+            int minLastModified = maxLastModified + 1;
 
-        int numSongs = 0;
-        while (true) {
-            String response = Download.downloadString(
-                mContext, "/songs", String.format("minSongId=%d&minLastModified=%d", maxSongId + 1, minLastModified), message);
-            if (response == null) {
-                db.endTransaction();
-                return false;
-            }
+            int numSongs = 0;
+            while (true) {
+                String response = Download.downloadString(
+                    mContext, "/songs", String.format("minSongId=%d&minLastModified=%d", maxSongId + 1, minLastModified), message);
+                if (response == null)
+                    return false;
 
-            try {
-                JSONArray jsonSongs = (JSONArray) new JSONTokener(response).nextValue();
-                if (jsonSongs.length() == 0)
-                    break;
+                try {
+                    JSONArray jsonSongs = (JSONArray) new JSONTokener(response).nextValue();
+                    if (jsonSongs.length() == 0)
+                        break;
 
-                for (int i = 0; i < jsonSongs.length(); ++i) {
-                    JSONArray jsonSong = jsonSongs.getJSONArray(i);
-                    if (jsonSong.length() != 11) {
-                        db.endTransaction();
-                        message[0] = "Row " + numSongs + " from server had " + jsonSong.length() + " row(s); expected 11";
-                        return false;
+                    for (int i = 0; i < jsonSongs.length(); ++i) {
+                        JSONArray jsonSong = jsonSongs.getJSONArray(i);
+                        if (jsonSong.length() != 11) {
+                            db.endTransaction();
+                            message[0] = "Row " + numSongs + " from server had " + jsonSong.length() + " row(s); expected 11";
+                            return false;
+                        }
+                        ContentValues values = new ContentValues(11);
+                        values.put("SongId", jsonSong.getInt(0));
+                        values.put("Sha1", jsonSong.getString(1));
+                        values.put("Filename", jsonSong.getString(2));
+                        values.put("Artist", jsonSong.getString(3));
+                        values.put("Title", jsonSong.getString(4));
+                        values.put("Album", jsonSong.getString(5));
+                        values.put("TrackNumber", jsonSong.getInt(6));
+                        values.put("Length", jsonSong.getInt(7));
+                        values.put("Rating", jsonSong.getDouble(8));
+                        values.put("Deleted", jsonSong.getInt(9));
+                        values.put("LastModified", jsonSong.getInt(10));
+                        db.replace("Songs", "", values);
+
+                        numSongs++;
+                        maxSongId = Math.max(maxSongId, jsonSong.getInt(0));
+                        maxLastModified = Math.max(maxLastModified, jsonSong.getInt(9));
                     }
-                    ContentValues values = new ContentValues(11);
-                    values.put("SongId", jsonSong.getInt(0));
-                    values.put("Sha1", jsonSong.getString(1));
-                    values.put("Filename", jsonSong.getString(2));
-                    values.put("Artist", jsonSong.getString(3));
-                    values.put("Title", jsonSong.getString(4));
-                    values.put("Album", jsonSong.getString(5));
-                    values.put("TrackNumber", jsonSong.getInt(6));
-                    values.put("Length", jsonSong.getInt(7));
-                    values.put("Rating", jsonSong.getDouble(8));
-                    values.put("Deleted", jsonSong.getInt(9));
-                    values.put("LastModified", jsonSong.getInt(10));
-                    db.replace("Songs", "", values);
-
-                    numSongs++;
-                    maxSongId = Math.max(maxSongId, jsonSong.getInt(0));
-                    maxLastModified = Math.max(maxLastModified, jsonSong.getInt(9));
+                    listener.onSyncProgress(numSongs);
+                } catch (org.json.JSONException e) {
+                    message[0] = "Couldn't parse response: " + e;
+                    return false;
                 }
-                listener.onSyncProgress(numSongs);
-            } catch (org.json.JSONException e) {
-                db.endTransaction();
-                message[0] = "Couldn't parse response: " + e;
-                return false;
             }
+
+            ContentValues values = new ContentValues(2);
+            values.put("Timestamp", new Date().getTime() / 1000);
+            values.put("MaxLastModified", maxLastModified);
+            db.update("LastUpdateTime", values, null, null);
+
+            updateStatsTables(db);
+
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
         }
 
-        ContentValues values = new ContentValues(2);
-        values.put("Timestamp", new Date().getTime() / 1000);
-        values.put("MaxLastModified", maxLastModified);
-        db.update("LastUpdateTime", values, null, null);
-
-        db.setTransactionSuccessful();
-        db.endTransaction();
-
-        refreshAggregateData();
+        loadAggregateData(db);
         message[0] = "Synchronization complete.";
         return true;
     }
 
-    private void refreshAggregateData() {
-        SQLiteDatabase db = mOpener.getReadableDatabase();
+    private void updateStatsTables(SQLiteDatabase db) {
+        // Map from lowercased artist name to the first row that we saw in its original case.
+        HashMap<String,String> artistCaseMap = new HashMap<String,String>();
+
+        // Map from artist name to map from album name to number of songs.
+        HashMap<String,HashMap<String,Integer>> artistAlbums = new HashMap<String,HashMap<String,Integer>>();
+
+        Cursor cursor = db.rawQuery("SELECT Artist, Album, COUNT(*) FROM Songs WHERE Deleted = 0 GROUP BY 1, 2", null);
+        cursor.moveToFirst();
+        while (!cursor.isAfterLast()) {
+            String lowerArtist = cursor.getString(0).toLowerCase();
+            if (!artistCaseMap.containsKey(lowerArtist))
+                artistCaseMap.put(lowerArtist, cursor.getString(0));
+
+            String artist = artistCaseMap.get(lowerArtist);
+            String album = cursor.getString(1);
+            if (album.isEmpty())
+                album = UNKNOWN_ALBUM;
+            int numSongsInAlbum = cursor.getInt(2);
+
+            HashMap<String,Integer> albumMap;
+            if (artistAlbums.containsKey(artist)) {
+                albumMap = artistAlbums.get(artist);
+            } else {
+                albumMap = new HashMap<String,Integer>();
+                artistAlbums.put(artist, albumMap);
+            }
+
+            int totalSongsInAlbum = (albumMap.containsKey(album) ? albumMap.get(album) : 0) + numSongsInAlbum;
+            albumMap.put(album, totalSongsInAlbum);
+
+            cursor.moveToNext();
+        }
+        cursor.close();
+
+        db.delete("ArtistAlbumStats", null, null);
+        for (String artist : artistAlbums.keySet()) {
+            HashMap<String,Integer> albumMap = artistAlbums.get(artist);
+            for (String album : albumMap.keySet()) {
+                ContentValues values = new ContentValues(3);
+                values.put("Artist", artist);
+                values.put("Album", album);
+                values.put("NumSongs", albumMap.get(album));
+                db.insert("ArtistAlbumStats", "", values);
+            }
+        }
+    }
+
+    private void loadAggregateData(SQLiteDatabase db) {
         Cursor cursor = db.rawQuery("SELECT Timestamp FROM LastUpdateTime", null);
         cursor.moveToFirst();
         Date lastSyncDate = (cursor.getInt(0) > -1) ? new Date((long) cursor.getInt(0) * 1000) : null;
@@ -285,26 +355,18 @@ class SongDatabase {
         int numSongs = cursor.getInt(0);
         cursor.close();
 
-        // Map from lowercase artist name to the first row that we saw in its original case.
-        HashMap artistCaseMap = new HashMap();
 
-        HashSet artistSet = new HashSet();
-        HashSet albumSet = new HashSet();
+        HashSet<String> artistSet = new HashSet<String>();
+        HashSet<String> albumSet = new HashSet<String>();
+        final HashMap<String,Integer> artistSongCounts = new HashMap<String,Integer>();  // 'final' so it can be used in an inner class
+        HashMap<String,List<String>> artistAlbums = new HashMap<String,List<String>>();
 
-        final HashMap artistSongCounts = new HashMap();  // 'final' so it can be used in an inner class
-        HashMap artistAlbums = new HashMap();
-
-        cursor = db.rawQuery("SELECT Artist, Album, COUNT(*) FROM Songs WHERE Deleted = 0 GROUP BY 1, 2", null);
+        cursor = db.rawQuery("SELECT Artist, Album, NumSongs FROM ArtistAlbumStats", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
-            String lowerArtist = cursor.getString(0).toLowerCase();
-            if (!artistCaseMap.containsKey(lowerArtist))
-                artistCaseMap.put(lowerArtist, cursor.getString(0));
-
-            String artist = (String) artistCaseMap.get(lowerArtist);
+            String artist = cursor.getString(0);
+            String lowerArtist = artist.toLowerCase();
             String album = cursor.getString(1);
-            if (album.isEmpty())
-                album = UNKNOWN_ALBUM;
             int numSongsInAlbum = cursor.getInt(2);
 
             artistSet.add(artist);
@@ -318,7 +380,7 @@ class SongDatabase {
 
             List<String> albums;
             if (artistAlbums.containsKey(lowerArtist)) {
-                albums = (List<String>) artistAlbums.get(lowerArtist);
+                albums = artistAlbums.get(lowerArtist);
             } else {
                 albums = new ArrayList<String>();
                 artistAlbums.put(lowerArtist, albums);

@@ -42,7 +42,7 @@ class YesNoPreference extends DialogPreference {
 
     public void updateSyncMessage() {
         SongDatabase db = NupActivity.getService().getSongDb();
-        if (!db.getSummariesLoaded()) {
+        if (!db.getAggregateDataLoaded()) {
             setSummary(mContext.getString(R.string.stats_not_loaded));
         } else if (db.getLastSyncDate() == null) {
             setSummary(mContext.getString(R.string.never_synced));
