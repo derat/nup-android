@@ -11,6 +11,7 @@ import android.widget.ArrayAdapter;
 import android.widget.ListAdapter;
 import android.widget.ListView;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class BrowseAlbumsActivity extends ListActivity
@@ -20,29 +21,23 @@ public class BrowseAlbumsActivity extends ListActivity
 
     // Albums that we display.  Just the albums featuring |mArtist| if it's non-null, or all
     // albums on the server otherwise.
-    private List<String> mAlbums;
+    private List<String> mAlbums = new ArrayList<String>();
+
+    private ArrayAdapter<String> mAdapter;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        NupActivity.getService().addSongDatabaseUpdateListener(this);
 
         mArtist = getIntent().getStringExtra(BrowseActivity.BUNDLE_ARTIST);
+        setTitle((mArtist != null) ? getString(R.string.browse_albums_fmt, mArtist) : getString(R.string.browse_albums));
 
-        if (mArtist != null) {
-            setTitle(getString(R.string.browse_albums_fmt, mArtist));
-            mAlbums = NupActivity.getService().getSongDb().getAlbumsByArtist(mArtist);
-        } else {
-            setTitle(R.string.browse_albums);
-            mAlbums = NupActivity.getService().getSongDb().getAlbumsSortedAlphabetically();
-        }
-
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1);
-        for (String album : mAlbums)
-            adapter.add(album);
-        setListAdapter(adapter);
-
+        mAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, mAlbums);
+        setListAdapter(mAdapter);
         getListView().setFastScrollEnabled(true);
+
+        NupActivity.getService().addSongDatabaseUpdateListener(this);
+        onSongDatabaseUpdate();
     }
 
     @Override
@@ -64,6 +59,11 @@ public class BrowseAlbumsActivity extends ListActivity
     // Implements NupService.SongDatabaseUpdateListener.
     @Override
     public void onSongDatabaseUpdate() {
-        // FIXME
+        mAlbums.clear();
+        mAlbums.addAll(
+            (mArtist != null) ?
+            NupActivity.getService().getSongDb().getAlbumsByArtist(mArtist) :
+            NupActivity.getService().getSongDb().getAlbumsSortedAlphabetically());
+        mAdapter.notifyDataSetChanged();
     }
 }

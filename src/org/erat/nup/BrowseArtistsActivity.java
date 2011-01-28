@@ -11,25 +11,30 @@ import android.widget.ArrayAdapter;
 import android.widget.ListAdapter;
 import android.widget.ListView;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class BrowseArtistsActivity extends ListActivity
                                    implements NupService.SongDatabaseUpdateListener {
+    // Identifier for the BrowseAlbumsActivity that we start.
     private static final int BROWSE_ALBUMS_REQUEST_CODE = 1;
+
+    // Artists that we display.
+    private List<String> mArtists = new ArrayList<String>(); 
+
+    private ArrayAdapter<String> mAdapter;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        NupActivity.getService().addSongDatabaseUpdateListener(this);
-
         setTitle(R.string.browse_artists);
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1);
-        for (String artist : NupActivity.getService().getSongDb().getArtistsSortedAlphabetically())
-            adapter.add(artist);
-        setListAdapter(adapter);
-
+        mAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, mArtists);
+        setListAdapter(mAdapter);
         getListView().setFastScrollEnabled(true);
+
+        NupActivity.getService().addSongDatabaseUpdateListener(this);
+        onSongDatabaseUpdate();
     }
 
     @Override
@@ -40,9 +45,8 @@ public class BrowseArtistsActivity extends ListActivity
 
     @Override
     protected void onListItemClick(ListView listView, View view, int position, long id) {
-        String artist = NupActivity.getService().getSongDb().getArtistsSortedAlphabetically().get(position);
         Intent intent = new Intent(this, BrowseAlbumsActivity.class);
-        intent.putExtra(BrowseActivity.BUNDLE_ARTIST, artist);
+        intent.putExtra(BrowseActivity.BUNDLE_ARTIST, mArtists.get(position));
         startActivityForResult(intent, BROWSE_ALBUMS_REQUEST_CODE);
     }
 
@@ -58,6 +62,8 @@ public class BrowseArtistsActivity extends ListActivity
     // Implements NupService.SongDatabaseUpdateListener.
     @Override
     public void onSongDatabaseUpdate() {
-        // FIXME
+        mArtists.clear();
+        mArtists.addAll(NupActivity.getService().getSongDb().getArtistsSortedAlphabetically());
+        mAdapter.notifyDataSetChanged();
     }
 }

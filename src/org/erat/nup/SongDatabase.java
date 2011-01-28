@@ -139,8 +139,6 @@ class SongDatabase {
         };
 
         // Get some info from the database in a background thread.
-        // FIXME: I think that this sometimes isn't finishing until after we've
-        // already displayed SettingsActivity (which is surprising).
         new AsyncTask<Void, Void, Void>() {
             @Override
             protected Void doInBackground(Void... args) {
@@ -162,7 +160,7 @@ class SongDatabase {
 
     public List<String> getAlbumsByArtist(String artist) {
         String lowerArtist = artist.toLowerCase();
-        return mArtistAlbums.containsKey(lowerArtist) ? mArtistAlbums.get(lowerArtist) : null;
+        return mArtistAlbums.containsKey(lowerArtist) ? mArtistAlbums.get(lowerArtist) : new ArrayList<String>();
     }
 
     public List<Song> query(String artist, String title, String album, String minRating, boolean shuffle, boolean substring) {
