@@ -29,7 +29,7 @@ public class BrowseArtistsActivity extends ListActivity
         super.onCreate(savedInstanceState);
         setTitle(R.string.browse_artists);
 
-        mAdapter = new ArrayAdapter<String>(this, android.R.layout.simple_list_item_1, mArtists);
+        mAdapter = new ArrayAdapter<String>(this, R.layout.browse_row, mArtists);
         setListAdapter(mAdapter);
         getListView().setFastScrollEnabled(true);
 

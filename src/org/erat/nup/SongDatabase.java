@@ -331,7 +331,10 @@ class SongDatabase {
         db.delete("ArtistAlbumStats", null, null);
         for (String artist : artistAlbums.keySet()) {
             HashMap<String,Integer> albumMap = artistAlbums.get(artist);
-            for (String album : albumMap.keySet()) {
+            ArrayList<String> sortedAlbums = new ArrayList<String>();
+            sortedAlbums.addAll(albumMap.keySet());
+            Collections.sort(sortedAlbums);
+            for (String album : sortedAlbums) {
                 ContentValues values = new ContentValues(3);
                 values.put("Artist", artist);
                 values.put("Album", album);
