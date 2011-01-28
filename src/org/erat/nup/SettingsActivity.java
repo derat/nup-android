@@ -32,7 +32,8 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
         pref.setSummary(mPrefs.getString(NupPreferences.USERNAME, ""));
 
         pref = findPreference(NupPreferences.SYNC_SONG_LIST);
-        ((YesNoPreference) pref).updateSyncMessage();
+        NupActivity.getService().addSongDatabaseUpdateListener((YesNoPreference) pref);
+        ((YesNoPreference) pref).onSongDatabaseUpdate();
 
         pref = findPreference(NupPreferences.CACHE_SIZE);
         pref.setOnPreferenceChangeListener(this);
@@ -65,6 +66,13 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
         pref.setSummary(downloadRate == 0 ?
                         getString(R.string.unlimited) :
                         getString(R.string.download_rate_value, downloadRate));
+    }
+
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        NupActivity.getService().removeSongDatabaseUpdateListener(
+            (YesNoPreference) findPreference(NupPreferences.SYNC_SONG_LIST));
     }
 
     @Override

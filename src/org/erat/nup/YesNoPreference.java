@@ -15,7 +15,8 @@ import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.Date;
 
-class YesNoPreference extends DialogPreference {
+class YesNoPreference extends DialogPreference
+                      implements NupService.SongDatabaseUpdateListener {
     Context mContext;
 
     public YesNoPreference(Context context, AttributeSet attrs) {
@@ -40,10 +41,17 @@ class YesNoPreference extends DialogPreference {
         }
     }
 
+    // Implements NupService.SongDatabaseUpdateListener.
+    @Override
+    public void onSongDatabaseUpdate() {
+        if (NupPreferences.SYNC_SONG_LIST.equals(getKey()))
+            updateSyncMessage();
+    }
+
     public void updateSyncMessage() {
         SongDatabase db = NupActivity.getService().getSongDb();
         if (!db.getAggregateDataLoaded()) {
-            setSummary(mContext.getString(R.string.stats_not_loaded));
+            setSummary(mContext.getString(R.string.loading_stats));
         } else if (db.getLastSyncDate() == null) {
             setSummary(mContext.getString(R.string.never_synced));
         } else {
