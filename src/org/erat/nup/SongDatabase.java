@@ -16,11 +16,18 @@ import org.json.JSONArray;
 import org.json.JSONTokener;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 
 class SongDatabase {
     private static final String TAG = "SongDatabase";
+
+    public static final String UNKNOWN_ALBUM = "[unknown]";
+
     private static final String DATABASE_NAME = "NupSongs";
     private static final int DATABASE_VERSION = 3;
 
@@ -52,16 +59,27 @@ class SongDatabase {
 
     private final SQLiteOpenHelper mOpener;
 
-    private boolean mSummariesLoaded = false;
+    private boolean mAggregateDataLoaded = false;
     private int mNumSongs = 0;
     private Date mLastSyncDate = null;
+    private List<String> mArtistsSortedAlphabetically = new ArrayList<String>();
+    private List<String> mAlbumsSortedAlphabetically = new ArrayList<String>();
+    private List<String> mArtistsSortedByNumSongs = new ArrayList<String>();
+    private HashMap mArtistAlbums = new HashMap();
+
+    private Listener mListener = null;
+
+    interface Listener {
+        void onAggregateDataUpdate();
+    }
 
     interface SyncProgressListener {
         void onSyncProgress(int numSongs);
     }
 
-    public SongDatabase(Context context) {
+    public SongDatabase(Context context, Listener listener) {
         mContext = context;
+        mListener = listener;
         mOpener = new SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
             @Override
             public void onCreate(SQLiteDatabase db) {
@@ -105,7 +123,7 @@ class SongDatabase {
         new AsyncTask<Void, Void, Void>() {
             @Override
             protected Void doInBackground(Void... args) {
-                refreshSummaries();
+                refreshAggregateData();
                 return (Void) null;
             }
         }.execute((Void) null);
@@ -114,9 +132,18 @@ class SongDatabase {
         mOpener.getWritableDatabase();
     }
 
-    public boolean getSummariesLoaded() { return mSummariesLoaded; }
+    public boolean getAggregateDataLoaded() { return mAggregateDataLoaded; }
     public int getNumSongs() { return mNumSongs; }
     public Date getLastSyncDate() { return mLastSyncDate; }
+    public List<String> getArtistsSortedAlphabetically() { return mArtistsSortedAlphabetically; }
+    public List<String> getAlbumsSortedAlphabetically() { return mAlbumsSortedAlphabetically; }
+    public List<String> getArtistsSortedByNumSongs() { return mArtistsSortedByNumSongs; }
+
+    public List<String> getAlbumsByArtist(String artist) {
+        String lowerArtist = artist.toLowerCase();
+        return mArtistAlbums.containsKey(lowerArtist) ?
+            (List<String>) mArtistAlbums.get(lowerArtist) : null;
+    }
 
     public List<Song> query(String artist, String title, String album, String minRating, boolean shuffle, boolean substring) {
         class QueryBuilder {
@@ -241,24 +268,94 @@ class SongDatabase {
         db.setTransactionSuccessful();
         db.endTransaction();
 
-        refreshSummaries();
+        refreshAggregateData();
         message[0] = "Synchronization complete.";
         return true;
     }
 
-    private void refreshSummaries() {
+    private void refreshAggregateData() {
         SQLiteDatabase db = mOpener.getReadableDatabase();
         Cursor cursor = db.rawQuery("SELECT Timestamp FROM LastUpdateTime", null);
         cursor.moveToFirst();
-        mLastSyncDate = (cursor.getInt(0) > -1) ? new Date((long) cursor.getInt(0) * 1000) : null;
+        Date lastSyncDate = (cursor.getInt(0) > -1) ? new Date((long) cursor.getInt(0) * 1000) : null;
         cursor.close();
 
         cursor = db.rawQuery("SELECT COUNT(*) FROM Songs", null);
         cursor.moveToFirst();
-        mNumSongs = cursor.getInt(0);
-        Log.d(TAG, "got " + mNumSongs + " songs");
+        int numSongs = cursor.getInt(0);
         cursor.close();
 
-        mSummariesLoaded = true;
+        // Map from lowercase artist name to the first row that we saw in its original case.
+        HashMap artistCaseMap = new HashMap();
+
+        HashSet artistSet = new HashSet();
+        HashSet albumSet = new HashSet();
+
+        final HashMap artistSongCounts = new HashMap();  // 'final' so it can be used in an inner class
+        HashMap artistAlbums = new HashMap();
+
+        cursor = db.rawQuery("SELECT Artist, Album, COUNT(*) FROM Songs WHERE Deleted = 0 GROUP BY 1, 2", null);
+        cursor.moveToFirst();
+        while (!cursor.isAfterLast()) {
+            String lowerArtist = cursor.getString(0).toLowerCase();
+            if (!artistCaseMap.containsKey(lowerArtist))
+                artistCaseMap.put(lowerArtist, cursor.getString(0));
+
+            String artist = (String) artistCaseMap.get(lowerArtist);
+            String album = cursor.getString(1);
+            if (album.isEmpty())
+                album = UNKNOWN_ALBUM;
+            int numSongsInAlbum = cursor.getInt(2);
+
+            artistSet.add(artist);
+            albumSet.add(album);
+
+            Integer totalSongsByArtist =
+                artistSongCounts.containsKey(artist) ?
+                (Integer) artistSongCounts.get(artist) : 0;
+            totalSongsByArtist += numSongsInAlbum;
+            artistSongCounts.put(artist, totalSongsByArtist);
+
+            List<String> albums;
+            if (artistAlbums.containsKey(lowerArtist)) {
+                albums = (List<String>) artistAlbums.get(lowerArtist);
+            } else {
+                albums = new ArrayList<String>();
+                artistAlbums.put(lowerArtist, albums);
+            }
+            albums.add(album);
+
+            cursor.moveToNext();
+        }
+        cursor.close();
+
+        List<String> artistsSortedAlphabetically = new ArrayList<String>();
+        artistsSortedAlphabetically.addAll(artistSet);
+        Collections.sort(artistsSortedAlphabetically);
+
+        List<String> albumsSortedAlphabetically = new ArrayList<String>();
+        albumsSortedAlphabetically.addAll(albumSet);
+        Collections.sort(albumsSortedAlphabetically);
+
+        List<String> artistsSortedByNumSongs = new ArrayList<String>();
+        artistsSortedByNumSongs.addAll(artistSet);
+        Collections.sort(artistsSortedByNumSongs, new Comparator<String>() {
+            @Override
+            public int compare(String a, String b) {
+                int aNum = (Integer) artistSongCounts.get(a);
+                int bNum = (Integer) artistSongCounts.get(b);
+                return (aNum == bNum) ? 0 : (aNum > bNum) ? -1 : 1;
+            }
+        });
+
+        mLastSyncDate = lastSyncDate;
+        mNumSongs = numSongs;
+        mArtistsSortedAlphabetically = artistsSortedAlphabetically;
+        mAlbumsSortedAlphabetically = albumsSortedAlphabetically;
+        mArtistsSortedByNumSongs = artistsSortedByNumSongs;
+        mArtistAlbums = artistAlbums;
+        mAggregateDataLoaded = true;
+
+        mListener.onAggregateDataUpdate();
     }
 }

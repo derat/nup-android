@@ -31,7 +31,7 @@ import java.util.List;
 import java.util.HashMap;
 
 public class SearchActivity extends Activity
-                            implements NupService.ContentsLoadListener {
+                            implements NupService.SongDatabaseUpdateListener {
     private static final String TAG = "SearchActivity";
 
     // IDs used to identify activities that we start.
@@ -77,11 +77,11 @@ public class SearchActivity extends Activity
             public void onFocusChange(View v, boolean hasFocus) {
                 if (hasFocus) {
                     String artist = mArtistEdit.getText().toString();
-                    List<String> albums = null;
+                    List<String> albums;
                     if (artist.trim().isEmpty()) {
-                        albums = NupActivity.getService().getAllAlbums();
+                        albums = NupActivity.getService().getSongDb().getAlbumsSortedAlphabetically();
                     } else {
-                        albums = NupActivity.getService().getAlbumsByArtist(artist);
+                        albums = NupActivity.getService().getSongDb().getAlbumsByArtist(artist);
                     }
                     if (albums == null)
                         albums = new ArrayList<String>();
@@ -108,15 +108,15 @@ public class SearchActivity extends Activity
         mShuffleCheckbox = (CheckBox) findViewById(R.id.shuffle_checkbox);
         mSubstringCheckbox = (CheckBox) findViewById(R.id.substring_checkbox);
 
-        NupActivity.getService().setContentsLoadListener(this);
-        onContentsLoad();
+        NupActivity.getService().addSongDatabaseUpdateListener(this);
+        onSongDatabaseUpdate();
     }
 
     @Override
     protected void onDestroy() {
         Log.d(TAG, "activity destroyed");
         super.onDestroy();
-        NupActivity.getService().unregisterListener(this);
+        NupActivity.getService().removeSongDatabaseUpdateListener(this);
         mSingleton = null;
     }
 
@@ -172,12 +172,11 @@ public class SearchActivity extends Activity
         startActivityForResult(new Intent(this, BrowseActivity.class), BROWSE_REQUEST_CODE);
     }
 
-    // Implements NupService.ContentsLoadListener.
+    // Implements NupService.SongDatabaseUpdateListener.
     @Override
-    public void onContentsLoad() {
-        final List<String> artists = NupActivity.getService().getArtistsSortedByNumAlbums();
-        if (artists != null)
-            mArtistEdit.setAdapter(new ArrayAdapter<String>(SearchActivity.this, android.R.layout.simple_dropdown_item_1line, artists));
+    public void onSongDatabaseUpdate() {
+        final List<String> artists = NupActivity.getService().getSongDb().getArtistsSortedByNumSongs();
+        mArtistEdit.setAdapter(new ArrayAdapter<String>(SearchActivity.this, android.R.layout.simple_dropdown_item_1line, artists));
     }
 
     private void sendQuery() {

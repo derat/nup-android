@@ -45,7 +45,8 @@ import java.util.List;
 
 public class NupService extends Service
                         implements Player.Listener,
-                                   FileCache.Listener {
+                                   FileCache.Listener,
+                                   SongDatabase.Listener {
     private static final String TAG = "NupService";
 
     // Identifier used for our "currently playing" notification.
@@ -89,9 +90,9 @@ public class NupService extends Service
         void onPlaylistChange(List<Song> songs);
     }
 
-    // Listener for the server contents (artists and albums) being loaded.
-    interface ContentsLoadListener {
-        void onContentsLoad();
+    // Listener for the song database's aggregate data being updated.
+    interface SongDatabaseUpdateListener {
+        void onSongDatabaseUpdate();
     }
 
     // Plays songs.
@@ -188,8 +189,8 @@ public class NupService extends Service
         }
     };
 
-    private SongListener mSongListener;
-    private ContentsLoadListener mContentsLoadListener;
+    private SongListener mSongListener = null;
+    private HashSet<SongDatabaseUpdateListener> mSongDatabaseUpdateListeners = new HashSet<SongDatabaseUpdateListener>();
 
     @Override
     public void onCreate() {
@@ -210,10 +211,7 @@ public class NupService extends Service
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
         mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
 
-        // TODO: Refetch after server prefs are changed or on failure.
-        new GetContentsTask().execute();
-
-        mSongDb = new SongDatabase(this);
+        mSongDb = new SongDatabase(this, this);
         mCoverLoader = new CoverLoader(this);
 
         mPlayer = new Player(this);
@@ -267,8 +265,12 @@ public class NupService extends Service
     public void setSongListener(SongListener listener) {
         mSongListener = listener;
     }
-    public void setContentsLoadListener(ContentsLoadListener listener) {
-        mContentsLoadListener = listener;
+
+    public void addSongDatabaseUpdateListener(SongDatabaseUpdateListener listener) {
+        mSongDatabaseUpdateListeners.add(listener);
+    }
+    public void removeSongDatabaseUpdateListener(SongDatabaseUpdateListener listener) {
+        mSongDatabaseUpdateListeners.remove(listener);
     }
 
     // Unregister an object that might be registered as one or more of our listeners.
@@ -277,8 +279,6 @@ public class NupService extends Service
     void unregisterListener(Object object) {
         if (mSongListener == object)
             mSongListener = null;
-        if (mContentsLoadListener == object)
-            mContentsLoadListener = null;
     }
 
     public class LocalBinder extends Binder {
@@ -548,71 +548,6 @@ public class NupService extends Service
         }
     }
 
-    // Fetches artists and albums from the server.
-    class GetContentsTask extends AsyncTask<Void, Void, String> {
-        private static final String TAG = "GetContentsTask";
-
-        // User-friendly description of error, if any, while getting contents.
-        private String[] mError = new String[1];
-
-        @Override
-        protected String doInBackground(Void... voidArg) {
-            return Download.downloadString(NupService.this, "/contents", null, mError);
-        }
-
-        @Override
-        protected void onPostExecute(String response) {
-
-            if (response == null || response.isEmpty()) {
-                Toast.makeText(NupService.this, "Unable to get autocomplete data: " + mError[0], Toast.LENGTH_LONG).show();
-                return;
-            }
-
-            try {
-                JSONObject jsonArtistMap = (JSONObject) new JSONTokener(response).nextValue();
-                mArtists.clear();
-                mArtistsSortedByNumAlbums.clear();
-                mAlbums.clear();
-                mAlbumMap.clear();
-                HashSet albumsSet = new HashSet();
-                for (Iterator<String> it = jsonArtistMap.keys(); it.hasNext(); ) {
-                    String artist = it.next();
-                    mArtists.add(artist);
-
-                    JSONArray jsonAlbums = jsonArtistMap.getJSONArray(artist);
-                    List<String> albums = new ArrayList<String>();
-                    for (int i = 0; i < jsonAlbums.length(); ++i) {
-                        albums.add(jsonAlbums.getString(i));
-                        albumsSet.add(jsonAlbums.getString(i));
-                    }
-                    mAlbumMap.put(artist.toLowerCase(), albums);
-                }
-
-                Collections.sort(mArtists);
-
-                mArtistsSortedByNumAlbums.addAll(mArtists);
-                Collections.sort(mArtistsSortedByNumAlbums, new Comparator<String>() {
-                    @Override
-                    public int compare(String a, String b) {
-                        int aNum = ((List<String>) mAlbumMap.get(a.toLowerCase())).size();
-                        int bNum = ((List<String>) mAlbumMap.get(b.toLowerCase())).size();
-                        return (aNum == bNum) ? 0 : (aNum > bNum) ? -1 : 1;
-                    }
-                });
-
-                // Add the de-duped albums to the albums list.
-                mAlbums.addAll(albumsSet);
-                Collections.sort(mAlbums);
-
-                Log.d(TAG, "got listing of " + mArtists.size() + " artist(s) and " + mAlbums.size() + " album(s) from server");
-                if (mContentsLoadListener != null)
-                    mContentsLoadListener.onContentsLoad();
-            } catch (org.json.JSONException e) {
-                Toast.makeText(NupService.this, "Unable to parse autocomplete data: " + e, Toast.LENGTH_LONG).show();
-            }
-        }
-    }
-
     public long getCacheDataBytes() {
         return mCache.getDataBytes();
     }
@@ -786,6 +721,19 @@ public class NupService extends Service
                 mCacheEntryIdToSong.remove(entry.getId());
                 if (mSongListener != null)
                     mSongListener.onSongFileSizeChange(song);
+            }
+        });
+    }
+
+    // Implements SongDatabase.Listener.
+    @Override
+    public void onAggregateDataUpdate() {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                Log.d(TAG, "got notice that aggregate data has been updated");
+                for (SongDatabaseUpdateListener listener : mSongDatabaseUpdateListeners)
+                    listener.onSongDatabaseUpdate();
             }
         });
     }
