@@ -47,9 +47,6 @@ public class SearchActivity extends Activity
     // Points from (lowercased) artist String to List of String album names.
     private HashMap mAlbumMap = new HashMap();
 
-    // Minimum rating set by |mMinRatingSpinner|.
-    private String mMinRating = null;
-
     // Search results received from the server.
     private List<Song> mSearchResults = new ArrayList<Song>();
 
@@ -94,16 +91,6 @@ public class SearchActivity extends Activity
         ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this, R.array.min_rating_array, android.R.layout.simple_spinner_item);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         mMinRatingSpinner.setAdapter(adapter);
-        mMinRatingSpinner.setOnItemSelectedListener(new AdapterView.OnItemSelectedListener() {
-            @Override
-            public void onItemSelected(AdapterView<?> parent, View view, int pos, long id) {
-                SearchActivity.this.mMinRating = parent.getItemAtPosition(pos).toString();
-            }
-            @Override
-            public void onNothingSelected(AdapterView<?> parent) {
-                SearchActivity.this.mMinRating = null;
-            }
-        });
 
         mShuffleCheckbox = (CheckBox) findViewById(R.id.shuffle_checkbox);
         mSubstringCheckbox = (CheckBox) findViewById(R.id.substring_checkbox);
@@ -126,7 +113,7 @@ public class SearchActivity extends Activity
         mTitleEdit.setText("");
         mShuffleCheckbox.setChecked(false);
         mSubstringCheckbox.setChecked(false);
-        // TODO: Reset min rating spinner.
+        mMinRatingSpinner.setSelection(0, true);
     }
 
     @Override
@@ -143,9 +130,17 @@ public class SearchActivity extends Activity
                 if (album != null)
                     mAlbumEdit.setText(album);
 
+                String minRating = data.getStringExtra(BrowseActivity.BUNDLE_MIN_RATING);
+                if (minRating != null) {
+                    int index = Util.getStringArrayIndex(
+                        getResources().getStringArray(R.array.min_rating_array), minRating);
+                    if (index >= 0)
+                        mMinRatingSpinner.setSelection(index);
+                }
+
                 // At least one of these should always be set, but whatever...
                 if (artist != null || album != null)
-                    sendQuery();
+                    doQuery();
             }
         } else if (requestCode == RESULTS_REQUEST_CODE) {
             mSearchResults.clear();
@@ -161,7 +156,7 @@ public class SearchActivity extends Activity
     }
 
     public void onSearchButtonClicked(View view) {
-        sendQuery();
+        doQuery();
     }
 
     public void onResetButtonClicked(View view) {
@@ -179,12 +174,12 @@ public class SearchActivity extends Activity
         mArtistEdit.setAdapter(new ArrayAdapter<String>(SearchActivity.this, android.R.layout.simple_dropdown_item_1line, artists));
     }
 
-    private void sendQuery() {
+    private void doQuery() {
         QueryParams params = new QueryParams();
         params.artist = mArtistEdit.getText().toString().trim();
         params.title = mTitleEdit.getText().toString().trim();
         params.album = mAlbumEdit.getText().toString().trim();
-        params.minRating = mMinRating;
+        params.minRating = mMinRatingSpinner.getSelectedItem().toString();
         params.shuffle = mShuffleCheckbox.isChecked();
         params.substring = mSubstringCheckbox.isChecked();
 

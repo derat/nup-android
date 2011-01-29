@@ -39,6 +39,7 @@
   <string name="replace_all">Replace all</string>
   <string name="search">Search</string>
   <string name="search_results">Search results</string>
+  <string name="search_with_75_rating">Search with 0.75 rating</string>
   <string name="server_url">Server URL</string>
   <string name="server_url_description">Location of music server, e.g. \"https://www.example.org:1234/\".</string>
   <string name="settings">Settings</string>

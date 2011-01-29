@@ -15,6 +15,7 @@ import android.widget.Toast;
 public class BrowseActivity extends ListActivity {
     public static final String BUNDLE_ARTIST = "artist";
     public static final String BUNDLE_ALBUM = "album";
+    public static final String BUNDLE_MIN_RATING = "min_rating";
 
     private static final int BROWSE_ARTISTS_REQUEST_CODE = 1;
     private static final int BROWSE_ALBUMS_REQUEST_CODE = 2;

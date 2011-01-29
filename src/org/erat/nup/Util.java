@@ -36,4 +36,12 @@ class Util {
         str = str.replace("*", "%2A");
         return str;
     }
+
+    // Find the position of a string in an array.  Returns -1 if it's not there.
+    public static int getStringArrayIndex(String[] array, String str) {
+        for (int i = 0; i < array.length; ++i)
+            if (array[i].equals(str))
+                return i;
+        return -1;
+    }
 }
