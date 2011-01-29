@@ -142,7 +142,7 @@ class SongDatabase {
         new AsyncTask<Void, Void, Void>() {
             @Override
             protected Void doInBackground(Void... args) {
-                loadAggregateData(mOpener.getReadableDatabase());
+                loadAggregateData(mOpener.getReadableDatabase(), false);
                 return (Void) null;
             }
         }.execute();
@@ -213,6 +213,7 @@ class SongDatabase {
         SQLiteDatabase db = mOpener.getWritableDatabase();
         db.beginTransaction();
 
+        int numSongsUpdated = 0;
         try {
             Cursor cursor = db.rawQuery("SELECT MaxLastModified FROM LastUpdateTime", null);
             cursor.moveToFirst();
@@ -232,7 +233,6 @@ class SongDatabase {
             //   ID, we'll miss the earlier song.
             int minLastModified = maxLastModified + 1;
 
-            int numSongs = 0;
             while (true) {
                 String response = Download.downloadString(
                     mContext, "/songs", String.format("minSongId=%d&minLastModified=%d", maxSongId + 1, minLastModified), message);
@@ -248,7 +248,7 @@ class SongDatabase {
                         JSONArray jsonSong = jsonSongs.getJSONArray(i);
                         if (jsonSong.length() != 11) {
                             db.endTransaction();
-                            message[0] = "Row " + numSongs + " from server had " + jsonSong.length() + " row(s); expected 11";
+                            message[0] = "Row " + numSongsUpdated + " from server had " + jsonSong.length() + " row(s); expected 11";
                             return false;
                         }
                         ContentValues values = new ContentValues(11);
@@ -265,11 +265,11 @@ class SongDatabase {
                         values.put("LastModified", jsonSong.getInt(10));
                         db.replace("Songs", "", values);
 
-                        numSongs++;
+                        numSongsUpdated++;
                         maxSongId = Math.max(maxSongId, jsonSong.getInt(0));
                         maxLastModified = Math.max(maxLastModified, jsonSong.getInt(9));
                     }
-                    listener.onSyncProgress(numSongs);
+                    listener.onSyncProgress(numSongsUpdated);
                 } catch (org.json.JSONException e) {
                     message[0] = "Couldn't parse response: " + e;
                     return false;
@@ -281,14 +281,15 @@ class SongDatabase {
             values.put("MaxLastModified", maxLastModified);
             db.update("LastUpdateTime", values, null, null);
 
-            updateStatsTables(db);
+            if (numSongsUpdated > 0)
+                updateStatsTables(db);
 
             db.setTransactionSuccessful();
         } finally {
             db.endTransaction();
         }
 
-        loadAggregateData(db);
+        loadAggregateData(db, numSongsUpdated > 0);
         message[0] = "Synchronization complete.";
         return true;
     }
@@ -344,17 +345,23 @@ class SongDatabase {
         }
     }
 
-    private void loadAggregateData(SQLiteDatabase db) {
+    private void loadAggregateData(SQLiteDatabase db, boolean songsUpdated) {
         Cursor cursor = db.rawQuery("SELECT Timestamp FROM LastUpdateTime", null);
         cursor.moveToFirst();
         Date lastSyncDate = (cursor.getInt(0) > -1) ? new Date((long) cursor.getInt(0) * 1000) : null;
         cursor.close();
 
+        // If the song data didn't change and we've already loaded it, bail out early.
+        if (!songsUpdated && mAggregateDataLoaded) {
+            mLastSyncDate = lastSyncDate;
+            mListener.onAggregateDataUpdate();
+            return;
+        }
+
         cursor = db.rawQuery("SELECT COUNT(*) FROM Songs", null);
         cursor.moveToFirst();
         int numSongs = cursor.getInt(0);
         cursor.close();
-
 
         HashSet<String> artistSet = new HashSet<String>();
         HashSet<String> albumSet = new HashSet<String>();

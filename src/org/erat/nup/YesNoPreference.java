@@ -76,16 +76,15 @@ class YesNoPreference extends DialogPreference
     private class SyncSongListTask extends AsyncTask<Void, Integer, String>
                                    implements DialogInterface.OnCancelListener,
                                               SongDatabase.SyncProgressListener {
-        private static final String MESSAGE_FMT = "Downloaded %d songs.";
-
         private ProgressDialog mDialog;
 
         @Override
         protected void onPreExecute() {
             mDialog = ProgressDialog.show(
                 mContext,
-                "Syncing song list",
-                String.format(MESSAGE_FMT, 0),
+                mContext.getString(R.string.syncing_song_list),
+                mContext.getResources().getQuantityString(
+                    R.plurals.sync_progress_fmt, 0, 0),
                 true,   // indeterminate
                 true);  // cancelable
         }
@@ -101,14 +100,16 @@ class YesNoPreference extends DialogPreference
         protected void onProgressUpdate(Integer... progress) {
             int numSongs = progress[0];
             mDialog.setProgress(numSongs);
-            mDialog.setMessage(String.format(MESSAGE_FMT, numSongs));
+            mDialog.setMessage(
+                mContext.getResources().getQuantityString(
+                    R.plurals.sync_progress_fmt, numSongs, numSongs));
         }
 
         @Override
         protected void onPostExecute(String message) {
             mDialog.dismiss();
             updateSyncMessage();
-            Toast.makeText(mContext, message, Toast.LENGTH_LONG).show();
+            Toast.makeText(mContext, message, Toast.LENGTH_SHORT).show();
         }
 
         // Implements DialogInterface.OnCancelListener.

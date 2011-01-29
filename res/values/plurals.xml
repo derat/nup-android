@@ -1,5 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <plurals name="sync_progress_fmt">
+    <item quantity="one">Updated %d song...</item>
+    <item quantity="other">Updated %d songs...</item>
+  </plurals>
   <plurals name="sync_status_fmt">
     <item quantity="one">%1$d song\nLast sync: %2$s</item>
     <item quantity="other">%1$d songs\nLast sync: %2$s</item>

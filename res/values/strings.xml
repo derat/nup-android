@@ -43,6 +43,7 @@
   <string name="server_url_description">Location of music server, e.g. \"https://www.example.org:1234/\".</string>
   <string name="settings">Settings</string>
   <string name="shuffle">Shuffle</string>
+  <string name="syncing_song_list">Syncing song list</string>
   <string name="songs_to_preload">Songs to preload</string>
   <string name="songs_to_preload_description">Number of songs to load in advance</string>
   <string name="songs_to_preload_value_plural">%d songs</string>
