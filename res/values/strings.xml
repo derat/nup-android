@@ -51,6 +51,7 @@
   <string name="songs_to_preload_value_singular">%d song</string>
   <string name="startup_notification_message">Service is running.</string>
   <string name="startup_notification_name">nup</string>
+  <string name="sync_progress_rebuilding_stats_tables">Rebuilding stats tables...</string>
   <string name="sync_song_list">Sync song list</string>
   <string name="sync_song_list_message">Sync the server\'s song list?</string>
   <string name="substring">Substring</string>

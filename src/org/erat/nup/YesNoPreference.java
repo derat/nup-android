@@ -99,10 +99,15 @@ class YesNoPreference extends DialogPreference
         @Override
         protected void onProgressUpdate(Integer... progress) {
             int numSongs = progress[0];
-            mDialog.setProgress(numSongs);
-            mDialog.setMessage(
-                mContext.getResources().getQuantityString(
-                    R.plurals.sync_progress_fmt, numSongs, numSongs));
+            if (numSongs >= 0) {
+                mDialog.setProgress(numSongs);
+                mDialog.setMessage(
+                    mContext.getResources().getQuantityString(
+                        R.plurals.sync_progress_fmt, numSongs, numSongs));
+            } else {
+                mDialog.setMessage(
+                    mContext.getString(R.string.sync_progress_rebuilding_stats_tables));
+            }
         }
 
         @Override
@@ -120,8 +125,8 @@ class YesNoPreference extends DialogPreference
 
         // Implements SongDatabase.SyncProgressListener.
         @Override
-        public void onSyncProgress(int numSongs) {
-            publishProgress(numSongs);
+        public void onSyncProgress(SongDatabase.SyncState state, int numSongs) {
+            publishProgress(state == SongDatabase.SyncState.UPDATING_STATS ? -1 : numSongs);
         }
     }
 }

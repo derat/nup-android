@@ -81,8 +81,12 @@ class SongDatabase {
         void onAggregateDataUpdate();
     }
 
+    public enum SyncState {
+        UPDATING_SONGS,
+        UPDATING_STATS
+    }
     interface SyncProgressListener {
-        void onSyncProgress(int numSongs);
+        void onSyncProgress(SyncState state, int numSongs);
     }
 
     public SongDatabase(Context context, Listener listener) {
@@ -296,7 +300,7 @@ class SongDatabase {
                         numSongsUpdated++;
                         maxSongId = Math.max(maxSongId, songId);
                     }
-                    listener.onSyncProgress(numSongsUpdated);
+                    listener.onSyncProgress(SyncState.UPDATING_SONGS, numSongsUpdated);
                 } catch (org.json.JSONException e) {
                     message[0] = "Couldn't parse response: " + e;
                     return false;
@@ -308,8 +312,10 @@ class SongDatabase {
             values.put("MaxLastModifiedUsec", maxLastModifiedUsec);
             db.update("LastUpdateTime", values, null, null);
 
-            if (numSongsUpdated > 0)
+            if (numSongsUpdated > 0) {
+                listener.onSyncProgress(SyncState.UPDATING_STATS, numSongsUpdated);
                 updateStatsTables(db);
+            }
 
             db.setTransactionSuccessful();
         } finally {
