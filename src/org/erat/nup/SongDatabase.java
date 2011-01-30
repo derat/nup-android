@@ -267,7 +267,7 @@ class SongDatabase {
 
                         numSongsUpdated++;
                         maxSongId = Math.max(maxSongId, jsonSong.getInt(0));
-                        maxLastModified = Math.max(maxLastModified, jsonSong.getInt(9));
+                        maxLastModified = Math.max(maxLastModified, jsonSong.getInt(10));
                     }
                     listener.onSyncProgress(numSongsUpdated);
                 } catch (org.json.JSONException e) {
