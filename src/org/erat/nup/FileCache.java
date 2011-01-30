@@ -57,7 +57,7 @@ class FileCache implements Runnable {
     private HashSet mPinnedIds = new HashSet();
 
     // Persistent information about cached items.
-    private FileCacheDatabase mDb;
+    private FileCacheDatabase mDb = null;
 
     private SharedPreferences mPrefs;
 
@@ -73,13 +73,12 @@ class FileCache implements Runnable {
             Log.e(TAG, "media has state " + state + "; we need " + Environment.MEDIA_MOUNTED);
 
         mMusicDir = mContext.getExternalFilesDir(Environment.DIRECTORY_MUSIC);
-        mDb = new FileCacheDatabase(mContext);
-
         mPrefs = PreferenceManager.getDefaultSharedPreferences(context);
     }
 
     @Override
     public void run() {
+        mDb = new FileCacheDatabase(mContext);
         Looper.prepare();
         mHandler = new Handler();
         Looper.loop();

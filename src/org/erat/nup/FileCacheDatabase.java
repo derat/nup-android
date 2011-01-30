@@ -57,49 +57,30 @@ class FileCacheDatabase {
             }
         };
 
-        // Make sure that we have a writable database when we try to do the upgrade.
-        mOpener.getWritableDatabase();
+        // Block until we've loaded everything into memory.
+        loadExistingEntries();
+    }
+
+    private synchronized void loadExistingEntries() {
+        Cursor cursor = mOpener.getReadableDatabase().rawQuery(
+            "SELECT CacheEntryId, RemotePath, LocalPath, IFNULL(ContentLength, 0), IFNULL(ETag, '') FROM CacheEntries", null);
+        cursor.moveToFirst();
+        while (!cursor.isAfterLast()) {
+            FileCacheEntry entry = new FileCacheEntry(
+                cursor.getInt(0), cursor.getString(1), cursor.getString(2), cursor.getLong(3), cursor.getString(4));
+            mEntries.put(entry.getId(), entry);
+            mEntriesByRemotePath.put(entry.getRemotePath(), entry);
+            cursor.moveToNext();
+        }
+        cursor.close();
     }
 
     public synchronized FileCacheEntry getEntryById(int id) {
-        FileCacheEntry entry = mEntries.get(id);
-        if (entry != null)
-            return entry;
-
-        Cursor cursor = mOpener.getReadableDatabase().rawQuery(
-            "SELECT " +
-            "  RemotePath, " +
-            "  LocalPath, " +
-            "  IFNULL(ContentLength, 0), " +
-            "  IFNULL(ETag, '') " +
-            "FROM CacheEntries " +
-            "WHERE CacheEntryId = ?",
-            new String[]{ Integer.toString(id) });
-        cursor.moveToFirst();
-        if (!cursor.isAfterLast())
-            entry = new FileCacheEntry(id, cursor.getString(0), cursor.getString(1), cursor.getLong(2), cursor.getString(3));
-        cursor.close();
-
-        if (entry != null) {
-            mEntries.put(id, entry);
-            mEntriesByRemotePath.put(entry.getRemotePath(), entry);
-        }
-        return entry;
+        return mEntries.get(id);
     }
 
     public synchronized FileCacheEntry getEntryForRemotePath(String remotePath) {
-        FileCacheEntry entry = mEntriesByRemotePath.get(remotePath);
-        if (entry != null)
-            return entry;
-
-        Cursor cursor = mOpener.getReadableDatabase().rawQuery(
-            "SELECT CacheEntryId FROM CacheEntries WHERE RemotePath = ?",
-            new String[]{remotePath});
-        cursor.moveToFirst();
-        if (!cursor.isAfterLast())
-            entry = getEntryById(cursor.getInt(0));
-        cursor.close();
-        return entry;
+        return mEntriesByRemotePath.get(remotePath);
     }
 
     public synchronized FileCacheEntry addEntry(String remotePath, String localPath) {
@@ -120,26 +101,29 @@ class FileCacheDatabase {
 
     public synchronized void removeEntry(int id) {
         FileCacheEntry entry = mEntries.get(id);
-        if (entry != null) {
-            mEntries.remove(id);
-            mEntriesByRemotePath.remove(entry.getRemotePath());
-        }
+        if (entry == null)
+            return;
+
+        mEntries.remove(id);
+        mEntriesByRemotePath.remove(entry.getRemotePath());
         mOpener.getWritableDatabase().execSQL(
             "DELETE FROM CacheEntries WHERE CacheEntryId = ?", new Object[]{id});
     }
 
     public synchronized void setContentLength(int id, long contentLength) {
         FileCacheEntry entry = mEntries.get(id);
-        if (entry != null)
-            entry.setContentLength(contentLength);
+        if (entry == null)
+            return;
+
+        entry.setContentLength(contentLength);
         mOpener.getWritableDatabase().execSQL(
-            "Update CacheEntries SET ContentLength = ? WHERE CacheEntryId = ?",
+            "UPDATE CacheEntries SET ContentLength = ? WHERE CacheEntryId = ?",
             new Object[]{ contentLength, id });
     }
 
     public synchronized void updateLastAccessTime(int id) {
         mOpener.getWritableDatabase().execSQL(
-            "Update CacheEntries SET LastAccessTime = ? WHERE CacheEntryId = ?",
+            "UPDATE CacheEntries SET LastAccessTime = ? WHERE CacheEntryId = ?",
             new Object[]{ new Date().getTime() / 1000, id });
     }
 

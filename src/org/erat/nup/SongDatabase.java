@@ -201,9 +201,6 @@ class SongDatabase {
                 return (Void) null;
             }
         }.execute();
-
-        // Make sure that we have a writable database when we try to do the upgrade.
-        mOpener.getWritableDatabase();
     }
 
     public boolean getAggregateDataLoaded() { return mAggregateDataLoaded; }
