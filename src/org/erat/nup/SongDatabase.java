@@ -29,10 +29,13 @@ class SongDatabase {
     public static final String UNKNOWN_ALBUM = "[unknown]";
 
     private static final String DATABASE_NAME = "NupSongs";
+
     private static final int DATABASE_VERSION = 6;
 
     private static final String MAX_QUERY_RESULTS = "250";
 
+    // IMPORTANT NOTE: When updating any of these, you must replace all previous references in
+    // upgradeFromPreviousVersion() with the hardcoded older version of the string.
     private static final String CREATE_SONGS_SQL =
         "CREATE TABLE Songs (" +
         "  SongId INTEGER PRIMARY KEY NOT NULL, " +
@@ -120,17 +123,31 @@ class SongDatabase {
             private void upgradeFromPreviousVersion(SQLiteDatabase db, int newVersion) {
                 if (newVersion == 2) {
                     // Version 2: Create LastUpdateTime table.
-                    db.execSQL(CREATE_LAST_UPDATE_TIME_SQL);
-                    db.execSQL(INSERT_LAST_UPDATE_TIME_SQL);
+                    db.execSQL("CREATE TABLE LastUpdateTime (" +
+                               "  Timestamp INTEGER NOT NULL, " +
+                               "  MaxLastModified INTEGER NOT NULL)");
+                    db.execSQL("INSERT INTO LastUpdateTime " +
+                               "  (Timestamp, MaxLastModified) " +
+                               "  VALUES(0, 0)");
                 } else if (newVersion == 3) {
                     // Version 3: Add Songs.Deleted column.
                     db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp");
-                    db.execSQL(CREATE_SONGS_SQL);
-                    db.execSQL(
-                        "INSERT INTO Songs " +
-                        "SELECT SongId, Sha1, Filename, Artist, Title, Album, " +
-                        "    TrackNumber, Length, Rating, 0, LastModified " +
-                        "FROM SongsTmp");
+                    db.execSQL("CREATE TABLE Songs (" +
+                               "  SongId INTEGER PRIMARY KEY NOT NULL, " +
+                               "  Sha1 CHAR(40) NOT NULL, " +
+                               "  Filename VARCHAR(256) NOT NULL, " +
+                               "  Artist VARCHAR(256) NOT NULL, " +
+                               "  Title VARCHAR(256) NOT NULL, " +
+                               "  Album VARCHAR(256) NOT NULL, " +
+                               "  TrackNumber INTEGER NOT NULL, " +
+                               "  Length INTEGER NOT NULL, " +
+                               "  Rating FLOAT NOT NULL, " +
+                               "  Deleted BOOLEAN NOT NULL, " +
+                               "  LastModifiedUsec INTEGER NOT NULL)");
+                    db.execSQL("INSERT INTO Songs " +
+                               "SELECT SongId, Sha1, Filename, Artist, Title, Album, " +
+                               "    TrackNumber, Length, Rating, 0, LastModified " +
+                               "FROM SongsTmp");
                     db.execSQL("DROP TABLE SongsTmp");
                 } else if (newVersion == 4) {
                     // Version 4: Create ArtistAlbumStats table and indexes on Songs.Artist and Songs.Album.
@@ -141,7 +158,18 @@ class SongDatabase {
                     // Version 5: LastModified -> LastModifiedUsec (seconds to microseconds).
                     db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp");
                     db.execSQL("UPDATE SongsTmp SET LastModified = LastModified * 1000000");
-                    db.execSQL(CREATE_SONGS_SQL);
+                    db.execSQL("CREATE TABLE Songs (" +
+                               "  SongId INTEGER PRIMARY KEY NOT NULL, " +
+                               "  Sha1 CHAR(40) NOT NULL, " +
+                               "  Filename VARCHAR(256) NOT NULL, " +
+                               "  Artist VARCHAR(256) NOT NULL, " +
+                               "  Title VARCHAR(256) NOT NULL, " +
+                               "  Album VARCHAR(256) NOT NULL, " +
+                               "  TrackNumber INTEGER NOT NULL, " +
+                               "  Length INTEGER NOT NULL, " +
+                               "  Rating FLOAT NOT NULL, " +
+                               "  Deleted BOOLEAN NOT NULL, " +
+                               "  LastModifiedUsec INTEGER NOT NULL)");
                     db.execSQL("INSERT INTO Songs SELECT * FROM SongsTmp");
                     db.execSQL("DROP TABLE SongsTmp");
 
