@@ -36,7 +36,7 @@
         android:layout_alignParentRight="true"
         android:paddingTop="2dp"
         android:paddingLeft="2dp"
-        android:paddingRight="2dp"
+        android:paddingRight="1dp"
         android:textSize="11dp"
         android:textColor="@color/playlist_download_status_fg"
         android:singleLine="true"
