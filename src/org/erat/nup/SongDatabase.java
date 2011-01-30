@@ -29,23 +29,20 @@ class SongDatabase {
     public static final String UNKNOWN_ALBUM = "[unknown]";
 
     private static final String DATABASE_NAME = "NupSongs";
-    private static final int DATABASE_VERSION = 5;
+    private static final int DATABASE_VERSION = 6;
 
     private static final String MAX_QUERY_RESULTS = "250";
 
     private static final String CREATE_SONGS_SQL =
         "CREATE TABLE Songs (" +
         "  SongId INTEGER PRIMARY KEY NOT NULL, " +
-        "  Sha1 CHAR(40) NOT NULL, " +
         "  Filename VARCHAR(256) NOT NULL, " +
         "  Artist VARCHAR(256) NOT NULL, " +
         "  Title VARCHAR(256) NOT NULL, " +
         "  Album VARCHAR(256) NOT NULL, " +
         "  TrackNumber INTEGER NOT NULL, " +
         "  Length INTEGER NOT NULL, " +
-        "  Rating FLOAT NOT NULL, " +
-        "  Deleted BOOLEAN NOT NULL, " +
-        "  LastModifiedUsec INTEGER NOT NULL)";
+        "  Rating FLOAT NOT NULL)";
     private static final String ADD_SONGS_ARTIST_INDEX_SQL =
         "CREATE INDEX Artist ON Songs (Artist)";
     private static final String ADD_SONGS_ALBUM_INDEX_SQL =
@@ -149,6 +146,14 @@ class SongDatabase {
                     db.execSQL(CREATE_LAST_UPDATE_TIME_SQL);
                     db.execSQL("INSERT INTO LastUpdateTime SELECT * FROM LastUpdateTimeTmp");
                     db.execSQL("DROP TABLE LastUpdateTimeTmp");
+                } else if (newVersion == 6) {
+                    // Version 6: Drop Sha1, Deleted, and LastModifiedUsec columns from Songs table.
+                    db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp");
+                    db.execSQL(CREATE_SONGS_SQL);
+                    db.execSQL("INSERT INTO Songs " +
+                               "SELECT SongId, Filename, Artist, Title, Album, TrackNumber, Length, Rating " +
+                               "FROM SongsTmp WHERE Deleted = 0");
+                    db.execSQL("DROP TABLE SongsTmp");
                 } else {
                     throw new RuntimeException(
                         "Got request to upgrade database to unknown version " + newVersion);
@@ -202,7 +207,6 @@ class SongDatabase {
         builder.add("Title", title, true, substring);
         builder.add("Album", album, true, substring);
         builder.addRaw("Rating >= ?", minRating, false);
-        builder.add("Deleted", "0", false, false);
 
         Cursor cursor = mOpener.getReadableDatabase().query(
             "Songs",
@@ -265,27 +269,32 @@ class SongDatabase {
 
                     for (int i = 0; i < jsonSongs.length(); ++i) {
                         JSONArray jsonSong = jsonSongs.getJSONArray(i);
-                        if (jsonSong.length() != 11) {
+                        if (jsonSong.length() != 9) {
                             db.endTransaction();
                             message[0] = "Row " + numSongsUpdated + " from server had " + jsonSong.length() + " row(s); expected 11";
                             return false;
                         }
-                        ContentValues values = new ContentValues(11);
-                        values.put("SongId", jsonSong.getInt(0));
-                        values.put("Sha1", jsonSong.getString(1));
-                        values.put("Filename", jsonSong.getString(2));
-                        values.put("Artist", jsonSong.getString(3));
-                        values.put("Title", jsonSong.getString(4));
-                        values.put("Album", jsonSong.getString(5));
-                        values.put("TrackNumber", jsonSong.getInt(6));
-                        values.put("Length", jsonSong.getInt(7));
-                        values.put("Rating", jsonSong.getDouble(8));
-                        values.put("Deleted", jsonSong.getInt(9));
-                        values.put("LastModifiedUsec", jsonSong.getLong(10));
-                        db.replace("Songs", "", values);
+
+                        int songId = jsonSong.getInt(0);
+                        boolean deleted = (jsonSong.getInt(8) != 0);
+
+                        if (!deleted) {
+                            ContentValues values = new ContentValues(8);
+                            values.put("SongId", songId);
+                            values.put("Filename", jsonSong.getString(1));
+                            values.put("Artist", jsonSong.getString(2));
+                            values.put("Title", jsonSong.getString(3));
+                            values.put("Album", jsonSong.getString(4));
+                            values.put("TrackNumber", jsonSong.getInt(5));
+                            values.put("Length", jsonSong.getInt(6));
+                            values.put("Rating", jsonSong.getDouble(7));
+                            db.replace("Songs", "", values);
+                        } else {
+                            db.delete("Songs", "SongId = ?", new String[]{ Integer.toString(songId) });
+                        }
 
                         numSongsUpdated++;
-                        maxSongId = Math.max(maxSongId, jsonSong.getInt(0));
+                        maxSongId = Math.max(maxSongId, songId);
                     }
                     listener.onSyncProgress(numSongsUpdated);
                 } catch (org.json.JSONException e) {
@@ -319,7 +328,7 @@ class SongDatabase {
         // Map from artist name to map from album name to number of songs.
         HashMap<String,HashMap<String,Integer>> artistAlbums = new HashMap<String,HashMap<String,Integer>>();
 
-        Cursor cursor = db.rawQuery("SELECT Artist, Album, COUNT(*) FROM Songs WHERE Deleted = 0 GROUP BY 1, 2", null);
+        Cursor cursor = db.rawQuery("SELECT Artist, Album, COUNT(*) FROM Songs GROUP BY 1, 2", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
             String lowerArtist = cursor.getString(0).toLowerCase();
