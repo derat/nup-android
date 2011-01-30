@@ -10,6 +10,7 @@ import android.database.sqlite.SQLiteOpenHelper;
 
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 
 class FileCacheDatabase {
@@ -18,6 +19,12 @@ class FileCacheDatabase {
     private static final int DATABASE_VERSION = 2;
 
     private final SQLiteOpenHelper mOpener;
+
+    // Map from an entry's ID to the entry itself.
+    private final HashMap<Integer,FileCacheEntry> mEntries = new HashMap<Integer,FileCacheEntry>();
+
+    // Map from an entry's remote path to the entry itself.
+    private final HashMap<String,FileCacheEntry> mEntriesByRemotePath = new HashMap<String,FileCacheEntry>();
 
     public FileCacheDatabase(Context context) {
         mOpener = new SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
@@ -55,6 +62,10 @@ class FileCacheDatabase {
     }
 
     public synchronized FileCacheEntry getEntryById(int id) {
+        FileCacheEntry entry = mEntries.get(id);
+        if (entry != null)
+            return entry;
+
         Cursor cursor = mOpener.getReadableDatabase().rawQuery(
             "SELECT " +
             "  RemotePath, " +
@@ -63,27 +74,35 @@ class FileCacheDatabase {
             "  IFNULL(ETag, '') " +
             "FROM CacheEntries " +
             "WHERE CacheEntryId = ?",
-            new String[]{Integer.toString(id)});
+            new String[]{ Integer.toString(id) });
         cursor.moveToFirst();
-        FileCacheEntry entry =
-            !cursor.isAfterLast() ?
-            new FileCacheEntry(id, cursor.getString(0), cursor.getString(1), cursor.getLong(2), cursor.getString(3)) :
-            null;
+        if (!cursor.isAfterLast())
+            entry = new FileCacheEntry(id, cursor.getString(0), cursor.getString(1), cursor.getLong(2), cursor.getString(3));
         cursor.close();
+
+        if (entry != null) {
+            mEntries.put(id, entry);
+            mEntriesByRemotePath.put(entry.getRemotePath(), entry);
+        }
         return entry;
     }
 
     public synchronized FileCacheEntry getEntryForRemotePath(String remotePath) {
+        FileCacheEntry entry = mEntriesByRemotePath.get(remotePath);
+        if (entry != null)
+            return entry;
+
         Cursor cursor = mOpener.getReadableDatabase().rawQuery(
             "SELECT CacheEntryId FROM CacheEntries WHERE RemotePath = ?",
             new String[]{remotePath});
         cursor.moveToFirst();
-        FileCacheEntry entry = cursor.isAfterLast() ? null : getEntryById(cursor.getInt(0));
+        if (!cursor.isAfterLast())
+            entry = getEntryById(cursor.getInt(0));
         cursor.close();
         return entry;
     }
 
-    public synchronized int addEntry(String remotePath, String localPath) {
+    public synchronized FileCacheEntry addEntry(String remotePath, String localPath) {
         SQLiteDatabase db = mOpener.getWritableDatabase();
         db.execSQL(
             "INSERT INTO CacheEntries (RemotePath, LocalPath, LastAccessTime) VALUES(?, ?, ?)",
@@ -92,15 +111,27 @@ class FileCacheDatabase {
         cursor.moveToFirst();
         int id = cursor.getInt(0);
         cursor.close();
-        return id;
+
+        FileCacheEntry entry = new FileCacheEntry(id, remotePath, localPath, 0, "");
+        mEntries.put(id, entry);
+        mEntriesByRemotePath.put(remotePath, entry);
+        return entry;
     }
 
     public synchronized void removeEntry(int id) {
+        FileCacheEntry entry = mEntries.get(id);
+        if (entry != null) {
+            mEntries.remove(id);
+            mEntriesByRemotePath.remove(entry.getRemotePath());
+        }
         mOpener.getWritableDatabase().execSQL(
             "DELETE FROM CacheEntries WHERE CacheEntryId = ?", new Object[]{id});
     }
 
     public synchronized void setContentLength(int id, long contentLength) {
+        FileCacheEntry entry = mEntries.get(id);
+        if (entry != null)
+            entry.setContentLength(contentLength);
         mOpener.getWritableDatabase().execSQL(
             "Update CacheEntries SET ContentLength = ? WHERE CacheEntryId = ?",
             new Object[]{ contentLength, id });

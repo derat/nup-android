@@ -155,8 +155,7 @@ class FileCache implements Runnable {
         FileCacheEntry entry = mDb.getEntryForRemotePath(remotePath);
         if (entry == null) {
             String localPath = new File(mMusicDir, filenameSuggestion).getAbsolutePath();
-            int id = mDb.addEntry(remotePath, localPath);
-            entry = mDb.getEntryForRemotePath(remotePath);
+            entry = mDb.addEntry(remotePath, localPath);
         } else {
             mDb.updateLastAccessTime(entry.getId());
         }
@@ -195,7 +194,7 @@ class FileCache implements Runnable {
         private static final int BUFFER_SIZE = 8 * 1024;
 
         // Cache entry that we're downloading.
-        private FileCacheEntry mEntry;
+        private final FileCacheEntry mEntry;
 
         // The entry's ID.
         private final int mId;
@@ -320,11 +319,9 @@ class FileCache implements Runnable {
                 return DownloadStatus.FATAL_ERROR;
             }
 
-            // Update the cache entry with the total content size.
-            if (mExistingLength == 0) {
+            // Update the cache entry with the total file size.
+            if (mExistingLength == 0)
                 mDb.setContentLength(mId, mResult.getEntity().getContentLength());
-                mEntry = mDb.getEntryForRemotePath(mEntry.getRemotePath());
-            }
 
             return DownloadStatus.SUCCESS;
         }
