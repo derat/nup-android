@@ -130,8 +130,10 @@ public class NupActivity extends Activity
             // Get current state from service.
             onPlaylistChange(mService.getSongs());
             onPauseStateChange(mService.getPaused());
-            if (getCurrentSong() != null)
+            if (getCurrentSong() != null) {
                 onSongPositionChange(mService.getCurrentSong(), mService.getCurrentSongLastPositionMs(), 0);
+                mPlaylistView.smoothScrollToPosition(mCurrentSongIndex);
+            }
         }
 
         public void onServiceDisconnected(ComponentName className) {
