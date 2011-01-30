@@ -74,7 +74,7 @@ class CoverLoader {
     }
 
     private File lookForLocalCover(final String artist, final String album) {
-        String filename = Util.escapeFilename(artist + "-" + album + ".jpg");
+        String filename = getDefaultFilename(artist, album);
         startLoad(filename);
         try {
             File file = new File(mCoverDir, filename);
@@ -84,10 +84,11 @@ class CoverLoader {
             finishLoad(filename);
         }
 
+        final String suffix = getFilenameSuffixForAlbum(album);
         String[] matchingFilenames = mCoverDir.list(new FilenameFilter() {
             @Override
             public boolean accept(File dir, String filename) {
-                if (!filename.endsWith(Util.escapeFilename("-" + album + ".jpg")))
+                if (!filename.endsWith(suffix))
                     return false;
 
                 startLoad(filename);
@@ -113,6 +114,9 @@ class CoverLoader {
             return null;
 
         String filename = Util.escapeFilename(remoteFilename);
+        if (!filename.endsWith(getFilenameSuffixForAlbum(album)))
+            Log.w(TAG, "got unexpected cover filename " + filename + " for album " + album);
+
         startLoad(filename);
 
         boolean success = false;
@@ -198,5 +202,15 @@ class CoverLoader {
         } finally {
             mLock.unlock();
         }
+    }
+
+    // Get the default file that we'd look for for a given artist and album.
+    private String getDefaultFilename(String artist, String album) {
+        return Util.escapeFilename(artist + "-" + album + ".jpg");
+    }
+
+    // Get the file suffix that we'd look for for a given album.
+    private String getFilenameSuffixForAlbum(String album) {
+        return Util.escapeFilename("-" + album + ".jpg");
     }
 }
