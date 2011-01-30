@@ -29,7 +29,7 @@ class SongDatabase {
     public static final String UNKNOWN_ALBUM = "[unknown]";
 
     private static final String DATABASE_NAME = "NupSongs";
-    private static final int DATABASE_VERSION = 4;
+    private static final int DATABASE_VERSION = 5;
 
     private static final String MAX_QUERY_RESULTS = "250";
 
@@ -45,7 +45,7 @@ class SongDatabase {
         "  Length INTEGER NOT NULL, " +
         "  Rating FLOAT NOT NULL, " +
         "  Deleted BOOLEAN NOT NULL, " +
-        "  LastModified INTEGER NOT NULL)";
+        "  LastModifiedUsec INTEGER NOT NULL)";
     private static final String ADD_SONGS_ARTIST_INDEX_SQL =
         "CREATE INDEX Artist ON Songs (Artist)";
     private static final String ADD_SONGS_ALBUM_INDEX_SQL =
@@ -60,10 +60,10 @@ class SongDatabase {
     private static final String CREATE_LAST_UPDATE_TIME_SQL =
         "CREATE TABLE LastUpdateTime (" +
         "  Timestamp INTEGER NOT NULL, " +
-        "  MaxLastModified INTEGER NOT NULL)";
+        "  MaxLastModifiedUsec INTEGER NOT NULL)";
     private static final String INSERT_LAST_UPDATE_TIME_SQL =
         "INSERT INTO LastUpdateTime " +
-        "  (Timestamp, MaxLastModified) " +
+        "  (Timestamp, MaxLastModifiedUsec) " +
         "  VALUES(-1, -1)";
 
     private final Context mContext;
@@ -105,17 +105,24 @@ class SongDatabase {
             @Override
             public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
                 Log.d(TAG, "onUpgrade: " + oldVersion + " -> " + newVersion);
+                db.beginTransaction();
+                try {
+                    for (int nextVersion = oldVersion + 1; nextVersion <= newVersion; ++nextVersion)
+                        upgradeFromPreviousVersion(db, nextVersion);
+                    db.setTransactionSuccessful();
+                } finally {
+                    db.endTransaction();
+                }
+            }
+
+            // Upgrade the database from the version before |newVersion| to |newVersion|.
+            private void upgradeFromPreviousVersion(SQLiteDatabase db, int newVersion) {
                 if (newVersion == 2) {
                     // Version 2: Create LastUpdateTime table.
-                    if (oldVersion != 1)
-                        throw new RuntimeException(
-                            "Got request to upgrade database from " + oldVersion + " to " + newVersion);
                     db.execSQL(CREATE_LAST_UPDATE_TIME_SQL);
                     db.execSQL(INSERT_LAST_UPDATE_TIME_SQL);
                 } else if (newVersion == 3) {
                     // Version 3: Add Songs.Deleted column.
-                    if (oldVersion < 2)
-                        onUpgrade(db, oldVersion, newVersion - 1);
                     db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp");
                     db.execSQL(CREATE_SONGS_SQL);
                     db.execSQL(
@@ -126,14 +133,25 @@ class SongDatabase {
                     db.execSQL("DROP TABLE SongsTmp");
                 } else if (newVersion == 4) {
                     // Version 4: Create ArtistAlbumStats table and indexes on Songs.Artist and Songs.Album.
-                    if (oldVersion < 3)
-                        onUpgrade(db, oldVersion, newVersion - 1);
                     db.execSQL(CREATE_ARTIST_ALBUM_STATS_SQL);
                     db.execSQL(ADD_SONGS_ARTIST_INDEX_SQL);
                     db.execSQL(ADD_SONGS_ALBUM_INDEX_SQL);
+                } else if (newVersion == 5) {
+                    // Version 5: LastModified -> LastModifiedUsec (seconds to microseconds).
+                    db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp");
+                    db.execSQL("UPDATE SongsTmp SET LastModified = LastModified * 1000000");
+                    db.execSQL(CREATE_SONGS_SQL);
+                    db.execSQL("INSERT INTO Songs SELECT * FROM SongsTmp");
+                    db.execSQL("DROP TABLE SongsTmp");
+
+                    db.execSQL("ALTER TABLE LastUpdateTime RENAME TO LastUpdateTimeTmp");
+                    db.execSQL("UPDATE LastUpdateTimeTmp SET MaxLastModified = MaxLastModified * 1000000 WHERE MaxLastModified > 0");
+                    db.execSQL(CREATE_LAST_UPDATE_TIME_SQL);
+                    db.execSQL("INSERT INTO LastUpdateTime SELECT * FROM LastUpdateTimeTmp");
+                    db.execSQL("DROP TABLE LastUpdateTimeTmp");
                 } else {
                     throw new RuntimeException(
-                        "Got request to upgrade database from " + oldVersion + " to " + newVersion);
+                        "Got request to upgrade database to unknown version " + newVersion);
                 }
             }
         };
@@ -215,9 +233,9 @@ class SongDatabase {
 
         int numSongsUpdated = 0;
         try {
-            Cursor cursor = db.rawQuery("SELECT MaxLastModified FROM LastUpdateTime", null);
+            Cursor cursor = db.rawQuery("SELECT MaxLastModifiedUsec FROM LastUpdateTime", null);
             cursor.moveToFirst();
-            int maxLastModified = cursor.getInt(0);
+            long maxLastModifiedUsec = cursor.getLong(0);
             cursor.close();
 
             // The server breaks its results up into batches instead of sending us a bunch of songs
@@ -225,17 +243,15 @@ class SongDatabase {
             // start in the next request.
             int maxSongId = 0;
 
-            // FIXME: This is completely braindead:
-            // - If an update, our previous sync, and a second update all happen in the same second
-            //   and in that order, then we'll miss the second update the next time we sync.
-            // - If an update happens to a song with an ID that we've already gone past while we're
-            //   in the middle of an update and then a second update happens to a song with a later
-            //   ID, we'll miss the earlier song.
-            int minLastModified = maxLastModified + 1;
+            // FIXME: If an update happens to a song with an ID that we've already gone past while we're in the middle
+            // of an update and then a second update happens to a song with a later ID, we'll miss the earlier song.
+            // Ask the server for the max LastModifiedUsec time first and then use that as the starting point for the
+            // next sync.
+            long minLastModifiedUsec = maxLastModifiedUsec + 1;
 
             while (true) {
                 String response = Download.downloadString(
-                    mContext, "/songs", String.format("minSongId=%d&minLastModified=%d", maxSongId + 1, minLastModified), message);
+                    mContext, "/songs", String.format("minSongId=%d&minLastModifiedUsec=%d", maxSongId + 1, minLastModifiedUsec), message);
                 if (response == null)
                     return false;
 
@@ -262,12 +278,12 @@ class SongDatabase {
                         values.put("Length", jsonSong.getInt(7));
                         values.put("Rating", jsonSong.getDouble(8));
                         values.put("Deleted", jsonSong.getInt(9));
-                        values.put("LastModified", jsonSong.getInt(10));
+                        values.put("LastModifiedUsec", jsonSong.getLong(10));
                         db.replace("Songs", "", values);
 
                         numSongsUpdated++;
                         maxSongId = Math.max(maxSongId, jsonSong.getInt(0));
-                        maxLastModified = Math.max(maxLastModified, jsonSong.getInt(10));
+                        maxLastModifiedUsec = Math.max(maxLastModifiedUsec, jsonSong.getLong(10));
                     }
                     listener.onSyncProgress(numSongsUpdated);
                 } catch (org.json.JSONException e) {
@@ -278,7 +294,7 @@ class SongDatabase {
 
             ContentValues values = new ContentValues(2);
             values.put("Timestamp", new Date().getTime() / 1000);
-            values.put("MaxLastModified", maxLastModified);
+            values.put("MaxLastModifiedUsec", maxLastModifiedUsec);
             db.update("LastUpdateTime", values, null, null);
 
             if (numSongsUpdated > 0)
