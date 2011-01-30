@@ -391,8 +391,8 @@ class FileCache implements Runnable {
                       mFile.getAbsolutePath() + " in " + (endDate.getTime() - startDate.getTime()) + " ms)");
 
                 // I see this happen when I kill the server midway through the download.
-                if (mExistingLength + bytesWritten != mResult.getEntity().getContentLength()) {
-                    mReason = "Expected " + mResult.getEntity().getContentLength() + " bytes but have " + (mExistingLength + bytesWritten);
+                if (bytesWritten != mResult.getEntity().getContentLength()) {
+                    mReason = "Expected " + mResult.getEntity().getContentLength() + " bytes but got " + bytesWritten;
                     return DownloadStatus.RETRYABLE_ERROR;
                 }
             } catch (IOException e) {
