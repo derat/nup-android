@@ -32,6 +32,15 @@ class FileCache implements Runnable {
         void onCacheEviction(FileCacheEntry entry);
     }
 
+    // Status returned by DownloadTask's startDownload() and writeFile() methods.
+    // Up here because only static internal classes can define enums.
+    private enum DownloadStatus {
+        SUCCESS,
+        ABORTED,
+        RETRYABLE_ERROR,
+        FATAL_ERROR
+    }
+
     // Application context.
     private final Context mContext;
 
@@ -179,11 +188,11 @@ class FileCache implements Runnable {
     private class DownloadTask implements Runnable {
         private static final String TAG = "FileCache.DownloadTask";
 
+        // Maximum number of seconds we'll wait before retrying after failure.  Never give up!
+        private static final int MAX_BACKOFF_SEC = 60;
+
         // Size of buffer used to write data to disk, in bytes.
         private static final int BUFFER_SIZE = 8 * 1024;
-
-        // Maximum number of times that we'll attempt a download without making any progress before we give up.
-        private static final int MAX_DOWNLOAD_ATTEMPTS = 3;
 
         // Cache entry that we're downloading.
         private FileCacheEntry mEntry;
@@ -191,176 +200,233 @@ class FileCache implements Runnable {
         // The entry's ID.
         private final int mId;
 
-        private DownloadRequest mRequest;
-        private DownloadResult mResult = null;
+        // How long we should wait before retrying after an error, in milliseconds.
+        // We start at 0 but back off exponentially after errors where we haven't made any progress.
+        private int mBackoffTimeMs = 0;
 
-        private FileOutputStream mOutputStream;
+        // Reason for the failure.
+        private String mReason;
+
+        // File that we're writing and its starting size.
+        private File mFile = null;
+        private long mExistingLength = 0;
+
+        private DownloadRequest mRequest = null;
+        private DownloadResult mResult = null;
+        private FileOutputStream mOutputStream = null;
 
         public DownloadTask(FileCacheEntry entry) {
             mEntry = entry;
             mId = entry.getId();
         }
 
-        // TODO: This needs to be broken up into smaller pieces.
         @Override
         public void run() {
             if (!isDownloadActive(mId))
                 return;
 
-            int numAttempts = 0;
-            while (numAttempts < MAX_DOWNLOAD_ATTEMPTS) {
-                numAttempts++;
-
-                // If the file was already downloaded, report success.
-                File file = new File(mEntry.getLocalPath());
-                long existingLength = file.exists() ? file.length() : 0;
-                if (mEntry.getContentLength() > 0 && existingLength == mEntry.getContentLength()) {
-                    handleSuccess();
-                    return;
-                }
-
+            while (true) {
                 try {
-                    mRequest = new DownloadRequest(mContext, DownloadRequest.Method.GET, mEntry.getRemotePath(), null);
-                } catch (DownloadRequest.PrefException e) {
-                    handleFailure("Invalid server info settings");
-                    return;
-                }
-                if (existingLength > 0 && existingLength < mEntry.getContentLength()) {
-                    Log.d(TAG, "attempting to resume download at byte " + existingLength);
-                    mRequest.setHeader("Range", "bytes=" + new Long(existingLength).toString() + "-");
-                }
+                    if (mBackoffTimeMs > 0) {
+                        Log.d(TAG, "sleeping for " + mBackoffTimeMs + " ms before retrying download " + mId);
+                        SystemClock.sleep(mBackoffTimeMs);
+                    }
 
-                try {
-                    mResult = Download.startDownload(mRequest);
-                } catch (org.apache.http.HttpException e) {
-                    handleError("HTTP error while connecting");
-                    continue;
-                } catch (IOException e) {
-                    handleError("IO error while connecting");
-                    continue;
-                }
-
-                Log.d(TAG, "got " + mResult.getStatusCode() + " from server");
-                if (mResult.getStatusCode() != 200 && mResult.getStatusCode() != 206) {
-                    handleFailure("Got status code " + mResult.getStatusCode());
-                    return;
-                }
-
-                if (!isDownloadActive(mId)) {
-                    mResult.close();
-                    return;
-                }
-
-                // Update the cache entry with the total content size.
-                if (existingLength == 0) {
-                    mDb.setContentLength(mId, mResult.getEntity().getContentLength());
-                    mEntry = mDb.getEntryForRemotePath(mEntry.getRemotePath());
-                }
-
-                // Make space for whatever we're planning to download.
-                if (!makeSpace(mResult.getEntity().getContentLength())) {
-                    handleFailure("Unable to make space for " + mResult.getEntity().getContentLength() + "-byte download");
-                    return;
-                }
-
-                if (!file.exists()) {
-                    file.getParentFile().mkdirs();
-                    try {
-                        file.createNewFile();
-                    } catch (IOException e) {
-                        handleFailure("Unable to create local file");
+                    // Find the local length of the file.  If it's fully downloaded, report success.
+                    mFile = new File(mEntry.getLocalPath());
+                    mExistingLength = mFile.exists() ? mFile.length() : 0;
+                    if (mEntry.getContentLength() > 0 && mExistingLength == mEntry.getContentLength()) {
+                        handleSuccess();
                         return;
                     }
-                }
 
-                try {
-                    // TODO: Also check the Content-Range header.
-                    boolean append = (mResult.getStatusCode() == 206);
-                    mOutputStream = new FileOutputStream(file, append);
-                } catch (java.io.FileNotFoundException e) {
-                    handleFailure("Unable to create output stream to local file");
-                    return;
-                }
-
-                final long maxBytesPerSecond = Long.valueOf(
-                    mPrefs.getString(NupPreferences.DOWNLOAD_RATE,
-                                     NupPreferences.DOWNLOAD_RATE_DEFAULT)) * 1024;
-
-                ProgressReporter reporter = new ProgressReporter(mEntry);
-                Thread reporterThread = new Thread(reporter, "FileCache.ProgressReporter" + mId);
-                reporterThread.start();
-
-                try {
-                    Date startDate = new Date();
-
-                    int bytesRead = 0, bytesWritten = 0;
-                    byte[] buffer = new byte[BUFFER_SIZE];
-                    InputStream inputStream = mResult.getEntity().getContent();
-                    while ((bytesRead = inputStream.read(buffer)) != -1) {
-                        if (!isDownloadActive(mId)) {
-                            mResult.close();
+                    // Start the download.
+                    switch (startDownload()) {
+                        case SUCCESS:
+                            break;
+                        case ABORTED:
                             return;
-                        }
-
-                        mOutputStream.write(buffer, 0, bytesRead);
-                        bytesWritten += bytesRead;
-
-                        // Well, we made some progress, at least.  Reset the attempt counter.
-                        numAttempts = 0;
-
-                        Date now = new Date();
-                        long elapsedMs = now.getTime() - startDate.getTime();
-                        reporter.update(existingLength + bytesWritten, bytesWritten, elapsedMs);
-
-                        if (maxBytesPerSecond > 0) {
-                            long expectedMs = (long) (bytesWritten / (float) maxBytesPerSecond * 1000);
-                            if (elapsedMs < expectedMs)
-                                SystemClock.sleep(expectedMs - elapsedMs);
-                        }
+                        case RETRYABLE_ERROR:
+                            mListener.onCacheDownloadError(mEntry, mReason);
+                            updateBackoffTime(false);
+                            continue;
+                        case FATAL_ERROR:
+                            handleFailure();
+                            return;
                     }
-                    Date endDate = new Date();
-                    Log.d(TAG, "finished download " + mId + " (" + bytesWritten + " bytes to " +
-                          file.getAbsolutePath() + " in " + (endDate.getTime() - startDate.getTime()) + " ms)");
-                } catch (IOException e) {
-                    handleError("IO error while reading body");
-                    continue;
+
+                    if (!isDownloadActive(mId))
+                        return;
+
+                    switch (writeFile()) {
+                        case SUCCESS:
+                            break;
+                        case ABORTED:
+                            return;
+                        case RETRYABLE_ERROR:
+                            mListener.onCacheDownloadError(mEntry, mReason);
+                            updateBackoffTime(true);
+                            continue;
+                        case FATAL_ERROR:
+                            handleFailure();
+                            return;
+                    }
+
+                    handleSuccess();
+                    return;
                 } finally {
-                    reporter.quit();
-                    try {
-                        reporterThread.join();
-                    } catch (InterruptedException e) {
+                    if (mResult != null) {
+                        mResult.close();
+                        mResult = null;
+                    }
+                    if (mOutputStream != null) {
+                        try {
+                            mOutputStream.close();
+                        } catch (IOException e) {
+                            Log.e(TAG, "got IO exception while closing output stream for " + mFile.getPath() + ": " + e);
+                        }
+                        mOutputStream = null;
                     }
                 }
+            }
+        }
 
-                handleSuccess();
-                return;
+        private DownloadStatus startDownload() {
+            try {
+                mRequest = new DownloadRequest(mContext, DownloadRequest.Method.GET, mEntry.getRemotePath(), null);
+            } catch (DownloadRequest.PrefException e) {
+                mReason = "Invalid server info settings";
+                return DownloadStatus.FATAL_ERROR;
             }
 
-            handleFailure("Giving up after " + MAX_DOWNLOAD_ATTEMPTS + " attempts without progress");
+            if (mExistingLength > 0 && mExistingLength < mEntry.getContentLength()) {
+                Log.d(TAG, "attempting to resume download at byte " + mExistingLength);
+                mRequest.setHeader("Range", "bytes=" + new Long(mExistingLength).toString() + "-");
+            }
+
+            try {
+                mResult = Download.startDownload(mRequest);
+            } catch (org.apache.http.HttpException e) {
+                mReason = "HTTP error while connecting";
+                return DownloadStatus.RETRYABLE_ERROR;
+            } catch (IOException e) {
+                mReason = "IO error while connecting";
+                return DownloadStatus.RETRYABLE_ERROR;
+            }
+
+            Log.d(TAG, "got " + mResult.getStatusCode() + " from server");
+            if (mResult.getStatusCode() != 200 && mResult.getStatusCode() != 206) {
+                mReason = "Got status code " + mResult.getStatusCode();
+                return DownloadStatus.FATAL_ERROR;
+            }
+
+            // Update the cache entry with the total content size.
+            if (mExistingLength == 0) {
+                mDb.setContentLength(mId, mResult.getEntity().getContentLength());
+                mEntry = mDb.getEntryForRemotePath(mEntry.getRemotePath());
+            }
+
+            return DownloadStatus.SUCCESS;
         }
 
-        private void handleError(String reason) {
-            if (mResult != null)
-                mResult.close();
-            mListener.onCacheDownloadError(mEntry, reason);
+        private DownloadStatus writeFile() {
+            // Make space for whatever we're planning to download.
+            if (!makeSpace(mResult.getEntity().getContentLength())) {
+                mReason = "Unable to make space for " + mResult.getEntity().getContentLength() + "-byte download";
+                return DownloadStatus.FATAL_ERROR;
+            }
+
+            if (!mFile.exists()) {
+                mFile.getParentFile().mkdirs();
+                try {
+                    mFile.createNewFile();
+                } catch (IOException e) {
+                    mReason = "Unable to create local file";
+                    return DownloadStatus.FATAL_ERROR;
+                }
+            }
+
+            try {
+                // TODO: Also check the Content-Range header.
+                boolean append = (mResult.getStatusCode() == 206);
+                mOutputStream = new FileOutputStream(mFile, append);
+            } catch (java.io.FileNotFoundException e) {
+                mReason = "Unable to create output stream to local file";
+                return DownloadStatus.FATAL_ERROR;
+            }
+
+            final long maxBytesPerSecond = Long.valueOf(
+                mPrefs.getString(NupPreferences.DOWNLOAD_RATE,
+                                 NupPreferences.DOWNLOAD_RATE_DEFAULT)) * 1024;
+
+            ProgressReporter reporter = new ProgressReporter(mEntry);
+            Thread reporterThread = new Thread(reporter, "FileCache.ProgressReporter" + mId);
+            reporterThread.start();
+
+            try {
+                Date startDate = new Date();
+
+                int bytesRead = 0, bytesWritten = 0;
+                byte[] buffer = new byte[BUFFER_SIZE];
+                InputStream inputStream = mResult.getEntity().getContent();
+                while ((bytesRead = inputStream.read(buffer)) != -1) {
+                    if (!isDownloadActive(mId))
+                        return DownloadStatus.ABORTED;
+
+                    mOutputStream.write(buffer, 0, bytesRead);
+                    bytesWritten += bytesRead;
+
+                    Date now = new Date();
+                    long elapsedMs = now.getTime() - startDate.getTime();
+                    reporter.update(mExistingLength + bytesWritten, bytesWritten, elapsedMs);
+
+                    if (maxBytesPerSecond > 0) {
+                        long expectedMs = (long) (bytesWritten / (float) maxBytesPerSecond * 1000);
+                        if (elapsedMs < expectedMs)
+                            SystemClock.sleep(expectedMs - elapsedMs);
+                    }
+                }
+                Date endDate = new Date();
+                Log.d(TAG, "finished download " + mId + " (" + bytesWritten + " bytes to " +
+                      mFile.getAbsolutePath() + " in " + (endDate.getTime() - startDate.getTime()) + " ms)");
+
+                // I see this happen when I kill the server midway through the download.
+                if (mExistingLength + bytesWritten != mResult.getEntity().getContentLength()) {
+                    mReason = "Expected " + mResult.getEntity().getContentLength() + " bytes but have " + (mExistingLength + bytesWritten);
+                    return DownloadStatus.RETRYABLE_ERROR;
+                }
+            } catch (IOException e) {
+                mReason = "IO error while reading body";
+                return DownloadStatus.RETRYABLE_ERROR;
+            } finally {
+                reporter.quit();
+                try { reporterThread.join(); } catch (InterruptedException e) { /* !~$#%$#!$#!~$#! */ }
+            }
+            return DownloadStatus.SUCCESS;
         }
 
-        private void handleFailure(String reason) {
-            if (mResult != null)
-                mResult.close();
+        private void handleFailure() {
             synchronized(mInProgressIds) {
                 mInProgressIds.remove(mId);
             }
-            mListener.onCacheDownloadFail(mEntry, reason);
+            mListener.onCacheDownloadFail(mEntry, mReason);
         }
 
         private void handleSuccess() {
-            if (mResult != null)
-                mResult.close();
             synchronized(mInProgressIds) {
                 mInProgressIds.remove(mId);
             }
             mListener.onCacheDownloadComplete(mEntry);
+        }
+
+        private void updateBackoffTime(boolean madeProgress) {
+            if (madeProgress) {
+                mBackoffTimeMs = 0;
+            } else if (mBackoffTimeMs == 0) {
+                mBackoffTimeMs = 1000;
+            } else {
+                mBackoffTimeMs = Math.min(mBackoffTimeMs * 2, MAX_BACKOFF_SEC * 1000);
+            }
         }
 
         private class ProgressReporter implements Runnable {
