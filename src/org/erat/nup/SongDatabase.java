@@ -233,21 +233,24 @@ class SongDatabase {
 
         int numSongsUpdated = 0;
         try {
+            // Ask the server for the max last modified time before we fetch anything.  We'll use this as the starting
+            // point the next sync, to handle the case where some songs in the server are updated while we're doing this
+            // sync.
+            String maxLastModifiedUsecStr = Download.downloadString(mContext, "/songs", "getMaxLastModifiedUsec", message);
+            if (maxLastModifiedUsecStr == null)
+                return false;
+            long maxLastModifiedUsec = Long.valueOf(maxLastModifiedUsecStr);
+
+            // Start where we left off last time.
             Cursor cursor = db.rawQuery("SELECT MaxLastModifiedUsec FROM LastUpdateTime", null);
             cursor.moveToFirst();
-            long maxLastModifiedUsec = cursor.getLong(0);
+            long minLastModifiedUsec = cursor.getLong(0) + 1;
             cursor.close();
 
             // The server breaks its results up into batches instead of sending us a bunch of songs
             // at once, so we store the highest song ID that we've seen here so we'll know where to
             // start in the next request.
             int maxSongId = 0;
-
-            // FIXME: If an update happens to a song with an ID that we've already gone past while we're in the middle
-            // of an update and then a second update happens to a song with a later ID, we'll miss the earlier song.
-            // Ask the server for the max LastModifiedUsec time first and then use that as the starting point for the
-            // next sync.
-            long minLastModifiedUsec = maxLastModifiedUsec + 1;
 
             while (true) {
                 String response = Download.downloadString(
@@ -283,7 +286,6 @@ class SongDatabase {
 
                         numSongsUpdated++;
                         maxSongId = Math.max(maxSongId, jsonSong.getInt(0));
-                        maxLastModifiedUsec = Math.max(maxLastModifiedUsec, jsonSong.getLong(10));
                     }
                     listener.onSyncProgress(numSongsUpdated);
                 } catch (org.json.JSONException e) {
