@@ -27,7 +27,7 @@ class FileCache implements Runnable {
     interface Listener {
         void onCacheDownloadError(FileCacheEntry entry, String reason);
         void onCacheDownloadFail(FileCacheEntry entry, String reason);
-        void onCacheDownloadProgress(FileCacheEntry entry, long diskBytes, long receivedBytes, long elapsedMs);
+        void onCacheDownloadProgress(FileCacheEntry entry, long downloadedBytes, long elapsedMs);
         void onCacheDownloadComplete(FileCacheEntry entry);
         void onCacheEviction(FileCacheEntry entry);
     }
@@ -195,9 +195,6 @@ class FileCache implements Runnable {
         // Cache entry that we're downloading.
         private final FileCacheEntry mEntry;
 
-        // The entry's ID.
-        private final int mId;
-
         // How long we should wait before retrying after an error, in milliseconds.
         // We start at 0 but back off exponentially after errors where we haven't made any progress.
         private int mBackoffTimeMs = 0;
@@ -205,35 +202,28 @@ class FileCache implements Runnable {
         // Reason for the failure.
         private String mReason;
 
-        // File that we're writing and its starting size.
-        private File mFile = null;
-        private long mExistingLength = 0;
-
         private DownloadRequest mRequest = null;
         private DownloadResult mResult = null;
         private FileOutputStream mOutputStream = null;
 
         public DownloadTask(FileCacheEntry entry) {
             mEntry = entry;
-            mId = entry.getId();
         }
 
         @Override
         public void run() {
-            if (!isDownloadActive(mId))
+            if (!isActive())
                 return;
 
             while (true) {
                 try {
                     if (mBackoffTimeMs > 0) {
-                        Log.d(TAG, "sleeping for " + mBackoffTimeMs + " ms before retrying download " + mId);
+                        Log.d(TAG, "sleeping for " + mBackoffTimeMs + " ms before retrying download " + mEntry.getId());
                         SystemClock.sleep(mBackoffTimeMs);
                     }
 
-                    // Find the local length of the file.  If it's fully downloaded, report success.
-                    mFile = new File(mEntry.getLocalPath());
-                    mExistingLength = mFile.exists() ? mFile.length() : 0;
-                    if (mEntry.getContentLength() > 0 && mExistingLength == mEntry.getContentLength()) {
+                    // If the file is fully downloaded already, report success.
+                    if (mEntry.isFullyCached()) {
                         handleSuccess();
                         return;
                     }
@@ -253,7 +243,7 @@ class FileCache implements Runnable {
                             return;
                     }
 
-                    if (!isDownloadActive(mId))
+                    if (!isActive())
                         return;
 
                     switch (writeFile()) {
@@ -281,7 +271,7 @@ class FileCache implements Runnable {
                         try {
                             mOutputStream.close();
                         } catch (IOException e) {
-                            Log.e(TAG, "got IO exception while closing output stream for " + mFile.getPath() + ": " + e);
+                            Log.e(TAG, "got IO exception while closing output stream: " + e);
                         }
                         mOutputStream = null;
                     }
@@ -297,9 +287,9 @@ class FileCache implements Runnable {
                 return DownloadStatus.FATAL_ERROR;
             }
 
-            if (mExistingLength > 0 && mExistingLength < mEntry.getContentLength()) {
-                Log.d(TAG, "attempting to resume download at byte " + mExistingLength);
-                mRequest.setHeader("Range", "bytes=" + new Long(mExistingLength).toString() + "-");
+            if (mEntry.getCachedBytes() > 0 && mEntry.getCachedBytes() < mEntry.getTotalBytes()) {
+                Log.d(TAG, "attempting to resume download at byte " + mEntry.getCachedBytes());
+                mRequest.setHeader("Range", "bytes=" + new Long(mEntry.getCachedBytes()).toString() + "-");
             }
 
             try {
@@ -319,8 +309,8 @@ class FileCache implements Runnable {
             }
 
             // Update the cache entry with the total file size.
-            if (mExistingLength == 0)
-                mDb.setContentLength(mId, mResult.getEntity().getContentLength());
+            if (mResult.getStatusCode() == 200)
+                mDb.setTotalBytes(mEntry.getId(), mResult.getEntity().getContentLength());
 
             return DownloadStatus.SUCCESS;
         }
@@ -332,12 +322,13 @@ class FileCache implements Runnable {
                 return DownloadStatus.FATAL_ERROR;
             }
 
-            if (!mFile.exists()) {
-                mFile.getParentFile().mkdirs();
+            File file = new File(mEntry.getLocalPath());
+            if (!file.exists()) {
+                file.getParentFile().mkdirs();
                 try {
-                    mFile.createNewFile();
+                    file.createNewFile();
                 } catch (IOException e) {
-                    mReason = "Unable to create local file";
+                    mReason = "Unable to create local file " + file.getPath();
                     return DownloadStatus.FATAL_ERROR;
                 }
             }
@@ -345,7 +336,9 @@ class FileCache implements Runnable {
             try {
                 // TODO: Also check the Content-Range header.
                 boolean append = (mResult.getStatusCode() == 206);
-                mOutputStream = new FileOutputStream(mFile, append);
+                mOutputStream = new FileOutputStream(file, append);
+                if (!append)
+                    mEntry.setCachedBytes(0);
             } catch (java.io.FileNotFoundException e) {
                 mReason = "Unable to create output stream to local file";
                 return DownloadStatus.FATAL_ERROR;
@@ -356,7 +349,7 @@ class FileCache implements Runnable {
                                  NupPreferences.DOWNLOAD_RATE_DEFAULT)) * 1024;
 
             ProgressReporter reporter = new ProgressReporter(mEntry);
-            Thread reporterThread = new Thread(reporter, "FileCache.ProgressReporter" + mId);
+            Thread reporterThread = new Thread(reporter, "FileCache.ProgressReporter" + mEntry.getId());
             reporterThread.start();
 
             try {
@@ -366,7 +359,7 @@ class FileCache implements Runnable {
                 byte[] buffer = new byte[BUFFER_SIZE];
                 InputStream inputStream = mResult.getEntity().getContent();
                 while ((bytesRead = inputStream.read(buffer)) != -1) {
-                    if (!isDownloadActive(mId))
+                    if (!isActive())
                         return DownloadStatus.ABORTED;
 
                     mOutputStream.write(buffer, 0, bytesRead);
@@ -374,7 +367,8 @@ class FileCache implements Runnable {
 
                     Date now = new Date();
                     long elapsedMs = now.getTime() - startDate.getTime();
-                    reporter.update(mExistingLength + bytesWritten, bytesWritten, elapsedMs);
+                    mEntry.incrementCachedBytes(bytesRead);
+                    reporter.update(bytesWritten, elapsedMs);
 
                     if (maxBytesPerSecond > 0) {
                         long expectedMs = (long) (bytesWritten / (float) maxBytesPerSecond * 1000);
@@ -383,8 +377,8 @@ class FileCache implements Runnable {
                     }
                 }
                 Date endDate = new Date();
-                Log.d(TAG, "finished download " + mId + " (" + bytesWritten + " bytes to " +
-                      mFile.getAbsolutePath() + " in " + (endDate.getTime() - startDate.getTime()) + " ms)");
+                Log.d(TAG, "finished download " + mEntry.getId() + " (" + bytesWritten + " bytes to " +
+                      file.getAbsolutePath() + " in " + (endDate.getTime() - startDate.getTime()) + " ms)");
 
                 // I see this happen when I kill the server midway through the download.
                 if (bytesWritten != mResult.getEntity().getContentLength()) {
@@ -403,14 +397,14 @@ class FileCache implements Runnable {
 
         private void handleFailure() {
             synchronized(mInProgressIds) {
-                mInProgressIds.remove(mId);
+                mInProgressIds.remove(mEntry.getId());
             }
             mListener.onCacheDownloadFail(mEntry, mReason);
         }
 
         private void handleSuccess() {
             synchronized(mInProgressIds) {
-                mInProgressIds.remove(mId);
+                mInProgressIds.remove(mEntry.getId());
             }
             mListener.onCacheDownloadComplete(mEntry);
         }
@@ -425,12 +419,16 @@ class FileCache implements Runnable {
             }
         }
 
+        // Is this download currently active, or has it been cancelled?
+        private boolean isActive() {
+            return isDownloadActive(mEntry.getId());
+        }
+
         private class ProgressReporter implements Runnable {
             private static final String TAG = "FileCache.ProgressReporter";
             private static final long PROGRESS_REPORT_MS = 500;
 
             private final FileCacheEntry mEntry;
-            private long mDiskBytes = 0;
             private long mDownloadedBytes = 0;
             private long mElapsedMs = 0;
             private Handler mHandler;
@@ -469,9 +467,8 @@ class FileCache implements Runnable {
                 });
             }
 
-            public void update(final long diskBytes, final long downloadedBytes, final long elapsedMs) {
+            public void update(final long downloadedBytes, final long elapsedMs) {
                 synchronized (this) {
-                    mDiskBytes = diskBytes;
                     mDownloadedBytes = downloadedBytes;
                     mElapsedMs = elapsedMs;
 
@@ -480,7 +477,7 @@ class FileCache implements Runnable {
                             @Override
                             public void run() {
                                 synchronized (ProgressReporter.this) {
-                                    mListener.onCacheDownloadProgress(mEntry, mDiskBytes, mDownloadedBytes, mElapsedMs);
+                                    mListener.onCacheDownloadProgress(mEntry, mDownloadedBytes, mElapsedMs);
                                     mLastReportDate = new Date();
                                     mTask = null;
                                 }

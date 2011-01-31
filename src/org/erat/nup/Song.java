@@ -51,5 +51,11 @@ class Song implements Serializable {
     public void setAvailableBytes(long bytes) { mAvailableBytes = bytes; }
     public void setTotalBytes(long bytes) { mTotalBytes = bytes; }
 
+    // Update our available and total bytes from a cache entry.
+    public void updateBytes(FileCacheEntry entry) {
+        mAvailableBytes = entry.getCachedBytes();
+        mTotalBytes = entry.getTotalBytes();
+    }
+
     public String getRemotePath() { return "/music/" + Uri.encode(mFilename); }
 }

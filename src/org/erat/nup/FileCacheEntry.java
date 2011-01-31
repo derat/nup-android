@@ -6,22 +6,27 @@ package org.erat.nup;
 class FileCacheEntry {
     private final int mId;
     private final String mRemotePath, mLocalPath;
-    private long mContentLength;
-    private final String mETag;
+    private long mCachedBytes, mTotalBytes;
 
-    public FileCacheEntry(int id, String remotePath, String localPath, long contentLength, String eTag) {
+    public FileCacheEntry(int id, String remotePath, String localPath, long totalBytes) {
         mId = id;
         mRemotePath = remotePath;
         mLocalPath = localPath;
-        mContentLength = contentLength;
-        mETag = eTag;
+        mCachedBytes = 0;
+        mTotalBytes = totalBytes;
     }
 
     public int getId() { return mId; }
     public String getRemotePath() { return mRemotePath; }
     public String getLocalPath() { return mLocalPath; }
-    public long getContentLength() { return mContentLength; }
-    public String getETag() { return mETag; }
+    public long getCachedBytes() { return mCachedBytes; }
+    public long getTotalBytes() { return mTotalBytes; }
 
-    public void setContentLength(long length) { mContentLength = length; }
+    public void incrementCachedBytes(long bytes) { mCachedBytes += bytes; }
+    public void setCachedBytes(long bytes) { mCachedBytes = bytes; }
+    public void setTotalBytes(long bytes) { mTotalBytes = bytes; }
+
+    public boolean isFullyCached() {
+        return mTotalBytes > 0 && mCachedBytes == mTotalBytes;
+    }
 }

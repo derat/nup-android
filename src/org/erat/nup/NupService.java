@@ -399,7 +399,7 @@ public class NupService extends Service
 
         // If we've already downloaded the whole file, start playing it.
         FileCacheEntry cacheEntry = mCache.getEntry(getCurrentSong().getRemotePath());
-        if (cacheEntry != null && isCacheEntryFullyDownloaded(cacheEntry)) {
+        if (cacheEntry != null && cacheEntry.isFullyCached()) {
             Log.d(TAG, "file " + getCurrentSong().getRemotePath() + " already downloaded; playing");
             playCacheEntry(cacheEntry);
 
@@ -640,8 +640,7 @@ public class NupService extends Service
                     return;
 
                 Song song = (Song) obj;
-                song.setAvailableBytes(entry.getContentLength());
-                song.setTotalBytes(entry.getContentLength());
+                song.updateBytes(entry);
 
                 if (song == getCurrentSong() && mWaitingForDownload) {
                     mWaitingForDownload = false;
@@ -663,7 +662,7 @@ public class NupService extends Service
 
     // Implements FileCache.Listener.
     @Override
-    public void onCacheDownloadProgress(final FileCacheEntry entry, final long diskBytes, final long downloadedBytes, final long elapsedMs) {
+    public void onCacheDownloadProgress(final FileCacheEntry entry, final long downloadedBytes, final long elapsedMs) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
@@ -672,11 +671,10 @@ public class NupService extends Service
                     return;
 
                 Song song = (Song) obj;
-                song.setAvailableBytes(diskBytes);
-                song.setTotalBytes(entry.getContentLength());
+                song.updateBytes(entry);
 
                 if (song == getCurrentSong()) {
-                    if (mWaitingForDownload && canPlaySong(entry.getContentLength(), diskBytes, downloadedBytes, elapsedMs, song.getLengthSec())) {
+                    if (mWaitingForDownload && canPlaySong(entry, downloadedBytes, elapsedMs, song.getLengthSec())) {
                         mWaitingForDownload = false;
                         playCacheEntry(entry);
                     }
@@ -761,8 +759,7 @@ public class NupService extends Service
             FileCacheEntry entry = mCache.getEntry(song.getRemotePath());
             if (entry != null) {
                 mCacheEntryIdToSong.put(entry.getId(), song);
-                song.setAvailableBytes(new File(entry.getLocalPath()).length());
-                song.setTotalBytes(entry.getContentLength());
+                song.updateBytes(entry);
                 if (mSongListener != null)
                     mSongListener.onSongFileSizeChange(song);
             }
@@ -787,25 +784,17 @@ public class NupService extends Service
 
     // Do we have enough of a song downloaded at a fast enough rate that we'll probably
     // finish downloading it before playback reaches the end of the song?
-    private boolean canPlaySong(long totalBytes, long diskBytes, long downloadedBytes, long elapsedMs, int songLengthSec) {
+    private boolean canPlaySong(FileCacheEntry entry, long downloadedBytes, long elapsedMs, int songLengthSec) {
+        if (entry.isFullyCached())
+            return true;
         double bytesPerMs = (double) downloadedBytes / elapsedMs;
-        long remainingMs = (long) ((totalBytes - diskBytes) / bytesPerMs);
-        return (diskBytes >= MIN_BYTES_BEFORE_PLAYING && remainingMs + EXTRA_BUFFER_MS <= songLengthSec * 1000);
-    }
-
-    // Is |entry| completely downloaded?
-    private boolean isCacheEntryFullyDownloaded(FileCacheEntry entry) {
-        if (entry.getContentLength() == 0)
-            return false;
-
-        File file = new File(entry.getLocalPath());
-        return file.exists() && file.length() == entry.getContentLength();
+        long remainingMs = (long) ((entry.getTotalBytes() - entry.getCachedBytes()) / bytesPerMs);
+        return (entry.getCachedBytes() >= MIN_BYTES_BEFORE_PLAYING && remainingMs + EXTRA_BUFFER_MS <= songLengthSec * 1000);
     }
 
     // Play the local file where a cache entry is stored.
     private void playCacheEntry(FileCacheEntry entry) {
-        mCurrentSongPath = entry.getLocalPath();
-        mPlayer.playFile(mCurrentSongPath);
+        mPlayer.playFile(entry.getLocalPath());
         mCurrentSongStartDate = new Date();
     }
 
@@ -823,7 +812,7 @@ public class NupService extends Service
         for (; index < mSongs.size() && index - mCurrentSongIndex <= songsToPreload; index++) {
             Song song = mSongs.get(index);
             FileCacheEntry entry = mCache.getEntry(song.getRemotePath());
-            if (entry != null && isCacheEntryFullyDownloaded(entry)) {
+            if (entry != null && entry.isFullyCached()) {
                 // We already have this one.  Pin it to make sure that it
                 // doesn't get evicted by a later song.
                 mCache.pinId(entry.getId());

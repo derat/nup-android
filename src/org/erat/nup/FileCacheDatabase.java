@@ -7,7 +7,9 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
+import android.util.Log;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -63,11 +65,16 @@ class FileCacheDatabase {
 
     private synchronized void loadExistingEntries() {
         Cursor cursor = mOpener.getReadableDatabase().rawQuery(
-            "SELECT CacheEntryId, RemotePath, LocalPath, IFNULL(ContentLength, 0), IFNULL(ETag, '') FROM CacheEntries", null);
+            "SELECT CacheEntryId, RemotePath, LocalPath, IFNULL(ContentLength, 0) FROM CacheEntries", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
             FileCacheEntry entry = new FileCacheEntry(
-                cursor.getInt(0), cursor.getString(1), cursor.getString(2), cursor.getLong(3), cursor.getString(4));
+                cursor.getInt(0), cursor.getString(1), cursor.getString(2), cursor.getLong(3));
+            File file = new File(entry.getLocalPath());
+            entry.setCachedBytes(file.exists() ? file.length() : 0);
+            Log.d(TAG, "loaded " + file.getName() + " for " + entry.getRemotePath() +
+                  ": " + entry.getCachedBytes() + "/" + entry.getTotalBytes());
+
             mEntries.put(entry.getId(), entry);
             mEntriesByRemotePath.put(entry.getRemotePath(), entry);
             cursor.moveToNext();
@@ -93,7 +100,7 @@ class FileCacheDatabase {
         int id = cursor.getInt(0);
         cursor.close();
 
-        FileCacheEntry entry = new FileCacheEntry(id, remotePath, localPath, 0, "");
+        FileCacheEntry entry = new FileCacheEntry(id, remotePath, localPath, 0);
         mEntries.put(id, entry);
         mEntriesByRemotePath.put(remotePath, entry);
         return entry;
@@ -110,15 +117,22 @@ class FileCacheDatabase {
             "DELETE FROM CacheEntries WHERE CacheEntryId = ?", new Object[]{id});
     }
 
-    public synchronized void setContentLength(int id, long contentLength) {
+    public synchronized void setCachedBytes(int id, long cachedBytes) {
+        FileCacheEntry entry = mEntries.get(id);
+        if (entry == null)
+            return;
+        entry.setCachedBytes(cachedBytes);
+    }
+
+    public synchronized void setTotalBytes(int id, long totalBytes) {
         FileCacheEntry entry = mEntries.get(id);
         if (entry == null)
             return;
 
-        entry.setContentLength(contentLength);
+        entry.setTotalBytes(totalBytes);
         mOpener.getWritableDatabase().execSQL(
             "UPDATE CacheEntries SET ContentLength = ? WHERE CacheEntryId = ?",
-            new Object[]{ contentLength, id });
+            new Object[]{ totalBytes, id });
     }
 
     public synchronized void updateLastAccessTime(int id) {
