@@ -84,6 +84,8 @@ class CoverLoader {
             finishLoad(filename);
         }
 
+        if (album.isEmpty())
+            return null;
         final String suffix = getFilenameSuffixForAlbum(album);
         String[] matchingFilenames = mCoverDir.list(new FilenameFilter() {
             @Override
