@@ -55,7 +55,7 @@ public class NupActivity extends Activity
 
     // Last song-position time passed to onSongPositionChange(), in seconds.
     // Used to rate-limit how often we update the display so we only do it on integral changes.
-    private int lastSongPositionSec = -1;
+    private int mLastSongPositionSec = -1;
 
     // Songs in the current playlist.
     private List<Song> mSongs = new ArrayList<Song>();
@@ -188,11 +188,12 @@ public class NupActivity extends Activity
                     return;
 
                 int positionSec = positionMs / 1000;
-                if (positionSec == lastSongPositionSec)
+                if (positionSec == mLastSongPositionSec)
                     return;
                 // MediaPlayer appears to get confused sometimes and report things like 0:01.
                 int durationSec = Math.max(durationMs / 1000, getCurrentSong().getLengthSec());
                 mTimeLabel.setText(Util.formatTimeString(positionSec, durationSec));
+                mLastSongPositionSec = positionSec;
             }
         });
     }
@@ -279,8 +280,8 @@ public class NupActivity extends Activity
             }
         }
 
-        // Update the time in response to the next position change we get.
-        lastSongPositionSec = -1;
+        // Update the displayed time in response to the next position change we get.
+        mLastSongPositionSec = -1;
     }
 
     @Override

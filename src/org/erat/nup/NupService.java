@@ -793,7 +793,8 @@ public class NupService extends Service
 
     // Play the local file where a cache entry is stored.
     private void playCacheEntry(FileCacheEntry entry) {
-        mPlayer.playFile(entry.getLocalPath());
+        mCurrentSongPath = entry.getLocalPath();
+        mPlayer.playFile(mCurrentSongPath);
         mCurrentSongStartDate = new Date();
     }
 
