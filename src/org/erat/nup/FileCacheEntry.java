@@ -7,13 +7,15 @@ class FileCacheEntry {
     private final int mId;
     private final String mRemotePath, mLocalPath;
     private long mCachedBytes, mTotalBytes;
+    private int mLastAccessTime;
 
-    public FileCacheEntry(int id, String remotePath, String localPath, long totalBytes) {
+    public FileCacheEntry(int id, String remotePath, String localPath, long totalBytes, int lastAccessTime) {
         mId = id;
         mRemotePath = remotePath;
         mLocalPath = localPath;
         mCachedBytes = 0;
         mTotalBytes = totalBytes;
+        mLastAccessTime = lastAccessTime;
     }
 
     public int getId() { return mId; }
@@ -21,10 +23,12 @@ class FileCacheEntry {
     public String getLocalPath() { return mLocalPath; }
     public long getCachedBytes() { return mCachedBytes; }
     public long getTotalBytes() { return mTotalBytes; }
+    public int getLastAccessTime() { return mLastAccessTime; }
 
     public void incrementCachedBytes(long bytes) { mCachedBytes += bytes; }
     public void setCachedBytes(long bytes) { mCachedBytes = bytes; }
     public void setTotalBytes(long bytes) { mTotalBytes = bytes; }
+    public void setLastAccessTime(int time) { mLastAccessTime = time; }
 
     public boolean isFullyCached() {
         return mTotalBytes > 0 && mCachedBytes == mTotalBytes;

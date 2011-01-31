@@ -94,6 +94,7 @@ class FileCache implements Runnable {
                 Looper.myLooper().quit();
             }
         });
+        mDb.quit();
     }
 
     // Get the entry corresponding to a particular cached URL.

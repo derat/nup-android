@@ -221,8 +221,7 @@ public class NupService extends Service
         try {
             mPlayerThread.join();
             mCacheThread.join();
-        } catch (InterruptedException e) {
-        }
+        } catch (InterruptedException e) {}
         CrashLogger.unregister();
     }
 
