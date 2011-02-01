@@ -30,7 +30,7 @@ class SongDatabase {
 
     private static final String DATABASE_NAME = "NupSongs";
 
-    private static final int DATABASE_VERSION = 6;
+    private static final int DATABASE_VERSION = 7;
 
     private static final String MAX_QUERY_RESULTS = "250";
 
@@ -46,16 +46,22 @@ class SongDatabase {
         "  TrackNumber INTEGER NOT NULL, " +
         "  Length INTEGER NOT NULL, " +
         "  Rating FLOAT NOT NULL)";
-    private static final String ADD_SONGS_ARTIST_INDEX_SQL =
+    private static final String CREATE_SONGS_ARTIST_INDEX_SQL =
         "CREATE INDEX Artist ON Songs (Artist)";
-    private static final String ADD_SONGS_ALBUM_INDEX_SQL =
+    private static final String CREATE_SONGS_ALBUM_INDEX_SQL =
         "CREATE INDEX Album ON Songs (Album)";
 
     private static final String CREATE_ARTIST_ALBUM_STATS_SQL =
         "CREATE TABLE ArtistAlbumStats (" +
         "  Artist VARCHAR(256) NOT NULL, " +
         "  Album VARCHAR(256) NOT NULL, " +
-        "  NumSongs INTEGER NOT NULL)";
+        "  NumSongs INTEGER NOT NULL, " +
+        "  ArtistSortKey VARCHAR(256) NOT NULL, " +
+        "  AlbumSortKey VARCHAR(256) NOT NULL)";
+    private static final String CREATE_ARTIST_ALBUM_STATS_ARTIST_SORT_KEY_INDEX_SQL =
+        "CREATE INDEX ArtistSortKey ON ArtistAlbumStats (ArtistSortKey)";
+    private static final String CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL =
+        "CREATE INDEX AlbumSortKey ON ArtistAlbumStats (AlbumSortKey)";
 
     private static final String CREATE_LAST_UPDATE_TIME_SQL =
         "CREATE TABLE LastUpdateTime (" +
@@ -99,9 +105,11 @@ class SongDatabase {
             @Override
             public void onCreate(SQLiteDatabase db) {
                 db.execSQL(CREATE_SONGS_SQL);
-                db.execSQL(ADD_SONGS_ARTIST_INDEX_SQL);
-                db.execSQL(ADD_SONGS_ALBUM_INDEX_SQL);
+                db.execSQL(CREATE_SONGS_ARTIST_INDEX_SQL);
+                db.execSQL(CREATE_SONGS_ALBUM_INDEX_SQL);
                 db.execSQL(CREATE_ARTIST_ALBUM_STATS_SQL);
+                db.execSQL(CREATE_ARTIST_ALBUM_STATS_ARTIST_SORT_KEY_INDEX_SQL);
+                db.execSQL(CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL);
                 db.execSQL(CREATE_LAST_UPDATE_TIME_SQL);
                 db.execSQL(INSERT_LAST_UPDATE_TIME_SQL);
             }
@@ -151,9 +159,12 @@ class SongDatabase {
                     db.execSQL("DROP TABLE SongsTmp");
                 } else if (newVersion == 4) {
                     // Version 4: Create ArtistAlbumStats table and indexes on Songs.Artist and Songs.Album.
-                    db.execSQL(CREATE_ARTIST_ALBUM_STATS_SQL);
-                    db.execSQL(ADD_SONGS_ARTIST_INDEX_SQL);
-                    db.execSQL(ADD_SONGS_ALBUM_INDEX_SQL);
+                    db.execSQL("CREATE TABLE ArtistAlbumStats (" +
+                               "  Artist VARCHAR(256) NOT NULL, " +
+                               "  Album VARCHAR(256) NOT NULL, " +
+                               "  NumSongs INTEGER NOT NULL)");
+                    db.execSQL(CREATE_SONGS_ARTIST_INDEX_SQL);
+                    db.execSQL(CREATE_SONGS_ALBUM_INDEX_SQL);
                 } else if (newVersion == 5) {
                     // Version 5: LastModified -> LastModifiedUsec (seconds to microseconds).
                     db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp");
@@ -186,6 +197,15 @@ class SongDatabase {
                                "SELECT SongId, Filename, Artist, Title, Album, TrackNumber, Length, Rating " +
                                "FROM SongsTmp WHERE Deleted = 0");
                     db.execSQL("DROP TABLE SongsTmp");
+                } else if (newVersion == 7) {
+                    // Version 7: Add ArtistSortKey and AlbumSortKey columns to ArtistAlbumStats.
+                    db.execSQL("ALTER TABLE ArtistAlbumStats RENAME TO ArtistAlbumStatsTmp");
+                    db.execSQL(CREATE_ARTIST_ALBUM_STATS_SQL);
+                    db.execSQL("INSERT INTO ArtistAlbumStats " +
+                               "SELECT Artist, Album, NumSongs, Artist, Album FROM ArtistAlbumStatsTmp");
+                    db.execSQL(CREATE_ARTIST_ALBUM_STATS_ARTIST_SORT_KEY_INDEX_SQL);
+                    db.execSQL(CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL);
+                    db.execSQL("DROP TABLE ArtistAlbumStatsTmp");
                 } else {
                     throw new RuntimeException(
                         "Got request to upgrade database to unknown version " + newVersion);
@@ -387,19 +407,25 @@ class SongDatabase {
         }
         cursor.close();
 
-        db.delete("ArtistAlbumStats", null, null);
-        for (String artist : artistAlbums.keySet()) {
-            HashMap<String,Integer> albumMap = artistAlbums.get(artist);
-            ArrayList<String> sortedAlbums = new ArrayList<String>();
-            sortedAlbums.addAll(albumMap.keySet());
-            Collections.sort(sortedAlbums);
-            for (String album : sortedAlbums) {
-                ContentValues values = new ContentValues(3);
-                values.put("Artist", artist);
-                values.put("Album", album);
-                values.put("NumSongs", albumMap.get(album));
-                db.insert("ArtistAlbumStats", "", values);
+        db.beginTransaction();
+        try {
+            db.delete("ArtistAlbumStats", null, null);
+            for (String artist : artistAlbums.keySet()) {
+                String artistSortKey = Util.getSortingKeyForString(artist);
+                HashMap<String,Integer> albumMap = artistAlbums.get(artist);
+                for (String album : albumMap.keySet()) {
+                    ContentValues values = new ContentValues(5);
+                    values.put("Artist", artist);
+                    values.put("Album", album);
+                    values.put("NumSongs", albumMap.get(album));
+                    values.put("ArtistSortKey", artistSortKey);
+                    values.put("AlbumSortKey", Util.getSortingKeyForString(album));
+                    db.insert("ArtistAlbumStats", "", values);
+                }
             }
+            db.setTransactionSuccessful();
+        } finally {
+            db.endTransaction();
         }
     }
 
@@ -426,16 +452,30 @@ class SongDatabase {
         final HashMap<String,Integer> artistSongCounts = new HashMap<String,Integer>();  // 'final' so it can be used in an inner class
         HashMap<String,List<String>> artistAlbums = new HashMap<String,List<String>>();
 
+        List<String> artistsSortedAlphabetically = new ArrayList<String>();
+        cursor = db.rawQuery("SELECT DISTINCT Artist FROM ArtistAlbumStats ORDER BY ArtistSortKey", null);
+        cursor.moveToFirst();
+        while (!cursor.isAfterLast()) {
+            artistsSortedAlphabetically.add(cursor.getString(0));
+            cursor.moveToNext();
+        }
+        cursor.close();
+
+        List<String> albumsSortedAlphabetically = new ArrayList<String>();
+        cursor = db.rawQuery("SELECT DISTINCT Album FROM ArtistAlbumStats ORDER BY AlbumSortKey", null);
+        cursor.moveToFirst();
+        while (!cursor.isAfterLast()) {
+            albumsSortedAlphabetically.add(cursor.getString(0));
+            cursor.moveToNext();
+        }
+        cursor.close();
+
         cursor = db.rawQuery("SELECT Artist, Album, NumSongs FROM ArtistAlbumStats", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
             String artist = cursor.getString(0);
-            String lowerArtist = artist.toLowerCase();
             String album = cursor.getString(1);
             int numSongsInAlbum = cursor.getInt(2);
-
-            artistSet.add(artist);
-            albumSet.add(album);
 
             Integer totalSongsByArtist =
                 artistSongCounts.containsKey(artist) ?
@@ -444,11 +484,11 @@ class SongDatabase {
             artistSongCounts.put(artist, totalSongsByArtist);
 
             List<String> albums;
-            if (artistAlbums.containsKey(lowerArtist)) {
-                albums = artistAlbums.get(lowerArtist);
+            if (artistAlbums.containsKey(artist)) {
+                albums = artistAlbums.get(artist);
             } else {
                 albums = new ArrayList<String>();
-                artistAlbums.put(lowerArtist, albums);
+                artistAlbums.put(artist, albums);
             }
             albums.add(album);
 
@@ -456,16 +496,8 @@ class SongDatabase {
         }
         cursor.close();
 
-        List<String> artistsSortedAlphabetically = new ArrayList<String>();
-        artistsSortedAlphabetically.addAll(artistSet);
-        Collections.sort(artistsSortedAlphabetically);
-
-        List<String> albumsSortedAlphabetically = new ArrayList<String>();
-        albumsSortedAlphabetically.addAll(albumSet);
-        Collections.sort(albumsSortedAlphabetically);
-
         List<String> artistsSortedByNumSongs = new ArrayList<String>();
-        artistsSortedByNumSongs.addAll(artistSet);
+        artistsSortedByNumSongs.addAll(artistsSortedAlphabetically);
         Collections.sort(artistsSortedByNumSongs, new Comparator<String>() {
             @Override
             public int compare(String a, String b) {

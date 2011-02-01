@@ -44,4 +44,29 @@ class Util {
                 return i;
         return -1;
     }
+
+    // Get a key that can be used for sorting a string.
+    // The string is converted to lowercase and common leading articles are removed.
+    public static String getSortingKeyForString(String str) {
+        str = str.toLowerCase();
+
+        // Strip off some leading punctuation.
+        int startingIndex = 0;
+        for (; startingIndex < str.length(); ++startingIndex) {
+            char ch = str.charAt(startingIndex);
+            if (ch != ' ' && ch != '"' && ch != '\'')
+                break;
+        }
+        if (startingIndex > 0)
+            str = str.substring(startingIndex);
+
+        // Remove common articles and other junk.
+        String[] prefixes = { "...", "a ", "an ", "the " };
+        for (int i = 0; i < prefixes.length; ++i) {
+            String prefix = prefixes[i];
+            if (str.startsWith(prefix))
+                str = str.substring(prefix.length());
+        }
+        return str;
+    }
 }
