@@ -47,8 +47,6 @@
   <string name="syncing_song_list">Syncing song list</string>
   <string name="songs_to_preload">Songs to preload</string>
   <string name="songs_to_preload_description">Number of songs to load in advance</string>
-  <string name="songs_to_preload_value_plural">%d songs</string>
-  <string name="songs_to_preload_value_singular">%d song</string>
   <string name="startup_notification_message">Service is running.</string>
   <string name="startup_notification_name">nup</string>
   <string name="sync_progress_rebuilding_stats_tables">Rebuilding stats tables...</string>

@@ -54,9 +54,10 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
             mPrefs.getString(NupPreferences.SONGS_TO_PRELOAD,
                              NupPreferences.SONGS_TO_PRELOAD_DEFAULT));
         pref.setSummary(
-            songsToPreload == 1 ?
-            getString(R.string.songs_to_preload_value_singular, songsToPreload) :
-            getString(R.string.songs_to_preload_value_plural, songsToPreload));
+            getResources().getQuantityString(
+                R.plurals.songs_to_preload_fmt,
+                songsToPreload,
+                songsToPreload));
 
         pref = findPreference(NupPreferences.DOWNLOAD_RATE);
         pref.setOnPreferenceChangeListener(this);
@@ -106,9 +107,10 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
             if (intValue < 0)
                 return false;
             findPreference(NupPreferences.SONGS_TO_PRELOAD).setSummary(
-                intValue == 1 ?
-                getString(R.string.songs_to_preload_value_singular, intValue) :
-                getString(R.string.songs_to_preload_value_plural, intValue));
+                getResources().getQuantityString(
+                    R.plurals.songs_to_preload_fmt,
+                    intValue,
+                    intValue));
             return true;
         } else if (pref.getKey().equals(NupPreferences.DOWNLOAD_RATE)) {
             int intValue = parseNonNegativeInt((String) value);
