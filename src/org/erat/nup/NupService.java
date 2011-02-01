@@ -106,14 +106,15 @@ public class NupService extends Service
     // Stores a local listing of all of the songs on the server.
     private SongDatabase mSongDb;
 
+    // Loads songs' cover art from local disk or the network.
     private CoverLoader mCoverLoader;
 
-    // Points from int song ID to Song.
-    // This is the canonical set of songs that we know about.
-    private HashMap mSongIdToSong = new HashMap();
+    // Points from song ID to Song.
+    // This is the canonical set of songs that we've seen.
+    private HashMap<Integer,Song> mSongIdToSong = new HashMap<Integer,Song>();
 
-    // Points from int cache entry ID to int song ID.
-    private HashMap mCacheEntryIdToSong = new HashMap();
+    // Points from cache entry ID to Song.
+    private HashMap<Integer,Song> mCacheEntryIdToSong = new HashMap<Integer,Song>();
 
     // ID of the cache entry that's currently being downloaded.
     private int mDownloadId = -1;
@@ -634,11 +635,10 @@ public class NupService extends Service
             public void run() {
                 Log.d(TAG, "got notification that download " + entry.getId() + " is done");
 
-                Object obj = mCacheEntryIdToSong.get(entry.getId());
-                if (obj == null)
+                Song song = mCacheEntryIdToSong.get(entry.getId());
+                if (song == null)
                     return;
 
-                Song song = (Song) obj;
                 song.updateBytes(entry);
 
                 if (song == getCurrentSong() && mWaitingForDownload) {
@@ -665,11 +665,10 @@ public class NupService extends Service
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                Object obj = mCacheEntryIdToSong.get(entry.getId());
-                if (obj == null)
+                Song song = mCacheEntryIdToSong.get(entry.getId());
+                if (song == null)
                     return;
 
-                Song song = (Song) obj;
                 song.updateBytes(entry);
 
                 if (song == getCurrentSong()) {
@@ -692,11 +691,10 @@ public class NupService extends Service
             @Override
             public void run() {
                 Log.d(TAG, "got notification that " + entry.getId() + " has been evicted");
-                Object obj = mCacheEntryIdToSong.get(entry.getId());
-                if (obj == null)
+                Song song = mCacheEntryIdToSong.get(entry.getId());
+                if (song == null)
                     return;
 
-                Song song = (Song) obj;
                 song.setAvailableBytes(0);
                 song.setTotalBytes(0);
                 mCacheEntryIdToSong.remove(entry.getId());
@@ -735,9 +733,9 @@ public class NupService extends Service
         // Use our own version of each song if we have it already.
         ArrayList<Song> tmpSongs = new ArrayList<Song>();
         for (Song song : songs) {
-            Object obj = mSongIdToSong.get(song.getSongId());
-            if (obj != null) {
-                tmpSongs.add((Song) obj);
+            Song ourSong = mSongIdToSong.get(song.getSongId());
+            if (ourSong != null) {
+                tmpSongs.add(ourSong);
             } else {
                 tmpSongs.add(song);
                 newSongs.add(song);
