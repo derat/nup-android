@@ -59,6 +59,9 @@ public class NupService extends Service
     // sooner than this many milliseconds before the song would end (whew).
     private static final long EXTRA_BUFFER_MS = 10 * 1000;
 
+    // Maximum number of cover bitmaps to keep in memory at once.
+    private static final int MAX_LOADED_COVERS = 3;
+
     // If we receive a playback position report with a timestamp more than this many milliseconds beyond the last
     // on we received, we assume that something has gone wrong and ignore it.
     private static final long MAX_POSITION_REPORT_MS = 1000;
@@ -157,7 +160,10 @@ public class NupService extends Service
     private final IBinder mBinder = new LocalBinder();
 
     // Songs whose covers are currently being fetched.
-    private HashSet mSongCoverFetches = new HashSet();
+    private HashSet<Song> mSongCoverFetches = new HashSet<Song>();
+
+    // Songs whose covers we're currently keeping in memory.
+    private List<Song> mSongsWithCovers = new ArrayList<Song>();
 
     // Used to run tasks on our thread.
     private Handler mHandler = new Handler();
@@ -454,38 +460,37 @@ public class NupService extends Service
 
         if (!mSongCoverFetches.contains(song)) {
             mSongCoverFetches.add(song);
-            new CoverFetcherTask().execute(song);
+            new CoverFetchTask(song).execute();
         }
         return false;
     }
 
     // Fetches the cover bitmap for a particular song.
-    // onCoverFetchDone() is called on completion, even if the fetch failed.
-    class CoverFetcherTask extends AsyncTask<Song, Void, Song> {
-        @Override
-        protected Song doInBackground(Song... songs) {
-            Song song = songs[0];
-            song.setCoverBitmap(mCoverLoader.loadCover(song.getArtist(), song.getAlbum()));
-            return song;
+    class CoverFetchTask extends AsyncTask<Void, Void, Bitmap> {
+        private final Song mSong;
+
+        public CoverFetchTask(Song song) {
+            mSong = song;
         }
 
         @Override
-        protected void onPostExecute(Song song) {
-            NupService.this.onCoverFetchDone(song);
+        protected Bitmap doInBackground(Void... args) {
+            return mCoverLoader.loadCover(mSong.getArtist(), mSong.getAlbum());
         }
-    }
 
-    // Called by CoverFetcherTask on the UI thread.
-    public void onCoverFetchDone(Song song) {
-        mSongCoverFetches.remove(song);
+        @Override
+        protected void onPostExecute(Bitmap bitmap) {
+            storeCoverForSong(mSong, bitmap);
+            mSongCoverFetches.remove(mSong);
 
-        if (song.getCoverBitmap() != null && mSongListener != null)
-            mSongListener.onSongCoverLoad(song);
+            if (mSong.getCoverBitmap() != null && mSongListener != null)
+                mSongListener.onSongCoverLoad(mSong);
 
-        // We need to update our notification even if the fetch failed.
-        // TODO: Some bitmaps appear to result in "bad array lengths" exceptions in android.os.Parcel.readIntArray().
-        if (song == getCurrentSong())
-            updateNotification(song.getArtist(), song.getTitle(), song.getAlbum(), song.getCoverBitmap());
+            // We need to update our notification even if the fetch failed.
+            // TODO: Some bitmaps appear to result in "bad array lengths" exceptions in android.os.Parcel.readIntArray().
+            if (mSong == getCurrentSong())
+                updateNotification(mSong.getArtist(), mSong.getTitle(), mSong.getAlbum(), mSong.getCoverBitmap());
+        }
     }
 
     // Reports that we've played a song.
@@ -824,6 +829,36 @@ public class NupService extends Service
             mCache.pinId(entry.getId());
             return;
         }
+    }
+
+    // Set |song|'s cover bitmap to |bitmap|.
+    // Also makes sure that we don't have more than |MAX_LOADED_COVERS| bitmaps in-memory.
+    private void storeCoverForSong(Song song, Bitmap bitmap) {
+        song.setCoverBitmap(bitmap);
+        final int existingIndex = mSongsWithCovers.indexOf(song);
+
+        // If we didn't get a bitmap, bail out early.
+        if (bitmap == null) {
+            if (existingIndex >= 0)
+                mSongsWithCovers.remove(existingIndex);
+            return;
+        }
+
+        // If the song is already in the list, remove it so we can add it to the end.
+        if (existingIndex >= 0) {
+            // It's already at the end of the list; we don't need to move it.
+            if (existingIndex == mSongsWithCovers.size() - 1)
+                return;
+            mSongsWithCovers.remove(existingIndex);
+        }
+
+        // If we're full, drop the cover from the first song on the list.
+        if (mSongsWithCovers.size() == MAX_LOADED_COVERS) {
+            mSongsWithCovers.get(0).setCoverBitmap(null);
+            mSongsWithCovers.remove(0);
+        }
+
+        mSongsWithCovers.add(song);
     }
 
     // Choose a filename to use for storing a song locally (used to just use a slightly-mangled version
