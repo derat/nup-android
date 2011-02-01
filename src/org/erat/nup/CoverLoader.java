@@ -41,6 +41,12 @@ class CoverLoader {
     // Names of cover files that we're currently fetching.
     private HashSet mFilesBeingLoaded = new HashSet();
 
+    // The last cover that we've loaded.  We store it here so that we can reuse the already-loaded
+    // bitmap in the common case where we're playing an album and need the same cover over and over.
+    private Object mLastCoverLock = new Object();
+    private String mLastCoverPath = "";
+    private Bitmap mLastCoverBitmap = null;
+
     public CoverLoader(Context context) {
         mContext = context;
 
@@ -70,7 +76,13 @@ class CoverLoader {
         if (file == null || !file.exists())
             return null;
 
-        return BitmapFactory.decodeFile(file.getPath());
+        synchronized (mLastCoverLock) {
+            if (mLastCoverPath.equals(file.getPath()))
+                return mLastCoverBitmap;
+            mLastCoverPath = file.getPath();
+            mLastCoverBitmap = BitmapFactory.decodeFile(file.getPath());
+            return mLastCoverBitmap;
+        }
     }
 
     private File lookForLocalCover(final String artist, final String album) {
