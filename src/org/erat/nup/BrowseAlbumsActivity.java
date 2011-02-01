@@ -38,7 +38,7 @@ public class BrowseAlbumsActivity extends ListActivity
         mArtist = getIntent().getStringExtra(BrowseActivity.BUNDLE_ARTIST);
         setTitle((mArtist != null) ? getString(R.string.browse_albums_fmt, mArtist) : getString(R.string.browse_albums));
 
-        mAdapter = new ArrayAdapter<String>(this, R.layout.browse_row, mAlbums);
+        mAdapter = new SortedStringArrayAdapter(this, R.layout.browse_row, mAlbums);
         setListAdapter(mAdapter);
         getListView().setFastScrollEnabled(true);
         registerForContextMenu(getListView());

@@ -36,7 +36,7 @@ public class BrowseArtistsActivity extends ListActivity
         super.onCreate(savedInstanceState);
         setTitle(R.string.browse_artists);
 
-        mAdapter = new ArrayAdapter<String>(this, R.layout.browse_row, mArtists);
+        mAdapter = new SortedStringArrayAdapter(this, R.layout.browse_row, mArtists);
         setListAdapter(mAdapter);
         getListView().setFastScrollEnabled(true);
         registerForContextMenu(getListView());
