@@ -30,7 +30,7 @@ class SongDatabase {
 
     private static final String DATABASE_NAME = "NupSongs";
 
-    private static final int DATABASE_VERSION = 8;
+    private static final int DATABASE_VERSION = 9;
 
     private static final String MAX_QUERY_RESULTS = "250";
 
@@ -50,6 +50,8 @@ class SongDatabase {
         "CREATE INDEX Artist ON Songs (Artist)";
     private static final String CREATE_SONGS_ALBUM_INDEX_SQL =
         "CREATE INDEX Album ON Songs (Album)";
+    private static final String CREATE_SONGS_FILENAME_INDEX_SQL =
+        "CREATE INDEX Filename ON Songs (Filename)";
 
     private static final String CREATE_ARTIST_ALBUM_STATS_SQL =
         "CREATE TABLE ArtistAlbumStats (" +
@@ -92,7 +94,8 @@ class SongDatabase {
     private List<String> mArtistsSortedByNumSongs = new ArrayList<String>();
     private HashMap<String,List<String>> mArtistAlbums = new HashMap<String,List<String>>();
 
-    private Listener mListener = null;
+    private final Listener mListener;
+    private final FileCache mCache;
 
     interface Listener {
         void onAggregateDataUpdate();
@@ -106,15 +109,17 @@ class SongDatabase {
         void onSyncProgress(SyncState state, int numSongs);
     }
 
-    public SongDatabase(Context context, Listener listener) {
+    public SongDatabase(Context context, Listener listener, FileCache cache) {
         mContext = context;
         mListener = listener;
+        mCache = cache;
         mOpener = new SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
             @Override
             public void onCreate(SQLiteDatabase db) {
                 db.execSQL(CREATE_SONGS_SQL);
                 db.execSQL(CREATE_SONGS_ARTIST_INDEX_SQL);
                 db.execSQL(CREATE_SONGS_ALBUM_INDEX_SQL);
+                db.execSQL(CREATE_SONGS_FILENAME_INDEX_SQL);
                 db.execSQL(CREATE_ARTIST_ALBUM_STATS_SQL);
                 db.execSQL(CREATE_ARTIST_ALBUM_STATS_ARTIST_SORT_KEY_INDEX_SQL);
                 db.execSQL(CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL);
@@ -218,6 +223,9 @@ class SongDatabase {
                 } else if (newVersion == 8) {
                     // Version 8: Add CachedSongs table.
                     db.execSQL(CREATE_CACHED_SONGS_SQL);
+                } else if (newVersion == 9) {
+                    // Version 8: Add index on Songs.Filename.
+                    db.execSQL(CREATE_SONGS_FILENAME_INDEX_SQL);
                 } else {
                     throw new RuntimeException(
                         "Got request to upgrade database to unknown version " + newVersion);
@@ -230,6 +238,15 @@ class SongDatabase {
             @Override
             protected Void doInBackground(Void... args) {
                 loadAggregateData(mOpener.getReadableDatabase(), false);
+
+                SQLiteDatabase db = mOpener.getWritableDatabase();
+                db.beginTransaction();
+                try {
+                    updateCachedSongs(db);
+                } finally {
+                    db.endTransaction();
+                }
+
                 return (Void) null;
             }
         }.execute();
@@ -402,6 +419,7 @@ class SongDatabase {
             if (numSongsUpdated > 0) {
                 listener.onSyncProgress(SyncState.UPDATING_STATS, numSongsUpdated);
                 updateStatsTables(db);
+                updateCachedSongs(db);
             }
 
             db.setTransactionSuccessful();
@@ -469,6 +487,25 @@ class SongDatabase {
         } finally {
             db.endTransaction();
         }
+    }
+
+    // Clear the CachedSongs table and repopulate it with all of the fully-downloaded songs in the cache.
+    private void updateCachedSongs(SQLiteDatabase db) {
+        db.delete("CachedSongs", null, null);
+
+        int numSongs = 0;
+        for (FileCacheEntry entry : mCache.getAllFullyCachedEntries()) {
+            if (!entry.isFullyCached())
+                continue;
+
+            String filename = Song.getFilenameFromRemotePath(entry.getRemotePath());
+            ContentValues values = new ContentValues(1);
+            db.execSQL("REPLACE INTO CachedSongs (SongId) " +
+                       "SELECT SongId FROM Songs WHERE Filename = ?",
+                       new Object[]{ filename });
+            numSongs++;
+        }
+        Log.d(TAG, "learned about " + numSongs + " cached song(s)");
     }
 
     private void loadAggregateData(SQLiteDatabase db, boolean songsUpdated) {

@@ -214,7 +214,7 @@ public class NupService extends Service
         mCacheThread = new Thread(mCache, "FileCache");
         mCacheThread.start();
 
-        mSongDb = new SongDatabase(this, this);
+        mSongDb = new SongDatabase(this, this, mCache);
         mCoverLoader = new CoverLoader(this);
     }
 

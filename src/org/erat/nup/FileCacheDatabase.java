@@ -172,4 +172,12 @@ class FileCacheDatabase {
             bytes += entry.getCachedBytes();
         return bytes;
     }
+
+    public synchronized List<FileCacheEntry> getAllFullyCachedEntries() {
+        List<FileCacheEntry> fullyCachedEntries = new ArrayList<FileCacheEntry>();
+        for (FileCacheEntry entry : mEntries.values())
+            if (entry.isFullyCached())
+                fullyCachedEntries.add(entry);
+        return fullyCachedEntries;
+    }
 }

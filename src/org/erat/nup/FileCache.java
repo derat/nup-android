@@ -119,6 +119,11 @@ class FileCache implements Runnable {
         return mDb.getEntryForRemotePath(remotePath);
     }
 
+    public List<FileCacheEntry> getAllFullyCachedEntries() {
+        waitUntilReady();
+        return mDb.getAllFullyCachedEntries();
+    }
+
     // Abort a previously-started download.
     public void abortDownload(int id) {
         synchronized(mInProgressIds) {
