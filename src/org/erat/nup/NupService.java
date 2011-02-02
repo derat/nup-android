@@ -206,9 +206,6 @@ public class NupService extends Service
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
         mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
 
-        mSongDb = new SongDatabase(this, this);
-        mCoverLoader = new CoverLoader(this);
-
         mPlayer = new Player(this);
         mPlayerThread = new Thread(mPlayer, "Player");
         mPlayerThread.start();
@@ -216,6 +213,9 @@ public class NupService extends Service
         mCache = new FileCache(this, this);
         mCacheThread = new Thread(mCache, "FileCache");
         mCacheThread.start();
+
+        mSongDb = new SongDatabase(this, this);
+        mCoverLoader = new CoverLoader(this);
     }
 
     @Override

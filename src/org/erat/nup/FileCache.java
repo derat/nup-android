@@ -17,6 +17,9 @@ import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.IOException;
 import java.net.URI;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.Lock;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.Date;
 import java.util.HashSet;
 import java.util.List;
@@ -40,6 +43,11 @@ class FileCache implements Runnable {
         RETRYABLE_ERROR,
         FATAL_ERROR
     }
+
+    // Are we ready to service requests?  This is blocked on |mDb| being initialized.
+    private boolean mIsReady = false;
+    private final Lock mIsReadyLock = new ReentrantLock();
+    private final Condition mIsReadyCond = mIsReadyLock.newCondition();
 
     // Application context.
     private final Context mContext;
@@ -81,6 +89,12 @@ class FileCache implements Runnable {
         mDb = new FileCacheDatabase(mContext);
         Looper.prepare();
         mHandler = new Handler();
+
+        mIsReadyLock.lock();
+        mIsReady = true;
+        mIsReadyCond.signal();
+        mIsReadyLock.unlock();
+
         Looper.loop();
     }
 
@@ -88,6 +102,7 @@ class FileCache implements Runnable {
         synchronized(mInProgressIds) {
             mInProgressIds.clear();
         }
+        waitUntilReady();
         mHandler.post(new Runnable() {
             @Override
             public void run() {
@@ -100,6 +115,7 @@ class FileCache implements Runnable {
     // Get the entry corresponding to a particular cached URL.
     // Returns null if the URL isn't cached.
     public FileCacheEntry getEntry(String remotePath) {
+        waitUntilReady();
         return mDb.getEntryForRemotePath(remotePath);
     }
 
@@ -117,11 +133,13 @@ class FileCache implements Runnable {
 
     // Get the total size of all cached data.
     public long getTotalCachedBytes() {
+        waitUntilReady();
         return mDb.getTotalCachedBytes();
     }
 
     // Clear all cached data.
     public void clear() {
+        waitUntilReady();
         mHandler.post(new Runnable() {
             @Override
             public void run() {
@@ -149,6 +167,7 @@ class FileCache implements Runnable {
     // Download a URL to the cache.  Returns the cache entry, or null if the URL is
     // already being downloaded.
     public FileCacheEntry downloadFile(String remotePath, String filenameSuggestion) {
+        waitUntilReady();
         FileCacheEntry entry = mDb.getEntryForRemotePath(remotePath);
         if (entry == null) {
             String localPath = new File(mMusicDir, filenameSuggestion).getAbsolutePath();
@@ -491,6 +510,18 @@ class FileCache implements Runnable {
                     }
                 }
             }
+        }
+    }
+
+    // Wait until |mIsReady| becomes true.
+    private void waitUntilReady() {
+        mIsReadyLock.lock();
+        try {
+            while (!mIsReady)
+                mIsReadyCond.await();
+        } catch (InterruptedException e) {
+        } finally {
+            mIsReadyLock.unlock();
         }
     }
 
