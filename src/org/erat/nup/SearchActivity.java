@@ -114,6 +114,7 @@ public class SearchActivity extends Activity
         mTitleEdit.setText("");
         mShuffleCheckbox.setChecked(false);
         mSubstringCheckbox.setChecked(false);
+        mCachedCheckbox.setChecked(false);
         mMinRatingSpinner.setSelection(0, true);
     }
 
