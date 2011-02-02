@@ -116,11 +116,8 @@ class FileCache implements Runnable {
     }
 
     // Get the total size of all cached data.
-    public long getDataBytes() {
-        long size = 0;
-        for (File file : mMusicDir.listFiles())
-            size += file.length();
-        return size;
+    public long getTotalCachedBytes() {
+        return mDb.getTotalCachedBytes();
     }
 
     // Clear all cached data.
@@ -510,7 +507,7 @@ class FileCache implements Runnable {
         long maxBytes = Long.valueOf(
             mPrefs.getString(NupPreferences.CACHE_SIZE,
                              NupPreferences.CACHE_SIZE_DEFAULT)) * 1024 * 1024;
-        long availableBytes = maxBytes - getDataBytes();
+        long availableBytes = maxBytes - getTotalCachedBytes();
 
         if (neededBytes <= availableBytes)
             return true;

@@ -137,13 +137,6 @@ class FileCacheDatabase {
             new Object[]{ id });
     }
 
-    public synchronized void setCachedBytes(int id, long cachedBytes) {
-        FileCacheEntry entry = mEntries.get(id);
-        if (entry == null)
-            return;
-        entry.setCachedBytes(cachedBytes);
-    }
-
     public synchronized void setTotalBytes(int id, long totalBytes) {
         FileCacheEntry entry = mEntries.get(id);
         if (entry == null)
@@ -173,6 +166,13 @@ class FileCacheDatabase {
             }
         });
         return ids;
+    }
+
+    public synchronized long getTotalCachedBytes() {
+        long bytes = 0;
+        for (FileCacheEntry entry : mEntries.values())
+            bytes += entry.getCachedBytes();
+        return bytes;
     }
 
     private class DatabaseUpdater implements Runnable {

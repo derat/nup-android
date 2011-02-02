@@ -537,8 +537,8 @@ public class NupService extends Service
         }
     }
 
-    public long getCacheDataBytes() {
-        return mCache.getDataBytes();
+    public long getTotalCachedBytes() {
+        return mCache.getTotalCachedBytes();
     }
 
     public void clearCache() {
