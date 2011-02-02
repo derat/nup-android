@@ -30,7 +30,7 @@ class SongDatabase {
 
     private static final String DATABASE_NAME = "NupSongs";
 
-    private static final int DATABASE_VERSION = 7;
+    private static final int DATABASE_VERSION = 8;
 
     private static final String MAX_QUERY_RESULTS = "250";
 
@@ -72,9 +72,17 @@ class SongDatabase {
         "  (Timestamp, MaxLastModifiedUsec) " +
         "  VALUES(-1, -1)";
 
+    private static final String CREATE_CACHED_SONGS_SQL =
+        "CREATE TABLE CachedSongs (" +
+        "  SongId INTEGER PRIMARY KEY NOT NULL)";
+
     private final Context mContext;
 
     private final SQLiteOpenHelper mOpener;
+
+    // Update the database in a background thread.
+    private final DatabaseUpdater mUpdater;
+    private final Thread mUpdaterThread;
 
     private boolean mAggregateDataLoaded = false;
     private int mNumSongs = 0;
@@ -112,6 +120,7 @@ class SongDatabase {
                 db.execSQL(CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL);
                 db.execSQL(CREATE_LAST_UPDATE_TIME_SQL);
                 db.execSQL(INSERT_LAST_UPDATE_TIME_SQL);
+                db.execSQL(CREATE_CACHED_SONGS_SQL);
             }
 
             @Override
@@ -206,6 +215,9 @@ class SongDatabase {
                     db.execSQL(CREATE_ARTIST_ALBUM_STATS_ARTIST_SORT_KEY_INDEX_SQL);
                     db.execSQL(CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL);
                     db.execSQL("DROP TABLE ArtistAlbumStatsTmp");
+                } else if (newVersion == 8) {
+                    // Version 8: Add CachedSongs table.
+                    db.execSQL(CREATE_CACHED_SONGS_SQL);
                 } else {
                     throw new RuntimeException(
                         "Got request to upgrade database to unknown version " + newVersion);
@@ -221,6 +233,10 @@ class SongDatabase {
                 return (Void) null;
             }
         }.execute();
+
+        mUpdater = new DatabaseUpdater(mOpener.getWritableDatabase());
+        mUpdaterThread = new Thread(mUpdater, "SongDatabase.DatabaseUpdater");
+        mUpdaterThread.start();
     }
 
     public boolean getAggregateDataLoaded() { return mAggregateDataLoaded; }
@@ -233,6 +249,11 @@ class SongDatabase {
     public List<String> getAlbumsByArtist(String artist) {
         String lowerArtist = artist.toLowerCase();
         return mArtistAlbums.containsKey(lowerArtist) ? mArtistAlbums.get(lowerArtist) : new ArrayList<String>();
+    }
+
+    public synchronized void quit() {
+        mUpdater.quit();
+        try { mUpdaterThread.join(); } catch (InterruptedException e) {}
     }
 
     public List<Song> query(String artist, String title, String album, String minRating, boolean shuffle, boolean substring) {
@@ -283,6 +304,22 @@ class SongDatabase {
         }
         cursor.close();
         return songs;
+    }
+
+    // Record the fact that a song has been successfully cached.
+    public void handleSongCached(int songId) {
+        mUpdater.postUpdate(
+            "REPLACE INTO CachedSongs (SongId) VALUES(?)", new Object[]{ songId });
+    }
+
+    // Record the fact that a song has been evicted from the cache.
+    // It's pretty weird that this method takes a filename while handleSongCached() takes a song ID, but
+    // previously-cached songs that we haven't accessed in the current run can still be evicted, while we only download
+    // songs that NupService has explicitly asked for (which implies that it's loaded Song objects for them).
+    public void handleSongEvicted(String filename) {
+        mUpdater.postUpdate(
+            "DELETE FROM CachedSongs WHERE SongId IN (SELECT SongId FROM Songs WHERE Filename = ?)",
+            new Object[]{ filename });
     }
 
     public boolean syncWithServer(SyncProgressListener listener, String message[]) {

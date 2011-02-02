@@ -7,8 +7,6 @@ import android.content.Context;
 import android.database.Cursor;
 import android.database.sqlite.SQLiteDatabase;
 import android.database.sqlite.SQLiteOpenHelper;
-import android.os.Handler;
-import android.os.Looper;
 import android.util.Log;
 
 import java.io.File;
@@ -36,8 +34,8 @@ class FileCacheDatabase {
     private int mNextId = 1;
 
     // Update the database in a background thread.
-    private DatabaseUpdater mUpdater;
-    private Thread mUpdaterThread;
+    private final DatabaseUpdater mUpdater;
+    private final Thread mUpdaterThread;
 
     public FileCacheDatabase(Context context) {
         mOpener = new SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
@@ -73,7 +71,7 @@ class FileCacheDatabase {
         // Block until we've loaded everything into memory.
         loadExistingEntries();
 
-        mUpdater = new DatabaseUpdater();
+        mUpdater = new DatabaseUpdater(mOpener.getWritableDatabase());
         mUpdaterThread = new Thread(mUpdater, "FileCacheDatabase.DatabaseUpdater");
         mUpdaterThread.start();
     }
@@ -173,35 +171,5 @@ class FileCacheDatabase {
         for (FileCacheEntry entry : mEntries.values())
             bytes += entry.getCachedBytes();
         return bytes;
-    }
-
-    private class DatabaseUpdater implements Runnable {
-        private Handler mHandler;
-
-        @Override
-        public void run() {
-            Looper.prepare();
-            mHandler = new Handler();
-            Looper.loop();
-        }
-
-        public void quit() {
-            mHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    Looper.myLooper().quit();
-                }
-            });
-        }
-
-        public void postUpdate(final String sql, final Object[] values) {
-            mHandler.post(new Runnable() {
-                @Override
-                public void run() {
-                    SQLiteDatabase db = mOpener.getWritableDatabase();
-                    db.execSQL(sql, values);
-                }
-            });
-        }
     }
 }

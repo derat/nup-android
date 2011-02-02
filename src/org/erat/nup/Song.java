@@ -11,6 +11,8 @@ import org.json.JSONObject;
 import java.io.Serializable;
 
 class Song implements Serializable {
+    private static final String SERVER_DIRECTORY = "/music";
+
     private final String mArtist, mTitle, mAlbum, mFilename;
     private final int mLengthSec, mSongId;
     private final double mRating;
@@ -57,5 +59,10 @@ class Song implements Serializable {
         mTotalBytes = entry.getTotalBytes();
     }
 
-    public String getRemotePath() { return "/music/" + Uri.encode(mFilename); }
+    public String getRemotePath() { return SERVER_DIRECTORY + "/" + Uri.encode(mFilename); }
+
+    // Reverses getRemotePath(), yielding the original filename given to us by the server.
+    public static String getFilenameFromRemotePath(String remotePath) {
+        return Uri.decode(remotePath.substring(SERVER_DIRECTORY.length() + 1));
+    }
 }

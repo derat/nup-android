@@ -223,12 +223,13 @@ public class NupService extends Service
         Log.d(TAG, "service destroyed");
         mNotificationManager.cancel(NOTIFICATION_ID);
         mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_NONE);
+
+        mSongDb.quit();
         mPlayer.quit();
         mCache.quit();
-        try {
-            mPlayerThread.join();
-            mCacheThread.join();
-        } catch (InterruptedException e) {}
+        try { mPlayerThread.join(); } catch (InterruptedException e) {}
+        try { mCacheThread.join(); } catch (InterruptedException e) {}
+
         CrashLogger.unregister();
     }
 
@@ -645,6 +646,7 @@ public class NupService extends Service
                     return;
 
                 song.updateBytes(entry);
+                mSongDb.handleSongCached(song.getSongId());
 
                 if (song == getCurrentSong() && mWaitingForDownload) {
                     mWaitingForDownload = false;
@@ -696,6 +698,8 @@ public class NupService extends Service
             @Override
             public void run() {
                 Log.d(TAG, "got notification that " + entry.getId() + " has been evicted");
+                mSongDb.handleSongEvicted(Song.getFilenameFromRemotePath(entry.getRemotePath()));
+
                 Song song = mCacheEntryIdToSong.get(entry.getId());
                 if (song == null)
                     return;
