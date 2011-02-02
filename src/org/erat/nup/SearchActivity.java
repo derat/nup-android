@@ -41,7 +41,7 @@ public class SearchActivity extends Activity
     // Various parts of our UI.
     private AutoCompleteTextView mArtistEdit, mAlbumEdit;
     private EditText mTitleEdit;
-    private CheckBox mShuffleCheckbox, mSubstringCheckbox;
+    private CheckBox mShuffleCheckbox, mSubstringCheckbox, mCachedCheckbox;
     private Spinner mMinRatingSpinner;
 
     // Points from (lowercased) artist String to List of String album names.
@@ -94,6 +94,7 @@ public class SearchActivity extends Activity
 
         mShuffleCheckbox = (CheckBox) findViewById(R.id.shuffle_checkbox);
         mSubstringCheckbox = (CheckBox) findViewById(R.id.substring_checkbox);
+        mCachedCheckbox = (CheckBox) findViewById(R.id.cached_checkbox);
 
         NupActivity.getService().addSongDatabaseUpdateListener(this);
         onSongDatabaseUpdate();
@@ -182,6 +183,7 @@ public class SearchActivity extends Activity
         params.minRating = mMinRatingSpinner.getSelectedItem().toString();
         params.shuffle = mShuffleCheckbox.isChecked();
         params.substring = mSubstringCheckbox.isChecked();
+        params.cached = mCachedCheckbox.isChecked();
 
         // Make a half-hearted attempt to abort the previous request, if there is one.
         // It's fine if it's already started; it'll abort when the background portion
@@ -194,7 +196,7 @@ public class SearchActivity extends Activity
 
     private class QueryParams {
         public String artist, title, album, minRating;
-        boolean shuffle, substring;
+        boolean shuffle, substring, cached;
     }
 
     private class QueryTask extends AsyncTask<QueryParams, Void, List<Song>> {
@@ -208,10 +210,11 @@ public class SearchActivity extends Activity
         }
 
         @Override
-        protected List<Song> doInBackground(QueryParams... params) {
+        protected List<Song> doInBackground(QueryParams... paramsArg) {
+            QueryParams params = paramsArg[0];
             return NupActivity.getService().getSongDb().query(
-                params[0].artist, params[0].title, params[0].album, params[0].minRating,
-                params[0].shuffle, params[0].substring);
+                params.artist, params.title, params.album, params.minRating,
+                params.shuffle, params.substring, params.cached);
         }
 
         @Override

@@ -273,7 +273,7 @@ class SongDatabase {
         try { mUpdaterThread.join(); } catch (InterruptedException e) {}
     }
 
-    public List<Song> query(String artist, String title, String album, String minRating, boolean shuffle, boolean substring) {
+    public List<Song> query(String artist, String title, String album, String minRating, boolean shuffle, boolean substring, boolean onlyCached) {
         class QueryBuilder {
             public List<String> selections = new ArrayList<String>();
             public List<String> selectionArgs = new ArrayList<String>();
@@ -288,6 +288,13 @@ class SongDatabase {
                 selections.add(clause);
                 selectionArgs.add(substring ? "%" + selectionArg + "%" : selectionArg);
             }
+
+            // Get a WHERE clause (plus trailing space) if |selections| is non-empty, or just an empty string otherwise.
+            public String getWhereClause() {
+                if (selections.isEmpty())
+                    return "";
+                return "WHERE " + TextUtils.join(" AND ", selections) + " ";
+            }
         }
         QueryBuilder builder = new QueryBuilder();
         builder.add("Artist", artist, true, substring);
@@ -300,15 +307,15 @@ class SongDatabase {
         }
         builder.addRaw("Rating >= ?", minRating, false);
 
-        Cursor cursor = mOpener.getReadableDatabase().query(
-            "Songs",
-            TextUtils.split("Artist Title Album Filename Length SongId Rating", " "),
-            TextUtils.join(" AND ", builder.selections),
-            builder.selectionArgs.toArray(new String[]{}),
-            null,  // groupBy
-            null,  // having
-            shuffle ? "RANDOM()" : "Album ASC, TrackNumber ASC",  // orderBy
-            MAX_QUERY_RESULTS);  // limit
+        String query =
+            "SELECT Artist, Title, Album, Filename, Length, s.SongId, Rating " +
+            "FROM Songs s " +
+            (onlyCached ? "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " : "") +
+            builder.getWhereClause() +
+            "ORDER BY " + (shuffle ? "RANDOM()" : "Album ASC, TrackNumber ASC") + " " +
+            "LIMIT " + MAX_QUERY_RESULTS;
+        Cursor cursor = mOpener.getReadableDatabase().rawQuery(
+            query, builder.selectionArgs.toArray(new String[]{}));
 
         List<Song> songs = new ArrayList<Song>();
         cursor.moveToFirst();

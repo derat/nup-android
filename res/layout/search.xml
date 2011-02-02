@@ -60,6 +60,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:paddingLeft="42dp"
             android:text="@string/substring"
             />
         <CheckBox
@@ -67,16 +68,42 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
+            android:paddingLeft="42dp"
             android:text="@string/shuffle"
+            />
+        <CheckBox
+            android:id="@+id/cached_checkbox"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:paddingLeft="42dp"
+            android:text="@string/cached"
+            />
+      </LinearLayout>
+
+      <RelativeLayout
+          android:orientation="horizontal"
+          android:layout_width="fill_parent"
+          android:layout_height="wrap_content"
+          android:paddingTop="6dp"
+          >
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toLeftOf="@+id/min_rating_spinner"
+            android:layout_centerVertical="true"
+            android:paddingRight="4dp"
+            android:textSize="16dp"
+            android:text="@string/minimum_rating_label"
             />
         <Spinner
             android:id="@+id/min_rating_spinner"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:layout_weight="1"
+            android:layout_alignParentRight="true"
             android:prompt="@string/minimum_rating"
             />
-      </LinearLayout>
+      </RelativeLayout>
     </LinearLayout>
   </ScrollView>
 

@@ -18,6 +18,7 @@
   <string name="cache_size_description">Maximum size of data stored on SD card in MB</string>
   <string name="cache_size_invalid">Cache must be at least %d MB.</string>
   <string name="cache_size_value">%d MB</string>
+  <string name="cached">Cached</string>
   <string name="clear_cache">Clear cache</string>
   <string name="clear_cache_message">Delete all cached music from the SD card?</string>
   <string name="download_rate">Download rate</string>
@@ -28,6 +29,7 @@
   <string name="insert_all">Insert all</string>
   <string name="loading_stats">Loading stats...</string>
   <string name="minimum_rating">Minimum rating</string>
+  <string name="minimum_rating_label">Minimum rating:</string>
   <string name="next">Next</string>
   <string name="never_synced">Never synced</string>
   <string name="password">Password</string>
