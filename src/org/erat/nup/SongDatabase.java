@@ -254,7 +254,12 @@ class SongDatabase {
         QueryBuilder builder = new QueryBuilder();
         builder.add("Artist", artist, true, substring);
         builder.add("Title", title, true, substring);
-        builder.add("Album", album, true, substring);
+        if (album != null && album.equals(UNKNOWN_ALBUM)) {
+            builder.selections.add("Album = ?");
+            builder.selectionArgs.add("");
+        } else {
+            builder.add("Album", album, true, substring);
+        }
         builder.addRaw("Rating >= ?", minRating, false);
 
         Cursor cursor = mOpener.getReadableDatabase().query(
