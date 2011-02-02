@@ -453,7 +453,7 @@ class SongDatabase {
         HashMap<String,List<String>> artistAlbums = new HashMap<String,List<String>>();
 
         List<String> artistsSortedAlphabetically = new ArrayList<String>();
-        cursor = db.rawQuery("SELECT DISTINCT Artist FROM ArtistAlbumStats ORDER BY ArtistSortKey", null);
+        cursor = db.rawQuery("SELECT DISTINCT Artist FROM ArtistAlbumStats ORDER BY ArtistSortKey ASC", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
             artistsSortedAlphabetically.add(cursor.getString(0));
@@ -462,7 +462,7 @@ class SongDatabase {
         cursor.close();
 
         List<String> albumsSortedAlphabetically = new ArrayList<String>();
-        cursor = db.rawQuery("SELECT DISTINCT Album FROM ArtistAlbumStats ORDER BY AlbumSortKey", null);
+        cursor = db.rawQuery("SELECT DISTINCT Album FROM ArtistAlbumStats ORDER BY AlbumSortKey ASC", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
             albumsSortedAlphabetically.add(cursor.getString(0));
@@ -470,7 +470,7 @@ class SongDatabase {
         }
         cursor.close();
 
-        cursor = db.rawQuery("SELECT Artist, Album, NumSongs FROM ArtistAlbumStats", null);
+        cursor = db.rawQuery("SELECT Artist, Album, NumSongs FROM ArtistAlbumStats ORDER BY AlbumSortKey ASC", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
             String artist = cursor.getString(0);
@@ -483,12 +483,11 @@ class SongDatabase {
             totalSongsByArtist += numSongsInAlbum;
             artistSongCounts.put(artist, totalSongsByArtist);
 
-            List<String> albums;
-            if (artistAlbums.containsKey(artist)) {
-                albums = artistAlbums.get(artist);
-            } else {
+            String lowerArtist = artist.toLowerCase();
+            List<String> albums = artistAlbums.get(lowerArtist);
+            if (albums == null) {
                 albums = new ArrayList<String>();
-                artistAlbums.put(artist, albums);
+                artistAlbums.put(lowerArtist, albums);
             }
             albums.add(album);
 
