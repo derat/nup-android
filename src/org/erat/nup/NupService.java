@@ -192,8 +192,6 @@ public class NupService extends Service
         Log.d(TAG, "service created");
         CrashLogger.register(new File(getExternalFilesDir(null), CRASH_SUBDIRECTORY));
 
-        mTelephonyManager = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
-
         mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         Notification notification = new Notification(R.drawable.icon, getString(R.string.startup_notification_message), System.currentTimeMillis());
         notification.flags |= (Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR);
@@ -204,6 +202,8 @@ public class NupService extends Service
         startForeground(NOTIFICATION_ID, notification);
 
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
+
+        mTelephonyManager = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
         mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
 
         mPlayer = new Player(this);
@@ -384,6 +384,7 @@ public class NupService extends Service
             mCurrentSongIndex--;
         if (index < mDownloadIndex)
             mDownloadIndex--;
+
         if (mSongListener != null)
             mSongListener.onPlaylistChange(mSongs);
     }

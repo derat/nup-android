@@ -5,6 +5,8 @@ package org.erat.nup;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.wifi.WifiManager;
+import android.net.wifi.WifiManager.WifiLock;
 import android.os.Environment;
 import android.os.Handler;
 import android.os.Looper;
@@ -27,6 +29,9 @@ import java.util.List;
 class FileCache implements Runnable {
     private static final String TAG = "FileCache";
 
+    // How long should we hold the wifi lock after noticing that there are no current downloads?
+    private static final long RELEASE_WIFI_LOCK_DELAY_SEC = 600;
+
     interface Listener {
         void onCacheDownloadError(FileCacheEntry entry, String reason);
         void onCacheDownloadFail(FileCacheEntry entry, String reason);
@@ -42,6 +47,18 @@ class FileCache implements Runnable {
         ABORTED,
         RETRYABLE_ERROR,
         FATAL_ERROR
+    }
+
+    // Current state of our use of the wifi connection.
+    private enum WifiState {
+        // We have an active download.
+        ACTIVE,
+
+        // No active downlodads, but we're waiting for another one to start before releasing the lock.
+        WAITING,
+
+        // No active downloads and the lock is released.
+        INACTIVE,
     }
 
     // Are we ready to service requests?  This is blocked on |mDb| being initialized.
@@ -67,7 +84,11 @@ class FileCache implements Runnable {
     // Persistent information about cached items.
     private FileCacheDatabase mDb = null;
 
-    private SharedPreferences mPrefs;
+    private final SharedPreferences mPrefs;
+
+    private WifiState mWifiState;
+    private final WifiLock mWifiLock;
+    private Runnable mUpdateWifiLockTask = null;
 
     private final Listener mListener;
 
@@ -82,6 +103,10 @@ class FileCache implements Runnable {
 
         mMusicDir = mContext.getExternalFilesDir(Environment.DIRECTORY_MUSIC);
         mPrefs = PreferenceManager.getDefaultSharedPreferences(context);
+
+        mWifiLock = ((WifiManager) mContext.getSystemService(Context.WIFI_SERVICE)).createWifiLock(
+            WifiManager.WIFI_MODE_FULL, mContext.getString(R.string.app_name));
+        mWifiLock.setReferenceCounted(false);
     }
 
     @Override
@@ -127,13 +152,12 @@ class FileCache implements Runnable {
     // Abort a previously-started download.
     public void abortDownload(int id) {
         synchronized(mInProgressIds) {
-            if (!mInProgressIds.contains(id)) {
+            if (!mInProgressIds.contains(id))
                 Log.e(TAG, "tried to abort nonexistent download " + id);
-                return;
-            }
             mInProgressIds.remove(id);
-            Log.d(TAG, "canceled download " + id);
         }
+        updateWifiLock();
+        Log.d(TAG, "canceled download " + id);
     }
 
     // Get the total size of all cached data.
@@ -151,6 +175,7 @@ class FileCache implements Runnable {
                 synchronized(mInProgressIds) {
                     mInProgressIds.clear();
                 }
+                updateWifiLock();
                 clearPinnedIds();
 
                 List<Integer> ids = mDb.getIdsByAge();
@@ -236,6 +261,8 @@ class FileCache implements Runnable {
         public void run() {
             if (!isActive())
                 return;
+
+            updateWifiLock();
 
             while (true) {
                 try {
@@ -421,6 +448,7 @@ class FileCache implements Runnable {
             synchronized(mInProgressIds) {
                 mInProgressIds.remove(mEntry.getId());
             }
+            updateWifiLock();
             mListener.onCacheDownloadFail(mEntry, mReason);
         }
 
@@ -428,6 +456,7 @@ class FileCache implements Runnable {
             synchronized(mInProgressIds) {
                 mInProgressIds.remove(mEntry.getId());
             }
+            updateWifiLock();
             mListener.onCacheDownloadComplete(mEntry);
         }
 
@@ -572,5 +601,40 @@ class FileCache implements Runnable {
         }
 
         return neededBytes <= availableBytes;
+    }
+
+    // Acquire or release the wifi lock, depending on our current state.
+    private void updateWifiLock() {
+        if (mUpdateWifiLockTask != null) {
+            mHandler.removeCallbacks(mUpdateWifiLockTask);
+            mUpdateWifiLockTask = null;
+        }
+
+        boolean active = false;
+        synchronized(mInProgressIds) {
+            active = !mInProgressIds.isEmpty();
+        }
+
+        if (active) {
+            Log.d(TAG, "acquiring wifi lock");
+            mWifiState = WifiState.ACTIVE;
+            mWifiLock.acquire();
+        } else {
+            if (mWifiState == WifiState.ACTIVE) {
+                Log.d(TAG, "waiting " + RELEASE_WIFI_LOCK_DELAY_SEC + " seconds before releasing wifi lock");
+                mWifiState = WifiState.WAITING;
+                mUpdateWifiLockTask = new Runnable() {
+                    @Override
+                    public void run() {
+                        updateWifiLock();
+                    }
+                };
+                mHandler.postDelayed(mUpdateWifiLockTask, RELEASE_WIFI_LOCK_DELAY_SEC * 1000);
+            } else {
+                Log.d(TAG, "releasing wifi lock");
+                mWifiState = WifiState.INACTIVE;
+                mWifiLock.release();
+            }
+        }
     }
 }
