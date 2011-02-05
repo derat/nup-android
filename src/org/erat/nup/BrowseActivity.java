@@ -16,6 +16,7 @@ public class BrowseActivity extends ListActivity {
     public static final String BUNDLE_ARTIST = "artist";
     public static final String BUNDLE_ALBUM = "album";
     public static final String BUNDLE_MIN_RATING = "min_rating";
+    public static final String BUNDLE_CACHED = "cached";
 
     private static final int BROWSE_ARTISTS_REQUEST_CODE = 1;
     private static final int BROWSE_ALBUMS_REQUEST_CODE = 2;
@@ -28,6 +29,7 @@ public class BrowseActivity extends ListActivity {
         ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, R.layout.browse_row);
         adapter.add(getString(R.string.artists));
         adapter.add(getString(R.string.albums));
+        adapter.add(getString(R.string.cached_artists));
         setListAdapter(adapter);
     }
 
@@ -37,6 +39,10 @@ public class BrowseActivity extends ListActivity {
             startActivityForResult(new Intent(this, BrowseArtistsActivity.class), BROWSE_ARTISTS_REQUEST_CODE);
         } else if (position == 1) {
             startActivityForResult(new Intent(this, BrowseAlbumsActivity.class), BROWSE_ALBUMS_REQUEST_CODE);
+        } else if (position == 2) {
+            Intent intent = new Intent(this, BrowseArtistsActivity.class);
+            intent.putExtra(BrowseActivity.BUNDLE_CACHED, true);
+            startActivityForResult(intent, BROWSE_ARTISTS_REQUEST_CODE);
         }
     }
 

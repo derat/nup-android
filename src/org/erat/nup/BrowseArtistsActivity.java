@@ -5,6 +5,7 @@ package org.erat.nup;
 
 import android.app.ListActivity;
 import android.content.Intent;
+import android.os.AsyncTask;
 import android.os.Bundle;
 import android.view.ContextMenu;
 import android.view.MenuItem;
@@ -26,6 +27,8 @@ public class BrowseArtistsActivity extends ListActivity
     private static final int MENU_ITEM_SEARCH = 2;
     private static final int MENU_ITEM_BROWSE_ALBUMS = 3;
 
+    private boolean mOnlyCached = false;
+
     // Artists that we display.
     private List<String> mArtists = new ArrayList<String>(); 
 
@@ -35,6 +38,8 @@ public class BrowseArtistsActivity extends ListActivity
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setTitle(R.string.browse_artists);
+
+        mOnlyCached = getIntent().getBooleanExtra(BrowseActivity.BUNDLE_CACHED, false);
 
         mAdapter = new SortedStringArrayAdapter(this, R.layout.browse_row, mArtists);
         setListAdapter(mAdapter);
@@ -94,8 +99,26 @@ public class BrowseArtistsActivity extends ListActivity
     // Implements NupService.SongDatabaseUpdateListener.
     @Override
     public void onSongDatabaseUpdate() {
+        if (!mOnlyCached) {
+            updateArtists(NupActivity.getService().getSongDb().getArtistsSortedAlphabetically());
+        } else {
+            new AsyncTask<Void, Void, List<String>>() {
+                @Override
+                protected List<String> doInBackground(Void... args) {
+                    return NupActivity.getService().getSongDb().getCachedArtistsSortedAlphabetically();
+                }
+                @Override
+                protected void onPostExecute(List<String> artists) {
+                    updateArtists(artists);
+                }
+            }.execute();
+        }
+    }
+
+    // Show a new list of artists.
+    private void updateArtists(List<String> artists) {
         mArtists.clear();
-        mArtists.addAll(NupActivity.getService().getSongDb().getArtistsSortedAlphabetically());
+        mArtists.addAll(artists);
         mAdapter.notifyDataSetChanged();
     }
 
@@ -103,6 +126,7 @@ public class BrowseArtistsActivity extends ListActivity
     private void startBrowseAlbumsActivity(String artist) {
         Intent intent = new Intent(this, BrowseAlbumsActivity.class);
         intent.putExtra(BrowseActivity.BUNDLE_ARTIST, artist);
+        intent.putExtra(BrowseActivity.BUNDLE_CACHED, mOnlyCached);
         startActivityForResult(intent, BROWSE_ALBUMS_REQUEST_CODE);
     }
 

@@ -258,13 +258,40 @@ class SongDatabase {
     public boolean getAggregateDataLoaded() { return mAggregateDataLoaded; }
     public int getNumSongs() { return mNumSongs; }
     public Date getLastSyncDate() { return mLastSyncDate; }
-    public List<String> getArtistsSortedAlphabetically() { return mArtistsSortedAlphabetically; }
     public List<String> getAlbumsSortedAlphabetically() { return mAlbumsSortedAlphabetically; }
+    public List<String> getArtistsSortedAlphabetically() { return mArtistsSortedAlphabetically; }
     public List<String> getArtistsSortedByNumSongs() { return mArtistsSortedByNumSongs; }
 
     public List<String> getAlbumsByArtist(String artist) {
         String lowerArtist = artist.toLowerCase();
         return mArtistAlbums.containsKey(lowerArtist) ? mArtistAlbums.get(lowerArtist) : new ArrayList<String>();
+    }
+
+    public List<String> getCachedArtistsSortedAlphabetically() {
+        String query =
+            "SELECT DISTINCT s.Artist FROM Songs s " +
+            "JOIN CachedSongs cs ON(s.SongId = cs.SongId)";
+        Cursor cursor = mOpener.getReadableDatabase().rawQuery(query, null);
+
+        List<String> artists = new ArrayList<String>();
+        cursor.moveToFirst();
+        while (!cursor.isAfterLast()) {
+            artists.add(cursor.getString(0));
+            cursor.moveToNext();
+        }
+        cursor.close();
+
+        final HashMap<String,String> sortKeys = new HashMap<String,String>();
+        for (String artist : artists)
+            sortKeys.put(artist, Util.getSortingKeyForString(artist));
+        Collections.sort(artists, new Comparator<String>() {
+            @Override
+            public int compare(String a, String b) {
+                return sortKeys.get(a).compareTo(sortKeys.get(b));
+            }
+        });
+
+        return artists;
     }
 
     public synchronized void quit() {
