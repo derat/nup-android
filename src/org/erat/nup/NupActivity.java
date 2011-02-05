@@ -134,6 +134,9 @@ public class NupActivity extends Activity
                 onSongPositionChange(mService.getCurrentSong(), mService.getCurrentSongLastPositionMs(), 0);
                 mPlaylistView.smoothScrollToPosition(mCurrentSongIndex);
             }
+
+            if (mSongs.isEmpty())
+                startActivity(new Intent(NupActivity.this, BrowseActivity.class));
         }
 
         public void onServiceDisconnected(ComponentName className) {
