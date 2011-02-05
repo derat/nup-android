@@ -298,7 +298,7 @@ public class NupActivity extends Activity
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
         case R.id.search_menu_item:
-            startActivity(new Intent(this, SearchActivity.class));
+            startActivity(new Intent(this, SearchFormActivity.class));
             return true;
         case R.id.settings_menu_item:
             startActivity(new Intent(this, SettingsActivity.class));

@@ -1,5 +1,13 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
+  <plurals name="search_found_songs_fmt">
+    <item quantity="one">Found %d song.</item>
+    <item quantity="other">Found %d songs.</item>
+  </plurals>
+  <plurals name="songs_to_preload_fmt">
+    <item quantity="one">%d song</item>
+    <item quantity="other">%d songs</item>
+  </plurals>
   <plurals name="sync_progress_fmt">
     <item quantity="one">Updated %d song...</item>
     <item quantity="other">Updated %d songs...</item>
@@ -7,13 +15,5 @@
   <plurals name="sync_status_fmt">
     <item quantity="one">%1$d song\nLast sync: %2$s</item>
     <item quantity="other">%1$d songs\nLast sync: %2$s</item>
-  </plurals>
-  <plurals name="search_got_songs_fmt">
-    <item quantity="one">Got %d song.</item>
-    <item quantity="other">Got %d songs.</item>
-  </plurals>
-  <plurals name="songs_to_preload_fmt">
-    <item quantity="one">%d song</item>
-    <item quantity="other">%d songs</item>
   </plurals>
 </resources>

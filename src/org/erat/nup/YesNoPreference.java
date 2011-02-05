@@ -87,6 +87,7 @@ class YesNoPreference extends DialogPreference
                     R.plurals.sync_progress_fmt, 0, 0),
                 true,   // indeterminate
                 true);  // cancelable
+            // FIXME: Support canceling.
         }
 
         @Override
