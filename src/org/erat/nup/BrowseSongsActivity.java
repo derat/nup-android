@@ -47,13 +47,28 @@ public class BrowseSongsActivity extends Activity {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        // FIXME: title
         setContentView(R.layout.browse_songs);
 
         mArtist = getIntent().getStringExtra(BrowseActivity.BUNDLE_ARTIST);
         mAlbum = getIntent().getStringExtra(BrowseActivity.BUNDLE_ALBUM);
         mOnlyCached = getIntent().getBooleanExtra(BrowseActivity.BUNDLE_CACHED, false);
         mMinRating = getIntent().getStringExtra(BrowseActivity.BUNDLE_MIN_RATING);
+
+        if (mAlbum != null) {
+            setTitle(getString(mOnlyCached ?
+                                   R.string.browse_cached_songs_from_album_fmt :
+                                   R.string.browse_songs_from_album_fmt,
+                               mAlbum));
+        } else if (mArtist != null) {
+            setTitle(getString(mOnlyCached ?
+                                   R.string.browse_cached_songs_by_artist_fmt :
+                                   R.string.browse_songs_by_artist_fmt,
+                               mArtist));
+        } else {
+            setTitle(getString(mOnlyCached ?
+                               R.string.browse_cached_songs :
+                               R.string.browse_songs));
+        }
 
         // Do the query for the songs in the background.
         new AsyncTask<Void, Void, List<Song>>() {

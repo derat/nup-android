@@ -39,9 +39,8 @@ public class BrowseArtistsActivity extends ListActivity
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setTitle(R.string.browse_artists);
-
         mOnlyCached = getIntent().getBooleanExtra(BrowseActivity.BUNDLE_CACHED, false);
+        setTitle(mOnlyCached ? R.string.browse_cached_artists : R.string.browse_artists);
 
         mAdapter = new SortedStringArrayAdapter(this, R.layout.browse_row, mArtists);
         setListAdapter(mAdapter);

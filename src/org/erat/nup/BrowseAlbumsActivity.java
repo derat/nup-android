@@ -44,7 +44,10 @@ public class BrowseAlbumsActivity extends ListActivity
 
         mOnlyCached = getIntent().getBooleanExtra(BrowseActivity.BUNDLE_CACHED, false);
         mArtist = getIntent().getStringExtra(BrowseActivity.BUNDLE_ARTIST);
-        setTitle((mArtist != null) ? getString(R.string.browse_albums_fmt, mArtist) : getString(R.string.browse_albums));
+        setTitle(
+            (mArtist != null) ?
+            getString(mOnlyCached ? R.string.browse_cached_albums_fmt : R.string.browse_albums_fmt, mArtist) :
+            getString(mOnlyCached ? R.string.browse_cached_albums: R.string.browse_albums));
 
         mAdapter = new SortedStringArrayAdapter(this, R.layout.browse_row, mAlbums);
         setListAdapter(mAdapter);

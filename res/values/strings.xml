@@ -14,7 +14,15 @@
   <string name="browse_albums">Browse albums</string>
   <string name="browse_albums_fmt">Browse %s albums</string>
   <string name="browse_artists">Browse artists</string>
+  <string name="browse_cached_albums">Browse cached albums</string>
+  <string name="browse_cached_albums_fmt">Browse cached %s albums</string>
+  <string name="browse_cached_artists">Browse cached artists</string>
+  <string name="browse_cached_songs">Browse cached songs</string>
+  <string name="browse_cached_songs_by_artist_fmt">Browse cached %s songs</string>
+  <string name="browse_cached_songs_from_album_fmt">Browse cached songs from %s</string>
   <string name="browse_songs">Browse songs</string>
+  <string name="browse_songs_by_artist_fmt">Browse %s songs</string>
+  <string name="browse_songs_from_album_fmt">Browse songs from %s</string>
   <string name="browse_songs_with_75_rating">Browse songs &#x2265; 0.75</string>
   <string name="cache_is_empty">Cache is empty</string>
   <string name="cache_current_usage">Current usage: %.1f MB</string>
