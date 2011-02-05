@@ -1,0 +1,139 @@
+// Copyright 2011 Daniel Erat <dan@erat.org>
+// All rights reserved.
+
+package org.erat.nup;
+
+import android.app.Activity;
+import android.content.Intent;
+import android.os.AsyncTask;
+import android.os.Bundle;
+import android.view.ContextMenu;
+import android.view.MenuItem;
+import android.view.View;
+import android.widget.AdapterView;
+import android.widget.ListView;
+import android.widget.SimpleAdapter;
+
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
+public class BrowseSongsActivity extends Activity {
+    private static final String TAG = "BrowseSongsActivity";
+
+    // IDs for items in our context menus.
+    private static final int MENU_ITEM_PLAY = 1;
+    private static final int MENU_ITEM_INSERT = 2;
+    private static final int MENU_ITEM_APPEND = 3;
+
+    // Are we displaying only cached songs?
+    private boolean mOnlyCached = false;
+
+    // Artist that was passed to us.
+    private String mArtist = null;
+
+    // Album that was passed to us.
+    private String mAlbum = null;
+
+    // Minimum rating that was passed to us.
+    private String mMinRating = null;
+
+    // Songs that we're displaying.
+    private List<Song> mSongs = new ArrayList<Song>();
+
+    @Override
+    public void onCreate(Bundle savedInstanceState) {
+        super.onCreate(savedInstanceState);
+        // FIXME: title
+        setContentView(R.layout.browse_songs);
+
+        mArtist = getIntent().getStringExtra(BrowseActivity.BUNDLE_ARTIST);
+        mAlbum = getIntent().getStringExtra(BrowseActivity.BUNDLE_ALBUM);
+        mOnlyCached = getIntent().getBooleanExtra(BrowseActivity.BUNDLE_CACHED, false);
+        mMinRating = getIntent().getStringExtra(BrowseActivity.BUNDLE_MIN_RATING);
+
+        // Do the query for the songs in the background.
+        new AsyncTask<Void, Void, List<Song>>() {
+            @Override
+            protected List<Song> doInBackground(Void... args) {
+                return NupActivity.getService().getSongDb().query(
+                    mArtist, null, mAlbum, mMinRating, false, false, mOnlyCached);
+            }
+            @Override
+            protected void onPostExecute(List<Song> songs) {
+                mSongs = songs;
+                final String titleKey = "title";
+                List<HashMap<String, String>> data = new ArrayList<HashMap<String, String>>();
+                for (Song song : mSongs) {
+                    HashMap<String, String> map = new HashMap<String, String>();
+                    map.put(titleKey, song.getTitle());
+                    data.add(map);
+                }
+
+                SimpleAdapter adapter = new SimpleAdapter(
+                    BrowseSongsActivity.this,
+                    data,
+                    R.layout.browse_row,
+                    new String[]{ titleKey },
+                    new int[]{ R.id.text });
+                ListView view = (ListView) findViewById(R.id.songs);
+                view.setAdapter(adapter);
+                registerForContextMenu(view);
+            }
+        }.execute();
+    }
+
+    @Override
+    public void onCreateContextMenu(ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
+        if (view.getId() == R.id.songs) {
+            AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) menuInfo;
+            Song song = mSongs.get(info.position);
+            if (song == null)
+                return;
+            menu.setHeaderTitle(song.getTitle());
+            menu.add(0, MENU_ITEM_PLAY, 0, R.string.play);
+            menu.add(0, MENU_ITEM_INSERT, 0, R.string.insert);
+            menu.add(0, MENU_ITEM_APPEND, 0, R.string.append);
+        }
+    }
+
+    @Override
+    public boolean onContextItemSelected(MenuItem item) {
+        AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
+        Song song = mSongs.get(info.position);
+        if (song == null)
+            return false;
+        switch (item.getItemId()) {
+            case MENU_ITEM_PLAY:
+                NupActivity.getService().addSongToPlaylist(song, true);
+                return true;
+            case MENU_ITEM_INSERT:
+                NupActivity.getService().addSongToPlaylist(song, false);
+                return true;
+            case MENU_ITEM_APPEND:
+                NupActivity.getService().appendSongToPlaylist(song);
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    public void onAppendButtonClicked(View view) {
+        NupActivity.getService().appendSongsToPlaylist(mSongs);
+        setResult(RESULT_OK);
+        finish();
+    }
+
+    public void onInsertButtonClicked(View view) {
+        NupActivity.getService().addSongsToPlaylist(mSongs, false);
+        setResult(RESULT_OK);
+        finish();
+    }
+
+    public void onReplaceButtonClicked(View view) {
+        NupActivity.getService().clearPlaylist();
+        NupActivity.getService().appendSongsToPlaylist(mSongs);
+        setResult(RESULT_OK);
+        finish();
+    }
+}

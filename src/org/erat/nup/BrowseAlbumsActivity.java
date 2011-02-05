@@ -20,6 +20,9 @@ import java.util.List;
 
 public class BrowseAlbumsActivity extends ListActivity
                                   implements NupService.SongDatabaseUpdateListener {
+    // Identifier for the BrowseSongsActivity that we start.
+    private static final int BROWSE_SONGS_REQUEST_CODE = 1;
+
     private static final int MENU_ITEM_SEARCH_WITH_RATING = 1;
     private static final int MENU_ITEM_SEARCH = 2;
 
@@ -29,7 +32,7 @@ public class BrowseAlbumsActivity extends ListActivity
     // Artist that was passed to us, or null if we were started directly from BrowseActivity.
     private String mArtist = null;
 
-    // Albums that we're displayiing.  Just the albums featuring |mArtist| if it's non-null, or all
+    // Albums that we're displaying.  Just the albums featuring |mArtist| if it's non-null, or all
     // albums on the server otherwise.
     private List<String> mAlbums = new ArrayList<String>();
 
@@ -59,11 +62,19 @@ public class BrowseAlbumsActivity extends ListActivity
     }
 
     @Override
+    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
+        if (requestCode == BROWSE_SONGS_REQUEST_CODE && resultCode == RESULT_OK) {
+            setResult(RESULT_OK, data);
+            finish();
+        }
+    }
+
+    @Override
     protected void onListItemClick(ListView listView, View view, int position, long id) {
         String album = mAlbums.get(position);
         if (album == null)
             return;
-        returnResult(album, null);
+        startBrowseSongsActivity(album);
     }
 
     @Override
@@ -126,6 +137,16 @@ public class BrowseAlbumsActivity extends ListActivity
         mAlbums.clear();
         mAlbums.addAll(albums);
         mAdapter.notifyDataSetChanged();
+    }
+
+    // Launch BrowseSongsActivity for a given album.
+    private void startBrowseSongsActivity(String album) {
+        Intent intent = new Intent(this, BrowseSongsActivity.class);
+        if (mArtist != null)
+            intent.putExtra(BrowseActivity.BUNDLE_ARTIST, mArtist);
+        intent.putExtra(BrowseActivity.BUNDLE_ALBUM, album);
+        intent.putExtra(BrowseActivity.BUNDLE_CACHED, mOnlyCached);
+        startActivityForResult(intent, BROWSE_SONGS_REQUEST_CODE);
     }
 
     private void returnResult(String album, String minRating) {

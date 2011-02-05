@@ -50,8 +50,8 @@ public class SearchResultsActivity extends Activity {
             this,
             data,
             R.layout.search_results_row,
-            new String[]{artistKey, titleKey},
-            new int[]{R.id.artist, R.id.title});
+            new String[]{ artistKey, titleKey },
+            new int[]{ R.id.artist, R.id.title });
         ListView view = (ListView) findViewById(R.id.results);
         view.setAdapter(adapter);
         registerForContextMenu(view);
