@@ -9,6 +9,11 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
+import java.util.HashMap;
+import java.util.List;
 
 class Util {
     // Yay.
@@ -68,5 +73,18 @@ class Util {
                 str = str.substring(prefix.length());
         }
         return str;
+    }
+
+    // Sort a list of strings.
+    public static void sortStringList(List<String> items) {
+        final HashMap<String,String> sortKeys = new HashMap<String,String>();
+        for (String item : items)
+            sortKeys.put(item, getSortingKeyForString(item));
+        Collections.sort(items, new Comparator<String>() {
+            @Override
+            public int compare(String a, String b) {
+                return sortKeys.get(a).compareTo(sortKeys.get(b));
+            }
+        });
     }
 }

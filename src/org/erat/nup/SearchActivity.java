@@ -132,6 +132,9 @@ public class SearchActivity extends Activity
                 if (album != null)
                     mAlbumEdit.setText(album);
 
+                boolean onlyCached = data.getBooleanExtra(BrowseActivity.BUNDLE_CACHED, false);
+                mCachedCheckbox.setChecked(onlyCached);
+
                 String minRating = data.getStringExtra(BrowseActivity.BUNDLE_MIN_RATING);
                 if (minRating != null) {
                     int index = Util.getStringArrayIndex(

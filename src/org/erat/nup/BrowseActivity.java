@@ -29,7 +29,8 @@ public class BrowseActivity extends ListActivity {
         ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, R.layout.browse_row);
         adapter.add(getString(R.string.artists));
         adapter.add(getString(R.string.albums));
-        adapter.add(getString(R.string.cached_artists));
+        adapter.add(getString(R.string.artists_cached));
+        adapter.add(getString(R.string.albums_cached));
         setListAdapter(adapter);
     }
 
@@ -43,6 +44,10 @@ public class BrowseActivity extends ListActivity {
             Intent intent = new Intent(this, BrowseArtistsActivity.class);
             intent.putExtra(BrowseActivity.BUNDLE_CACHED, true);
             startActivityForResult(intent, BROWSE_ARTISTS_REQUEST_CODE);
+        } else if (position == 3) {
+            Intent intent = new Intent(this, BrowseAlbumsActivity.class);
+            intent.putExtra(BrowseActivity.BUNDLE_CACHED, true);
+            startActivityForResult(intent, BROWSE_ALBUMS_REQUEST_CODE);
         }
     }
 

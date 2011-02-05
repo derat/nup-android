@@ -4,10 +4,12 @@
 
   <string name="album">Album</string>
   <string name="albums">Albums</string>
+  <string name="albums_cached">Albums (cached)</string>
   <string name="append">Append</string>
   <string name="append_all">Append all</string>
   <string name="artist">Artist</string>
   <string name="artists">Artists</string>
+  <string name="artists_cached">Artists (cached)</string>
   <string name="browse">Browse</string>
   <string name="browse_albums">Browse albums</string>
   <string name="browse_albums_fmt">Browse %s albums</string>
@@ -19,7 +21,6 @@
   <string name="cache_size_invalid">Cache must be at least %d MB.</string>
   <string name="cache_size_value">%d MB</string>
   <string name="cached">Cached</string>
-  <string name="cached_artists">Cached artists</string>
   <string name="clear_cache">Clear cache</string>
   <string name="clear_cache_message">Delete all cached music from the SD card?</string>
   <string name="download_rate">Download rate</string>
@@ -28,6 +29,7 @@
   <string name="exit">Exit</string>
   <string name="insert">Insert</string>
   <string name="insert_all">Insert all</string>
+  <string name="loading">Loading...</string>
   <string name="loading_stats">Loading stats...</string>
   <string name="minimum_rating">Minimum rating</string>
   <string name="minimum_rating_label">Minimum rating:</string>

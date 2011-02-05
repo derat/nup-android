@@ -27,9 +27,10 @@ public class BrowseArtistsActivity extends ListActivity
     private static final int MENU_ITEM_SEARCH = 2;
     private static final int MENU_ITEM_BROWSE_ALBUMS = 3;
 
+    // Are we displaying only cached songs?
     private boolean mOnlyCached = false;
 
-    // Artists that we display.
+    // Artists that we're displaying.
     private List<String> mArtists = new ArrayList<String>(); 
 
     private ArrayAdapter<String> mAdapter;
@@ -58,7 +59,10 @@ public class BrowseArtistsActivity extends ListActivity
 
     @Override
     protected void onListItemClick(ListView listView, View view, int position, long id) {
-        startBrowseAlbumsActivity(mArtists.get(position));
+        String artist = mArtists.get(position);
+        if (artist == null)
+            return;
+        startBrowseAlbumsActivity(artist);
     }
 
     @Override
@@ -72,6 +76,8 @@ public class BrowseArtistsActivity extends ListActivity
     public boolean onContextItemSelected(MenuItem item) {
         AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
         String artist = mArtists.get(info.position);
+        if (artist == null)
+            return false;
         switch (item.getItemId()) {
             case MENU_ITEM_SEARCH_WITH_RATING:
                 returnArtistResult(artist, "0.75");
@@ -104,6 +110,13 @@ public class BrowseArtistsActivity extends ListActivity
         } else {
             new AsyncTask<Void, Void, List<String>>() {
                 @Override
+                protected void onPreExecute() {
+                    if (mArtists.isEmpty()) {
+                        mArtists.add(getString(R.string.loading));
+                        mAdapter.notifyDataSetChanged();
+                    }
+                }
+                @Override
                 protected List<String> doInBackground(Void... args) {
                     return NupActivity.getService().getSongDb().getCachedArtistsSortedAlphabetically();
                 }
@@ -135,6 +148,7 @@ public class BrowseArtistsActivity extends ListActivity
     private void returnArtistResult(String artist, String minRating) {
         Intent intent = new Intent();
         intent.putExtra(BrowseActivity.BUNDLE_ARTIST, artist);
+        intent.putExtra(BrowseActivity.BUNDLE_CACHED, mOnlyCached);
         if (minRating != null && !minRating.isEmpty())
             intent.putExtra(BrowseActivity.BUNDLE_MIN_RATING, minRating);
         setResult(RESULT_OK, intent);

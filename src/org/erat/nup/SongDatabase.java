@@ -268,30 +268,25 @@ class SongDatabase {
     }
 
     public List<String> getCachedArtistsSortedAlphabetically() {
-        String query =
+        return getSortedItems(
             "SELECT DISTINCT s.Artist FROM Songs s " +
-            "JOIN CachedSongs cs ON(s.SongId = cs.SongId)";
-        Cursor cursor = mOpener.getReadableDatabase().rawQuery(query, null);
+            "JOIN CachedSongs cs ON(s.SongId = cs.SongId)",
+            null);
+    }
 
-        List<String> artists = new ArrayList<String>();
-        cursor.moveToFirst();
-        while (!cursor.isAfterLast()) {
-            artists.add(cursor.getString(0));
-            cursor.moveToNext();
-        }
-        cursor.close();
+    public List<String> getCachedAlbumsSortedAlphabetically() {
+        return getSortedItems(
+            "SELECT DISTINCT s.Album FROM Songs s " +
+            "JOIN CachedSongs cs ON(s.SongId = cs.SongId)",
+            null);
+    }
 
-        final HashMap<String,String> sortKeys = new HashMap<String,String>();
-        for (String artist : artists)
-            sortKeys.put(artist, Util.getSortingKeyForString(artist));
-        Collections.sort(artists, new Comparator<String>() {
-            @Override
-            public int compare(String a, String b) {
-                return sortKeys.get(a).compareTo(sortKeys.get(b));
-            }
-        });
-
-        return artists;
+    public List<String> getCachedAlbumsByArtist(String artist) {
+        return getSortedItems(
+            "SELECT DISTINCT s.Album FROM Songs s " +
+            "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
+            "WHERE LOWER(s.Artist) = LOWER(?)",
+            new String[]{ artist });
     }
 
     public synchronized void quit() {
@@ -621,5 +616,22 @@ class SongDatabase {
         mAggregateDataLoaded = true;
 
         mListener.onAggregateDataUpdate();
+    }
+
+    // Given a query that returns strings in its first column, returns its results
+    // in sorted order.
+    private List<String> getSortedItems(String query, String[] selectionArgs) {
+        Cursor cursor = mOpener.getReadableDatabase().rawQuery(query, selectionArgs);
+
+        List<String> items = new ArrayList<String>();
+        cursor.moveToFirst();
+        while (!cursor.isAfterLast()) {
+            items.add(cursor.getString(0));
+            cursor.moveToNext();
+        }
+        cursor.close();
+
+        Util.sortStringList(items);
+        return items;
     }
 }
