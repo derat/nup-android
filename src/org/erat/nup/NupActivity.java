@@ -43,6 +43,7 @@ public class NupActivity extends Activity
     // IDs for items in our context menus.
     private static final int MENU_ITEM_PLAY = 1;
     private static final int MENU_ITEM_REMOVE_FROM_LIST = 2;
+    private static final int MENU_ITEM_TRUNCATE_LIST = 3;
 
     // Persistent service to which we connect.
     private static NupService mService;
@@ -356,9 +357,10 @@ public class NupActivity extends Activity
         if (view.getId() == R.id.playlist) {
             AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) menuInfo;
             Song song = mSongs.get(info.position);
-            menu.setHeaderTitle(song.getArtist() + " - " + song.getTitle());
+            menu.setHeaderTitle(song.getTitle());
             menu.add(0, MENU_ITEM_PLAY, 0, R.string.play);
             menu.add(0, MENU_ITEM_REMOVE_FROM_LIST, 0, R.string.remove_from_list);
+            menu.add(0, MENU_ITEM_TRUNCATE_LIST, 0, R.string.truncate_list);
         }
     }
 
@@ -372,6 +374,9 @@ public class NupActivity extends Activity
                 return true;
             case MENU_ITEM_REMOVE_FROM_LIST:
                 mService.removeFromPlaylist(info.position);
+                return true;
+            case MENU_ITEM_TRUNCATE_LIST:
+                mService.removeRangeFromPlaylist(info.position, mSongs.size() - 1);
                 return true;
             default:
                 return false;

@@ -70,6 +70,7 @@
   <string name="substring">Substring</string>
   <string name="title">Title</string>
   <string name="toggle_pause">Toggle pause</string>
+  <string name="truncate_list">Truncate list</string>
   <string name="unlimited">Unlimited</string>
   <string name="username">Username</string>
   <string name="username_description">Used for HTTP basic authentication, or blank if auth isn\'t needed.</string>

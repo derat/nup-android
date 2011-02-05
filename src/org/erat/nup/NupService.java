@@ -316,16 +316,7 @@ public class NupService extends Service
     }
 
     public void clearPlaylist() {
-        mSongs.clear();
-        mCurrentSongIndex = -1;
-        if (mDownloadSongId != -1) {
-            mCache.abortDownload(mDownloadSongId);
-            mDownloadSongId = -1;
-            mDownloadIndex = -1;
-        }
-
-        if (mSongListener != null)
-            mSongListener.onPlaylistChange(mSongs);
+        removeRangeFromPlaylist(0, mSongs.size() - 1);
     }
 
     public void appendSongToPlaylist(Song song) {
@@ -356,31 +347,42 @@ public class NupService extends Service
     }
 
     public void removeFromPlaylist(int index) {
-        if (index < 0 || index >= mSongs.size()) {
-            Log.e(TAG, "ignoring request to remove song at position " + index +
-                  " from " + mSongs.size() + "-length playlist");
-            return;
+        removeRangeFromPlaylist(index, index);
+    }
+
+    // Remove a range of songs from the playlist.
+    public void removeRangeFromPlaylist(int firstIndex, int lastIndex) {
+        if (firstIndex < 0)
+            firstIndex = 0;
+        if (lastIndex >= mSongs.size())
+            lastIndex = mSongs.size() - 1;
+
+        boolean removedPlaying = false;
+        for (int numToRemove = lastIndex - firstIndex + 1; numToRemove > 0; --numToRemove) {
+            mSongs.remove(firstIndex);
+
+            if (mCurrentSongIndex == firstIndex) {
+                removedPlaying = true;
+                stopPlaying();
+            } else if (mCurrentSongIndex > firstIndex) {
+                mCurrentSongIndex--;
+            }
+
+            if (mDownloadIndex == firstIndex) {
+                mCache.abortDownload(mDownloadSongId);
+                mDownloadSongId = -1;
+                mDownloadIndex = -1;
+            } else if (mDownloadIndex > firstIndex) {
+                mDownloadIndex--;
+            }
         }
 
-        if (index == mDownloadIndex) {
-            mCache.abortDownload(mDownloadSongId);
-            mDownloadSongId = -1;
-            mDownloadIndex = -1;
-        }
-
-        if (index == mCurrentSongIndex) {
-            stopPlaying();
-            if (mCurrentSongIndex < mSongs.size() - 1)
-                playSongAtIndex(mCurrentSongIndex + 1);
+        if (removedPlaying) {
+            if (mCurrentSongIndex < mSongs.size())
+                playSongAtIndex(mCurrentSongIndex);
             else
                 mCurrentSongIndex = -1;
         }
-
-        mSongs.remove(index);
-        if (index < mCurrentSongIndex)
-            mCurrentSongIndex--;
-        if (index < mDownloadIndex)
-            mDownloadIndex--;
 
         if (mSongListener != null)
             mSongListener.onPlaylistChange(mSongs);
