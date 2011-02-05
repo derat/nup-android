@@ -168,8 +168,8 @@ public class NupActivity extends Activity
         schedulePlaySongTask(SONG_CHANGE_DELAY_MS);
     }
 
-    public void onSearchButtonClicked(View view) {
-        startActivity(new Intent(this, SearchActivity.class));
+    public void onBrowseButtonClicked(View view) {
+        startActivity(new Intent(this, BrowseActivity.class));
     }
 
     // Implements NupService.SongListener.
@@ -293,6 +293,9 @@ public class NupActivity extends Activity
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
+        case R.id.search_menu_item:
+            startActivity(new Intent(this, SearchActivity.class));
+            return true;
         case R.id.settings_menu_item:
             startActivity(new Intent(this, SettingsActivity.class));
             return true;

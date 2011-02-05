@@ -35,8 +35,7 @@ public class SearchActivity extends Activity
     private static final String TAG = "SearchActivity";
 
     // IDs used to identify activities that we start.
-    private static final int BROWSE_REQUEST_CODE = 1;
-    private static final int RESULTS_REQUEST_CODE = 2;
+    private static final int RESULTS_REQUEST_CODE = 1;
 
     // Various parts of our UI.
     private AutoCompleteTextView mArtistEdit, mAlbumEdit;
@@ -120,8 +119,7 @@ public class SearchActivity extends Activity
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == BROWSE_REQUEST_CODE) {
-        } else if (requestCode == RESULTS_REQUEST_CODE) {
+        if (requestCode == RESULTS_REQUEST_CODE) {
             mSearchResults.clear();
             if (resultCode == RESULT_OK)
                 finish();
@@ -140,10 +138,6 @@ public class SearchActivity extends Activity
 
     public void onResetButtonClicked(View view) {
         resetForm();
-    }
-
-    public void onBrowseButtonClicked(View view) {
-        startActivityForResult(new Intent(this, BrowseActivity.class), BROWSE_REQUEST_CODE);
     }
 
     // Implements NupService.SongDatabaseUpdateListener.

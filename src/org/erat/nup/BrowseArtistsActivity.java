@@ -68,6 +68,9 @@ public class BrowseArtistsActivity extends ListActivity
 
     @Override
     public void onCreateContextMenu(ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
+        String artist = mArtists.get(((AdapterView.AdapterContextMenuInfo) menuInfo).position);
+        if (artist != null)
+            menu.setHeaderTitle(artist);
         menu.add(0, MENU_ITEM_BROWSE_SONGS_WITH_RATING, 0, R.string.browse_songs_with_75_rating);
         menu.add(0, MENU_ITEM_BROWSE_SONGS, 0, R.string.browse_songs);
         menu.add(0, MENU_ITEM_BROWSE_ALBUMS, 0, R.string.browse_albums);
