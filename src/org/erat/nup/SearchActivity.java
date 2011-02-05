@@ -121,32 +121,6 @@ public class SearchActivity extends Activity
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
         if (requestCode == BROWSE_REQUEST_CODE) {
-            if (resultCode == RESULT_OK) {
-                resetForm();
-
-                String artist = data.getStringExtra(BrowseActivity.BUNDLE_ARTIST);
-                if (artist != null)
-                    mArtistEdit.setText(artist);
-
-                String album = data.getStringExtra(BrowseActivity.BUNDLE_ALBUM);
-                if (album != null)
-                    mAlbumEdit.setText(album);
-
-                boolean onlyCached = data.getBooleanExtra(BrowseActivity.BUNDLE_CACHED, false);
-                mCachedCheckbox.setChecked(onlyCached);
-
-                String minRating = data.getStringExtra(BrowseActivity.BUNDLE_MIN_RATING);
-                if (minRating != null) {
-                    int index = Util.getStringArrayIndex(
-                        getResources().getStringArray(R.array.min_rating_array), minRating);
-                    if (index >= 0)
-                        mMinRatingSpinner.setSelection(index);
-                }
-
-                // At least one of these should always be set, but whatever...
-                if (artist != null || album != null)
-                    doQuery();
-            }
         } else if (requestCode == RESULTS_REQUEST_CODE) {
             mSearchResults.clear();
             if (resultCode == RESULT_OK)

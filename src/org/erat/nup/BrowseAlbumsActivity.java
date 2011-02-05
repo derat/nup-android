@@ -23,8 +23,8 @@ public class BrowseAlbumsActivity extends ListActivity
     // Identifier for the BrowseSongsActivity that we start.
     private static final int BROWSE_SONGS_REQUEST_CODE = 1;
 
-    private static final int MENU_ITEM_SEARCH_WITH_RATING = 1;
-    private static final int MENU_ITEM_SEARCH = 2;
+    private static final int MENU_ITEM_BROWSE_SONGS_WITH_RATING = 1;
+    private static final int MENU_ITEM_BROWSE_SONGS = 2;
 
     // Are we displaying only cached songs?
     private boolean mOnlyCached = false;
@@ -63,10 +63,6 @@ public class BrowseAlbumsActivity extends ListActivity
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (requestCode == BROWSE_SONGS_REQUEST_CODE && resultCode == RESULT_OK) {
-            setResult(RESULT_OK, data);
-            finish();
-        }
     }
 
     @Override
@@ -74,13 +70,13 @@ public class BrowseAlbumsActivity extends ListActivity
         String album = mAlbums.get(position);
         if (album == null)
             return;
-        startBrowseSongsActivity(album);
+        startBrowseSongsActivity(album, null);
     }
 
     @Override
     public void onCreateContextMenu(ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
-        menu.add(0, MENU_ITEM_SEARCH_WITH_RATING, 0, R.string.search_with_75_rating);
-        menu.add(0, MENU_ITEM_SEARCH, 0, R.string.search);
+        menu.add(0, MENU_ITEM_BROWSE_SONGS_WITH_RATING, 0, R.string.browse_songs_with_75_rating);
+        menu.add(0, MENU_ITEM_BROWSE_SONGS, 0, R.string.browse_songs);
     }
 
     @Override
@@ -90,11 +86,11 @@ public class BrowseAlbumsActivity extends ListActivity
         if (album == null)
             return false;
         switch (item.getItemId()) {
-            case MENU_ITEM_SEARCH_WITH_RATING:
-                returnResult(album, "0.75");
+            case MENU_ITEM_BROWSE_SONGS_WITH_RATING:
+                startBrowseSongsActivity(album, "0.75");
                 return true;
-            case MENU_ITEM_SEARCH:
-                returnResult(album, null);
+            case MENU_ITEM_BROWSE_SONGS:
+                startBrowseSongsActivity(album, null);
                 return true;
             default:
                 return false;
@@ -140,24 +136,14 @@ public class BrowseAlbumsActivity extends ListActivity
     }
 
     // Launch BrowseSongsActivity for a given album.
-    private void startBrowseSongsActivity(String album) {
+    private void startBrowseSongsActivity(String album, String minRating) {
         Intent intent = new Intent(this, BrowseSongsActivity.class);
         if (mArtist != null)
             intent.putExtra(BrowseActivity.BUNDLE_ARTIST, mArtist);
         intent.putExtra(BrowseActivity.BUNDLE_ALBUM, album);
         intent.putExtra(BrowseActivity.BUNDLE_CACHED, mOnlyCached);
-        startActivityForResult(intent, BROWSE_SONGS_REQUEST_CODE);
-    }
-
-    private void returnResult(String album, String minRating) {
-        Intent intent = new Intent();
-        intent.putExtra(BrowseActivity.BUNDLE_ALBUM, album);
-        intent.putExtra(BrowseActivity.BUNDLE_CACHED, mOnlyCached);
-        if (mArtist != null)
-            intent.putExtra(BrowseActivity.BUNDLE_ARTIST, mArtist);
         if (minRating != null && !minRating.isEmpty())
             intent.putExtra(BrowseActivity.BUNDLE_MIN_RATING, minRating);
-        setResult(RESULT_OK, intent);
-        finish();
+        startActivityForResult(intent, BROWSE_SONGS_REQUEST_CODE);
     }
 }

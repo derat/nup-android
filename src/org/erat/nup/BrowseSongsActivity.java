@@ -11,10 +11,13 @@ import android.view.ContextMenu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
+import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.SimpleAdapter;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 
@@ -55,13 +58,35 @@ public class BrowseSongsActivity extends Activity {
         // Do the query for the songs in the background.
         new AsyncTask<Void, Void, List<Song>>() {
             @Override
+            protected void onPreExecute() {
+                // Create a temporary ArrayAdapter that just says "Loading...".
+                List<String> items = new ArrayList<String>();
+                items.add(getString(R.string.loading));
+                ArrayAdapter<String> adapter =
+                    new ArrayAdapter<String>(BrowseSongsActivity.this, R.layout.browse_row, items);
+                ListView view = (ListView) findViewById(R.id.songs);
+                view.setAdapter(adapter);
+            }
+            @Override
             protected List<Song> doInBackground(Void... args) {
                 return NupActivity.getService().getSongDb().query(
                     mArtist, null, mAlbum, mMinRating, false, false, mOnlyCached);
             }
             @Override
             protected void onPostExecute(List<Song> songs) {
+                // The results come back in album order.  If we're viewing all songs by
+                // an artist, sort them alphabetically instead.
+                if (mAlbum == null || mAlbum.isEmpty()) {
+                    Collections.sort(songs, new Comparator<Song>() {
+                        @Override
+                        public int compare(Song a, Song b) {
+                            return Util.getSortingKey(a.getTitle()).compareTo(
+                                Util.getSortingKey(b.getTitle()));
+                        }
+                    });
+                }
                 mSongs = songs;
+
                 final String titleKey = "title";
                 List<HashMap<String, String>> data = new ArrayList<HashMap<String, String>>();
                 for (Song song : mSongs) {

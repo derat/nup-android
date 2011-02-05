@@ -495,7 +495,7 @@ class SongDatabase {
         try {
             db.delete("ArtistAlbumStats", null, null);
             for (String artist : artistAlbums.keySet()) {
-                String artistSortKey = Util.getSortingKeyForString(artist);
+                String artistSortKey = Util.getSortingKey(artist);
                 HashMap<String,Integer> albumMap = artistAlbums.get(artist);
                 for (String album : albumMap.keySet()) {
                     ContentValues values = new ContentValues(5);
@@ -503,7 +503,7 @@ class SongDatabase {
                     values.put("Album", album);
                     values.put("NumSongs", albumMap.get(album));
                     values.put("ArtistSortKey", artistSortKey);
-                    values.put("AlbumSortKey", Util.getSortingKeyForString(album));
+                    values.put("AlbumSortKey", Util.getSortingKey(album));
                     db.insert("ArtistAlbumStats", "", values);
                 }
             }

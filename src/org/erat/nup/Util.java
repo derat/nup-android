@@ -52,7 +52,7 @@ class Util {
 
     // Get a key that can be used for sorting a string.
     // The string is converted to lowercase and common leading articles are removed.
-    public static String getSortingKeyForString(String str) {
+    public static String getSortingKey(String str) {
         str = str.toLowerCase();
 
         // Strip off some leading punctuation.
@@ -79,7 +79,7 @@ class Util {
     public static void sortStringList(List<String> items) {
         final HashMap<String,String> sortKeys = new HashMap<String,String>();
         for (String item : items)
-            sortKeys.put(item, getSortingKeyForString(item));
+            sortKeys.put(item, getSortingKey(item));
         Collections.sort(items, new Comparator<String>() {
             @Override
             public int compare(String a, String b) {

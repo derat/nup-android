@@ -20,11 +20,12 @@ import java.util.List;
 
 public class BrowseArtistsActivity extends ListActivity
                                    implements NupService.SongDatabaseUpdateListener {
-    // Identifier for the BrowseAlbumsActivity that we start.
+    // Identifiers for activities that we start.
     private static final int BROWSE_ALBUMS_REQUEST_CODE = 1;
+    private static final int BROWSE_SONGS_REQUEST_CODE = 2;
 
-    private static final int MENU_ITEM_SEARCH_WITH_RATING = 1;
-    private static final int MENU_ITEM_SEARCH = 2;
+    private static final int MENU_ITEM_BROWSE_SONGS_WITH_RATING = 1;
+    private static final int MENU_ITEM_BROWSE_SONGS = 2;
     private static final int MENU_ITEM_BROWSE_ALBUMS = 3;
 
     // Are we displaying only cached songs?
@@ -67,8 +68,8 @@ public class BrowseArtistsActivity extends ListActivity
 
     @Override
     public void onCreateContextMenu(ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
-        menu.add(0, MENU_ITEM_SEARCH_WITH_RATING, 0, R.string.search_with_75_rating);
-        menu.add(0, MENU_ITEM_SEARCH, 0, R.string.search);
+        menu.add(0, MENU_ITEM_BROWSE_SONGS_WITH_RATING, 0, R.string.browse_songs_with_75_rating);
+        menu.add(0, MENU_ITEM_BROWSE_SONGS, 0, R.string.browse_songs);
         menu.add(0, MENU_ITEM_BROWSE_ALBUMS, 0, R.string.browse_albums);
     }
 
@@ -79,11 +80,11 @@ public class BrowseArtistsActivity extends ListActivity
         if (artist == null)
             return false;
         switch (item.getItemId()) {
-            case MENU_ITEM_SEARCH_WITH_RATING:
-                returnArtistResult(artist, "0.75");
+            case MENU_ITEM_BROWSE_SONGS_WITH_RATING:
+                startBrowseSongsActivity(artist, "0.75");
                 return true;
-            case MENU_ITEM_SEARCH:
-                returnArtistResult(artist, null);
+            case MENU_ITEM_BROWSE_SONGS:
+                startBrowseSongsActivity(artist, null);
                 return true;
             case MENU_ITEM_BROWSE_ALBUMS:
                 startBrowseAlbumsActivity(artist);
@@ -95,11 +96,6 @@ public class BrowseArtistsActivity extends ListActivity
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        // Pass the intent back through to BrowseActivity.
-        if (requestCode == BROWSE_ALBUMS_REQUEST_CODE && resultCode == RESULT_OK) {
-            setResult(RESULT_OK, data);
-            finish();
-        }
     }
 
     // Implements NupService.SongDatabaseUpdateListener.
@@ -143,15 +139,13 @@ public class BrowseArtistsActivity extends ListActivity
         startActivityForResult(intent, BROWSE_ALBUMS_REQUEST_CODE);
     }
 
-    // Return a result to BrowseActivity containing just an artist and an optional minimum rating.
-    // Invoked when the user searches for an artist (without browsing albums) via the context menu.
-    private void returnArtistResult(String artist, String minRating) {
-        Intent intent = new Intent();
+    // Launch BrowseSongsActivity for a given artist.
+    private void startBrowseSongsActivity(String artist, String minRating) {
+        Intent intent = new Intent(this, BrowseSongsActivity.class);
         intent.putExtra(BrowseActivity.BUNDLE_ARTIST, artist);
         intent.putExtra(BrowseActivity.BUNDLE_CACHED, mOnlyCached);
         if (minRating != null && !minRating.isEmpty())
             intent.putExtra(BrowseActivity.BUNDLE_MIN_RATING, minRating);
-        setResult(RESULT_OK, intent);
-        finish();
+        startActivityForResult(intent, BROWSE_SONGS_REQUEST_CODE);
     }
 }

@@ -84,7 +84,7 @@ class SortedStringArrayAdapter extends ArrayAdapter<String>
     }
 
     private String getSectionNameForString(String str) {
-        str = Util.getSortingKeyForString(str);
+        str = Util.getSortingKey(str);
         char ch = str.charAt(0);
         if (ch < 'a')
             return NUMBER_SECTION;
