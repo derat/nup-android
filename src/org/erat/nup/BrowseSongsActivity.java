@@ -8,6 +8,7 @@ import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.view.ContextMenu;
+import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
@@ -121,6 +122,27 @@ public class BrowseSongsActivity extends Activity {
                 registerForContextMenu(view);
             }
         }.execute();
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.browse_menu, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+        case R.id.pause_menu_item:
+            NupActivity.getService().togglePause();
+            return true;
+        case R.id.return_menu_item:
+            setResult(RESULT_OK);
+            finish();
+            return true;
+        default:
+            return false;
+        }
     }
 
     @Override

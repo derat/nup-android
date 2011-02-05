@@ -6,6 +6,8 @@ package org.erat.nup;
 import android.app.ListActivity;
 import android.content.Intent;
 import android.os.Bundle;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.view.View;
 import android.widget.ArrayAdapter;
 import android.widget.ListAdapter;
@@ -35,6 +37,27 @@ public class BrowseActivity extends ListActivity {
     }
 
     @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.browse_menu, menu);
+        return true;
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch (item.getItemId()) {
+        case R.id.pause_menu_item:
+            NupActivity.getService().togglePause();
+            return true;
+        case R.id.return_menu_item:
+            setResult(RESULT_OK);
+            finish();
+            return true;
+        default:
+            return false;
+        }
+    }
+
+    @Override
     protected void onListItemClick(ListView listView, View view, int position, long id) {
         if (position == 0) {
             startActivityForResult(new Intent(this, BrowseArtistsActivity.class), BROWSE_ARTISTS_REQUEST_CODE);
@@ -53,11 +76,8 @@ public class BrowseActivity extends ListActivity {
 
     @Override
     protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        // Pass the intent back through to SearchActivity.
-        if (resultCode == RESULT_OK &&
-            (requestCode == BROWSE_ARTISTS_REQUEST_CODE ||
-             requestCode == BROWSE_ALBUMS_REQUEST_CODE)) {
-            setResult(RESULT_OK, data);
+        if (resultCode == RESULT_OK) {
+            setResult(RESULT_OK);
             finish();
         }
     }
