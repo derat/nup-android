@@ -19,19 +19,23 @@ import java.util.List;
 
 class FileCacheDatabase {
     private static final String TAG = "FileCacheDatabase";
+
     private static final String DATABASE_NAME = "NupFileCache";
-    private static final int DATABASE_VERSION = 2;
+    private static final int DATABASE_VERSION = 3;
+
+    // IMPORTANT NOTE: When updating any of these, you must replace all previous references in
+    // upgradeFromPreviousVersion() with the hardcoded older version of the string.
+    private static final String CREATE_CACHE_ENTRIES_SQL =
+        "CREATE TABLE CacheEntries (" +
+        "  SongId INTEGER PRIMARY KEY NOT NULL, " +
+        "  TotalBytes INTEGER NOT NULL DEFAULT 0, " +
+        "  ETag VARCHAR(40) NOT NULL DEFAULT '', " +
+        "  LastAccessTime INTEGER NOT NULL)";
 
     private final SQLiteOpenHelper mOpener;
 
-    // Map from an entry's ID to the entry itself.
+    // Map from an entry's song ID to the entry itself.
     private final HashMap<Integer,FileCacheEntry> mEntries = new HashMap<Integer,FileCacheEntry>();
-
-    // Map from an entry's remote path to the entry itself.
-    private final HashMap<String,FileCacheEntry> mEntriesByRemotePath = new HashMap<String,FileCacheEntry>();
-
-    // Next ID to be assigned to a new cache entry.
-    private int mNextId = 1;
 
     // Update the database in a background thread.
     private final DatabaseUpdater mUpdater;
@@ -41,56 +45,85 @@ class FileCacheDatabase {
         mOpener = new SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
             @Override
             public void onCreate(SQLiteDatabase db) {
-                db.execSQL(
-                    "CREATE TABLE CacheEntries (" +
-                    "  CacheEntryId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
-                    "  RemotePath VARCHAR(2048) UNIQUE NOT NULL, " +
-                    "  LocalPath VARCHAR(2048) UNIQUE NOT NULL, " +
-                    "  ContentLength INTEGER, " +
-                    "  ETag VARCHAR(40), " +
-                    "  LastAccessTime INTEGER)");
-                db.execSQL("CREATE INDEX RemotePath on CacheEntries (RemotePath)");
+                db.execSQL(CREATE_CACHE_ENTRIES_SQL);
             }
 
             @Override
             public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
-                if (oldVersion == 1 && newVersion == 2) {
+                Log.d(TAG, "onUpgrade: " + oldVersion + " -> " + newVersion);
+                db.beginTransaction();
+                try {
+                    for (int nextVersion = oldVersion + 1; nextVersion <= newVersion; ++nextVersion)
+                        upgradeFromPreviousVersion(db, nextVersion);
+                    db.setTransactionSuccessful();
+                } finally {
+                    db.endTransaction();
+                }
+            }
+
+            // Upgrade the database from the version before |newVersion| to |newVersion|.
+            private void upgradeFromPreviousVersion(SQLiteDatabase db, int newVersion) {
+                if (newVersion == 2) {
                     // Rename "LocalFilename" column to "LocalPath".
                     db.execSQL("DROP INDEX IF EXISTS RemotePath");
                     db.execSQL("ALTER TABLE CacheEntries RENAME TO CacheEntriesTmp");
-                    onCreate(db);
+                    db.execSQL("CREATE TABLE CacheEntries (" +
+                               "  CacheEntryId INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL, " +
+                               "  RemotePath VARCHAR(2048) UNIQUE NOT NULL, " +
+                               "  LocalPath VARCHAR(2048) UNIQUE NOT NULL, " +
+                               "  ContentLength INTEGER, " +
+                               "  ETag VARCHAR(40), " +
+                               "  LastAccessTime INTEGER)");
+                    db.execSQL("CREATE INDEX RemotePath on CacheEntries (RemotePath)");
                     db.execSQL("INSERT INTO CacheEntries SELECT * FROM CacheEntriesTmp");
+                    db.execSQL("DROP TABLE CacheEntriesTmp");
+                } else if (newVersion == 3) {
+                    // Redo CacheEntries to be keyed by SongId.
+                    db.execSQL("DROP INDEX IF EXISTS RemotePath");
+                    db.execSQL("ALTER TABLE CacheEntries RENAME TO CacheEntriesTmp");
+                    db.execSQL(CREATE_CACHE_ENTRIES_SQL);
+                    Cursor cursor = db.rawQuery(
+                        "SELECT LocalPath, IFNULL(ContentLength, 0), IFNULL(LastAccessTime, 0) " +
+                        "FROM CacheEntriesTmp",
+                        null);
+                    cursor.moveToFirst();
+                    while (!cursor.isAfterLast()) {
+                        File file = new File(cursor.getString(0));
+                        int songId = Integer.valueOf(file.getName().split("\\.")[0]);
+                        db.execSQL("REPLACE INTO CacheEntries (SongId, TotalBytes, LastAccessTime) VALUES(?, ?, ?)",
+                                   new Object[]{ songId, cursor.getInt(1), cursor.getInt(2) });
+                        cursor.moveToNext();
+                    }
+                    cursor.close();
                     db.execSQL("DROP TABLE CacheEntriesTmp");
                 } else {
                     throw new RuntimeException(
-                        "Got request to upgrade database from " + oldVersion + " to " + newVersion);
+                        "Got request to upgrade database to unknown version " + newVersion);
                 }
             }
         };
 
         // Block until we've loaded everything into memory.
-        loadExistingEntries();
+        loadExistingEntries(context);
 
         mUpdater = new DatabaseUpdater(mOpener.getWritableDatabase());
         mUpdaterThread = new Thread(mUpdater, "FileCacheDatabase.DatabaseUpdater");
         mUpdaterThread.start();
     }
 
-    private synchronized void loadExistingEntries() {
+    private synchronized void loadExistingEntries(Context context) {
         Cursor cursor = mOpener.getReadableDatabase().rawQuery(
-            "SELECT CacheEntryId, RemotePath, LocalPath, IFNULL(ContentLength, 0), LastAccessTime FROM CacheEntries", null);
+            "SELECT SongId, TotalBytes, LastAccessTime FROM CacheEntries", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
-            FileCacheEntry entry = new FileCacheEntry(
-                cursor.getInt(0), cursor.getString(1), cursor.getString(2), cursor.getLong(3), cursor.getInt(4));
-            File file = new File(entry.getLocalPath());
+            FileCacheEntry entry =
+                new FileCacheEntry(cursor.getInt(0), cursor.getLong(1), cursor.getInt(2));
+            File file = entry.getLocalFile(context);
             entry.setCachedBytes(file.exists() ? file.length() : 0);
-            Log.d(TAG, "loaded " + file.getName() + " for " + entry.getRemotePath() +
+            Log.d(TAG, "loaded " + file.getName() + " for song " + entry.getSongId() +
                   ": " + entry.getCachedBytes() + "/" + entry.getTotalBytes());
 
-            mEntries.put(entry.getId(), entry);
-            mEntriesByRemotePath.put(entry.getRemotePath(), entry);
-            mNextId = Math.max(mNextId, entry.getId() + 1);
+            mEntries.put(entry.getSongId(), entry);
             cursor.moveToNext();
         }
         cursor.close();
@@ -101,65 +134,56 @@ class FileCacheDatabase {
         try { mUpdaterThread.join(); } catch (InterruptedException e) {}
     }
 
-    public synchronized FileCacheEntry getEntryById(int id) {
-        return mEntries.get(id);
+    public synchronized FileCacheEntry getEntry(int songId) {
+        return mEntries.get(songId);
     }
 
-    public synchronized FileCacheEntry getEntryForRemotePath(String remotePath) {
-        return mEntriesByRemotePath.get(remotePath);
-    }
-
-    public synchronized FileCacheEntry addEntry(String remotePath, String localPath) {
-        final int id = mNextId++;
-        final int accessTime = (int) new Date().getTime() / 1000;
-        FileCacheEntry entry = new FileCacheEntry(id, remotePath, localPath, 0, accessTime);
-        mEntries.put(id, entry);
-        mEntriesByRemotePath.put(remotePath, entry);
+    public synchronized FileCacheEntry addEntry(int songId) {
+        final int accessTime = (int) (new Date().getTime() / 1000);
+        FileCacheEntry entry = new FileCacheEntry(songId, 0, accessTime);
+        mEntries.put(songId, entry);
         mUpdater.postUpdate(
-            "INSERT INTO CacheEntries " +
-            "(CacheEntryId, RemotePath, LocalPath, ContentLength, LastAccessTime) " +
-            "VALUES(?, ?, ?, 0, ?)",
-            new Object[]{ id, remotePath, localPath, accessTime });
+            "INSERT INTO CacheEntries (SongId, TotalBytes, LastAccessTime) VALUES(?, 0, ?)",
+            new Object[]{ songId, accessTime });
         return entry;
     }
 
-    public synchronized void removeEntry(int id) {
-        FileCacheEntry entry = mEntries.get(id);
+    public synchronized void removeEntry(int songId) {
+        FileCacheEntry entry = mEntries.get(songId);
         if (entry == null)
             return;
 
-        mEntries.remove(id);
-        mEntriesByRemotePath.remove(entry.getRemotePath());
+        mEntries.remove(songId);
         mUpdater.postUpdate(
-            "DELETE FROM CacheEntries WHERE CacheEntryId = ?",
-            new Object[]{ id });
+            "DELETE FROM CacheEntries WHERE SongId = ?",
+            new Object[]{ songId });
     }
 
-    public synchronized void setTotalBytes(int id, long totalBytes) {
-        FileCacheEntry entry = mEntries.get(id);
+    public synchronized void setTotalBytes(int songId, long totalBytes) {
+        FileCacheEntry entry = mEntries.get(songId);
         if (entry == null)
             return;
 
         entry.setTotalBytes(totalBytes);
         mUpdater.postUpdate(
-            "UPDATE CacheEntries SET ContentLength = ? WHERE CacheEntryId = ?",
-            new Object[]{ totalBytes, id });
+            "UPDATE CacheEntries SET TotalBytes = ? WHERE SongId = ?",
+            new Object[]{ totalBytes, songId });
     }
 
-    public synchronized void updateLastAccessTime(int id) {
+    public synchronized void updateLastAccessTime(int songId) {
         mUpdater.postUpdate(
-            "UPDATE CacheEntries SET LastAccessTime = ? WHERE CacheEntryId = ?",
-            new Object[]{ new Date().getTime() / 1000, id });
+            "UPDATE CacheEntries SET LastAccessTime = ? WHERE SongId = ?",
+            new Object[]{ (int) (new Date().getTime() / 1000), songId });
     }
 
-    public synchronized List<Integer> getIdsByAge() {
+    public synchronized List<Integer> getSongIdsByAge() {
         List<Integer> ids = new ArrayList<Integer>();
         ids.addAll(mEntries.keySet());
         Collections.sort(ids, new Comparator<Integer>() {
             @Override
             public int compare(Integer a, Integer b) {
-                int aTime = (Integer) getEntryById(a).getLastAccessTime();
-                int bTime = (Integer) getEntryById(b).getLastAccessTime();
+                int aTime = (Integer) getEntry(a).getLastAccessTime();
+                int bTime = (Integer) getEntry(b).getLastAccessTime();
                 return (aTime == bTime) ? 0 : (aTime < bTime) ? -1 : 1;
             }
         });

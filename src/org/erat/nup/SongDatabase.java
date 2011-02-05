@@ -28,11 +28,10 @@ class SongDatabase {
 
     public static final String UNKNOWN_ALBUM = "[unknown]";
 
-    private static final String DATABASE_NAME = "NupSongs";
-
-    private static final int DATABASE_VERSION = 9;
-
     private static final String MAX_QUERY_RESULTS = "250";
+
+    private static final String DATABASE_NAME = "NupSongs";
+    private static final int DATABASE_VERSION = 9;
 
     // IMPORTANT NOTE: When updating any of these, you must replace all previous references in
     // upgradeFromPreviousVersion() with the hardcoded older version of the string.
@@ -337,13 +336,9 @@ class SongDatabase {
     }
 
     // Record the fact that a song has been evicted from the cache.
-    // It's pretty weird that this method takes a filename while handleSongCached() takes a song ID, but
-    // previously-cached songs that we haven't accessed in the current run can still be evicted, while we only download
-    // songs that NupService has explicitly asked for (which implies that it's loaded Song objects for them).
-    public void handleSongEvicted(String filename) {
+    public void handleSongEvicted(int songId) {
         mUpdater.postUpdate(
-            "DELETE FROM CachedSongs WHERE SongId IN (SELECT SongId FROM Songs WHERE Filename = ?)",
-            new Object[]{ filename });
+            "DELETE FROM CachedSongs WHERE SongId = ?", new Object[]{ songId });
     }
 
     public boolean syncWithServer(SyncProgressListener listener, String message[]) {
@@ -505,11 +500,9 @@ class SongDatabase {
             if (!entry.isFullyCached())
                 continue;
 
-            String filename = Song.getFilenameFromRemotePath(entry.getRemotePath());
             ContentValues values = new ContentValues(1);
-            db.execSQL("REPLACE INTO CachedSongs (SongId) " +
-                       "SELECT SongId FROM Songs WHERE Filename = ?",
-                       new Object[]{ filename });
+            values.put("SongId", entry.getSongId());
+            db.replace("CachedSongs", null, values);
             numSongs++;
         }
         Log.d(TAG, "learned about " + numSongs + " cached song(s)");

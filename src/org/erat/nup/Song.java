@@ -60,9 +60,4 @@ class Song implements Serializable {
     }
 
     public String getRemotePath() { return SERVER_DIRECTORY + "/" + Uri.encode(mFilename); }
-
-    // Reverses getRemotePath(), yielding the original filename given to us by the server.
-    public static String getFilenameFromRemotePath(String remotePath) {
-        return Uri.decode(remotePath.substring(SERVER_DIRECTORY.length() + 1));
-    }
 }
