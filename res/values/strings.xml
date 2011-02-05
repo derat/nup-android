@@ -56,7 +56,7 @@
   <string name="replace_all">Replace all</string>
   <string name="return_to_player">Return to player</string>
   <string name="search">Search</string>
-  <string name="search_hint">Search artists, albums, and titles</string>
+  <string name="search_hint">Search songs</string>
   <string name="search_results">Search results</string>
   <string name="searching">Searching...</string>
   <string name="server_url">Server URL</string>

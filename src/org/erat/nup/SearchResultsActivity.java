@@ -5,6 +5,7 @@ package org.erat.nup;
 
 import android.app.Activity;
 import android.app.ProgressDialog;
+import android.app.SearchManager;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -50,13 +51,38 @@ public class SearchResultsActivity extends Activity {
         setTitle(R.string.search_results);
         setContentView(R.layout.search_results);
 
-        final String artist = getIntent().getStringExtra(BUNDLE_ARTIST);
-        final String title = getIntent().getStringExtra(BUNDLE_TITLE);
-        final String album = getIntent().getStringExtra(BUNDLE_ALBUM);
-        final String minRating = getIntent().getStringExtra(BUNDLE_MIN_RATING);
-        final boolean shuffle = getIntent().getBooleanExtra(BUNDLE_SHUFFLE, false);
-        final boolean substring = getIntent().getBooleanExtra(BUNDLE_SUBSTRING, false);
-        final boolean onlyCached = getIntent().getBooleanExtra(BUNDLE_CACHED, false);
+        class Query {
+            public String artist, title, album, minRating;
+            public boolean shuffle, substring, onlyCached;
+
+            Query(String artist, String title, String album, String minRating,
+                  boolean shuffle, boolean substring, boolean onlyCached) {
+                this.artist = artist;
+                this.title = title;
+                this.album = album;
+                this.minRating = minRating;
+                this.shuffle = shuffle;
+                this.substring = substring;
+                this.onlyCached = onlyCached;
+            }
+        };
+        final List<Query> queries = new ArrayList<Query>();
+
+        final Intent intent = getIntent();
+        if (Intent.ACTION_SEARCH.equals(intent.getAction())) {
+            String queryString = intent.getStringExtra(SearchManager.QUERY);
+            queries.add(new Query(queryString, null, null, null, false, true, false));
+            queries.add(new Query(null, null, queryString, null, false, true, false));
+            queries.add(new Query(null, queryString, null, null, false, true, false));
+        } else {
+            queries.add(new Query(intent.getStringExtra(BUNDLE_ARTIST),
+                                  intent.getStringExtra(BUNDLE_TITLE),
+                                  intent.getStringExtra(BUNDLE_ALBUM),
+                                  intent.getStringExtra(BUNDLE_MIN_RATING),
+                                  intent.getBooleanExtra(BUNDLE_SHUFFLE, false),
+                                  intent.getBooleanExtra(BUNDLE_SUBSTRING, false),
+                                  intent.getBooleanExtra(BUNDLE_CACHED, false)));
+        }
 
         new AsyncTask<Void, Void, List<Song>>() {
             private ProgressDialog mDialog;
@@ -71,11 +97,19 @@ public class SearchResultsActivity extends Activity {
                     true);  // cancelable
                 // FIXME: Support canceling.
             }
+
             @Override
             protected List<Song> doInBackground(Void... args) {
-                return NupActivity.getService().getSongDb().query(
-                    artist, title, album, minRating, shuffle, substring, onlyCached);
+                List<Song> songs = new ArrayList<Song>();
+                for (Query query : queries) {
+                    songs.addAll(
+                        NupActivity.getService().getSongDb().query(
+                            query.artist, query.title, query.album, query.minRating,
+                            query.shuffle, query.substring, query.onlyCached));
+                }
+                return songs;
             }
+
             @Override
             protected void onPostExecute(List<Song> songs) {
                 mSongs = songs;
