@@ -26,7 +26,10 @@ import java.util.List;
 class SongDatabase {
     private static final String TAG = "SongDatabase";
 
-    public static final String UNKNOWN_ALBUM = "[unknown]";
+    // Special string that we use to represent a blank field.
+    // It should be something that doesn't legitimately appear in any fields,
+    // so "[unknown]" is out (MusicBrainz uses it for unknown artists).
+    public static final String UNSET_STRING = "[unset]";
 
     private static final String MAX_QUERY_RESULTS = "250";
 
@@ -299,15 +302,15 @@ class SongDatabase {
             public List<String> selections = new ArrayList<String>();
             public List<String> selectionArgs = new ArrayList<String>();
 
-            public void add(String selection, String selectionArg, boolean useLike, boolean substring) {
-                addRaw(selection + (useLike ? " LIKE ?" : " = ?"), selectionArg, substring);
-            }
-
-            public void addRaw(String clause, String selectionArg, boolean substring) {
+            public void add(String clause, String selectionArg, boolean substring) {
                 if (selectionArg == null || selectionArg.isEmpty())
                     return;
+
                 selections.add(clause);
-                selectionArgs.add(substring ? "%" + selectionArg + "%" : selectionArg);
+                if (selectionArg.equals(UNSET_STRING))
+                    selectionArgs.add("");
+                else
+                    selectionArgs.add(substring ? "%" + selectionArg + "%" : selectionArg);
             }
 
             // Get a WHERE clause (plus trailing space) if |selections| is non-empty, or just an empty string otherwise.
@@ -318,15 +321,10 @@ class SongDatabase {
             }
         }
         QueryBuilder builder = new QueryBuilder();
-        builder.add("Artist", artist, true, substring);
-        builder.add("Title", title, true, substring);
-        if (album != null && album.equals(UNKNOWN_ALBUM)) {
-            builder.selections.add("Album = ?");
-            builder.selectionArgs.add("");
-        } else {
-            builder.add("Album", album, true, substring);
-        }
-        builder.addRaw("Rating >= ?", minRating, false);
+        builder.add("Artist LIKE ?", artist, substring);
+        builder.add("Title LIKE ?", title, substring);
+        builder.add("Album LIKE ?", album, substring);
+        builder.add("Rating >= ?", minRating, false);
 
         String query =
             "SELECT Artist, Title, Album, Filename, Length, s.SongId, Rating " +
@@ -466,14 +464,18 @@ class SongDatabase {
         Cursor cursor = db.rawQuery("SELECT Artist, Album, COUNT(*) FROM Songs GROUP BY 1, 2", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
-            String lowerArtist = cursor.getString(0).toLowerCase();
+            String origArtist = cursor.getString(0);
+            if (origArtist.isEmpty())
+                origArtist = UNSET_STRING;
+            String lowerArtist = origArtist.toLowerCase();
             if (!artistCaseMap.containsKey(lowerArtist))
-                artistCaseMap.put(lowerArtist, cursor.getString(0));
-
+                artistCaseMap.put(lowerArtist, origArtist);
             String artist = artistCaseMap.get(lowerArtist);
+
             String album = cursor.getString(1);
             if (album.isEmpty())
-                album = UNKNOWN_ALBUM;
+                album = UNSET_STRING;
+
             int numSongsInAlbum = cursor.getInt(2);
 
             HashMap<String,Integer> albumMap;
@@ -626,7 +628,10 @@ class SongDatabase {
         List<String> items = new ArrayList<String>();
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
-            items.add(cursor.getString(0));
+            String item = cursor.getString(0);
+            if (item.isEmpty())
+                item = UNSET_STRING;
+            items.add(item);
             cursor.moveToNext();
         }
         cursor.close();
