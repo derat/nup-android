@@ -19,6 +19,7 @@
   <string name="cache_size_invalid">Cache must be at least %d MB.</string>
   <string name="cache_size_value">%d MB</string>
   <string name="cached">Cached</string>
+  <string name="cached_artists">Cached artists</string>
   <string name="clear_cache">Clear cache</string>
   <string name="clear_cache_message">Delete all cached music from the SD card?</string>
   <string name="download_rate">Download rate</string>
