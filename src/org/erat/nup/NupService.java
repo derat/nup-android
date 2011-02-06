@@ -23,24 +23,11 @@ import android.view.View;
 import android.widget.RemoteViews;
 import android.widget.Toast;
 
-import org.apache.http.HttpException;
-import org.json.JSONArray;
-import org.json.JSONObject;
-import org.json.JSONTokener;
-
-import java.io.ByteArrayInputStream;
 import java.io.File;
-import java.io.InputStream;
-import java.io.IOException;
-import java.net.URI;
-import java.net.URL;
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 
 public class NupService extends Service
@@ -111,6 +98,9 @@ public class NupService extends Service
 
     // Loads songs' cover art from local disk or the network.
     private CoverLoader mCoverLoader;
+
+    // Reports song playback to the music server.
+    private PlaybackReporter mPlaybackReporter;
 
     // Points from song ID to Song.
     // This is the canonical set of songs that we've seen.
@@ -213,6 +203,7 @@ public class NupService extends Service
 
         mSongDb = new SongDatabase(this, this, mCache);
         mCoverLoader = new CoverLoader(this);
+        mPlaybackReporter = new PlaybackReporter(this, mSongDb);
     }
 
     @Override
@@ -493,50 +484,6 @@ public class NupService extends Service
         }
     }
 
-    // Reports that we've played a song.
-    class ReportPlayedTask extends AsyncTask<Void, Void, Void> {
-        private final Song mSong;
-        private final Date mStartDate;
-        private String mError;
-
-        public ReportPlayedTask(Song song, Date startDate) {
-            mSong = song;
-            mStartDate = startDate;
-        }
-
-        @Override
-        protected Void doInBackground(Void... voidArg) {
-            Log.d(TAG, "reporting song " + mSong.getSongId() + " started at " + mStartDate);
-            try {
-                DownloadRequest request = new DownloadRequest(NupService.this, DownloadRequest.Method.POST, "/report_played", null);
-                String body = "songId=" + mSong.getSongId() + "&startTime=" + (mStartDate.getTime() / 1000);
-                request.setBody(new ByteArrayInputStream(body.getBytes()), body.length());
-                request.setHeader("Content-Type", "application/x-www-form-urlencoded");
-                request.setHeader("Content-Length", Long.toString(body.length()));
-
-                DownloadResult result = Download.startDownload(request);
-                if (result.getStatusCode() != 200)
-                    mError = "Got " + result.getStatusCode() + " response while reporting played song: " + result.getReason();
-                result.close();
-            } catch (DownloadRequest.PrefException e) {
-                mError = "Got preferences error while reporting played song: " + e;
-            } catch (HttpException e) {
-                mError = "Got HTTP error while reporting played song: " + e;
-            } catch (IOException e) {
-                mError = "Got IO error while reporting played song: " + e;
-            }
-            return null;
-        }
-
-        @Override
-        protected void onPostExecute(Void voidArg) {
-            if (mError != null) {
-                Log.e(TAG, "got error while reporting song: " + mError);
-                Toast.makeText(NupService.this, mError, Toast.LENGTH_LONG).show();
-            }
-        }
-    }
-
     public long getTotalCachedBytes() {
         return mCache.getTotalCachedBytes();
     }
@@ -577,7 +524,7 @@ public class NupService extends Service
                     if (!mReportedCurrentSong &&
                         (mCurrentSongPlayedMs >= Math.max(durationMs, song.getLengthSec() * 1000) / 2 ||
                          mCurrentSongPlayedMs >= REPORT_PLAYBACK_THRESHOLD_MS)) {
-                        new ReportPlayedTask(song, mCurrentSongStartDate).execute();
+                        mPlaybackReporter.report(song.getSongId(), mCurrentSongStartDate);
                         mReportedCurrentSong = true;
                     }
                 }

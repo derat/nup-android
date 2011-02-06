@@ -34,7 +34,7 @@ class SongDatabase {
     private static final String MAX_QUERY_RESULTS = "250";
 
     private static final String DATABASE_NAME = "NupSongs";
-    private static final int DATABASE_VERSION = 9;
+    private static final int DATABASE_VERSION = 10;
 
     // IMPORTANT NOTE: When updating any of these, you must replace all previous references in
     // upgradeFromPreviousVersion() with the hardcoded older version of the string.
@@ -79,6 +79,12 @@ class SongDatabase {
     private static final String CREATE_CACHED_SONGS_SQL =
         "CREATE TABLE CachedSongs (" +
         "  SongId INTEGER PRIMARY KEY NOT NULL)";
+
+    private static final String CREATE_PENDING_PLAYBACK_REPORTS_SQL =
+        "CREATE TABLE PendingPlaybackReports (" +
+        "  SongId INTEGER NOT NULL, " +
+        "  StartTime INTEGER NOT NULL, " +
+        "  PRIMARY KEY (SongId, StartTime))";
 
     private final Context mContext;
 
@@ -226,8 +232,11 @@ class SongDatabase {
                     // Version 8: Add CachedSongs table.
                     db.execSQL(CREATE_CACHED_SONGS_SQL);
                 } else if (newVersion == 9) {
-                    // Version 8: Add index on Songs.Filename.
+                    // Version 9: Add index on Songs.Filename.
                     db.execSQL(CREATE_SONGS_FILENAME_INDEX_SQL);
+                } else if (newVersion == 10) {
+                    // Version 10: Add PendingPlaybackReports table.
+                    db.execSQL(CREATE_PENDING_PLAYBACK_REPORTS_SQL);
                 } else {
                     throw new RuntimeException(
                         "Got request to upgrade database to unknown version " + newVersion);
@@ -359,6 +368,45 @@ class SongDatabase {
     public void handleSongEvicted(int songId) {
         mUpdater.postUpdate(
             "DELETE FROM CachedSongs WHERE SongId = ?", new Object[]{ songId });
+    }
+
+    // Add an entry to the PendingPlaybackReports table.
+    public void addPendingPlaybackReport(int songId, Date startDate) {
+        mUpdater.postUpdate(
+            "REPLACE INTO PendingPlaybackReports (SongId, StartTime) VALUES(?, ?)",
+            new Object[]{ songId, startDate.getTime() / 1000 });
+    }
+
+    // Remove an entry from the PendingPlaybackReports table.
+    public void removePendingPlaybackReport(int songId, Date startDate) {
+        mUpdater.postUpdate(
+            "DELETE FROM PendingPlaybackReports WHERE SongId = ? AND StartTime = ?",
+            new Object[]{ songId, startDate.getTime() / 1000 });
+    }
+
+    // Simple struct representing a queued report of a song being played.
+    public static class PendingPlaybackReport {
+        public int songId;
+        public Date startDate;
+
+        PendingPlaybackReport(int songId, Date startDate) {
+            this.songId = songId;
+            this.startDate = startDate;
+        }
+    }
+
+    // Get all pending playback reports from the PendingPlaybackReports table.
+    public List<PendingPlaybackReport> getAllPendingPlaybackReports() {
+        String query = "SELECT SongId, StartTime FROM PendingPlaybackReports";
+        Cursor cursor = mOpener.getReadableDatabase().rawQuery(query, null);
+        cursor.moveToFirst();
+        List<PendingPlaybackReport> reports = new ArrayList<PendingPlaybackReport>();
+        while (!cursor.isAfterLast()) {
+            reports.add(new PendingPlaybackReport(cursor.getInt(0), new Date(cursor.getLong(1) * 1000)));
+            cursor.moveToNext();
+        }
+        cursor.close();
+        return reports;
     }
 
     public boolean syncWithServer(SyncProgressListener listener, String message[]) {
