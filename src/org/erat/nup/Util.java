@@ -3,6 +3,9 @@
 
 package org.erat.nup;
 
+import android.content.Context;
+import android.net.ConnectivityManager;
+import android.net.NetworkInfo;
 import android.net.Uri;
 
 import java.io.BufferedReader;
@@ -86,5 +89,12 @@ class Util {
                 return sortKeys.get(a).compareTo(sortKeys.get(b));
             }
         });
+    }
+
+    // Is a network connection currently available?
+    public static boolean isNetworkAvailable(Context context) {
+        ConnectivityManager manager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        NetworkInfo info = manager.getActiveNetworkInfo();
+        return (info != null && info.isAvailable());
     }
 }

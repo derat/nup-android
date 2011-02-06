@@ -48,6 +48,9 @@ class PlaybackReporter {
 
     // Synchronously report the playback of a song.
     private boolean reportInternal(int songId, Date startDate) {
+        if (!Util.isNetworkAvailable(mContext))
+            return false;
+
         Log.d(TAG, "reporting song " + songId + " started at " + startDate);
         DownloadResult result = null;
 

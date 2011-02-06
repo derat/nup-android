@@ -117,6 +117,9 @@ class CoverLoader {
     }
 
     private File downloadCover(String artist, String album) {
+        if (!Util.isNetworkAvailable(mContext))
+            return null;
+
         String[] error = new String[1];
         String remoteFilename = Download.downloadString(
             mContext,

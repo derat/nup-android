@@ -410,10 +410,14 @@ class SongDatabase {
     }
 
     public boolean syncWithServer(SyncProgressListener listener, String message[]) {
-        SQLiteDatabase db = mOpener.getWritableDatabase();
-        db.beginTransaction();
+        if (!Util.isNetworkAvailable(mContext)) {
+            message[0] = mContext.getString(R.string.network_is_unavailable);
+            return false;
+        }
 
+        SQLiteDatabase db = mOpener.getWritableDatabase();
         int numSongsUpdated = 0;
+        db.beginTransaction();
         try {
             // Ask the server for the max last modified time before we fetch anything.  We'll use this as the starting
             // point the next sync, to handle the case where some songs in the server are updated while we're doing this

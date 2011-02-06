@@ -43,6 +43,7 @@
   <string name="loading_stats">Loading stats...</string>
   <string name="minimum_rating">Minimum rating</string>
   <string name="minimum_rating_label">Minimum rating:</string>
+  <string name="network_is_unavailable">Network is unavailable</string>
   <string name="next">Next</string>
   <string name="never_synced">Never synced</string>
   <string name="no_results">No results.</string>

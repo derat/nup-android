@@ -271,6 +271,12 @@ class FileCache implements Runnable {
             if (!isActive())
                 return;
 
+            if (!Util.isNetworkAvailable(mContext)) {
+                mReason = mContext.getString(R.string.network_is_unavailable);
+                handleFailure();
+                return;
+            }
+
             updateWifiLock();
 
             while (true) {
