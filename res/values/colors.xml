@@ -4,4 +4,5 @@
   <color name="playlist_highlight_bg">#333</color>
   <color name="song_download_status_fg">#555</color>
   <color name="song_playback_time_fg">#888</color>
+  <color name="song_details_fg">#fff</color>
 </resources>

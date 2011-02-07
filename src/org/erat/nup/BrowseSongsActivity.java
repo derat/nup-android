@@ -4,6 +4,7 @@
 package org.erat.nup;
 
 import android.app.Activity;
+import android.app.Dialog;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
@@ -29,6 +30,9 @@ public class BrowseSongsActivity extends Activity {
     private static final int MENU_ITEM_PLAY = 1;
     private static final int MENU_ITEM_INSERT = 2;
     private static final int MENU_ITEM_APPEND = 3;
+    private static final int MENU_ITEM_SONG_DETAILS = 4;
+
+    private static final int DIALOG_SONG_DETAILS = 1;
 
     // Are we displaying only cached songs?
     private boolean mOnlyCached = false;
@@ -156,6 +160,7 @@ public class BrowseSongsActivity extends Activity {
             menu.add(0, MENU_ITEM_PLAY, 0, R.string.play);
             menu.add(0, MENU_ITEM_INSERT, 0, R.string.insert);
             menu.add(0, MENU_ITEM_APPEND, 0, R.string.append);
+            menu.add(0, MENU_ITEM_SONG_DETAILS, 0, R.string.song_details_ellipsis);
         }
     }
 
@@ -175,9 +180,26 @@ public class BrowseSongsActivity extends Activity {
             case MENU_ITEM_APPEND:
                 NupActivity.getService().appendSongToPlaylist(song);
                 return true;
+            case MENU_ITEM_SONG_DETAILS:
+                showDialog(DIALOG_SONG_DETAILS, SongDetailsDialog.createBundle(song));
+                return true;
             default:
                 return false;
         }
+    }
+
+    @Override
+    protected Dialog onCreateDialog(int id, Bundle args) {
+        if (id == DIALOG_SONG_DETAILS)
+            return SongDetailsDialog.createDialog(this);
+        return null;
+    }
+
+    @Override
+    protected void onPrepareDialog(int id, Dialog dialog, Bundle args) {
+        super.onPrepareDialog(id, dialog, args);
+        if (id == DIALOG_SONG_DETAILS)
+            SongDetailsDialog.prepareDialog(dialog, args);
     }
 
     public void onAppendButtonClicked(View view) {

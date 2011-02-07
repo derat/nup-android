@@ -4,6 +4,7 @@
 package org.erat.nup;
 
 import android.app.Activity;
+import android.app.Dialog;
 import android.content.ComponentName;
 import android.content.Context;
 import android.content.Intent;
@@ -44,6 +45,9 @@ public class NupActivity extends Activity
     private static final int MENU_ITEM_PLAY = 1;
     private static final int MENU_ITEM_REMOVE_FROM_LIST = 2;
     private static final int MENU_ITEM_TRUNCATE_LIST = 3;
+    private static final int MENU_ITEM_SONG_DETAILS = 4;
+
+    private static final int DIALOG_SONG_DETAILS = 1;
 
     // Persistent service to which we connect.
     private static NupService mService;
@@ -196,7 +200,7 @@ public class NupActivity extends Activity
                     return;
                 // MediaPlayer appears to get confused sometimes and report things like 0:01.
                 int durationSec = Math.max(durationMs / 1000, getCurrentSong().getLengthSec());
-                mTimeLabel.setText(Util.formatTimeString(positionSec, durationSec));
+                mTimeLabel.setText(Util.formatDurationProgressString(positionSec, durationSec));
                 mLastSongPositionSec = positionSec;
             }
         });
@@ -269,7 +273,7 @@ public class NupActivity extends Activity
             mTitleLabel.setText(song.getTitle());
             mAlbumLabel.setText(song.getAlbum());
             mTimeLabel.setText(
-                Util.formatTimeString(
+                Util.formatDurationProgressString(
                     (song == mService.getCurrentSong()) ?
                         mService.getCurrentSongLastPositionMs() / 1000 :
                         0,
@@ -361,12 +365,14 @@ public class NupActivity extends Activity
             menu.add(0, MENU_ITEM_PLAY, 0, R.string.play);
             menu.add(0, MENU_ITEM_REMOVE_FROM_LIST, 0, R.string.remove_from_list);
             menu.add(0, MENU_ITEM_TRUNCATE_LIST, 0, R.string.truncate_list);
+            menu.add(0, MENU_ITEM_SONG_DETAILS, 0, R.string.song_details_ellipsis);
         }
     }
 
     @Override
     public boolean onContextItemSelected(MenuItem item) {
         AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
+        Song song = mSongs.get(info.position);
         switch (item.getItemId()) {
             case MENU_ITEM_PLAY:
                 updateCurrentSongIndex(info.position);
@@ -378,9 +384,27 @@ public class NupActivity extends Activity
             case MENU_ITEM_TRUNCATE_LIST:
                 mService.removeRangeFromPlaylist(info.position, mSongs.size() - 1);
                 return true;
+            case MENU_ITEM_SONG_DETAILS:
+                if (song != null)
+                    showDialog(DIALOG_SONG_DETAILS, SongDetailsDialog.createBundle(song));
+                return true;
             default:
                 return false;
         }
+    }
+
+    @Override
+    protected Dialog onCreateDialog(int id, Bundle args) {
+        if (id == DIALOG_SONG_DETAILS)
+            return SongDetailsDialog.createDialog(this);
+        return null;
+    }
+
+    @Override
+    protected void onPrepareDialog(int id, Dialog dialog, Bundle args) {
+        super.onPrepareDialog(id, dialog, args);
+        if (id == DIALOG_SONG_DETAILS)
+            SongDetailsDialog.prepareDialog(dialog, args);
     }
 
     private Song getCurrentSong() {

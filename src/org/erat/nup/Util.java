@@ -30,9 +30,14 @@ class Util {
         return sb.toString();
     }
 
-    // Formats a current time and total time as "0:00 / 0:00".
-    public static String formatTimeString(int curSec, int totalSec) {
-        return String.format("%d:%02d / %d:%02d", curSec / 60, curSec % 60, totalSec / 60, totalSec % 60);
+    // Formats a duration as "0:00".
+    public static String formatDurationString(int sec) {
+        return String.format("%d:%02d", sec / 60, sec % 60);
+    }
+
+    // Formats a current duration and total duration as "0:00 / 0:00".
+    public static String formatDurationProgressString(int curSec, int totalSec) {
+        return formatDurationString(curSec) + " / " + formatDurationString(totalSec);
     }
 
     // Work around bad design decisions made 35 years ago.
