@@ -415,7 +415,7 @@ public class NupService extends Service
         } else {
             // Otherwise, start downloading it if we've never tried downloading it before,
             // or if we have but it's not currently being downloaded.
-            mPlayer.abort();
+            mPlayer.abortPlayback();
             if (cacheEntry == null || mDownloadSongId != cacheEntry.getSongId()) {
                 if (mDownloadSongId != -1)
                     mCache.abortDownload(mDownloadSongId);
@@ -441,7 +441,7 @@ public class NupService extends Service
     // Stop playing the current song, if any.
     public void stopPlaying() {
         mCurrentSongPath = null;
-        mPlayer.abort();
+        mPlayer.abortPlayback();
     }
 
     // Returns true if the cover is already loaded or can't be loaded and false if we started a task to fetch it.
@@ -494,7 +494,7 @@ public class NupService extends Service
 
     // Implements Player.Listener.
     @Override
-    public void onPlaybackComplete(String path) {
+    public void onPlaybackComplete(String oldPath, String newPath) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {

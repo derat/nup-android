@@ -12,17 +12,16 @@ import android.util.Log;
 import java.io.IOException;
 
 class Player implements Runnable,
-                        MediaPlayer.OnPreparedListener,
                         MediaPlayer.OnCompletionListener,
                         MediaPlayer.OnErrorListener {
     private static final String TAG = "Player";
 
-    // Interval between reports to mListener..
+    // Interval between reports to mListener.
     private static final int POSITION_CHANGE_REPORT_MS = 100;
 
     interface Listener {
         // Invoked on completion of the currently-playing file.
-        void onPlaybackComplete(String path);
+        void onPlaybackComplete(String completedPath, String nextPath);
 
         // Invoked when the playback position of the current file changes.
         void onPlaybackPositionChange(
@@ -35,18 +34,16 @@ class Player implements Runnable,
         void onPlaybackError(String description);
     }
 
-    // Plays the current song.  On song change, we throw out the old one and create a new one, which seems non-ideal but
-    // avoids a bunch of issues with invalid state changes that seem to be caused by prepareAsync().
-    private MediaPlayer mMediaPlayer;
+    // Plays the current song or queues the next one.
+    private MediaPlayer mCurrentPlayer = null;
+    private MediaPlayer mNextPlayer = null;
 
-    // Is |mMediaPlayer| prepared?
-    private boolean mPrepared = false;
+    // Paths currently loaded by |mCurrentPlayer| and |mNextPlayer|.
+    private String mCurrentPath = "";
+    private String mNextPath = "";
 
     // Is playback paused?
     private boolean mPaused = false;
-
-    // Path currently being played.
-    private String mCurrentPath;
 
     // Used to run tasks on our own thread.
     private Handler mHandler;
@@ -66,46 +63,55 @@ class Player implements Runnable,
     }
 
     public void quit() {
-        abort();
         mHandler.post(new Runnable() {
             @Override
             public void run() {
+                resetCurrent();
+                resetNext();
                 Looper.myLooper().quit();
             }
         });
     }
 
-    public void abort() {
+    public void abortPlayback() {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                stopPositionTimer();
-                if (mMediaPlayer != null)
-                    mMediaPlayer.release();
-                mPrepared = false;
+                resetCurrent();
             }
         });
     }
 
     public void playFile(final String path) {
-        abort();
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                mMediaPlayer = new MediaPlayer();
-                mMediaPlayer.setOnPreparedListener(Player.this);
-                mMediaPlayer.setOnCompletionListener(Player.this);
-                mMediaPlayer.setOnErrorListener(Player.this);
-
-                try {
-                    mMediaPlayer.setDataSource(path);
-                    mCurrentPath = path;
-                } catch (final IOException e) {
-                    if (mListener != null)
-                        mListener.onPlaybackError("Got exception while setting data source to " + path + ": " + e.toString());
-                    return;
+                resetCurrent();
+                if (mNextPath.equals(path)) {
+                    switchToNext();
+                } else {
+                    mCurrentPlayer = createPlayer(path);
+                    if (mCurrentPlayer != null) {
+                        mCurrentPath = path;
+                        playCurrent();
+                    }
                 }
-                mMediaPlayer.prepareAsync();
+            }
+        });
+    }
+
+    public void queueFile(final String path) {
+        mHandler.post(new Runnable() {
+            @Override
+            public void run() {
+                // Check if it's already queued.
+                if (path.equals(mNextPath))
+                    return;
+
+                resetNext();
+                mNextPlayer = createPlayer(path);
+                if (mNextPlayer != null)
+                    mNextPath = path;
             }
         });
     }
@@ -114,14 +120,13 @@ class Player implements Runnable,
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                if (!mPrepared || mPaused)
+                if (mPaused || mCurrentPlayer == null)
                     return;
 
                 mPaused = true;
-                mMediaPlayer.pause();
+                mCurrentPlayer.pause();
                 stopPositionTimer();
-                if (mListener != null)
-                    mListener.onPauseStateChange(mPaused);
+                mListener.onPauseStateChange(mPaused);
             }
         });
     }
@@ -130,78 +135,131 @@ class Player implements Runnable,
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                if (!mPrepared)
+                if (mCurrentPlayer == null)
                     return;
 
                 mPaused = !mPaused;
                 if (mPaused) {
-                    mMediaPlayer.pause();
+                    mCurrentPlayer.pause();
                     stopPositionTimer();
                 } else {
-                    mMediaPlayer.start();
+                    mCurrentPlayer.start();
                     startPositionTimer();
                 }
-
-                if (mListener != null)
-                    mListener.onPauseStateChange(mPaused);
+                mListener.onPauseStateChange(mPaused);
             }
         });
+    }
+
+    private MediaPlayer createPlayer(String path) {
+        MediaPlayer player = new MediaPlayer();
+        player.setOnCompletionListener(this);
+        player.setOnErrorListener(this);
+
+        try {
+            player.setDataSource(path);
+        } catch (IOException e) {
+            mListener.onPlaybackError("Got error while setting data source to " + path + ": " + e);
+            return null;
+        }
+        try {
+            player.prepare();
+        } catch (IOException e) {
+            mListener.onPlaybackError("Got error while preparing " + path + ": " + e);
+            return null;
+        }
+
+        Log.d(TAG, "created player " + player + " for " + path);
+        return player;
     }
 
     // Periodically invoked to notify the observer about the playback position of the current song.
     private Runnable mPositionTask = new Runnable() {
         public void run() {
-            if (!mPrepared)
+            if (mCurrentPlayer == null)
                 return;
-            if (mListener != null)
-                mListener.onPlaybackPositionChange(
-                    mCurrentPath, mMediaPlayer.getCurrentPosition(), mMediaPlayer.getDuration());
+            mListener.onPlaybackPositionChange(
+                mCurrentPath, mCurrentPlayer.getCurrentPosition(), mCurrentPlayer.getDuration());
             mHandler.postDelayed(this, POSITION_CHANGE_REPORT_MS);
         }
     };
 
-    // Start running mSongPositionTask.
+    // Start running |mSongPositionTask|.
     private void startPositionTimer() {
         stopPositionTimer();
         mHandler.post(mPositionTask);
     }
 
-    // Stop running mSongPositionTask.
+    // Stop running |mSongPositionTask|.
     private void stopPositionTimer() {
         mHandler.removeCallbacks(mPositionTask);
     }
 
+    // Implements MediaPlayer.OnCompletionListener.
     @Override
-    public void onPrepared(MediaPlayer player) {
-        Log.d(TAG, "onPrepared");
+    public void onCompletion(final MediaPlayer player) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                mPrepared = true;
-                mMediaPlayer.start();
-                startPositionTimer();
-
-                if (mPaused) {
-                    mPaused = false;
-                    if (mListener != null)
-                        mListener.onPauseStateChange(mPaused);
-                }
+                Log.d(TAG, "player " + player + " completed playback");
+                String oldCurrentPath = mCurrentPath;
+                resetCurrent();
+                if (mNextPlayer != null)
+                    switchToNext();
+                mListener.onPlaybackComplete(oldCurrentPath, mCurrentPath);
             }
         });
     }
 
+    // Implements MediaPlayer.OnErrorListener.
     @Override
-    public void onCompletion(MediaPlayer player) {
-        Log.d(TAG, "onCompletion");
-        if (mListener != null)
-            mListener.onPlaybackComplete(mCurrentPath);
-    }
-
-    @Override
-    public boolean onError(MediaPlayer mp, int what, int extra) {
-        if (mListener != null)
-            mListener.onPlaybackError("MediaPlayer reported a vague, not-very-useful error: what=" + what + " extra=" + extra);
+    public boolean onError(MediaPlayer player, int what, int extra) {
+        mListener.onPlaybackError("MediaPlayer reported a vague, not-very-useful error: what=" + what + " extra=" + extra);
         // Return false so the completion listener will get called.
         return false;
+    }
+
+    // Reset |mCurrentPlayer| and |mCurrentPath|.
+    private void resetCurrent() {
+        stopPositionTimer();
+        if (mCurrentPlayer != null)
+            mCurrentPlayer.release();
+        mCurrentPlayer = null;
+        mCurrentPath = "";
+    }
+
+    // Reset |mNextPlayer| and |mNextPath|.
+    private void resetNext() {
+        if (mNextPlayer != null)
+            mNextPlayer.release();
+        mNextPlayer = null;
+        mNextPath = "";
+    }
+
+    // Switch to |mNextPlayer| and start playing it.
+    private void switchToNext() {
+        mCurrentPlayer = mNextPlayer;
+        mCurrentPath = mNextPath;
+        mNextPlayer = null;
+        mNextPath = "";
+
+        if (mCurrentPlayer != null)
+            playCurrent();
+    }
+
+    // Start playing the file loaded by |mCurrentPlayer|.
+    private void playCurrent() {
+        if (mCurrentPlayer == null) {
+            Log.e(TAG, "ignoring request to play uninitialized current file");
+            return;
+        }
+
+        Log.d(TAG, "playing " + mCurrentPath + " using " + mCurrentPlayer);
+        mCurrentPlayer.start();
+        startPositionTimer();
+        if (mPaused) {
+            mPaused = false;
+            mListener.onPauseStateChange(mPaused);
+        }
     }
 }
