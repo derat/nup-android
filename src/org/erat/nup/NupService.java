@@ -238,6 +238,9 @@ public class NupService extends Service
     public Song getCurrentSong() {
         return (mCurrentSongIndex >= 0 && mCurrentSongIndex < mSongs.size()) ? mSongs.get(mCurrentSongIndex) : null;
     }
+    public Song getNextSong() {
+        return (mCurrentSongIndex >= 0 && mCurrentSongIndex + 1 < mSongs.size()) ? mSongs.get(mCurrentSongIndex + 1) : null;
+    }
     public int getCurrentSongLastPositionMs() { return mCurrentSongLastPositionMs; }
     public SongDatabase getSongDb() { return mSongDb; }
 
@@ -426,6 +429,15 @@ public class NupService extends Service
             mWaitingForDownload = true;
         }
 
+        // Enqueue the next song if we already have it.
+        Song nextSong = getNextSong();
+        if (nextSong != null) {
+            FileCacheEntry nextEntry = mCache.getEntry(nextSong.getSongId());
+            if (nextEntry != null && nextEntry.isFullyCached()) {
+                mPlayer.queueFile(nextEntry.getLocalFile(this).getPath());
+            }
+        }
+
         // Make sure that we won't drop the song that we're currently playing from the cache.
         mCache.pinSongId(song.getSongId());
 
@@ -494,7 +506,7 @@ public class NupService extends Service
 
     // Implements Player.Listener.
     @Override
-    public void onPlaybackComplete(String oldPath, String newPath) {
+    public void onPlaybackComplete() {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
@@ -511,7 +523,7 @@ public class NupService extends Service
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                if (path != mCurrentSongPath)
+                if (!path.equals(mCurrentSongPath))
                     return;
 
                 Song song = getCurrentSong();
@@ -598,6 +610,8 @@ public class NupService extends Service
                 if (song == getCurrentSong() && mWaitingForDownload) {
                     mWaitingForDownload = false;
                     playCacheEntry(entry);
+                } else if (song == getNextSong()) {
+                    mPlayer.queueFile(entry.getLocalFile(NupService.this).getPath());
                 }
 
                 if (mSongListener != null)

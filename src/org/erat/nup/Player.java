@@ -21,7 +21,7 @@ class Player implements Runnable,
 
     interface Listener {
         // Invoked on completion of the currently-playing file.
-        void onPlaybackComplete(String completedPath, String nextPath);
+        void onPlaybackComplete();
 
         // Invoked when the playback position of the current file changes.
         void onPlaybackPositionChange(
@@ -36,11 +36,11 @@ class Player implements Runnable,
 
     // Plays the current song or queues the next one.
     private MediaPlayer mCurrentPlayer = null;
-    private MediaPlayer mNextPlayer = null;
+    private MediaPlayer mQueuedPlayer = null;
 
-    // Paths currently loaded by |mCurrentPlayer| and |mNextPlayer|.
+    // Paths currently loaded by |mCurrentPlayer| and |mQueuedPlayer|.
     private String mCurrentPath = "";
-    private String mNextPath = "";
+    private String mQueuedPath = "";
 
     // Is playback paused?
     private boolean mPaused = false;
@@ -67,7 +67,7 @@ class Player implements Runnable,
             @Override
             public void run() {
                 resetCurrent();
-                resetNext();
+                resetQueued();
                 Looper.myLooper().quit();
             }
         });
@@ -86,9 +86,10 @@ class Player implements Runnable,
         mHandler.post(new Runnable() {
             @Override
             public void run() {
+                Log.d(TAG, "got request to play " + path);
                 resetCurrent();
-                if (mNextPath.equals(path)) {
-                    switchToNext();
+                if (mQueuedPath.equals(path)) {
+                    switchToQueued();
                 } else {
                     mCurrentPlayer = createPlayer(path);
                     if (mCurrentPlayer != null) {
@@ -104,14 +105,13 @@ class Player implements Runnable,
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                // Check if it's already queued.
-                if (path.equals(mNextPath))
+                Log.d(TAG, "got request to queue " + path);
+                if (path.equals(mQueuedPath))
                     return;
-
-                resetNext();
-                mNextPlayer = createPlayer(path);
-                if (mNextPlayer != null)
-                    mNextPath = path;
+                resetQueued();
+                mQueuedPlayer = createPlayer(path);
+                if (mQueuedPlayer != null)
+                    mQueuedPath = path;
             }
         });
     }
@@ -151,6 +151,8 @@ class Player implements Runnable,
         });
     }
 
+    // Create a new MediaPlayer for playing |path|.
+    // Returns null on error.
     private MediaPlayer createPlayer(String path) {
         MediaPlayer player = new MediaPlayer();
         player.setOnCompletionListener(this);
@@ -176,8 +178,10 @@ class Player implements Runnable,
     // Periodically invoked to notify the observer about the playback position of the current song.
     private Runnable mPositionTask = new Runnable() {
         public void run() {
-            if (mCurrentPlayer == null)
+            if (mCurrentPlayer == null) {
+                Log.w(TAG, "aborting position task; player is null");
                 return;
+            }
             mListener.onPlaybackPositionChange(
                 mCurrentPath, mCurrentPlayer.getCurrentPosition(), mCurrentPlayer.getDuration());
             mHandler.postDelayed(this, POSITION_CHANGE_REPORT_MS);
@@ -198,17 +202,9 @@ class Player implements Runnable,
     // Implements MediaPlayer.OnCompletionListener.
     @Override
     public void onCompletion(final MediaPlayer player) {
-        mHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                Log.d(TAG, "player " + player + " completed playback");
-                String oldCurrentPath = mCurrentPath;
-                resetCurrent();
-                if (mNextPlayer != null)
-                    switchToNext();
-                mListener.onPlaybackComplete(oldCurrentPath, mCurrentPath);
-            }
-        });
+        Log.d(TAG, "player " + player + " completed playback");
+        resetCurrent();
+        mListener.onPlaybackComplete();
     }
 
     // Implements MediaPlayer.OnErrorListener.
@@ -228,20 +224,20 @@ class Player implements Runnable,
         mCurrentPath = "";
     }
 
-    // Reset |mNextPlayer| and |mNextPath|.
-    private void resetNext() {
-        if (mNextPlayer != null)
-            mNextPlayer.release();
-        mNextPlayer = null;
-        mNextPath = "";
+    // Reset |mQueuedPlayer| and |mQueuedPath|.
+    private void resetQueued() {
+        if (mQueuedPlayer != null)
+            mQueuedPlayer.release();
+        mQueuedPlayer = null;
+        mQueuedPath = "";
     }
 
-    // Switch to |mNextPlayer| and start playing it.
-    private void switchToNext() {
-        mCurrentPlayer = mNextPlayer;
-        mCurrentPath = mNextPath;
-        mNextPlayer = null;
-        mNextPath = "";
+    // Switch to |mQueuedPlayer| and start playing it.
+    private void switchToQueued() {
+        mCurrentPlayer = mQueuedPlayer;
+        mCurrentPath = mQueuedPath;
+        mQueuedPlayer = null;
+        mQueuedPath = "";
 
         if (mCurrentPlayer != null)
             playCurrent();
