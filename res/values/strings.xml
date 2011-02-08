@@ -56,6 +56,7 @@
   <string name="play">Play</string>
   <string name="prev">Prev</string>
   <string name="querying_database">Querying database.</string>
+  <string name="rating_colon">Rating:</string>
   <string name="reset">Reset</string>
   <string name="remove_from_list">Remove from list</string>
   <string name="replace_all">Replace all</string>

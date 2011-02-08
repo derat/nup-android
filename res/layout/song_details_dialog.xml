@@ -64,4 +64,19 @@
         android:textColor="@color/song_details_fg"
         />
   </TableRow>
+
+  <TableRow>
+    <TextView
+        android:paddingRight="7dp"
+        android:gravity="right"
+        android:textSize="16dp"
+        android:text="@string/rating_colon"
+        />
+    <TextView
+        android:id="@+id/rating"
+        android:textSize="16dp"
+        android:textStyle="bold"
+        android:textColor="@color/song_details_fg"
+        />
+  </TableRow>
 </TableLayout>
