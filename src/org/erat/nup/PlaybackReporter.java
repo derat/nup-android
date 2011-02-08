@@ -20,18 +20,20 @@ class PlaybackReporter {
         mSongDb = songDb;
 
         // Retry all of the pending reports in the background.
-        new AsyncTask<Void, Void, Void>() {
-            @Override
-            protected Void doInBackground(Void... args) {
-                List<SongDatabase.PendingPlaybackReport> reports =
-                    mSongDb.getAllPendingPlaybackReports();
-                for (SongDatabase.PendingPlaybackReport report : reports) {
-                    if (reportInternal(report.songId, report.startDate))
-                        mSongDb.removePendingPlaybackReport(report.songId, report.startDate);
+        if (Util.isNetworkAvailable(mContext)) {
+            new AsyncTask<Void, Void, Void>() {
+                @Override
+                protected Void doInBackground(Void... args) {
+                    List<SongDatabase.PendingPlaybackReport> reports =
+                        mSongDb.getAllPendingPlaybackReports();
+                    for (SongDatabase.PendingPlaybackReport report : reports) {
+                        if (reportInternal(report.songId, report.startDate))
+                            mSongDb.removePendingPlaybackReport(report.songId, report.startDate);
+                    }
+                    return (Void) null;
                 }
-                return (Void) null;
-            }
-        }.execute();
+            }.execute();
+        }
     }
 
     // Asynchronously report the playback of a song.
