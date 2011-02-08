@@ -35,7 +35,7 @@ public class BrowseArtistsActivity extends ListActivity
     // Artists that we're displaying.
     private List<String> mArtists = new ArrayList<String>(); 
 
-    private ArrayAdapter<String> mAdapter;
+    private SortedStringArrayAdapter mAdapter;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -137,6 +137,7 @@ public class BrowseArtistsActivity extends ListActivity
                 protected void onPreExecute() {
                     if (mArtists.isEmpty()) {
                         mArtists.add(getString(R.string.loading));
+                        mAdapter.setEnabled(false);
                         mAdapter.notifyDataSetChanged();
                     }
                 }
@@ -156,6 +157,7 @@ public class BrowseArtistsActivity extends ListActivity
     private void updateArtists(List<String> artists) {
         mArtists.clear();
         mArtists.addAll(artists);
+        mAdapter.setEnabled(true);
         mAdapter.notifyDataSetChanged();
     }
 

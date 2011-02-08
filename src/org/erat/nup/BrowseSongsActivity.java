@@ -84,8 +84,16 @@ public class BrowseSongsActivity extends Activity
                 // Create a temporary ArrayAdapter that just says "Loading...".
                 List<String> items = new ArrayList<String>();
                 items.add(getString(R.string.loading));
-                ArrayAdapter<String> adapter =
-                    new ArrayAdapter<String>(BrowseSongsActivity.this, R.layout.browse_row, items);
+                ArrayAdapter<String> adapter = new ArrayAdapter<String>(BrowseSongsActivity.this, R.layout.browse_row, items) {
+                    @Override
+                    public boolean areAllItemsEnabled() {
+                        return false;
+                    }
+                    @Override
+                    public boolean isEnabled(int position) {
+                        return false;
+                    }
+                };
                 ListView view = (ListView) findViewById(R.id.songs);
                 view.setAdapter(adapter);
             }
@@ -216,18 +224,24 @@ public class BrowseSongsActivity extends Activity
     }
 
     public void onAppendButtonClicked(View view) {
+        if (mSongs.isEmpty())
+            return;
         NupActivity.getService().appendSongsToPlaylist(mSongs);
         setResult(RESULT_OK);
         finish();
     }
 
     public void onInsertButtonClicked(View view) {
+        if (mSongs.isEmpty())
+            return;
         NupActivity.getService().addSongsToPlaylist(mSongs, false);
         setResult(RESULT_OK);
         finish();
     }
 
     public void onReplaceButtonClicked(View view) {
+        if (mSongs.isEmpty())
+            return;
         NupActivity.getService().clearPlaylist();
         NupActivity.getService().appendSongsToPlaylist(mSongs);
         setResult(RESULT_OK);

@@ -12,6 +12,9 @@ class SortedStringArrayAdapter extends ArrayAdapter<String>
                                implements SectionIndexer {
     private List<String> mItems;
 
+    // Are all items in the list enabled?  If false, all are disabled.
+    private boolean mEnabled = true;
+
     private static final String NUMBER_SECTION = "#";
     private static final String OTHER_SECTION = "\u2668";  // HOT SPRINGS (Android isn't snowman-compatible)
 
@@ -33,6 +36,11 @@ class SortedStringArrayAdapter extends ArrayAdapter<String>
         mSections.add(OTHER_SECTION);
 
         initSections();
+    }
+
+    // Should all of the items in the list be enabled, or all disabled?
+    public void setEnabled(boolean enabled) {
+        mEnabled = enabled;
     }
 
     @Override
@@ -59,6 +67,16 @@ class SortedStringArrayAdapter extends ArrayAdapter<String>
     public void notifyDataSetChanged() {
         super.notifyDataSetChanged();
         initSections();
+    }
+
+    @Override
+    public boolean areAllItemsEnabled() {
+        return mEnabled;
+    }
+
+    @Override
+    public boolean isEnabled(int position) {
+        return mEnabled;
     }
 
     private void initSections() {

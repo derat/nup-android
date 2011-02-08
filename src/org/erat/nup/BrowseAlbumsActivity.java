@@ -37,7 +37,7 @@ public class BrowseAlbumsActivity extends ListActivity
     // albums on the server otherwise.
     private List<String> mAlbums = new ArrayList<String>();
 
-    private ArrayAdapter<String> mAdapter;
+    private SortedStringArrayAdapter mAdapter;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -143,6 +143,7 @@ public class BrowseAlbumsActivity extends ListActivity
                 protected void onPreExecute() {
                     if (mAlbums.isEmpty()) {
                         mAlbums.add(getString(R.string.loading));
+                        mAdapter.setEnabled(false);
                         mAdapter.notifyDataSetChanged();
                     }
                 }
@@ -164,6 +165,7 @@ public class BrowseAlbumsActivity extends ListActivity
     private void updateAlbums(List<String> albums) {
         mAlbums.clear();
         mAlbums.addAll(albums);
+        mAdapter.setEnabled(true);
         mAdapter.notifyDataSetChanged();
     }
 
