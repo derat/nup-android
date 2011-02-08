@@ -336,7 +336,7 @@ class SongDatabase {
         builder.add("Rating >= ?", minRating, false);
 
         String query =
-            "SELECT Artist, Title, Album, Filename, Length, s.SongId, Rating " +
+            "SELECT s.SongId, Artist, Title, Album, Filename, Length, s.TrackNumber, Rating " +
             "FROM Songs s " +
             (onlyCached ? "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " : "") +
             builder.getWhereClause() +
@@ -349,8 +349,8 @@ class SongDatabase {
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
             Song song = new Song(
-                cursor.getString(0), cursor.getString(1), cursor.getString(2), cursor.getString(3),
-                cursor.getInt(4), cursor.getInt(5), cursor.getFloat(6));
+                cursor.getInt(0), cursor.getString(1), cursor.getString(2), cursor.getString(3),
+                cursor.getString(4), cursor.getInt(5), cursor.getInt(6), cursor.getFloat(7));
             songs.add(song);
             cursor.moveToNext();
         }

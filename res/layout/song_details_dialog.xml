@@ -55,6 +55,21 @@
         android:paddingRight="7dp"
         android:gravity="right"
         android:textSize="16dp"
+        android:text="@string/track_colon"
+        />
+    <TextView
+        android:id="@+id/track"
+        android:textSize="16dp"
+        android:textStyle="bold"
+        android:textColor="@color/song_details_fg"
+        />
+  </TableRow>
+
+  <TableRow>
+    <TextView
+        android:paddingRight="7dp"
+        android:gravity="right"
+        android:textSize="16dp"
         android:text="@string/length_colon"
         />
     <TextView

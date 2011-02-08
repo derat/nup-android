@@ -82,6 +82,7 @@
   <string name="title">Title</string>
   <string name="title_colon">Title:</string>
   <string name="toggle_pause">Toggle pause</string>
+  <string name="track_colon">Track:</string>
   <string name="truncate_list">Truncate list</string>
   <string name="unlimited">Unlimited</string>
   <string name="username">Username</string>

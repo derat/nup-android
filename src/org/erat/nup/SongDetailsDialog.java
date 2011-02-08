@@ -15,6 +15,7 @@ class SongDetailsDialog {
     private static final String BUNDLE_ARTIST = "artist";
     private static final String BUNDLE_TITLE = "title";
     private static final String BUNDLE_ALBUM = "album";
+    private static final String BUNDLE_TRACK_NUM = "track_num";
     private static final String BUNDLE_LENGTH_SEC = "length_sec";
     private static final String BUNDLE_RATING = "rating";
 
@@ -23,6 +24,7 @@ class SongDetailsDialog {
         bundle.putString(BUNDLE_ARTIST, song.getArtist());
         bundle.putString(BUNDLE_TITLE, song.getTitle());
         bundle.putString(BUNDLE_ALBUM, song.getAlbum());
+        bundle.putInt(BUNDLE_TRACK_NUM, song.getTrackNum());
         bundle.putInt(BUNDLE_LENGTH_SEC, song.getLengthSec());
         bundle.putDouble(BUNDLE_RATING, song.getRating());
         return bundle;
@@ -42,14 +44,17 @@ class SongDetailsDialog {
             bundle.getString(BUNDLE_TITLE));
         ((TextView) dialog.findViewById(R.id.album)).setText(
             bundle.getString(BUNDLE_ALBUM));
+        ((TextView) dialog.findViewById(R.id.track)).setText(
+            Integer.toString(bundle.getInt(BUNDLE_TRACK_NUM)));
         ((TextView) dialog.findViewById(R.id.length)).setText(
             Util.formatDurationString(bundle.getInt(BUNDLE_LENGTH_SEC)));
 
-        int numStars = (int) Math.round(bundle.getDouble(BUNDLE_RATING) * 4);
         // Really, Java?  No way to repeat a string X times without using Apache Commons?
+        int numStars = (int) Math.round(bundle.getDouble(BUNDLE_RATING) * 4);
         String ratingStr = "";
-        for (int i = 1; i <= 4; ++i)
-            ratingStr += (i <= numStars) ? "\u2605" : "\u2606";
+        if (numStars >= 0)
+            for (int i = 1; i <= 4; ++i)
+                ratingStr += (i <= numStars) ? "\u2605" : "\u2606";
         ((TextView) dialog.findViewById(R.id.rating)).setText(ratingStr);
     }
 }
