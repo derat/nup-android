@@ -180,7 +180,7 @@ public class NupService extends Service
         CrashLogger.register(new File(getExternalFilesDir(null), CRASH_SUBDIRECTORY));
 
         mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        Notification notification = new Notification(R.drawable.icon, getString(R.string.startup_notification_message), System.currentTimeMillis());
+        Notification notification = new Notification(R.drawable.status, getString(R.string.startup_notification_message), System.currentTimeMillis());
         notification.flags |= (Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR);
         RemoteViews view = new RemoteViews(getPackageName(), R.layout.startup_notification);
         notification.contentView = view;
@@ -271,7 +271,7 @@ public class NupService extends Service
 
     // Create a new persistent notification displaying information about the current song.
     private Notification updateNotification(String artist, String title, String album, Bitmap bitmap) {
-        Notification notification = new Notification(R.drawable.icon, artist + " - " + title, System.currentTimeMillis());
+        Notification notification = new Notification(R.drawable.status, artist + " - " + title, System.currentTimeMillis());
         notification.flags |= (Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR);
 
         // TODO: Any way to update an existing remote view?  I couldn't find one. :-(
