@@ -16,6 +16,7 @@ import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
 import android.widget.ListView;
 import android.widget.SimpleAdapter;
+import android.widget.Toast;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -23,7 +24,8 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 
-public class BrowseSongsActivity extends Activity {
+public class BrowseSongsActivity extends Activity
+                                 implements AdapterView.OnItemClickListener {
     private static final String TAG = "BrowseSongsActivity";
 
     // IDs for items in our context menus.
@@ -123,6 +125,7 @@ public class BrowseSongsActivity extends Activity {
                     new int[]{ R.id.text });
                 ListView view = (ListView) findViewById(R.id.songs);
                 view.setAdapter(adapter);
+                view.setOnItemClickListener(BrowseSongsActivity.this);
                 registerForContextMenu(view);
             }
         }.execute();
@@ -186,6 +189,16 @@ public class BrowseSongsActivity extends Activity {
             default:
                 return false;
         }
+    }
+
+    // Implements AdapterView.OnItemClickListener.
+    @Override
+    public void onItemClick(AdapterView parent, View view, int position, long id) {
+        Song song = mSongs.get(position);
+        if (song == null)
+            return;
+        NupActivity.getService().appendSongToPlaylist(song);
+        Toast.makeText(this, getString(R.string.appended_song_fmt, song.getTitle()), Toast.LENGTH_SHORT).show();
     }
 
     @Override

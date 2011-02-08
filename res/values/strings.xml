@@ -8,6 +8,7 @@
   <string name="albums_cached">Albums (cached)</string>
   <string name="append">Append</string>
   <string name="append_all">Append all</string>
+  <string name="appended_song_fmt">Appended \"%s\" to playlist.</string>
   <string name="artist">Artist</string>
   <string name="artist_colon">Artist:</string>
   <string name="artists">Artists</string>
@@ -46,7 +47,7 @@
   <string name="loading_stats">Loading stats...</string>
   <string name="minimum_rating">Minimum rating</string>
   <string name="minimum_rating_label">Minimum rating:</string>
-  <string name="network_is_unavailable">Network is unavailable</string>
+  <string name="network_is_unavailable">Network is unavailable.</string>
   <string name="next">Next</string>
   <string name="never_synced">Never synced</string>
   <string name="no_results">No results.</string>
