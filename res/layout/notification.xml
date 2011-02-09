@@ -3,43 +3,62 @@
     android:orientation="horizontal"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
+    android:paddingTop="8dp"
+    android:paddingLeft="8dp"
     >
-  <ImageView android:id="@+id/notification_image"
-      android:layout_width="57dp"
-      android:layout_height="57dp"
-      android:paddingTop="3dp"
-      android:paddingLeft="3dp"
-      android:src="@drawable/icon"
+  <ImageView
+      android:id="@+id/image"
+      android:layout_width="48dp"
+      android:layout_height="48dp"
+      android:gravity="center_vertical"
       android:adjustViewBounds="true"
       android:scaleType="centerInside"
+      android:src="@drawable/status"
       />
   <LinearLayout
       android:orientation="vertical"
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:paddingLeft="3dp"
+      android:layout_width="fill_parent"
+      android:layout_height="fill_parent"
+      android:paddingLeft="8dp"
       >
+    <RelativeLayout
+        android:orientation="horizontal"
+        android:layout_width="fill_parent"
+        android:layout_height="24dp"
+        >
+      <TextView
+          android:id="@+id/line_1"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_alignParentLeft="true"
+          android:layout_alignParentBottom="true"
+          android:layout_toLeftOf="@+id/time"
+          android:singleLine="true"
+          android:textSize="16dp"
+          android:textStyle="bold"
+          android:textColor="#000"
+          />
+      <TextView
+          android:id="@+id/time"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_alignParentRight="true"
+          android:layout_alignParentBottom="true"
+          android:paddingBottom="2dp"
+          android:paddingLeft="3dp"
+          android:paddingRight="5dp"
+          android:singleLine="true"
+          android:textSize="12dp"
+          android:textColor="#333"
+          />
+    </RelativeLayout>
     <TextView
-        android:id="@+id/notification_artist"
+        android:id="@+id/line_2"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
+        android:paddingTop="2dp"
         android:singleLine="true"
-        android:textStyle="bold"
-        android:textColor="#000"
-        />
-    <TextView
-        android:id="@+id/notification_title"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:singleLine="true"
-        android:textStyle="italic"
-        android:textColor="#000"
-        />
-    <TextView
-        android:id="@+id/notification_album"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:singleLine="true"
+        android:textSize="14dp"
         android:textColor="#000"
         />
   </LinearLayout>

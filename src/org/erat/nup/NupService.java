@@ -116,6 +116,7 @@ public class NupService extends Service
     private boolean mWaitingForDownload = false;
 
     private NotificationManager mNotificationManager;
+    private Notification mNotification;
 
     // Current playlist.
     private List<Song> mSongs = new ArrayList<Song>();
@@ -180,13 +181,13 @@ public class NupService extends Service
         CrashLogger.register(new File(getExternalFilesDir(null), CRASH_SUBDIRECTORY));
 
         mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
-        Notification notification = new Notification(R.drawable.status, getString(R.string.startup_notification_message), System.currentTimeMillis());
-        notification.flags |= (Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR);
-        RemoteViews view = new RemoteViews(getPackageName(), R.layout.startup_notification);
-        notification.contentView = view;
-        notification.contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0);
-        mNotificationManager.notify(NOTIFICATION_ID, notification);
-        startForeground(NOTIFICATION_ID, notification);
+        mNotification = new Notification(R.drawable.status, getString(R.string.startup_message), System.currentTimeMillis());
+        mNotification.flags |= (Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR);
+        mNotification.contentView = new RemoteViews(getPackageName(), R.layout.notification);
+        mNotification.contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0);
+        updateNotification(null, getString(R.string.app_name), getString(R.string.startup_message), 0, 0);
+
+        startForeground(NOTIFICATION_ID, mNotification);
 
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
 
@@ -269,39 +270,38 @@ public class NupService extends Service
         }
     }
 
-    // Create a new persistent notification displaying information about the current song.
-    private Notification updateNotification(String artist, String title, String album, Bitmap bitmap) {
-        Notification notification = new Notification(R.drawable.status, artist + " - " + title, System.currentTimeMillis());
-        notification.flags |= (Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR);
-
-        // TODO: Any way to update an existing remote view?  I couldn't find one. :-(
-        RemoteViews view = new RemoteViews(getPackageName(), R.layout.notification);
-
-        if (artist != null && !artist.isEmpty())
-            view.setTextViewText(R.id.notification_artist, artist);
-        else
-            view.setViewVisibility(R.id.notification_artist, View.GONE);
-
-        if (title != null && !title.isEmpty())
-            view.setTextViewText(R.id.notification_title, title);
-        else
-            view.setViewVisibility(R.id.notification_title, View.GONE);
-
-        if (album != null && !album.isEmpty())
-            view.setTextViewText(R.id.notification_album, album);
-        else
-            view.setViewVisibility(R.id.notification_album, View.GONE);
-
+    // Update the notification.
+    private void updateNotification(Bitmap bitmap, String line_1, String line_2, int elapsedSec, int totalSec) {
         if (bitmap != null)
-            view.setImageViewBitmap(R.id.notification_image, bitmap);
+            mNotification.contentView.setImageViewBitmap(R.id.image, bitmap);
         else
-            view.setViewVisibility(R.id.notification_image, View.GONE);
+            mNotification.contentView.setImageViewResource(R.id.image, R.drawable.status_48);
 
-        notification.contentView = view;
+        mNotification.contentView.setTextViewText(R.id.line_1, line_1);
+        mNotification.contentView.setTextViewText(R.id.line_2, line_2);
 
-        notification.contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0);
-        mNotificationManager.notify(NOTIFICATION_ID, notification);
-        return notification;
+        if (totalSec <= 0) {
+            mNotification.contentView.setViewVisibility(R.id.time, View.GONE);
+        } else {
+            // TODO: See comment in onPlaybackPositionChange().
+            //mNotification.contentView.setTextViewText(R.id.time, "[" + Util.formatDurationProgressString(elapsedSec, totalSec) + "]");
+            mNotification.contentView.setTextViewText(R.id.time, "[" + Util.formatDurationString(totalSec) + "]");
+            mNotification.contentView.setViewVisibility(R.id.time, View.VISIBLE);
+        }
+
+        mNotificationManager.notify(NOTIFICATION_ID, mNotification);
+    }
+
+    // Update just the notification's bitmap.
+    private void updateNotificationBitmap(Bitmap bitmap) {
+        mNotification.contentView.setImageViewBitmap(R.id.image, bitmap);
+        mNotificationManager.notify(NOTIFICATION_ID, mNotification);
+    }
+
+    // Update just the notification's displayed time.
+    private void updateNotificationTime(int elapsedSec, int totalSec) {
+        mNotification.contentView.setTextViewText(R.id.time, "[" + Util.formatDurationProgressString(elapsedSec, totalSec) + "]");
+        mNotificationManager.notify(NOTIFICATION_ID, mNotification);
     }
 
     // Toggle whether we're playing the current song or not.
@@ -441,10 +441,8 @@ public class NupService extends Service
         // Make sure that we won't drop the song that we're currently playing from the cache.
         mCache.pinSongId(song.getSongId());
 
-        // Update the notification now if we already have the cover.  We'll update it when the fetch
-        // task finishes otherwise.
-        if (fetchCoverForSongIfMissing(song))
-            updateNotification(song.getArtist(), song.getTitle(), song.getAlbum(), song.getCoverBitmap());
+        fetchCoverForSongIfMissing(song);
+        updateNotification(song.getCoverBitmap(), song.getArtist(), song.getTitle(), 0, song.getLengthSec());
 
         if (mSongListener != null)
             mSongListener.onSongChange(song, mCurrentSongIndex);
@@ -456,16 +454,15 @@ public class NupService extends Service
         mPlayer.abortPlayback();
     }
 
-    // Returns true if the cover is already loaded or can't be loaded and false if we started a task to fetch it.
-    public boolean fetchCoverForSongIfMissing(Song song) {
+    // Start fetching the cover for a song if it's not loaded already.
+    public void fetchCoverForSongIfMissing(Song song) {
         if (song.getCoverBitmap() != null)
-            return true;
+            return;
 
         if (!mSongCoverFetches.contains(song)) {
             mSongCoverFetches.add(song);
             new CoverFetchTask(song).execute();
         }
-        return false;
     }
 
     // Fetches the cover bitmap for a particular song.
@@ -485,14 +482,10 @@ public class NupService extends Service
         protected void onPostExecute(Bitmap bitmap) {
             storeCoverForSong(mSong, bitmap);
             mSongCoverFetches.remove(mSong);
-
             if (mSong.getCoverBitmap() != null && mSongListener != null)
                 mSongListener.onSongCoverLoad(mSong);
-
-            // We need to update our notification even if the fetch failed.
-            // TODO: Some bitmaps appear to result in "bad array lengths" exceptions in android.os.Parcel.readIntArray().
-            if (mSong == getCurrentSong())
-                updateNotification(mSong.getArtist(), mSong.getTitle(), mSong.getAlbum(), mSong.getCoverBitmap());
+            if (mSong == getCurrentSong() && mSong.getCoverBitmap() != null)
+                updateNotificationBitmap(mSong.getCoverBitmap());
         }
     }
 
@@ -529,6 +522,12 @@ public class NupService extends Service
                 Song song = getCurrentSong();
                 if (mSongListener != null)
                     mSongListener.onSongPositionChange(song, positionMs, durationMs);
+
+                // TODO: Ideally the notification would also include the current played duration,
+                // but the emulator lags horribly when I update the notification here, even when it's
+                // rate-limited to only once per second.
+                //if ((int) (positionMs / 1000) != (int) (mCurrentSongLastPositionMs / 1000))
+                //    updateNotificationTime(positionMs / 1000, Math.max(durationMs / 1000, song.getLengthSec()));
 
                 if (positionMs > mCurrentSongLastPositionMs &&
                     positionMs <= mCurrentSongLastPositionMs + MAX_POSITION_REPORT_MS) {
