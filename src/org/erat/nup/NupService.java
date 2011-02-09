@@ -185,7 +185,7 @@ public class NupService extends Service
         mNotification.flags |= (Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR);
         mNotification.contentView = new RemoteViews(getPackageName(), R.layout.notification);
         mNotification.contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0);
-        updateNotification(null, getString(R.string.app_name), getString(R.string.startup_message), 0, 0);
+        updateNotification(getString(R.string.app_name), getString(R.string.startup_message), 0, 0);
 
         startForeground(NOTIFICATION_ID, mNotification);
 
@@ -271,12 +271,7 @@ public class NupService extends Service
     }
 
     // Update the notification.
-    private void updateNotification(Bitmap bitmap, String line_1, String line_2, int elapsedSec, int totalSec) {
-        if (bitmap != null)
-            mNotification.contentView.setImageViewBitmap(R.id.image, bitmap);
-        else
-            mNotification.contentView.setImageViewResource(R.id.image, R.drawable.status_48);
-
+    private void updateNotification(String line_1, String line_2, int elapsedSec, int totalSec) {
         mNotification.contentView.setTextViewText(R.id.line_1, line_1);
         mNotification.contentView.setTextViewText(R.id.line_2, line_2);
 
@@ -289,12 +284,6 @@ public class NupService extends Service
             mNotification.contentView.setViewVisibility(R.id.time, View.VISIBLE);
         }
 
-        mNotificationManager.notify(NOTIFICATION_ID, mNotification);
-    }
-
-    // Update just the notification's bitmap.
-    private void updateNotificationBitmap(Bitmap bitmap) {
-        mNotification.contentView.setImageViewBitmap(R.id.image, bitmap);
         mNotificationManager.notify(NOTIFICATION_ID, mNotification);
     }
 
@@ -442,7 +431,7 @@ public class NupService extends Service
         mCache.pinSongId(song.getSongId());
 
         fetchCoverForSongIfMissing(song);
-        updateNotification(song.getCoverBitmap(), song.getArtist(), song.getTitle(), 0, song.getLengthSec());
+        updateNotification(song.getArtist(), song.getTitle(), 0, song.getLengthSec());
 
         if (mSongListener != null)
             mSongListener.onSongChange(song, mCurrentSongIndex);
@@ -484,8 +473,6 @@ public class NupService extends Service
             mSongCoverFetches.remove(mSong);
             if (mSong.getCoverBitmap() != null && mSongListener != null)
                 mSongListener.onSongCoverLoad(mSong);
-            if (mSong == getCurrentSong() && mSong.getCoverBitmap() != null)
-                updateNotificationBitmap(mSong.getCoverBitmap());
         }
     }
 

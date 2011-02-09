@@ -38,7 +38,7 @@
         android:paddingLeft="2dp"
         android:paddingRight="1dp"
         android:textSize="11dp"
-        android:textColor="@color/playlist_download_status_fg"
+        android:textColor="#888"
         android:singleLine="true"
         />
   </RelativeLayout>

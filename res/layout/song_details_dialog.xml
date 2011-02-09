@@ -15,7 +15,7 @@
         android:id="@+id/artist"
         android:textSize="16dp"
         android:textStyle="bold"
-        android:textColor="@color/song_details_fg"
+        android:textColor="#fff"
         />
   </TableRow>
 
@@ -31,7 +31,7 @@
         android:id="@+id/title"
         android:textSize="16dp"
         android:textStyle="bold"
-        android:textColor="@color/song_details_fg"
+        android:textColor="#fff"
         />
   </TableRow>
 
@@ -46,7 +46,7 @@
         android:id="@+id/album"
         android:textSize="16dp"
         android:textStyle="bold"
-        android:textColor="@color/song_details_fg"
+        android:textColor="#fff"
         />
   </TableRow>
 
@@ -61,7 +61,7 @@
         android:id="@+id/track"
         android:textSize="16dp"
         android:textStyle="bold"
-        android:textColor="@color/song_details_fg"
+        android:textColor="#fff"
         />
   </TableRow>
 
@@ -76,7 +76,7 @@
         android:id="@+id/length"
         android:textSize="16dp"
         android:textStyle="bold"
-        android:textColor="@color/song_details_fg"
+        android:textColor="#fff"
         />
   </TableRow>
 
@@ -91,7 +91,7 @@
         android:id="@+id/rating"
         android:textSize="16dp"
         android:textStyle="bold"
-        android:textColor="@color/song_details_fg"
+        android:textColor="#fff"
         />
   </TableRow>
 </TableLayout>

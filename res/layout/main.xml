@@ -58,7 +58,7 @@
             android:singleLine="true"
             android:text=""
             android:textSize="14dp"
-            android:textColor="@color/song_playback_time_fg"
+            android:textColor="#888"
             />
         <TextView
             android:id="@+id/download_status_label"
@@ -68,7 +68,7 @@
             android:gravity="right"
             android:text=""
             android:textSize="14dp"
-            android:textColor="@color/song_download_status_fg"
+            android:textColor="#555"
             />
       </LinearLayout>
     </LinearLayout>
