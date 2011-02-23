@@ -420,7 +420,7 @@ class SongDatabase {
         db.beginTransaction();
         try {
             // Ask the server for the max last modified time before we fetch anything.  We'll use this as the starting
-            // point the next sync, to handle the case where some songs in the server are updated while we're doing this
+            // point for the next sync, to handle the case where some songs in the server are updated while we're doing this
             // sync.
             String maxLastModifiedUsecStr = Download.downloadString(mContext, "/songs", "getMaxLastModifiedUsec", message);
             if (maxLastModifiedUsecStr == null)
