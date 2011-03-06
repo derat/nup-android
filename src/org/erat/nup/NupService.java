@@ -371,6 +371,7 @@ public class NupService extends Service
         }
 
         if (removedPlaying) {
+            updateNotificationText(getString(R.string.app_name), getString(R.string.startup_message));
             if (mCurrentSongIndex < mSongs.size())
                 playSongAtIndex(mCurrentSongIndex);
             else
