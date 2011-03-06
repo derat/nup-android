@@ -59,6 +59,9 @@ public class NupService extends Service
     // Subdirectory where crash reports are written.
     private static final String CRASH_SUBDIRECTORY = "crashes";
 
+    // Intent actions.
+    private static final String ACTION_TOGGLE_PAUSE = "nup_toggle_pause";
+
     interface SongListener {
         // Invoked when we switch to a new track in the playlist.
         void onSongChange(Song song, int index);
@@ -185,7 +188,13 @@ public class NupService extends Service
         mNotification.flags |= (Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR);
         mNotification.contentView = new RemoteViews(getPackageName(), R.layout.notification);
         mNotification.contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0);
-        updateNotification(getString(R.string.app_name), getString(R.string.startup_message), 0, 0);
+        updateNotificationText(getString(R.string.app_name), getString(R.string.startup_message));
+        updateNotificationPauseState(false, false);
+
+        Intent pauseIntent = new Intent(this, NupService.class);
+        pauseIntent.setAction(ACTION_TOGGLE_PAUSE);
+        mNotification.contentView.setOnClickPendingIntent(
+            R.id.pause_button, PendingIntent.getService(this, 0, pauseIntent, 0));
 
         startForeground(NOTIFICATION_ID, mNotification);
 
@@ -225,6 +234,8 @@ public class NupService extends Service
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "received start id " + startId + ": " + intent);
+        if (ACTION_TOGGLE_PAUSE.equals(intent.getAction()))
+            togglePause();
         return START_STICKY;
     }
 
@@ -270,26 +281,25 @@ public class NupService extends Service
         }
     }
 
-    // Update the notification.
-    private void updateNotification(String line_1, String line_2, int elapsedSec, int totalSec) {
+    // Update the notification text.
+    private void updateNotificationText(String line_1, String line_2) {
         mNotification.contentView.setTextViewText(R.id.line_1, line_1);
         mNotification.contentView.setTextViewText(R.id.line_2, line_2);
-
-        if (totalSec <= 0) {
-            mNotification.contentView.setViewVisibility(R.id.time, View.GONE);
-        } else {
-            // TODO: See comment in onPlaybackPositionChange().
-            //mNotification.contentView.setTextViewText(R.id.time, "[" + Util.formatDurationProgressString(elapsedSec, totalSec) + "]");
-            mNotification.contentView.setTextViewText(R.id.time, "[" + Util.formatDurationString(totalSec) + "]");
-            mNotification.contentView.setViewVisibility(R.id.time, View.VISIBLE);
-        }
-
         mNotificationManager.notify(NOTIFICATION_ID, mNotification);
     }
 
-    // Update just the notification's displayed time.
-    private void updateNotificationTime(int elapsedSec, int totalSec) {
-        mNotification.contentView.setTextViewText(R.id.time, "[" + Util.formatDurationProgressString(elapsedSec, totalSec) + "]");
+    private void updateNotificationPauseState(boolean currentlyPlaying, boolean showButton) {
+        // Grrr, it seems that there's no way for a nested view in a notification to receive clicks:
+        // http://stackoverflow.com/questions/2826786/pendingintents-in-notifications
+        // http://groups.google.com/group/android-developers/browse_thread/thread/dd1f2709e4c77d92
+        // http://groups.google.com/group/android-developers/browse_thread/thread/75b6d9d50b4f4986
+        if (showButton && false) {  // TODO: Enable this if the above is fixed.
+            mNotification.contentView.setTextViewText(
+                R.id.pause_button, getString(currentlyPlaying ? R.string.pause : R.string.play));
+            mNotification.contentView.setViewVisibility(R.id.pause_button, View.VISIBLE);
+        } else {
+            mNotification.contentView.setViewVisibility(R.id.pause_button, View.GONE);
+        }
         mNotificationManager.notify(NOTIFICATION_ID, mNotification);
     }
 
@@ -431,7 +441,7 @@ public class NupService extends Service
         mCache.pinSongId(song.getSongId());
 
         fetchCoverForSongIfMissing(song);
-        updateNotification(song.getArtist(), song.getTitle(), 0, song.getLengthSec());
+        updateNotificationText(song.getArtist(), song.getTitle());
 
         if (mSongListener != null)
             mSongListener.onSongChange(song, mCurrentSongIndex);
@@ -491,6 +501,7 @@ public class NupService extends Service
             @Override
             public void run() {
                 mPlaybackComplete = true;
+                updateNotificationPauseState(false, false);
                 if (mCurrentSongIndex < mSongs.size() - 1)
                     playSongAtIndex(mCurrentSongIndex + 1);
             }
@@ -509,12 +520,6 @@ public class NupService extends Service
                 Song song = getCurrentSong();
                 if (mSongListener != null)
                     mSongListener.onSongPositionChange(song, positionMs, durationMs);
-
-                // TODO: Ideally the notification would also include the current played duration,
-                // but the emulator lags horribly when I update the notification here, even when it's
-                // rate-limited to only once per second.
-                //if ((int) (positionMs / 1000) != (int) (mCurrentSongLastPositionMs / 1000))
-                //    updateNotificationTime(positionMs / 1000, Math.max(durationMs / 1000, song.getLengthSec()));
 
                 if (positionMs > mCurrentSongLastPositionMs &&
                     positionMs <= mCurrentSongLastPositionMs + MAX_POSITION_REPORT_MS) {
@@ -535,6 +540,7 @@ public class NupService extends Service
     @Override
     public void onPauseStateChange(boolean paused) {
         mPaused = paused;
+        updateNotificationPauseState(!mPaused, true);
         if (mSongListener != null)
             mSongListener.onPauseStateChange(paused);
     }
@@ -749,6 +755,7 @@ public class NupService extends Service
         mCurrentSongPath = entry.getLocalFile(this).getPath();
         mPlayer.playFile(mCurrentSongPath);
         mCurrentSongStartDate = new Date();
+        updateNotificationPauseState(true, true);
     }
 
     // Try to download the next not-yet-downloaded song in the playlist.
