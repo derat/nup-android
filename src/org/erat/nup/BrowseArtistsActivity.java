@@ -129,18 +129,17 @@ public class BrowseArtistsActivity extends ListActivity
     // Implements NupService.SongDatabaseUpdateListener.
     @Override
     public void onSongDatabaseUpdate() {
+        if (!NupActivity.getService().getSongDb().getAggregateDataLoaded()) {
+            mArtists.add(getString(R.string.loading));
+            mAdapter.setEnabled(false);
+            mAdapter.notifyDataSetChanged();
+            return;
+        }
+
         if (!mOnlyCached) {
             updateArtists(NupActivity.getService().getSongDb().getArtistsSortedAlphabetically());
         } else {
             new AsyncTask<Void, Void, List<String>>() {
-                @Override
-                protected void onPreExecute() {
-                    if (mArtists.isEmpty()) {
-                        mArtists.add(getString(R.string.loading));
-                        mAdapter.setEnabled(false);
-                        mAdapter.notifyDataSetChanged();
-                    }
-                }
                 @Override
                 protected List<String> doInBackground(Void... args) {
                     return NupActivity.getService().getSongDb().getCachedArtistsSortedAlphabetically();

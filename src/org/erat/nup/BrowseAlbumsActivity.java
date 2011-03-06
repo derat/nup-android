@@ -132,6 +132,13 @@ public class BrowseAlbumsActivity extends ListActivity
     // Implements NupService.SongDatabaseUpdateListener.
     @Override
     public void onSongDatabaseUpdate() {
+        if (!NupActivity.getService().getSongDb().getAggregateDataLoaded()) {
+            mAlbums.add(getString(R.string.loading));
+            mAdapter.setEnabled(false);
+            mAdapter.notifyDataSetChanged();
+            return;
+        }
+
         if (!mOnlyCached) {
             updateAlbums(
                 (mArtist != null) ?
@@ -139,14 +146,6 @@ public class BrowseAlbumsActivity extends ListActivity
                 NupActivity.getService().getSongDb().getAlbumsSortedAlphabetically());
         } else {
             new AsyncTask<Void, Void, List<String>>() {
-                @Override
-                protected void onPreExecute() {
-                    if (mAlbums.isEmpty()) {
-                        mAlbums.add(getString(R.string.loading));
-                        mAdapter.setEnabled(false);
-                        mAdapter.notifyDataSetChanged();
-                    }
-                }
                 @Override
                 protected List<String> doInBackground(Void... args) {
                     return (mArtist != null) ?
