@@ -171,9 +171,15 @@ class FileCacheDatabase {
     }
 
     public synchronized void updateLastAccessTime(int songId) {
+        FileCacheEntry entry = mEntries.get(songId);
+        if (entry == null)
+            return;
+
+        int now = (int) (new Date().getTime() / 1000);
+        entry.setLastAccessTime(now);
         mUpdater.postUpdate(
             "UPDATE CacheEntries SET LastAccessTime = ? WHERE SongId = ?",
-            new Object[]{ (int) (new Date().getTime() / 1000), songId });
+            new Object[]{ now, songId });
     }
 
     public synchronized List<Integer> getSongIdsByAge() {

@@ -756,6 +756,7 @@ public class NupService extends Service
         mCurrentSongPath = entry.getLocalFile(this).getPath();
         mPlayer.playFile(mCurrentSongPath);
         mCurrentSongStartDate = new Date();
+        mCache.updateLastAccessTime(entry.getSongId());
         updateNotificationPauseState(true, true);
     }
 
