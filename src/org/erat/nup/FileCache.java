@@ -145,7 +145,10 @@ class FileCache implements Runnable {
     // Returns null if the URL isn't cached.
     public FileCacheEntry getEntry(int songId) {
         waitUntilReady();
-        return mDb.getEntry(songId);
+        FileCacheEntry entry = mDb.getEntry(songId);
+        if (entry != null)
+            mDb.updateLastAccessTime(songId);
+        return entry;
     }
 
     public List<FileCacheEntry> getAllFullyCachedEntries() {
