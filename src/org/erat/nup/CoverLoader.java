@@ -223,11 +223,14 @@ class CoverLoader {
 
     // Get the default file that we'd look for for a given artist and album.
     private String getDefaultFilename(String artist, String album) {
+        artist = artist.replace("/", "%");
+        album = album.replace("/", "%");
         return Util.escapeFilename(artist + "-" + album + ".jpg");
     }
 
     // Get the file suffix that we'd look for for a given album.
     private String getFilenameSuffixForAlbum(String album) {
+        album = album.replace("/", "%");
         return Util.escapeFilename("-" + album + ".jpg");
     }
 }
