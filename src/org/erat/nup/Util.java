@@ -19,6 +19,8 @@ import java.util.HashMap;
 import java.util.List;
 
 class Util {
+    private static final String TRUNCATION_STRING = "...";
+
     // Yay.
     public static String getStringFromInputStream(InputStream stream) throws IOException {
         StringBuilder sb = new StringBuilder();
@@ -40,11 +42,22 @@ class Util {
         return formatDurationString(curSec) + " / " + formatDurationString(totalSec);
     }
 
+    // Truncate a string.
+    public static String truncateString(String str, int maxLength) {
+        if (str.length() <= maxLength)
+            return str;
+        if (maxLength <= TRUNCATION_STRING.length())
+            throw new RuntimeException("unable to truncate string to just " + maxLength + " char(s)");
+        return str.substring(0, maxLength - TRUNCATION_STRING.length()) + TRUNCATION_STRING;
+    }
+
     // Work around bad design decisions made 35 years ago.
-    public static String escapeFilename(String str) {
+    //
+    // Unicode support in filenames is a mess on Android.  Filenames are silently converted to UTF-8
+    // bytes before being written.  On FAT filesystems, hilarity ensues.  Just URL-escape everything instead.
+    public static String escapeStringForFilename(String str) {
         // Uri: "Leaves letters (A-Z, a-z), numbers (0-9), and unreserved characters (_-!.~'()*) intact."
         // FAT: permits letters, numbers, spaces, and these characters: ! # $ % & ' ( ) - @ ^ _ ` { } ~
-        str = str.trim();
         str = Uri.encode(str, " #$&@^`{}");
         str = str.replace("*", "%2A");
         return str;

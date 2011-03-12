@@ -26,6 +26,8 @@ class CoverLoader {
     // Size of buffer used to write data to disk, in bytes.
     private static final int BUFFER_SIZE = 8 * 1024;
 
+    private static final int MAX_ARTIST_OR_ALBUM_LENGTH_FOR_FILENAME = 64;
+
     // Application context.
     private final Context mContext;
 
@@ -130,14 +132,11 @@ class CoverLoader {
         if (remoteFilename == null || remoteFilename.isEmpty())
             return null;
 
-        String filename = Util.escapeFilename(remoteFilename);
-        if (!filename.endsWith(getFilenameSuffixForAlbum(album)))
-            Log.w(TAG, "got unexpected cover filename " + filename + " for album " + album);
-
-        startLoad(filename);
+        String localFilename = getDefaultFilename(artist, album);
+        startLoad(localFilename);
 
         boolean success = false;
-        File file = new File(mCoverDir, filename);
+        File file = new File(mCoverDir, localFilename);
         FileOutputStream outputStream = null;
         DownloadRequest request = null;
         DownloadResult result = null;
@@ -183,7 +182,7 @@ class CoverLoader {
             if (!success && file.exists())
                 file.delete();
 
-            finishLoad(filename);
+            finishLoad(localFilename);
         }
 
         return success ? file : null;
@@ -223,14 +222,14 @@ class CoverLoader {
 
     // Get the default file that we'd look for for a given artist and album.
     private String getDefaultFilename(String artist, String album) {
-        artist = artist.replace("/", "%");
-        album = album.replace("/", "%");
-        return Util.escapeFilename(artist + "-" + album + ".jpg");
+        artist = Util.truncateString(Util.escapeStringForFilename(artist), MAX_ARTIST_OR_ALBUM_LENGTH_FOR_FILENAME);
+        album = Util.truncateString(Util.escapeStringForFilename(album), MAX_ARTIST_OR_ALBUM_LENGTH_FOR_FILENAME);
+        return artist + "-" + album + ".jpg";
     }
 
     // Get the file suffix that we'd look for for a given album.
     private String getFilenameSuffixForAlbum(String album) {
-        album = album.replace("/", "%");
-        return Util.escapeFilename("-" + album + ".jpg");
+        album = Util.truncateString(Util.escapeStringForFilename(album), MAX_ARTIST_OR_ALBUM_LENGTH_FOR_FILENAME);
+        return "-" + album + ".jpg";
     }
 }
