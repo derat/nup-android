@@ -9,7 +9,8 @@ import android.os.Looper;
 
 class DatabaseUpdater implements Runnable {
     private final SQLiteDatabase mDb;
-    private Handler mHandler;
+    private Handler mHandler = null;
+    private boolean mShouldQuit = false;
 
     DatabaseUpdater(SQLiteDatabase db) {
         mDb = db;
@@ -18,11 +19,22 @@ class DatabaseUpdater implements Runnable {
     @Override
     public void run() {
         Looper.prepare();
-        mHandler = new Handler();
+        synchronized (this) {
+            if (mShouldQuit)
+                return;
+            mHandler = new Handler();
+        }
         Looper.loop();
     }
 
     public void quit() {
+        synchronized (this) {
+            // The thread hasn't started looping yet; tell it to exit before starting.
+            if (mHandler == null) {
+                mShouldQuit = true;
+                return;
+            }
+        }
         mHandler.post(new Runnable() {
             @Override
             public void run() {
