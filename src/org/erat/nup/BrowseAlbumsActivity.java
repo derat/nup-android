@@ -52,7 +52,6 @@ public class BrowseAlbumsActivity extends ListActivity
 
         mAdapter = new SortedStringArrayAdapter(this, R.layout.browse_row, mAlbums);
         setListAdapter(mAdapter);
-        getListView().setFastScrollEnabled(true);
         registerForContextMenu(getListView());
 
         NupActivity.getService().addSongDatabaseUpdateListener(this);
@@ -162,10 +161,14 @@ public class BrowseAlbumsActivity extends ListActivity
 
     // Show a new list of albums.
     private void updateAlbums(List<String> albums) {
+        final ListView listView = getListView();
         mAlbums.clear();
         mAlbums.addAll(albums);
+        listView.setFastScrollEnabled(false);
         mAdapter.setEnabled(true);
         mAdapter.notifyDataSetChanged();
+        listView.setFastScrollEnabled(true);
+        Util.resizeListViewToFixFastScroll(listView);
     }
 
     // Launch BrowseSongsActivity for a given album.

@@ -10,6 +10,8 @@ import java.util.List;
 
 class SortedStringArrayAdapter extends ArrayAdapter<String>
                                implements SectionIndexer {
+    private static final String TAG = "SortedStringArrayAdapter";
+
     private List<String> mItems;
 
     // Are all items in the list enabled?  If false, all are disabled.
@@ -27,14 +29,7 @@ class SortedStringArrayAdapter extends ArrayAdapter<String>
                              int textViewResourceId,
                              List<String> items) {
         super(context, textViewResourceId, items);
-
         mItems = items;
-
-        mSections.add(NUMBER_SECTION);
-        for (char ch = 'A'; ch <= 'Z'; ++ch)
-            mSections.add(Character.toString(ch));
-        mSections.add(OTHER_SECTION);
-
         initSections();
     }
 
@@ -80,23 +75,29 @@ class SortedStringArrayAdapter extends ArrayAdapter<String>
     }
 
     private void initSections() {
-        mSectionStartingPositions.clear();
-        mSectionStartingPositions.add(0);
+        // Create a list of all possible sections in the order in which they'd appear.
+        ArrayList<String> sections = new ArrayList<String>();
+        sections.add(NUMBER_SECTION);
+        for (char ch = 'A'; ch <= 'Z'; ++ch)
+            sections.add(Character.toString(ch));
+        sections.add(OTHER_SECTION);
 
-        int currentSection = 0;
-        for (int i = 0; i < mItems.size(); ++i) {
-            String item = mItems.get(i);
+        mSections.clear();
+        mSectionStartingPositions.clear();
+
+        int sectionIndex = -1;
+        for (int itemIndex = 0; itemIndex < mItems.size(); ++itemIndex) {
+            String item = mItems.get(itemIndex);
             String sectionName = getSectionNameForString(item);
 
-            if (sectionName.equals(mSections.get(currentSection)))
-                continue;
+            int prevSectionIndex = sectionIndex;
+            while (sectionIndex == -1 || !sectionName.equals(sections.get(sectionIndex)))
+                sectionIndex++;
 
-            for (currentSection = currentSection + 1;
-                 currentSection < mSections.size();
-                 currentSection++) {
-                mSectionStartingPositions.add(i);
-                if (sectionName.equals(mSections.get(currentSection)))
-                    break;
+            // If we advanced to a new section, register it.
+            if (sectionIndex != prevSectionIndex) {
+                mSections.add(sections.get(sectionIndex));
+                mSectionStartingPositions.add(itemIndex);
             }
         }
     }

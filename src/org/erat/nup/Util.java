@@ -7,6 +7,8 @@ import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
+import android.widget.ListView;
+import android.widget.FrameLayout;
 
 import java.io.BufferedReader;
 import java.io.InputStream;
@@ -114,5 +116,22 @@ class Util {
         ConnectivityManager manager = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
         NetworkInfo info = manager.getActiveNetworkInfo();
         return (info != null && info.isAvailable());
+    }
+
+    // ListView is stupid and can't handle a SectionIndexer's sections getting updated:
+    // http://code.google.com/p/android/issues/detail?id=9054
+    // http://stackoverflow.com/questions/2912082/section-indexer-overlay-is-not-updating-as-the-adapters-data-changes
+    //
+    // One workaround is calling setFastScrollEnabled(false), calling notifyDataSetChanged(),
+    // calling setFastScrollEnabled(true), and then calling this method to force a resize of the
+    // ListView (otherwise, the section indicator is drawn in the top-left corner of the view
+    // instead of being centered over it).
+    //
+    // TODO: Switch to something that doesn't shrink the size of the ListView every time it's called.
+    public static void resizeListViewToFixFastScroll(ListView view) {
+        FrameLayout.LayoutParams layoutParams =
+            new FrameLayout.LayoutParams(
+                view.getWidth() - 1, FrameLayout.LayoutParams.FILL_PARENT);
+        view.setLayoutParams(layoutParams);
     }
 }

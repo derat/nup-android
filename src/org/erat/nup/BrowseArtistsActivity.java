@@ -45,7 +45,6 @@ public class BrowseArtistsActivity extends ListActivity
 
         mAdapter = new SortedStringArrayAdapter(this, R.layout.browse_row, mArtists);
         setListAdapter(mAdapter);
-        getListView().setFastScrollEnabled(true);
         registerForContextMenu(getListView());
 
         NupActivity.getService().addSongDatabaseUpdateListener(this);
@@ -154,10 +153,14 @@ public class BrowseArtistsActivity extends ListActivity
 
     // Show a new list of artists.
     private void updateArtists(List<String> artists) {
+        final ListView listView = getListView();
         mArtists.clear();
         mArtists.addAll(artists);
+        listView.setFastScrollEnabled(false);
         mAdapter.setEnabled(true);
         mAdapter.notifyDataSetChanged();
+        listView.setFastScrollEnabled(true);
+        Util.resizeListViewToFixFastScroll(listView);
     }
 
     // Launch BrowseAlbumsActivity for a given artist.
