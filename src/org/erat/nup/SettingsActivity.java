@@ -129,7 +129,7 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
     // -1 is returned if the string can't be parsed.
     private int parseNonNegativeInt(String strValue) {
         try {
-            return Integer.parseInt((String) strValue);
+            return Integer.parseInt(strValue);
         } catch (NumberFormatException e) {
             return -1;
         }
