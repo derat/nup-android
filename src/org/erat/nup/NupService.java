@@ -118,6 +118,9 @@ public class NupService extends Service
     // Are we currently waiting for a file to be downloaded before we can play it?
     private boolean mWaitingForDownload = false;
 
+    // Have we temporarily been told to download all queued songs?
+    private boolean mShouldDownloadAll = false;
+
     private NotificationManager mNotificationManager;
     private Notification mNotification;
 
@@ -265,6 +268,15 @@ public class NupService extends Service
     }
     public void removeSongDatabaseUpdateListener(SongDatabaseUpdateListener listener) {
         mSongDatabaseUpdateListeners.remove(listener);
+    }
+
+    public boolean getShouldDownloadAll() { return mShouldDownloadAll; }
+    public void setShouldDownloadAll(boolean downloadAll) {
+        if (downloadAll == mShouldDownloadAll)
+            return;
+        mShouldDownloadAll = downloadAll;
+        if (!mSongs.isEmpty() && downloadAll && mDownloadSongId == -1)
+            maybeDownloadAnotherSong(mCurrentSongIndex >= 0 ? mCurrentSongIndex : 0);
     }
 
     // Unregister an object that might be registered as one or more of our listeners.
@@ -771,7 +783,7 @@ public class NupService extends Service
             mPrefs.getString(NupPreferences.SONGS_TO_PRELOAD,
                              NupPreferences.SONGS_TO_PRELOAD_DEFAULT));
 
-        for (; index < mSongs.size() && index - mCurrentSongIndex <= songsToPreload; index++) {
+        for (; index < mSongs.size() && (mShouldDownloadAll || index - mCurrentSongIndex <= songsToPreload); index++) {
             Song song = mSongs.get(index);
             FileCacheEntry entry = mCache.getEntry(song.getSongId());
             if (entry != null && entry.isFullyCached()) {

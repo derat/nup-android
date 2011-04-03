@@ -299,10 +299,22 @@ public class NupActivity extends Activity
     }
 
     @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+        MenuItem item = menu.findItem(R.id.download_all_menu_item);
+        final boolean downloadAll = mService.getShouldDownloadAll();
+        item.setTitle(downloadAll ? R.string.dont_download_all : R.string.download_all);
+        item.setIcon(downloadAll ? R.drawable.ic_menu_stop : android.R.drawable.ic_menu_save);
+        return true;
+    }
+
+    @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
         case R.id.search_menu_item:
             startActivity(new Intent(this, SearchFormActivity.class));
+            return true;
+        case R.id.download_all_menu_item:
+            mService.setShouldDownloadAll(!mService.getShouldDownloadAll());
             return true;
         case R.id.settings_menu_item:
             startActivity(new Intent(this, SettingsActivity.class));
