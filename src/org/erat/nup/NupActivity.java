@@ -84,7 +84,20 @@ public class NupActivity extends Activity
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        //StrictMode.enableDefaults();
+        // TODO: Add penaltyDeathOnNetwork() after switching to updated API.
+        StrictMode.setThreadPolicy(
+            new StrictMode.ThreadPolicy.Builder()
+                .detectDiskReads()
+                .detectDiskWrites()
+                .detectNetwork()
+                .penaltyLog()
+                .build());
+        StrictMode.setVmPolicy(
+            new StrictMode.VmPolicy.Builder()
+                .detectAll()
+                .penaltyLog()
+                .penaltyDeath()
+                .build());
         super.onCreate(savedInstanceState);
 
         Log.d(TAG, "activity created");
