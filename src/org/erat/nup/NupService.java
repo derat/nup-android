@@ -208,6 +208,7 @@ public class NupService extends Service
 
         mPlayer = new Player(this);
         mPlayerThread = new Thread(mPlayer, "Player");
+        mPlayerThread.setPriority(Thread.MAX_PRIORITY);
         mPlayerThread.start();
 
         mCache = new FileCache(this, this);
