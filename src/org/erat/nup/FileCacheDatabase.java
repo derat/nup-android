@@ -34,6 +34,8 @@ class FileCacheDatabase {
 
     private final SQLiteOpenHelper mOpener;
 
+    private SQLiteDatabase mDb;
+
     // Map from an entry's song ID to the entry itself.
     private final HashMap<Integer,FileCacheEntry> mEntries = new HashMap<Integer,FileCacheEntry>();
 
@@ -103,17 +105,17 @@ class FileCacheDatabase {
             }
         };
 
+        mDb = mOpener.getWritableDatabase();
+
         // Block until we've loaded everything into memory.
         loadExistingEntries(context);
-
-        mUpdater = new DatabaseUpdater(mOpener.getWritableDatabase());
+        mUpdater = new DatabaseUpdater(mDb);
         mUpdaterThread = new Thread(mUpdater, "FileCacheDatabase.DatabaseUpdater");
         mUpdaterThread.start();
     }
 
     private synchronized void loadExistingEntries(Context context) {
-        Cursor cursor = mOpener.getReadableDatabase().rawQuery(
-            "SELECT SongId, TotalBytes, LastAccessTime FROM CacheEntries", null);
+        Cursor cursor = mDb.rawQuery("SELECT SongId, TotalBytes, LastAccessTime FROM CacheEntries", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
             FileCacheEntry entry =
