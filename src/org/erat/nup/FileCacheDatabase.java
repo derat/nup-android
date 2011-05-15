@@ -32,7 +32,6 @@ class FileCacheDatabase {
         "  ETag VARCHAR(40) NOT NULL DEFAULT '', " +
         "  LastAccessTime INTEGER NOT NULL)";
 
-    private final SQLiteOpenHelper mOpenHelper;
     private final DatabaseOpener mOpener;
 
     // Map from an entry's song ID to the entry itself.
@@ -43,7 +42,7 @@ class FileCacheDatabase {
     private final Thread mUpdaterThread;
 
     public FileCacheDatabase(Context context) {
-        mOpenHelper = new SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+        SQLiteOpenHelper helper = new SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
             @Override
             public void onCreate(SQLiteDatabase db) {
                 db.execSQL(CREATE_CACHE_ENTRIES_SQL);
@@ -103,8 +102,7 @@ class FileCacheDatabase {
                 }
             }
         };
-
-        mOpener = new DatabaseOpener(mOpenHelper);
+        mOpener = new DatabaseOpener(context, DATABASE_NAME, helper);
 
         // Block until we've loaded everything into memory.
         loadExistingEntries(context);

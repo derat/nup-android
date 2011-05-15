@@ -89,7 +89,6 @@ class SongDatabase {
 
     private final Context mContext;
 
-    private final SQLiteOpenHelper mOpenHelper;
     private final DatabaseOpener mOpener;
 
     // Update the database in a background thread.
@@ -123,7 +122,8 @@ class SongDatabase {
         mContext = context;
         mListener = listener;
         mCache = cache;
-        mOpenHelper = new SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+
+        SQLiteOpenHelper helper = new SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
             @Override
             public void onCreate(SQLiteDatabase db) {
                 db.execSQL(CREATE_SONGS_SQL);
@@ -245,8 +245,7 @@ class SongDatabase {
                 }
             }
         };
-
-        mOpener = new DatabaseOpener(mOpenHelper);
+        mOpener = new DatabaseOpener(mContext, DATABASE_NAME, helper);
 
         // Get some info from the database in a background thread.
         new AsyncTask<Void, Void, Void>() {

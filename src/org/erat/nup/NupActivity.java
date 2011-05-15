@@ -92,12 +92,14 @@ public class NupActivity extends Activity
                 .detectNetwork()
                 .penaltyLog()
                 .build());
+
         StrictMode.setVmPolicy(
             new StrictMode.VmPolicy.Builder()
                 .detectAll()
                 .penaltyLog()
                 .penaltyDeath()
                 .build());
+
         super.onCreate(savedInstanceState);
 
         Log.d(TAG, "activity created");
