@@ -3,17 +3,16 @@
 
 package org.erat.nup;
 
-import android.database.sqlite.SQLiteDatabase;
 import android.os.Handler;
 import android.os.Looper;
 
 class DatabaseUpdater implements Runnable {
-    private final SQLiteDatabase mDb;
+    private final DatabaseOpener mOpener;
     private Handler mHandler = null;
     private boolean mShouldQuit = false;
 
-    DatabaseUpdater(SQLiteDatabase db) {
-        mDb = db;
+    DatabaseUpdater(DatabaseOpener opener) {
+        mOpener = opener;
     }
 
     @Override
@@ -47,7 +46,7 @@ class DatabaseUpdater implements Runnable {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
-                mDb.execSQL(sql, values);
+                mOpener.getDb().execSQL(sql, values);
             }
         });
     }

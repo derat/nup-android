@@ -32,9 +32,8 @@ class FileCacheDatabase {
         "  ETag VARCHAR(40) NOT NULL DEFAULT '', " +
         "  LastAccessTime INTEGER NOT NULL)";
 
-    private final SQLiteOpenHelper mOpener;
-
-    private SQLiteDatabase mDb;
+    private final SQLiteOpenHelper mOpenHelper;
+    private final DatabaseOpener mOpener;
 
     // Map from an entry's song ID to the entry itself.
     private final HashMap<Integer,FileCacheEntry> mEntries = new HashMap<Integer,FileCacheEntry>();
@@ -44,7 +43,7 @@ class FileCacheDatabase {
     private final Thread mUpdaterThread;
 
     public FileCacheDatabase(Context context) {
-        mOpener = new SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
+        mOpenHelper = new SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
             @Override
             public void onCreate(SQLiteDatabase db) {
                 db.execSQL(CREATE_CACHE_ENTRIES_SQL);
@@ -105,29 +104,28 @@ class FileCacheDatabase {
             }
         };
 
-        mDb = mOpener.getWritableDatabase();
+        mOpener = new DatabaseOpener(mOpenHelper);
 
         // Block until we've loaded everything into memory.
         loadExistingEntries(context);
-        mUpdater = new DatabaseUpdater(mDb);
+        mUpdater = new DatabaseUpdater(mOpener);
         mUpdaterThread = new Thread(mUpdater, "FileCacheDatabase.DatabaseUpdater");
         mUpdaterThread.start();
     }
 
     private synchronized void loadExistingEntries(Context context) {
-        Cursor cursor = mDb.rawQuery("SELECT SongId, TotalBytes, LastAccessTime FROM CacheEntries", null);
+        Log.d(TAG, "loading cache entries");
+        Cursor cursor = mOpener.getDb().rawQuery("SELECT SongId, TotalBytes, LastAccessTime FROM CacheEntries", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
             FileCacheEntry entry =
                 new FileCacheEntry(cursor.getInt(0), cursor.getLong(1), cursor.getInt(2));
             File file = entry.getLocalFile(context);
             entry.setCachedBytes(file.exists() ? file.length() : 0);
-            Log.d(TAG, "loaded " + file.getName() + " for song " + entry.getSongId() +
-                  ": " + entry.getCachedBytes() + "/" + entry.getTotalBytes());
-
             mEntries.put(entry.getSongId(), entry);
             cursor.moveToNext();
         }
+        Log.d(TAG, "finished loading " + mEntries.size() + " cache entries");
         cursor.close();
     }
 
