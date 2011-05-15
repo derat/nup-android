@@ -3,6 +3,7 @@
 
 package org.erat.nup;
 
+import android.database.sqlite.SQLiteDatabase;
 import android.os.Handler;
 import android.os.Looper;
 

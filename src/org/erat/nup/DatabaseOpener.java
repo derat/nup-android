@@ -8,7 +8,7 @@ import android.database.sqlite.SQLiteException;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
 
-// This is a simpler wrapper around a SQLiteOpenHelper that caches a writable[1] database, repeatedly trying to open it
+// This is a simpler wrapper around a SQLiteOpenHelper that returns a writable[1] database, repeatedly trying to open it
 // on error[2].
 //
 // 1. Using SQLiteOpenHelper.getReadableDatabase() seems like a disaster for a multithreaded program; the database
@@ -19,20 +19,19 @@ class DatabaseOpener {
     private static final String TAG = "DatabaseOpener";
 
     private final SQLiteOpenHelper mOpenHelper;
-    private SQLiteDatabase mDb = null;
 
     public DatabaseOpener(SQLiteOpenHelper helper) {
         mOpenHelper = helper;
     }
 
+    // Returns a writable handle.  Do not call close on it(); it will be shared with subsequent callers.
     public synchronized SQLiteDatabase getDb() {
-        while (mDb == null) {
+        while (true) {
             try {
-                mDb = mOpenHelper.getWritableDatabase();
+                return mOpenHelper.getWritableDatabase();
             } catch (SQLiteException e) {
                 Log.e(TAG, "got exception while trying to open database: " + e);
             }
         }
-        return mDb;
     }
 }
