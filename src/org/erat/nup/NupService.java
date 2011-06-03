@@ -7,10 +7,14 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
+import android.content.BroadcastReceiver;
+import android.content.Context;
 import android.content.Intent;
+import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.media.AudioManager;
 import android.os.AsyncTask;
 import android.os.Binder;
 import android.os.Handler;
@@ -162,6 +166,7 @@ public class NupService extends Service
     // Used to run tasks on our thread.
     private Handler mHandler = new Handler();
 
+    private AudioManager mAudioManager;
     private TelephonyManager mTelephonyManager;
 
     private SharedPreferences mPrefs;
@@ -174,6 +179,40 @@ public class NupService extends Service
             if (state == TelephonyManager.CALL_STATE_RINGING) {
                 mPlayer.pause();
                 Toast.makeText(NupService.this, "Paused for incoming call.", Toast.LENGTH_SHORT).show();
+            }
+        }
+    };
+
+    private BroadcastReceiver mHeadsetPlugReceiver = new BroadcastReceiver() {
+        @Override
+        public void onReceive(Context context, Intent intent) {
+            if (intent.getIntExtra("state", 0) == 0 && mCurrentSongIndex >= 0 && !mPaused) {
+                mPlayer.pause();
+                Toast.makeText(NupService.this, "Paused since unplugged.", Toast.LENGTH_SHORT).show();
+            }
+        }
+    };
+
+    private AudioManager.OnAudioFocusChangeListener mAudioFocusListener = new AudioManager.OnAudioFocusChangeListener() {
+        @Override
+        public void onAudioFocusChange(int focusChange) {
+            // TODO: Actually do something in response to focus changes.
+            switch (focusChange) {
+            case AudioManager.AUDIOFOCUS_GAIN:
+                Log.d(TAG, "audio focus gain");
+                break;
+            case AudioManager.AUDIOFOCUS_LOSS:
+                Log.d(TAG, "audio focus loss");
+                break;
+            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
+                Log.d(TAG, "audio focus loss transient");
+                break;
+            case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
+                Log.d(TAG, "audio focus loss transient can duck");
+                break;
+            default:
+                Log.d(TAG, "audio focus " + focusChange);
+                break;
             }
         }
     };
@@ -201,10 +240,16 @@ public class NupService extends Service
 
         startForeground(NOTIFICATION_ID, mNotification);
 
-        mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
+        mAudioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
+        int result = mAudioManager.requestAudioFocus(mAudioFocusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
+        Log.d(TAG, "requested audio focus; got " + result);
 
         mTelephonyManager = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
         mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
+
+        registerReceiver(mHeadsetPlugReceiver, new IntentFilter(Intent.ACTION_HEADSET_PLUG));
+
+        mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
 
         mPlayer = new Player(this);
         mPlayerThread = new Thread(mPlayer, "Player");
@@ -224,7 +269,9 @@ public class NupService extends Service
     public void onDestroy() {
         Log.d(TAG, "service destroyed");
         mNotificationManager.cancel(NOTIFICATION_ID);
+        mAudioManager.abandonAudioFocus(mAudioFocusListener);
         mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_NONE);
+        unregisterReceiver(mHeadsetPlugReceiver);
 
         mSongDb.quit();
         mPlayer.quit();
