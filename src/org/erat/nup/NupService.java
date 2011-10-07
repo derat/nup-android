@@ -41,7 +41,9 @@ public class NupService extends Service
     private static final String TAG = "NupService";
 
     // Identifier used for our "currently playing" notification.
-    private static final int NOTIFICATION_ID = 0;
+    // Note: Using 0 makes the service not run in the foreground and the notification not show up.  Yay, that was fun to
+    // figure out.
+    private static final int NOTIFICATION_ID = 1;
 
     // Don't start playing a song until we have at least this many bytes of it.
     private static final long MIN_BYTES_BEFORE_PLAYING = 128 * 1024;
@@ -225,20 +227,12 @@ public class NupService extends Service
         Log.d(TAG, "service created");
         CrashLogger.register(new File(getExternalFilesDir(null), CRASH_SUBDIRECTORY));
 
-        mNotificationManager = (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
         mNotification = new Notification(R.drawable.status, getString(R.string.startup_message), System.currentTimeMillis());
         mNotification.flags |= (Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR);
         mNotification.contentView = new RemoteViews(getPackageName(), R.layout.notification);
+        mNotification.contentView.setViewVisibility(R.id.pause_button, View.GONE);  // TODO: update this if it ever works
         mNotification.contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0);
-        updateNotificationText(getString(R.string.app_name), getString(R.string.startup_message));
-        updateNotificationPauseState(false, false);
-
-        Intent pauseIntent = new Intent(this, NupService.class);
-        pauseIntent.setAction(ACTION_TOGGLE_PAUSE);
-        mNotification.contentView.setOnClickPendingIntent(
-            R.id.pause_button, PendingIntent.getService(this, 0, pauseIntent, 0));
-
-        startForeground(NOTIFICATION_ID, mNotification);
+        updateNotification(getString(R.string.app_name), getString(R.string.startup_message));
 
         mAudioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
         int result = mAudioManager.requestAudioFocus(mAudioFocusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
@@ -342,25 +336,10 @@ public class NupService extends Service
     }
 
     // Update the notification text.
-    private void updateNotificationText(String line_1, String line_2) {
-        mNotification.contentView.setTextViewText(R.id.line_1, line_1);
-        mNotification.contentView.setTextViewText(R.id.line_2, line_2);
-        mNotificationManager.notify(NOTIFICATION_ID, mNotification);
-    }
-
-    private void updateNotificationPauseState(boolean currentlyPlaying, boolean showButton) {
-        // Grrr, it seems that there's no way for a nested view in a notification to receive clicks:
-        // http://stackoverflow.com/questions/2826786/pendingintents-in-notifications
-        // http://groups.google.com/group/android-developers/browse_thread/thread/dd1f2709e4c77d92
-        // http://groups.google.com/group/android-developers/browse_thread/thread/75b6d9d50b4f4986
-        if (showButton && false) {  // TODO: Enable this if the above is fixed.
-            mNotification.contentView.setTextViewText(
-                R.id.pause_button, getString(currentlyPlaying ? R.string.pause : R.string.play));
-            mNotification.contentView.setViewVisibility(R.id.pause_button, View.VISIBLE);
-        } else {
-            mNotification.contentView.setViewVisibility(R.id.pause_button, View.GONE);
-        }
-        mNotificationManager.notify(NOTIFICATION_ID, mNotification);
+    private void updateNotification(String line1, String line2) {
+        mNotification.contentView.setTextViewText(R.id.line_1, line1);
+        mNotification.contentView.setTextViewText(R.id.line_2, line2);
+        startForeground(NOTIFICATION_ID, mNotification);
     }
 
     // Toggle whether we're playing the current song or not.
@@ -431,7 +410,7 @@ public class NupService extends Service
         }
 
         if (removedPlaying) {
-            updateNotificationText(getString(R.string.app_name), getString(R.string.startup_message));
+            updateNotification(getString(R.string.app_name), getString(R.string.startup_message));
             if (mCurrentSongIndex < mSongs.size())
                 playSongAtIndex(mCurrentSongIndex);
             else
@@ -502,7 +481,7 @@ public class NupService extends Service
         mCache.pinSongId(song.getSongId());
 
         fetchCoverForSongIfMissing(song);
-        updateNotificationText(song.getArtist(), song.getTitle());
+        updateNotification(song.getArtist(), song.getTitle());
 
         if (mSongListener != null)
             mSongListener.onSongChange(song, mCurrentSongIndex);
@@ -562,7 +541,6 @@ public class NupService extends Service
             @Override
             public void run() {
                 mPlaybackComplete = true;
-                updateNotificationPauseState(false, false);
                 if (mCurrentSongIndex < mSongs.size() - 1)
                     playSongAtIndex(mCurrentSongIndex + 1);
             }
@@ -601,7 +579,6 @@ public class NupService extends Service
     @Override
     public void onPauseStateChange(boolean paused) {
         mPaused = paused;
-        updateNotificationPauseState(!mPaused, true);
         if (mSongListener != null)
             mSongListener.onPauseStateChange(paused);
     }
@@ -817,7 +794,6 @@ public class NupService extends Service
         mPlayer.playFile(mCurrentSongPath);
         mCurrentSongStartDate = new Date();
         mCache.updateLastAccessTime(entry.getSongId());
-        updateNotificationPauseState(true, true);
     }
 
     // Try to download the next not-yet-downloaded song in the playlist.
