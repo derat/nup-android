@@ -348,7 +348,8 @@ public class NupService extends Service
             R.id.line_2,
             song != null ? song.getTitle() : getString(R.string.startup_message));
 
-        if (song != null && !mPlaybackComplete) {
+        // FIXME: Reenable this if views within notifications are clickable in a later version of the API.
+        if (false && song != null && !mPlaybackComplete) {
             mNotification.contentView.setTextViewText(
                 R.id.pause_button,
                 getString(mPaused ? R.string.play : R.string.pause));
