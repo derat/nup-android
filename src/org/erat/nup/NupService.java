@@ -4,7 +4,6 @@
 package org.erat.nup;
 
 import android.app.Notification;
-import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.BroadcastReceiver;
@@ -127,7 +126,6 @@ public class NupService extends Service
     // Have we temporarily been told to download all queued songs?
     private boolean mShouldDownloadAll = false;
 
-    private NotificationManager mNotificationManager;
     private Notification mNotification;
 
     // Current playlist.
@@ -229,10 +227,15 @@ public class NupService extends Service
 
         mNotification = new Notification(R.drawable.status, getString(R.string.startup_message), System.currentTimeMillis());
         mNotification.flags |= (Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR);
-        mNotification.contentView = new RemoteViews(getPackageName(), R.layout.notification);
-        mNotification.contentView.setViewVisibility(R.id.pause_button, View.GONE);  // TODO: update this if it ever works
         mNotification.contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0);
-        updateNotification(getString(R.string.app_name), getString(R.string.startup_message));
+        mNotification.contentView = new RemoteViews(getPackageName(), R.layout.notification);
+
+        Intent pauseIntent = new Intent(this, NupService.class);
+        pauseIntent.setAction(ACTION_TOGGLE_PAUSE);
+        mNotification.contentView.setOnClickPendingIntent(
+            R.id.pause_button, PendingIntent.getService(this, 0, pauseIntent, 0));
+
+        updateNotification();
 
         mAudioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
         int result = mAudioManager.requestAudioFocus(mAudioFocusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
@@ -262,7 +265,6 @@ public class NupService extends Service
     @Override
     public void onDestroy() {
         Log.d(TAG, "service destroyed");
-        mNotificationManager.cancel(NOTIFICATION_ID);
         mAudioManager.abandonAudioFocus(mAudioFocusListener);
         mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_NONE);
         unregisterReceiver(mHeadsetPlugReceiver);
@@ -336,9 +338,25 @@ public class NupService extends Service
     }
 
     // Update the notification text.
-    private void updateNotification(String line1, String line2) {
-        mNotification.contentView.setTextViewText(R.id.line_1, line1);
-        mNotification.contentView.setTextViewText(R.id.line_2, line2);
+    private void updateNotification() {
+        final Song song = getCurrentSong();
+
+        mNotification.contentView.setTextViewText(
+            R.id.line_1,
+            song != null ? song.getArtist() : getString(R.string.app_name));
+        mNotification.contentView.setTextViewText(
+            R.id.line_2,
+            song != null ? song.getTitle() : getString(R.string.startup_message));
+
+        if (song != null && !mPlaybackComplete) {
+            mNotification.contentView.setTextViewText(
+                R.id.pause_button,
+                getString(mPaused ? R.string.play : R.string.pause));
+            mNotification.contentView.setViewVisibility(R.id.pause_button, View.VISIBLE);
+        } else {
+            mNotification.contentView.setViewVisibility(R.id.pause_button, View.GONE);
+        }
+
         startForeground(NOTIFICATION_ID, mNotification);
     }
 
@@ -410,7 +428,7 @@ public class NupService extends Service
         }
 
         if (removedPlaying) {
-            updateNotification(getString(R.string.app_name), getString(R.string.startup_message));
+            updateNotification();
             if (mCurrentSongIndex < mSongs.size())
                 playSongAtIndex(mCurrentSongIndex);
             else
@@ -481,7 +499,7 @@ public class NupService extends Service
         mCache.pinSongId(song.getSongId());
 
         fetchCoverForSongIfMissing(song);
-        updateNotification(song.getArtist(), song.getTitle());
+        updateNotification();
 
         if (mSongListener != null)
             mSongListener.onSongChange(song, mCurrentSongIndex);
@@ -541,6 +559,7 @@ public class NupService extends Service
             @Override
             public void run() {
                 mPlaybackComplete = true;
+                updateNotification();
                 if (mCurrentSongIndex < mSongs.size() - 1)
                     playSongAtIndex(mCurrentSongIndex + 1);
             }
@@ -579,6 +598,7 @@ public class NupService extends Service
     @Override
     public void onPauseStateChange(boolean paused) {
         mPaused = paused;
+        updateNotification();
         if (mSongListener != null)
             mSongListener.onPauseStateChange(paused);
     }
@@ -794,6 +814,7 @@ public class NupService extends Service
         mPlayer.playFile(mCurrentSongPath);
         mCurrentSongStartDate = new Date();
         mCache.updateLastAccessTime(entry.getSongId());
+        updateNotification();
     }
 
     // Try to download the next not-yet-downloaded song in the playlist.
