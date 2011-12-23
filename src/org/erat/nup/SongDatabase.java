@@ -136,6 +136,7 @@ class SongDatabase {
                 db.execSQL(CREATE_LAST_UPDATE_TIME_SQL);
                 db.execSQL(INSERT_LAST_UPDATE_TIME_SQL);
                 db.execSQL(CREATE_CACHED_SONGS_SQL);
+                db.execSQL(CREATE_PENDING_PLAYBACK_REPORTS_SQL);
             }
 
             @Override
