@@ -281,7 +281,7 @@ public class NupService extends Service
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "received start id " + startId + ": " + intent);
-        if (ACTION_TOGGLE_PAUSE.equals(intent.getAction()))
+        if (intent != null && intent.getAction() != null && ACTION_TOGGLE_PAUSE.equals(intent.getAction()))
             togglePause();
         return START_STICKY;
     }
