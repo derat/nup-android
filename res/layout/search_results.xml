@@ -16,6 +16,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="@string/append_all"
+        android:textSize="14dp"
         android:onClick="onAppendButtonClicked"
         />
     <Button
@@ -24,6 +25,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="@string/insert_all"
+        android:textSize="14dp"
         android:onClick="onInsertButtonClicked"
         />
     <Button
@@ -32,6 +34,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="@string/replace_all"
+        android:textSize="14dp"
         android:onClick="onReplaceButtonClicked"
         />
   </LinearLayout>

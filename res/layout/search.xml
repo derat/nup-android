@@ -62,6 +62,7 @@
             android:layout_weight="1"
             android:paddingLeft="42dp"
             android:text="@string/substring"
+            android:textSize="14dp"
             />
         <CheckBox
             android:id="@+id/shuffle_checkbox"
@@ -70,6 +71,7 @@
             android:layout_weight="1"
             android:paddingLeft="42dp"
             android:text="@string/shuffle"
+            android:textSize="14dp"
             />
         <CheckBox
             android:id="@+id/cached_checkbox"
@@ -78,6 +80,7 @@
             android:layout_weight="1"
             android:paddingLeft="42dp"
             android:text="@string/cached"
+            android:textSize="14dp"
             />
       </LinearLayout>
 

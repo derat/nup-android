@@ -19,7 +19,7 @@
       </intent-filter>
     </activity>
 
-    <activity android:name=".SearchResultsActivity">
+    <activity android:name=".SearchResultsActivity" android:theme="@android:style/Theme.Holo.NoActionBar">
       <intent-filter>
         <action android:name="android.intent.action.SEARCH" />
       </intent-filter>
@@ -34,8 +34,7 @@
     <activity android:name=".SearchFormActivity" android:theme="@android:style/Theme.Holo.NoActionBar" />
     <activity android:name=".SettingsActivity" android:theme="@android:style/Theme.Holo.NoActionBar" />
 
-    <meta-data android:name="android.app.default_searchable"
-        android:value=".SearchResultsActivity" />
+    <meta-data android:name="android.app.default_searchable" android:value=".SearchResultsActivity" />
   </application>
 
   <uses-sdk android:minSdkVersion="15" android:targetSdkVersion="15" />
