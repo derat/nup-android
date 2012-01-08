@@ -130,6 +130,7 @@ class FileCacheDatabase {
     public synchronized void quit() {
         mUpdater.quit();
         try { mUpdaterThread.join(); } catch (InterruptedException e) {}
+        mOpener.close();
     }
 
     public synchronized FileCacheEntry getEntry(int songId) {

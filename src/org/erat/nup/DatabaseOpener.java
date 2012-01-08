@@ -61,4 +61,12 @@ class DatabaseOpener {
 
         return mDb;
     }
+
+    // Closes the internal database.  Any previously-returned copies of it cannot be used afterwards.
+    public synchronized void close() {
+        if (mDb != null) {
+            mDb.close();
+            mDb = null;
+        }
+    }
 }

@@ -308,6 +308,7 @@ class SongDatabase {
     public synchronized void quit() {
         mUpdater.quit();
         try { mUpdaterThread.join(); } catch (InterruptedException e) {}
+        mOpener.close();
     }
 
     public List<Song> query(String artist, String title, String album, String minRating, boolean shuffle, boolean substring, boolean onlyCached) {
