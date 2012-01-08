@@ -341,6 +341,12 @@ public class NupService extends Service
     private void updateNotification() {
         final Song song = getCurrentSong();
 
+        Bitmap bitmap = (song != null) ? song.getCoverBitmap() : null;
+        if (bitmap != null)
+            mNotification.contentView.setImageViewBitmap(R.id.image, bitmap);
+        else
+            mNotification.contentView.setImageViewResource(R.id.image, R.drawable.status);
+
         mNotification.contentView.setTextViewText(
             R.id.line_1,
             song != null ? song.getArtist() : getString(R.string.app_name));
@@ -540,8 +546,12 @@ public class NupService extends Service
         protected void onPostExecute(Bitmap bitmap) {
             storeCoverForSong(mSong, bitmap);
             mSongCoverFetches.remove(mSong);
-            if (mSong.getCoverBitmap() != null && mSongListener != null)
-                mSongListener.onSongCoverLoad(mSong);
+            if (mSong.getCoverBitmap() != null) {
+                if (mSongListener != null)
+                    mSongListener.onSongCoverLoad(mSong);
+                if (mSong == getCurrentSong())
+                    updateNotification();
+            }
         }
     }
 
