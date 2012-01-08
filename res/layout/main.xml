@@ -85,6 +85,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="@string/pause"
+        android:textSize="16dp"
         android:onClick="onPauseButtonClicked"
         />
     <Button
@@ -93,6 +94,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="@string/prev"
+        android:textSize="16dp"
         android:onClick="onPrevButtonClicked"
         />
     <Button
@@ -101,6 +103,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="@string/next"
+        android:textSize="16dp"
         android:onClick="onNextButtonClicked"
         />
     <Button
@@ -109,6 +112,7 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="@string/browse"
+        android:textSize="16dp"
         android:onClick="onBrowseButtonClicked"
         />
   </LinearLayout>
