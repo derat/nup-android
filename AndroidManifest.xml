@@ -37,10 +37,7 @@
         android:value=".SearchResultsActivity" />
   </application>
 
-  <!-- TODO: I actually have no idea what the minimum version that this
-       will run on is; I'm just using 4 since that gets rid of the
-       implicit "Read phone state" privilege. -->
-  <uses-sdk android:minSdkVersion="4" android:targetSdkVersion="9" />
+  <uses-sdk android:minSdkVersion="15" android:targetSdkVersion="15" />
 
   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
   <uses-permission android:name="android.permission.INTERNET" />
