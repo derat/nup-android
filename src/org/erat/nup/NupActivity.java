@@ -3,7 +3,6 @@
 
 package org.erat.nup;
 
-import android.app.ActionBar;
 import android.app.Activity;
 import android.app.Dialog;
 import android.content.ComponentName;
@@ -122,9 +121,6 @@ public class NupActivity extends Activity
         mPlaylistView = (ListView) findViewById(R.id.playlist);
         registerForContextMenu(mPlaylistView);
         mPlaylistView.setAdapter(mSongListAdapter);
-
-        ActionBar actionBar = getActionBar();
-        //actionBar.setDisplayShowTitleEnabled(false);
 
         Intent serviceIntent = new Intent(this, NupService.class);
         startService(serviceIntent);
