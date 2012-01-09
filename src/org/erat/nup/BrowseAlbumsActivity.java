@@ -7,6 +7,7 @@ import android.app.ListActivity;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.ContextMenu;
 import android.view.Menu;
 import android.view.MenuItem;
@@ -21,6 +22,8 @@ import java.util.List;
 
 public class BrowseAlbumsActivity extends ListActivity
                                   implements NupService.SongDatabaseUpdateListener {
+    private static final String TAG = "BrowseAlbumsActivity";
+
     // Identifier for the BrowseSongsActivity that we start.
     private static final int BROWSE_SONGS_REQUEST_CODE = 1;
 
@@ -60,8 +63,8 @@ public class BrowseAlbumsActivity extends ListActivity
 
     @Override
     protected void onDestroy() {
-        super.onDestroy();
         NupActivity.getService().removeSongDatabaseUpdateListener(this);
+        super.onDestroy();
     }
 
     @Override

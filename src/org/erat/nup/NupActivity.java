@@ -84,18 +84,21 @@ public class NupActivity extends Activity
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
-        // TODO: Add penaltyDeathOnNetwork() after switching to updated API.
         StrictMode.setThreadPolicy(
             new StrictMode.ThreadPolicy.Builder()
                 .detectDiskReads()
                 .detectDiskWrites()
                 .detectNetwork()
                 .penaltyLog()
+                .penaltyDeathOnNetwork()
                 .build());
 
         StrictMode.setVmPolicy(
             new StrictMode.VmPolicy.Builder()
-                .detectAll()
+                .detectLeakedClosableObjects()
+                .detectLeakedSqlLiteObjects()
+                // TODO: Not including detectActivityLeaks() since I'm getting leaks of Browser*Activity objects that I
+                // don't understand.
                 .penaltyLog()
                 .penaltyDeath()
                 .build());
