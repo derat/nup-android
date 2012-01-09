@@ -1,15 +1,22 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
+  <item android:id="@+id/browse_menu_item"
+        android:icon="@android:drawable/ic_menu_add"
+        android:title="@string/browse"
+        android:showAsAction="ifRoom|withText" />
   <item android:id="@+id/search_menu_item"
         android:icon="@android:drawable/ic_menu_search"
-        android:title="@string/search" />
+        android:title="@string/search"
+        android:showAsAction="ifRoom|withText" />
   <item android:id="@+id/download_all_menu_item"
         android:icon="@android:drawable/ic_menu_save"
         android:title="@string/download_all" />
   <item android:id="@+id/settings_menu_item"
         android:icon="@android:drawable/ic_menu_preferences"
-        android:title="@string/settings" />
+        android:title="@string/settings"
+        android:showAsAction="ifRoom|withText" />
   <item android:id="@+id/exit_menu_item"
         android:icon="@android:drawable/ic_menu_close_clear_cancel"
-        android:title="@string/exit" />
+        android:title="@string/exit"
+        android:showAsAction="ifRoom|withText" />
 </menu>

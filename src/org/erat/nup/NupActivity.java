@@ -3,6 +3,7 @@
 
 package org.erat.nup;
 
+import android.app.ActionBar;
 import android.app.Activity;
 import android.app.Dialog;
 import android.content.ComponentName;
@@ -122,6 +123,9 @@ public class NupActivity extends Activity
         registerForContextMenu(mPlaylistView);
         mPlaylistView.setAdapter(mSongListAdapter);
 
+        ActionBar actionBar = getActionBar();
+        //actionBar.setDisplayShowTitleEnabled(false);
+
         Intent serviceIntent = new Intent(this, NupService.class);
         startService(serviceIntent);
         bindService(new Intent(this, NupService.class), mConnection, 0);
@@ -192,10 +196,6 @@ public class NupActivity extends Activity
         mService.stopPlaying();
         updateCurrentSongIndex(mCurrentSongIndex + 1);
         schedulePlaySongTask(SONG_CHANGE_DELAY_MS);
-    }
-
-    public void onBrowseButtonClicked(View view) {
-        startActivity(new Intent(this, BrowseActivity.class));
     }
 
     // Implements NupService.SongListener.
@@ -328,6 +328,9 @@ public class NupActivity extends Activity
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
+        case R.id.browse_menu_item:
+            startActivity(new Intent(this, BrowseActivity.class));
+            return true;
         case R.id.search_menu_item:
             startActivity(new Intent(this, SearchFormActivity.class));
             return true;
