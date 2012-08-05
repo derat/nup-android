@@ -498,7 +498,7 @@ public class NupService extends Service
         if (nextSong != null) {
             FileCacheEntry nextEntry = mCache.getEntry(nextSong.getSongId());
             if (nextEntry != null && nextEntry.isFullyCached()) {
-                mPlayer.queueFile(nextEntry.getLocalFile(this).getPath());
+                mPlayer.queueFile(nextEntry.getLocalFile(this).getPath(), nextEntry.getTotalBytes());
             }
         }
 
@@ -672,7 +672,7 @@ public class NupService extends Service
                     mWaitingForDownload = false;
                     playCacheEntry(entry);
                 } else if (song == getNextSong()) {
-                    mPlayer.queueFile(entry.getLocalFile(NupService.this).getPath());
+                    mPlayer.queueFile(entry.getLocalFile(NupService.this).getPath(), entry.getTotalBytes());
                 }
 
                 if (mSongListener != null)
@@ -822,7 +822,7 @@ public class NupService extends Service
     // Play the local file where a cache entry is stored.
     private void playCacheEntry(FileCacheEntry entry) {
         mCurrentSongPath = entry.getLocalFile(this).getPath();
-        mPlayer.playFile(mCurrentSongPath);
+        mPlayer.playFile(mCurrentSongPath, entry.getTotalBytes());
         mCurrentSongStartDate = new Date();
         mCache.updateLastAccessTime(entry.getSongId());
         updateNotification();

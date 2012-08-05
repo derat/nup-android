@@ -9,6 +9,9 @@ import android.os.Handler;
 import android.os.Looper;
 import android.util.Log;
 
+import java.io.FileDescriptor;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
 import java.io.IOException;
 
 class Player implements Runnable,
@@ -41,6 +44,14 @@ class Player implements Runnable,
     // Paths currently loaded by |mCurrentPlayer| and |mQueuedPlayer|.
     private String mCurrentPath = "";
     private String mQueuedPath = "";
+
+    // Final, expected lengths of |mCurrentPath| and |mQueuedPath|.
+    private long mCurrentNumBytes = 0;
+    private long mQueuedNumBytes = 0;
+
+    // InputStreams used by |mCurrentPlayer| and |mQueuedPlayer|.
+    private FileInputStream mCurrentStream = null;
+    private FileInputStream mQueuedStream = null;
 
     // Is playback paused?
     private boolean mPaused = false;
@@ -95,7 +106,7 @@ class Player implements Runnable,
         });
     }
 
-    public void playFile(final String path) {
+    public void playFile(final String path, final long numBytes) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
@@ -104,17 +115,25 @@ class Player implements Runnable,
                 if (mQueuedPath.equals(path)) {
                     switchToQueued();
                 } else {
-                    mCurrentPlayer = createPlayer(path);
+                    FileInputStream stream = createStream(path);
+                    if (stream == null)
+                        return;
+
+                    mCurrentPlayer = createPlayer(stream);
                     if (mCurrentPlayer != null) {
                         mCurrentPath = path;
+                        mCurrentNumBytes = numBytes;
+                        mCurrentStream = stream;
                         playCurrent();
+                    } else {
+                        closeStream(stream);
                     }
                 }
             }
         });
     }
 
-    public void queueFile(final String path) {
+    public void queueFile(final String path, final long numBytes) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
@@ -122,9 +141,18 @@ class Player implements Runnable,
                 if (path.equals(mQueuedPath))
                     return;
                 resetQueued();
-                mQueuedPlayer = createPlayer(path);
-                if (mQueuedPlayer != null)
+                FileInputStream stream = createStream(path);
+                if (stream == null)
+                    return;
+
+                mQueuedPlayer = createPlayer(stream);
+                if (mQueuedPlayer != null) {
                     mQueuedPath = path;
+                    mQueuedNumBytes = numBytes;
+                    mQueuedStream = stream;
+                } else {
+                    closeStream(stream);
+                }
             }
         });
     }
@@ -164,28 +192,21 @@ class Player implements Runnable,
         });
     }
 
-    // Create a new MediaPlayer for playing |path|.
+    // Create a new MediaPlayer for playing |path| of length |numBytes|.
     // Returns null on error.
-    private MediaPlayer createPlayer(String path) {
-        MediaPlayer player = new MediaPlayer();
-        player.setOnCompletionListener(this);
-        player.setOnErrorListener(this);
-
+    private MediaPlayer createPlayer(FileInputStream stream) {
         try {
-            player.setDataSource(path);
-        } catch (IOException e) {
-            mListener.onPlaybackError("Got error while setting data source to " + path + ": " + e);
-            return null;
-        }
-        try {
+            MediaPlayer player = new MediaPlayer();
+            Log.d(TAG, "created player " + player);
+            player.setOnCompletionListener(this);
+            player.setOnErrorListener(this);
+            player.setDataSource(stream.getFD());
             player.prepare();
+            return player;
         } catch (IOException e) {
-            mListener.onPlaybackError("Got error while preparing " + path + ": " + e);
+            mListener.onPlaybackError("Got error while creating player: " + e);
             return null;
         }
-
-        Log.d(TAG, "created player " + player + " for " + path);
-        return player;
     }
 
     // Periodically invoked to notify the observer about the playback position of the current song.
@@ -215,9 +236,25 @@ class Player implements Runnable,
     // Implements MediaPlayer.OnCompletionListener.
     @Override
     public void onCompletion(final MediaPlayer player) {
-        Log.d(TAG, "player " + player + " completed playback");
-        resetCurrent();
-        mListener.onPlaybackComplete();
+        try {
+            long streamPosition = mCurrentStream.getChannel().position();
+            Log.d(TAG, player + " completed playback at " + streamPosition + " of " + mCurrentNumBytes);
+            if (streamPosition < mCurrentNumBytes) {
+                mListener.onPlaybackError("Buffer underrun at " + streamPosition + " of " + mCurrentNumBytes);
+                int currentPositionMs = mCurrentPlayer.getCurrentPosition();
+                Log.d(TAG, player + " not done; resetting and seeking to " + currentPositionMs);
+                mCurrentPlayer.reset();
+                mCurrentPlayer.setDataSource(mCurrentStream.getFD());
+                mCurrentPlayer.prepare();
+                mCurrentPlayer.seekTo(currentPositionMs);
+                mCurrentPlayer.start();
+            } else {
+                resetCurrent();
+                mListener.onPlaybackComplete();
+            }
+        } catch (IOException e) {
+            Log.e(TAG, "got error while handling completion of " + player + ": " + e);
+        }
     }
 
     // Implements MediaPlayer.OnErrorListener.
@@ -235,6 +272,10 @@ class Player implements Runnable,
             mCurrentPlayer.release();
         mCurrentPlayer = null;
         mCurrentPath = "";
+        mCurrentNumBytes = 0;
+        if (mCurrentStream != null)
+            closeStream(mCurrentStream);
+        mCurrentStream = null;
     }
 
     // Reset |mQueuedPlayer| and |mQueuedPath|.
@@ -243,14 +284,23 @@ class Player implements Runnable,
             mQueuedPlayer.release();
         mQueuedPlayer = null;
         mQueuedPath = "";
+        mQueuedNumBytes = 0;
+        if (mQueuedStream != null)
+            closeStream(mQueuedStream);
+        mQueuedStream = null;
     }
 
     // Switch to |mQueuedPlayer| and start playing it.
     private void switchToQueued() {
         mCurrentPlayer = mQueuedPlayer;
         mCurrentPath = mQueuedPath;
+        mCurrentNumBytes = mQueuedNumBytes;
+        mCurrentStream = mQueuedStream;
+
         mQueuedPlayer = null;
         mQueuedPath = "";
+        mQueuedNumBytes = 0;
+        mQueuedStream = null;
 
         if (mCurrentPlayer != null)
             playCurrent();
@@ -269,6 +319,26 @@ class Player implements Runnable,
         if (mPaused) {
             mPaused = false;
             mListener.onPauseStateChange(mPaused);
+        }
+    }
+
+    // Create a new FileInputStream for reading |path|.  Returns null on error.
+    private FileInputStream createStream(final String path) {
+        FileInputStream stream = null;
+        try {
+            stream = new FileInputStream(path);
+        } catch (FileNotFoundException e) {
+            mListener.onPlaybackError("Unable to open " + path + ": " + e);
+        }
+        return stream;
+    }
+
+    // Close |stream|.
+    private void closeStream(final FileInputStream stream) {
+        try {
+            stream.close();
+        } catch (IOException e) {
+            mListener.onPlaybackError("Unable close stream: " + e);
         }
     }
 }
