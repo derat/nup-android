@@ -36,7 +36,7 @@ public class BrowseArtistsActivity extends ListActivity
     private boolean mOnlyCached = false;
 
     // Artists that we're displaying.
-    private List<String> mArtists = new ArrayList<String>(); 
+    private List<StringIntPair> mArtists = new ArrayList<StringIntPair>(); 
 
     private SortedStringArrayAdapter mAdapter;
 
@@ -83,17 +83,17 @@ public class BrowseArtistsActivity extends ListActivity
 
     @Override
     protected void onListItemClick(ListView listView, View view, int position, long id) {
-        String artist = mArtists.get(position);
+        StringIntPair artist = mArtists.get(position);
         if (artist == null)
             return;
-        startBrowseAlbumsActivity(artist);
+        startBrowseAlbumsActivity(artist.getString());
     }
 
     @Override
     public void onCreateContextMenu(ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
-        String artist = mArtists.get(((AdapterView.AdapterContextMenuInfo) menuInfo).position);
+        StringIntPair artist = mArtists.get(((AdapterView.AdapterContextMenuInfo) menuInfo).position);
         if (artist != null)
-            menu.setHeaderTitle(artist);
+            menu.setHeaderTitle(artist.getString());
         menu.add(0, MENU_ITEM_BROWSE_SONGS_WITH_RATING, 0, R.string.browse_songs_with_75_rating);
         menu.add(0, MENU_ITEM_BROWSE_SONGS, 0, R.string.browse_songs);
         menu.add(0, MENU_ITEM_BROWSE_ALBUMS, 0, R.string.browse_albums);
@@ -102,18 +102,18 @@ public class BrowseArtistsActivity extends ListActivity
     @Override
     public boolean onContextItemSelected(MenuItem item) {
         AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
-        String artist = mArtists.get(info.position);
+        StringIntPair artist = mArtists.get(info.position);
         if (artist == null)
             return false;
         switch (item.getItemId()) {
             case MENU_ITEM_BROWSE_SONGS_WITH_RATING:
-                startBrowseSongsActivity(artist, "0.75");
+                startBrowseSongsActivity(artist.getString(), "0.75");
                 return true;
             case MENU_ITEM_BROWSE_SONGS:
-                startBrowseSongsActivity(artist, null);
+                startBrowseSongsActivity(artist.getString(), null);
                 return true;
             case MENU_ITEM_BROWSE_ALBUMS:
-                startBrowseAlbumsActivity(artist);
+                startBrowseAlbumsActivity(artist.getString());
                 return true;
             default:
                 return false;
@@ -132,7 +132,7 @@ public class BrowseArtistsActivity extends ListActivity
     @Override
     public void onSongDatabaseUpdate() {
         if (!NupActivity.getService().getSongDb().getAggregateDataLoaded()) {
-            mArtists.add(getString(R.string.loading));
+            mArtists.add(new StringIntPair(getString(R.string.loading), -1));
             mAdapter.setEnabled(false);
             mAdapter.notifyDataSetChanged();
             return;
@@ -141,13 +141,13 @@ public class BrowseArtistsActivity extends ListActivity
         if (!mOnlyCached) {
             updateArtists(NupActivity.getService().getSongDb().getArtistsSortedAlphabetically());
         } else {
-            new AsyncTask<Void, Void, List<String>>() {
+            new AsyncTask<Void, Void, List<StringIntPair>>() {
                 @Override
-                protected List<String> doInBackground(Void... args) {
+                protected List<StringIntPair> doInBackground(Void... args) {
                     return NupActivity.getService().getSongDb().getCachedArtistsSortedAlphabetically();
                 }
                 @Override
-                protected void onPostExecute(List<String> artists) {
+                protected void onPostExecute(List<StringIntPair> artists) {
                     updateArtists(artists);
                 }
             }.execute();
@@ -155,7 +155,7 @@ public class BrowseArtistsActivity extends ListActivity
     }
 
     // Show a new list of artists.
-    private void updateArtists(List<String> artists) {
+    private void updateArtists(List<StringIntPair> artists) {
         final ListView listView = getListView();
         mArtists.clear();
         mArtists.addAll(artists);

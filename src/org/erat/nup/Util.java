@@ -98,15 +98,15 @@ class Util {
         return str;
     }
 
-    // Sort a list of strings.
-    public static void sortStringList(List<String> items) {
+    // Sort a list of StringIntPair objects.
+    public static void sortStringIntPairList(List<StringIntPair> items) {
         final HashMap<String,String> sortKeys = new HashMap<String,String>();
-        for (String item : items)
-            sortKeys.put(item, getSortingKey(item));
-        Collections.sort(items, new Comparator<String>() {
+        for (StringIntPair item : items)
+            sortKeys.put(item.getString(), getSortingKey(item.getString()));
+        Collections.sort(items, new Comparator<StringIntPair>() {
             @Override
-            public int compare(String a, String b) {
-                return sortKeys.get(a).compareTo(sortKeys.get(b));
+            public int compare(StringIntPair a, StringIntPair b) {
+                return sortKeys.get(a.getString()).compareTo(sortKeys.get(b.getString()));
             }
         });
     }

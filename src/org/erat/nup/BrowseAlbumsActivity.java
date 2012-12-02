@@ -36,9 +36,9 @@ public class BrowseAlbumsActivity extends ListActivity
     // Artist that was passed to us, or null if we were started directly from BrowseActivity.
     private String mArtist = null;
 
-    // Albums that we're displaying.  Just the albums featuring |mArtist| if it's non-null, or all
-    // albums on the server otherwise.
-    private List<String> mAlbums = new ArrayList<String>();
+    // Albums that we're displaying along with number of tracks.  Just the albums featuring |mArtist| if it's non-null,
+    // or all albums on the server otherwise.
+    private List<StringIntPair> mAlbums = new ArrayList<StringIntPair>();
 
     private SortedStringArrayAdapter mAdapter;
 
@@ -98,17 +98,17 @@ public class BrowseAlbumsActivity extends ListActivity
 
     @Override
     protected void onListItemClick(ListView listView, View view, int position, long id) {
-        String album = mAlbums.get(position);
+        StringIntPair album = mAlbums.get(position);
         if (album == null)
             return;
-        startBrowseSongsActivity(album, null);
+        startBrowseSongsActivity(album.getString(), null);
     }
 
     @Override
     public void onCreateContextMenu(ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
-        String album = mAlbums.get(((AdapterView.AdapterContextMenuInfo) menuInfo).position);
+        StringIntPair album = mAlbums.get(((AdapterView.AdapterContextMenuInfo) menuInfo).position);
         if (album != null)
-            menu.setHeaderTitle(album);
+            menu.setHeaderTitle(album.getString());
         menu.add(0, MENU_ITEM_BROWSE_SONGS_WITH_RATING, 0, R.string.browse_songs_with_75_rating);
         menu.add(0, MENU_ITEM_BROWSE_SONGS, 0, R.string.browse_songs);
     }
@@ -116,15 +116,15 @@ public class BrowseAlbumsActivity extends ListActivity
     @Override
     public boolean onContextItemSelected(MenuItem item) {
         AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
-        String album = mAlbums.get(info.position);
+        StringIntPair album = mAlbums.get(info.position);
         if (album == null)
             return false;
         switch (item.getItemId()) {
             case MENU_ITEM_BROWSE_SONGS_WITH_RATING:
-                startBrowseSongsActivity(album, "0.75");
+                startBrowseSongsActivity(album.getString(), "0.75");
                 return true;
             case MENU_ITEM_BROWSE_SONGS:
-                startBrowseSongsActivity(album, null);
+                startBrowseSongsActivity(album.getString(), null);
                 return true;
             default:
                 return false;
@@ -135,7 +135,7 @@ public class BrowseAlbumsActivity extends ListActivity
     @Override
     public void onSongDatabaseUpdate() {
         if (!NupActivity.getService().getSongDb().getAggregateDataLoaded()) {
-            mAlbums.add(getString(R.string.loading));
+            mAlbums.add(new StringIntPair(getString(R.string.loading), -1));
             mAdapter.setEnabled(false);
             mAdapter.notifyDataSetChanged();
             return;
@@ -147,15 +147,15 @@ public class BrowseAlbumsActivity extends ListActivity
                 NupActivity.getService().getSongDb().getAlbumsByArtist(mArtist) :
                 NupActivity.getService().getSongDb().getAlbumsSortedAlphabetically());
         } else {
-            new AsyncTask<Void, Void, List<String>>() {
+            new AsyncTask<Void, Void, List<StringIntPair>>() {
                 @Override
-                protected List<String> doInBackground(Void... args) {
+                protected List<StringIntPair> doInBackground(Void... args) {
                     return (mArtist != null) ?
                         NupActivity.getService().getSongDb().getCachedAlbumsByArtist(mArtist) :
                         NupActivity.getService().getSongDb().getCachedAlbumsSortedAlphabetically();
                 }
                 @Override
-                protected void onPostExecute(List<String> albums) {
+                protected void onPostExecute(List<StringIntPair> albums) {
                     updateAlbums(albums);
                 }
             }.execute();
@@ -163,10 +163,10 @@ public class BrowseAlbumsActivity extends ListActivity
     }
 
     // Show a new list of albums.
-    private void updateAlbums(List<String> albums) {
-        final ListView listView = getListView();
+    private void updateAlbums(List<StringIntPair> albums) {
         mAlbums.clear();
         mAlbums.addAll(albums);
+        final ListView listView = getListView();
         listView.setFastScrollEnabled(false);
         mAdapter.setEnabled(true);
         mAdapter.notifyDataSetChanged();

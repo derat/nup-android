@@ -48,11 +48,16 @@ public class SearchFormActivity extends Activity
             public void onFocusChange(View v, boolean hasFocus) {
                 if (hasFocus) {
                     String artist = mArtistEdit.getText().toString();
-                    List<String> albums = artist.trim().isEmpty() ?
+                    List<String> albums = new ArrayList<String>();
+                    List<StringIntPair> albumsWithCounts =
+                        artist.trim().isEmpty() ?
                         NupActivity.getService().getSongDb().getAlbumsSortedAlphabetically() :
                         NupActivity.getService().getSongDb().getAlbumsByArtist(artist);
-                    if (albums == null)
-                        albums = new ArrayList<String>();
+                    if (albumsWithCounts != null) {
+                        for (StringIntPair pair : albumsWithCounts) {
+                            albums.add(pair.getString());
+                        }
+                    }
                     mAlbumEdit.setAdapter(new ArrayAdapter<String>(SearchFormActivity.this, android.R.layout.simple_dropdown_item_1line, albums));
                 }
             }
@@ -122,7 +127,13 @@ public class SearchFormActivity extends Activity
     // Implements NupService.SongDatabaseUpdateListener.
     @Override
     public void onSongDatabaseUpdate() {
-        final List<String> artists = NupActivity.getService().getSongDb().getArtistsSortedByNumSongs();
+        List<String> artists = new ArrayList<String>();
+        List<StringIntPair> artistsWithCounts = NupActivity.getService().getSongDb().getArtistsSortedByNumSongs();
+        if (artistsWithCounts != null) {
+            for (StringIntPair pair : artistsWithCounts) {
+                artists.add(pair.getString());
+            }
+        }
         mArtistEdit.setAdapter(new ArrayAdapter<String>(SearchFormActivity.this, android.R.layout.simple_dropdown_item_1line, artists));
     }
 }

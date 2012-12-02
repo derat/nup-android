@@ -98,10 +98,10 @@ class SongDatabase {
     private boolean mAggregateDataLoaded = false;
     private int mNumSongs = 0;
     private Date mLastSyncDate = null;
-    private List<String> mArtistsSortedAlphabetically = new ArrayList<String>();
-    private List<String> mAlbumsSortedAlphabetically = new ArrayList<String>();
-    private List<String> mArtistsSortedByNumSongs = new ArrayList<String>();
-    private HashMap<String,List<String>> mArtistAlbums = new HashMap<String,List<String>>();
+    private List<StringIntPair> mArtistsSortedAlphabetically = new ArrayList<StringIntPair>();
+    private List<StringIntPair> mAlbumsSortedAlphabetically = new ArrayList<StringIntPair>();
+    private List<StringIntPair> mArtistsSortedByNumSongs = new ArrayList<StringIntPair>();
+    private HashMap<String,List<StringIntPair>> mArtistAlbums = new HashMap<String,List<StringIntPair>>();
 
     private final Listener mListener;
     private final FileCache mCache;
@@ -274,34 +274,38 @@ class SongDatabase {
     public boolean getAggregateDataLoaded() { return mAggregateDataLoaded; }
     public int getNumSongs() { return mNumSongs; }
     public Date getLastSyncDate() { return mLastSyncDate; }
-    public List<String> getAlbumsSortedAlphabetically() { return mAlbumsSortedAlphabetically; }
-    public List<String> getArtistsSortedAlphabetically() { return mArtistsSortedAlphabetically; }
-    public List<String> getArtistsSortedByNumSongs() { return mArtistsSortedByNumSongs; }
 
-    public List<String> getAlbumsByArtist(String artist) {
+    public List<StringIntPair> getAlbumsSortedAlphabetically() { return mAlbumsSortedAlphabetically; }
+    public List<StringIntPair> getArtistsSortedAlphabetically() { return mArtistsSortedAlphabetically; }
+    public List<StringIntPair> getArtistsSortedByNumSongs() { return mArtistsSortedByNumSongs; }
+
+    public List<StringIntPair> getAlbumsByArtist(String artist) {
         String lowerArtist = artist.toLowerCase();
-        return mArtistAlbums.containsKey(lowerArtist) ? mArtistAlbums.get(lowerArtist) : new ArrayList<String>();
+        return mArtistAlbums.containsKey(lowerArtist) ? mArtistAlbums.get(lowerArtist) : new ArrayList<StringIntPair>();
     }
 
-    public List<String> getCachedArtistsSortedAlphabetically() {
+    public List<StringIntPair> getCachedArtistsSortedAlphabetically() {
         return getSortedItems(
-            "SELECT DISTINCT s.Artist FROM Songs s " +
-            "JOIN CachedSongs cs ON(s.SongId = cs.SongId)",
-            null);
-    }
-
-    public List<String> getCachedAlbumsSortedAlphabetically() {
-        return getSortedItems(
-            "SELECT DISTINCT s.Album FROM Songs s " +
-            "JOIN CachedSongs cs ON(s.SongId = cs.SongId)",
-            null);
-    }
-
-    public List<String> getCachedAlbumsByArtist(String artist) {
-        return getSortedItems(
-            "SELECT DISTINCT s.Album FROM Songs s " +
+            "SELECT s.Artist, COUNT(*) FROM Songs s " +
             "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
-            "WHERE LOWER(s.Artist) = LOWER(?)",
+            "GROUP BY 1",
+            null);
+    }
+
+    public List<StringIntPair> getCachedAlbumsSortedAlphabetically() {
+        return getSortedItems(
+            "SELECT s.Album, COUNT(*) FROM Songs s " +
+            "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
+            "GROUP BY 1",
+            null);
+    }
+
+    public List<StringIntPair> getCachedAlbumsByArtist(String artist) {
+        return getSortedItems(
+            "SELECT s.Album, COUNT(*) FROM Songs s " +
+            "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
+            "WHERE LOWER(s.Artist) = LOWER(?) " +
+            "GROUP BY 1",
             new String[]{ artist });
     }
 
@@ -602,62 +606,50 @@ class SongDatabase {
         int numSongs = cursor.getInt(0);
         cursor.close();
 
-        HashSet<String> artistSet = new HashSet<String>();
-        HashSet<String> albumSet = new HashSet<String>();
-        final HashMap<String,Integer> artistSongCounts = new HashMap<String,Integer>();  // 'final' so it can be used in an inner class
-        HashMap<String,List<String>> artistAlbums = new HashMap<String,List<String>>();
-
-        List<String> artistsSortedAlphabetically = new ArrayList<String>();
-        cursor = db.rawQuery("SELECT DISTINCT Artist FROM ArtistAlbumStats ORDER BY ArtistSortKey ASC", null);
+        List<StringIntPair> artistsSortedAlphabetically = new ArrayList<StringIntPair>();
+        cursor = db.rawQuery("SELECT Artist, SUM(NumSongs) FROM ArtistAlbumStats GROUP BY 1 ORDER BY ArtistSortKey ASC", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
-            artistsSortedAlphabetically.add(cursor.getString(0));
+            artistsSortedAlphabetically.add(new StringIntPair(cursor.getString(0), cursor.getInt(1)));
             cursor.moveToNext();
         }
         cursor.close();
 
-        List<String> albumsSortedAlphabetically = new ArrayList<String>();
-        cursor = db.rawQuery("SELECT DISTINCT Album FROM ArtistAlbumStats ORDER BY AlbumSortKey ASC", null);
+        List<StringIntPair> albumsSortedAlphabetically = new ArrayList<StringIntPair>();
+        cursor = db.rawQuery("SELECT Album, SUM(NumSongs) FROM ArtistAlbumStats GROUP BY 1 ORDER BY AlbumSortKey ASC", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
-            albumsSortedAlphabetically.add(cursor.getString(0));
+            albumsSortedAlphabetically.add(new StringIntPair(cursor.getString(0), cursor.getInt(1)));
             cursor.moveToNext();
         }
         cursor.close();
 
+        HashMap<String,List<StringIntPair>> artistAlbums = new HashMap<String,List<StringIntPair>>();
         cursor = db.rawQuery("SELECT Artist, Album, NumSongs FROM ArtistAlbumStats ORDER BY AlbumSortKey ASC", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
             String artist = cursor.getString(0);
             String album = cursor.getString(1);
-            int numSongsInAlbum = cursor.getInt(2);
-
-            Integer totalSongsByArtist =
-                artistSongCounts.containsKey(artist) ?
-                (Integer) artistSongCounts.get(artist) : 0;
-            totalSongsByArtist += numSongsInAlbum;
-            artistSongCounts.put(artist, totalSongsByArtist);
+            int numSongsForArtistAlbum = cursor.getInt(2);
 
             String lowerArtist = artist.toLowerCase();
-            List<String> albums = artistAlbums.get(lowerArtist);
+            List<StringIntPair> albums = artistAlbums.get(lowerArtist);
             if (albums == null) {
-                albums = new ArrayList<String>();
+                albums = new ArrayList<StringIntPair>();
                 artistAlbums.put(lowerArtist, albums);
             }
-            albums.add(album);
+            albums.add(new StringIntPair(album, numSongsForArtistAlbum));
 
             cursor.moveToNext();
         }
         cursor.close();
 
-        List<String> artistsSortedByNumSongs = new ArrayList<String>();
+        List<StringIntPair> artistsSortedByNumSongs = new ArrayList<StringIntPair>();
         artistsSortedByNumSongs.addAll(artistsSortedAlphabetically);
-        Collections.sort(artistsSortedByNumSongs, new Comparator<String>() {
+        Collections.sort(artistsSortedByNumSongs, new Comparator<StringIntPair>() {
             @Override
-            public int compare(String a, String b) {
-                int aNum = (Integer) artistSongCounts.get(a);
-                int bNum = (Integer) artistSongCounts.get(b);
-                return (aNum == bNum) ? 0 : (aNum > bNum) ? -1 : 1;
+            public int compare(StringIntPair a, StringIntPair b) {
+                return b.getInt() - a.getInt();
             }
         });
 
@@ -672,24 +664,24 @@ class SongDatabase {
         mListener.onAggregateDataUpdate();
     }
 
-    // Given a query that returns strings in its first column, returns its results
-    // in sorted order.
-    private List<String> getSortedItems(String query, String[] selectionArgs) {
+    // Given a query that returns strings in its first column and ints in its second column, returns its results in
+    // sorted order (on the first column only).
+    private List<StringIntPair> getSortedItems(String query, String[] selectionArgs) {
         SQLiteDatabase db = mOpener.getDb();
         Cursor cursor = db.rawQuery(query, selectionArgs);
 
-        List<String> items = new ArrayList<String>();
+        List<StringIntPair> items = new ArrayList<StringIntPair>();
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
-            String item = cursor.getString(0);
-            if (item.isEmpty())
-                item = UNSET_STRING;
-            items.add(item);
+            String string = cursor.getString(0);
+            if (string.isEmpty())
+                string = UNSET_STRING;
+            items.add(new StringIntPair(string, cursor.getInt(1)));
             cursor.moveToNext();
         }
         cursor.close();
 
-        Util.sortStringList(items);
+        Util.sortStringIntPairList(items);
         return items;
     }
 }

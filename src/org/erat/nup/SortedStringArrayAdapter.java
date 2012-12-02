@@ -8,11 +8,11 @@ import android.widget.SectionIndexer;
 import java.util.ArrayList;
 import java.util.List;
 
-class SortedStringArrayAdapter extends ArrayAdapter<String>
+class SortedStringArrayAdapter extends ArrayAdapter<StringIntPair>
                                implements SectionIndexer {
     private static final String TAG = "SortedStringArrayAdapter";
 
-    private List<String> mItems;
+    private List<StringIntPair> mItems;
 
     // Are all items in the list enabled?  If false, all are disabled.
     private boolean mEnabled = true;
@@ -27,7 +27,7 @@ class SortedStringArrayAdapter extends ArrayAdapter<String>
 
     SortedStringArrayAdapter(Context context,
                              int textViewResourceId,
-                             List<String> items) {
+                             List<StringIntPair> items) {
         super(context, textViewResourceId, items);
         mItems = items;
         initSections();
@@ -87,8 +87,8 @@ class SortedStringArrayAdapter extends ArrayAdapter<String>
 
         int sectionIndex = -1;
         for (int itemIndex = 0; itemIndex < mItems.size(); ++itemIndex) {
-            String item = mItems.get(itemIndex);
-            String sectionName = getSectionNameForString(item);
+            StringIntPair item = mItems.get(itemIndex);
+            String sectionName = getSectionNameForString(item.getString());
 
             int prevSectionIndex = sectionIndex;
             while (sectionIndex == -1 || !sectionName.equals(sections.get(sectionIndex)))
