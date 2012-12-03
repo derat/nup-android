@@ -84,7 +84,7 @@ public class BrowseSongsActivity extends Activity
                 // Create a temporary ArrayAdapter that just says "Loading...".
                 List<String> items = new ArrayList<String>();
                 items.add(getString(R.string.loading));
-                ArrayAdapter<String> adapter = new ArrayAdapter<String>(BrowseSongsActivity.this, R.layout.browse_row, items) {
+                ArrayAdapter<String> adapter = new ArrayAdapter<String>(BrowseSongsActivity.this, R.layout.browse_row, R.id.main, items) {
                     @Override
                     public boolean areAllItemsEnabled() {
                         return false;
@@ -130,7 +130,7 @@ public class BrowseSongsActivity extends Activity
                     data,
                     R.layout.browse_row,
                     new String[]{ titleKey },
-                    new int[]{ R.id.text });
+                    new int[]{ R.id.main });
                 ListView view = (ListView) findViewById(R.id.songs);
                 view.setAdapter(adapter);
                 view.setOnItemClickListener(BrowseSongsActivity.this);

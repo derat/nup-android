@@ -2,8 +2,12 @@ package org.erat.nup;
 
 import android.content.Context;
 import android.util.Log;
+import android.view.LayoutInflater;
+import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ArrayAdapter;
 import android.widget.SectionIndexer;
+import android.widget.TextView;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -72,6 +76,22 @@ class SortedStringArrayAdapter extends ArrayAdapter<StringIntPair>
     @Override
     public boolean isEnabled(int position) {
         return mEnabled;
+    }
+
+    @Override
+    public View getView(int position, View convertView, ViewGroup parent) {
+        View view;
+        if (convertView != null) {
+            view = convertView;
+        } else {
+            LayoutInflater inflater = (LayoutInflater) getContext().getSystemService(Context.LAYOUT_INFLATER_SERVICE);
+            view = inflater.inflate(R.layout.browse_row, null);
+        }
+
+        StringIntPair item = mItems.get(position);
+        ((TextView) view.findViewById(R.id.main)).setText(item.getString());
+        ((TextView) view.findViewById(R.id.extra)).setText(item.getInt() >= 0 ? "" + item.getInt() : "");
+        return view;
     }
 
     private void initSections() {

@@ -28,7 +28,7 @@ public class BrowseActivity extends ListActivity {
         super.onCreate(savedInstanceState);
         setTitle(R.string.browse);
 
-        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, R.layout.browse_row);
+        ArrayAdapter<String> adapter = new ArrayAdapter<String>(this, R.layout.browse_row, R.id.main);
         adapter.add(getString(R.string.artists));
         adapter.add(getString(R.string.albums));
         adapter.add(getString(R.string.artists_cached));
