@@ -4,6 +4,7 @@
 package org.erat.nup;
 
 import android.app.Activity;
+import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.os.Handler;
 import android.os.Looper;
@@ -198,6 +199,7 @@ class Player implements Runnable,
         try {
             MediaPlayer player = new MediaPlayer();
             Log.d(TAG, "created player " + player);
+            player.setAudioStreamType(AudioManager.STREAM_MUSIC);
             player.setOnCompletionListener(this);
             player.setOnErrorListener(this);
             player.setDataSource(stream.getFD());
