@@ -242,7 +242,7 @@ class Player implements Runnable,
             if (streamPosition < mCurrentNumBytes) {
                 mListener.onPlaybackError("Buffer underrun at " + streamPosition + " of " + mCurrentNumBytes);
                 int currentPositionMs = mCurrentPlayer.getCurrentPosition();
-                Log.d(TAG, player + " not done; resetting and seeking to " + currentPositionMs);
+                Log.w(TAG, player + " not done; resetting and seeking to " + currentPositionMs + " ms");
                 mCurrentPlayer.reset();
                 mCurrentPlayer.setDataSource(mCurrentStream.getFD());
                 mCurrentPlayer.prepare();
