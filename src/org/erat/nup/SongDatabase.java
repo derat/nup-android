@@ -432,10 +432,16 @@ class SongDatabase {
             // Ask the server for the max last modified time before we fetch anything.  We'll use this as the starting
             // point for the next sync, to handle the case where some songs in the server are updated while we're doing this
             // sync.
-            String maxLastModifiedUsecStr = Download.downloadString(mContext, "/songs", "getMaxLastModifiedUsec", message);
+            String maxLastModifiedUsecStr = Download.downloadString(mContext, "/songs", "getMaxLastModifiedUsec=1", message);
             if (maxLastModifiedUsecStr == null)
                 return false;
-            long maxLastModifiedUsec = Long.valueOf(maxLastModifiedUsecStr);
+            long maxLastModifiedUsec = 0;
+            try {
+                maxLastModifiedUsec = Long.valueOf(maxLastModifiedUsecStr);
+            } catch (NumberFormatException e) {
+                message[0] = "Unable to parse max last-modified time: " + maxLastModifiedUsecStr;
+                return false;
+            }
 
             // Start where we left off last time.
             Cursor cursor = db.rawQuery("SELECT MaxLastModifiedUsec FROM LastUpdateTime", null);
