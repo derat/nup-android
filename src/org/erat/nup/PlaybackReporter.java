@@ -37,7 +37,7 @@ class PlaybackReporter {
     }
 
     // Asynchronously report the playback of a song.
-    public void report(final int songId, final Date startDate) {
+    public void report(final long songId, final Date startDate) {
         new AsyncTask<Void, Void, Void>() {
             @Override
             protected Void doInBackground(Void... args) {
@@ -49,7 +49,7 @@ class PlaybackReporter {
     }
 
     // Synchronously report the playback of a song.
-    private boolean reportInternal(int songId, Date startDate) {
+    private boolean reportInternal(long songId, Date startDate) {
         if (!Util.isNetworkAvailable(mContext))
             return false;
 
@@ -57,11 +57,9 @@ class PlaybackReporter {
         DownloadResult result = null;
 
         try {
-            DownloadRequest request = new DownloadRequest(mContext, DownloadRequest.Method.POST, "/report_played", null);
-            String body = "songId=" + songId + "&startTime=" + (startDate.getTime() / 1000);
-            request.setBody(new ByteArrayInputStream(body.getBytes()), body.length());
-            request.setHeader("Content-Type", "application/x-www-form-urlencoded");
-            request.setHeader("Content-Length", Long.toString(body.length()));
+            String params = "songId=" + songId + "&startTime=" + (startDate.getTime() / 1000);
+            DownloadRequest request = new DownloadRequest(
+                mContext, DownloadRequest.getServerUri(mContext, "/report_played", params), DownloadRequest.Method.POST);
             result = Download.startDownload(request);
             return true;
         } catch (DownloadRequest.PrefException e) {

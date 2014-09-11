@@ -8,18 +8,18 @@ import android.content.Context;
 import java.io.File;
 
 class FileCacheEntry {
-    private final int mSongId;
+    private final long mSongId;
     private long mCachedBytes, mTotalBytes;
     private int mLastAccessTime;
 
-    public FileCacheEntry(int songId, long totalBytes, int lastAccessTime) {
+    public FileCacheEntry(long songId, long totalBytes, int lastAccessTime) {
         mSongId = songId;
         mCachedBytes = 0;
         mTotalBytes = totalBytes;
         mLastAccessTime = lastAccessTime;
     }
 
-    public int getSongId() { return mSongId; }
+    public long getSongId() { return mSongId; }
     public long getCachedBytes() { return mCachedBytes; }
     public long getTotalBytes() { return mTotalBytes; }
     public int getLastAccessTime() { return mLastAccessTime; }

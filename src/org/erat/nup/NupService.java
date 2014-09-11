@@ -112,10 +112,10 @@ public class NupService extends Service
 
     // Points from song ID to Song.
     // This is the canonical set of songs that we've seen.
-    private HashMap<Integer,Song> mSongIdToSong = new HashMap<Integer,Song>();
+    private HashMap<Long,Song> mSongIdToSong = new HashMap<Long,Song>();
 
     // ID of the song that's currently being downloaded.
-    private int mDownloadSongId = -1;
+    private long mDownloadSongId = -1;
 
     // Index into |mSongs| of the song that's currently being downloaded.
     private int mDownloadIndex = -1;
@@ -465,7 +465,7 @@ public class NupService extends Service
         // If we've already downloaded the whole file, start playing it.
         FileCacheEntry cacheEntry = mCache.getEntry(getCurrentSong().getSongId());
         if (cacheEntry != null && cacheEntry.isFullyCached()) {
-            Log.d(TAG, "file " + getCurrentSong().getRemotePath() + " already downloaded; playing");
+            Log.d(TAG, "file " + getCurrentSong().getUri().toString() + " already downloaded; playing");
             playCacheEntry(cacheEntry);
 
             // If we're downloading some other song (maybe we were downloading the
@@ -520,7 +520,7 @@ public class NupService extends Service
 
     // Start fetching the cover for a song if it's not loaded already.
     public void fetchCoverForSongIfMissing(Song song) {
-        if (song.getCoverBitmap() != null)
+        if (song.getCoverBitmap() != null || song.getCoverUri() == null)
             return;
 
         if (!mSongCoverFetches.contains(song)) {
@@ -539,7 +539,7 @@ public class NupService extends Service
 
         @Override
         protected Bitmap doInBackground(Void... args) {
-            return mCoverLoader.loadCover(mSong.getArtist(), mSong.getAlbum());
+            return mCoverLoader.loadCover(mSong.getCoverUri());
         }
 
         @Override
@@ -642,7 +642,7 @@ public class NupService extends Service
             @Override
             public void run() {
                 Log.d(TAG, "got notification that download of song " + entry.getSongId() + " failed: " + reason);
-                Toast.makeText(NupService.this, "Download of " + mSongIdToSong.get(entry.getSongId()).getRemotePath() +
+                Toast.makeText(NupService.this, "Download of " + mSongIdToSong.get(entry.getSongId()).getUri().toString() +
                                " failed: " + reason, Toast.LENGTH_LONG).show();
                 if (entry.getSongId() == mDownloadSongId) {
                     mDownloadSongId = -1;

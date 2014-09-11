@@ -14,8 +14,10 @@ import android.text.TextUtils;
 import android.util.Log;
 
 import org.json.JSONArray;
+import org.json.JSONObject;
 import org.json.JSONTokener;
 
+import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -42,19 +44,19 @@ class SongDatabase {
     private static final String CREATE_SONGS_SQL =
         "CREATE TABLE Songs (" +
         "  SongId INTEGER PRIMARY KEY NOT NULL, " +
-        "  Filename VARCHAR(256) NOT NULL, " +
+        "  Url VARCHAR(256) NOT NULL, " +
+        "  CoverUrl VARCHAR(256) NOT NULL, " +
         "  Artist VARCHAR(256) NOT NULL, " +
         "  Title VARCHAR(256) NOT NULL, " +
         "  Album VARCHAR(256) NOT NULL, " +
         "  TrackNumber INTEGER NOT NULL, " +
+        "  DiscNumber INTEGER NOT NULL, " +
         "  Length INTEGER NOT NULL, " +
         "  Rating FLOAT NOT NULL)";
     private static final String CREATE_SONGS_ARTIST_INDEX_SQL =
         "CREATE INDEX Artist ON Songs (Artist)";
     private static final String CREATE_SONGS_ALBUM_INDEX_SQL =
         "CREATE INDEX Album ON Songs (Album)";
-    private static final String CREATE_SONGS_FILENAME_INDEX_SQL =
-        "CREATE INDEX Filename ON Songs (Filename)";
 
     private static final String CREATE_ARTIST_ALBUM_STATS_SQL =
         "CREATE TABLE ArtistAlbumStats (" +
@@ -129,7 +131,6 @@ class SongDatabase {
                 db.execSQL(CREATE_SONGS_SQL);
                 db.execSQL(CREATE_SONGS_ARTIST_INDEX_SQL);
                 db.execSQL(CREATE_SONGS_ALBUM_INDEX_SQL);
-                db.execSQL(CREATE_SONGS_FILENAME_INDEX_SQL);
                 db.execSQL(CREATE_ARTIST_ALBUM_STATS_SQL);
                 db.execSQL(CREATE_ARTIST_ALBUM_STATS_ARTIST_SORT_KEY_INDEX_SQL);
                 db.execSQL(CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL);
@@ -217,7 +218,15 @@ class SongDatabase {
                 } else if (newVersion == 6) {
                     // Version 6: Drop Sha1, Deleted, and LastModifiedUsec columns from Songs table.
                     db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp");
-                    db.execSQL(CREATE_SONGS_SQL);
+                    db.execSQL("CREATE TABLE Songs (" +
+                               "  SongId INTEGER PRIMARY KEY NOT NULL, " +
+                               "  Filename VARCHAR(256) NOT NULL, " +
+                               "  Artist VARCHAR(256) NOT NULL, " +
+                               "  Title VARCHAR(256) NOT NULL, " +
+                               "  Album VARCHAR(256) NOT NULL, " +
+                               "  TrackNumber INTEGER NOT NULL, " +
+                               "  Length INTEGER NOT NULL, " +
+                               "  Rating FLOAT NOT NULL)");
                     db.execSQL("INSERT INTO Songs " +
                                "SELECT SongId, Filename, Artist, Title, Album, TrackNumber, Length, Rating " +
                                "FROM SongsTmp WHERE Deleted = 0");
@@ -236,10 +245,13 @@ class SongDatabase {
                     db.execSQL(CREATE_CACHED_SONGS_SQL);
                 } else if (newVersion == 9) {
                     // Version 9: Add index on Songs.Filename.
-                    db.execSQL(CREATE_SONGS_FILENAME_INDEX_SQL);
+                    db.execSQL("CREATE INDEX Filename ON Songs (Filename)");
                 } else if (newVersion == 10) {
                     // Version 10: Add PendingPlaybackReports table.
                     db.execSQL(CREATE_PENDING_PLAYBACK_REPORTS_SQL);
+                } else if (newVersion == 11) {
+                    // Version 11: Change way too much stuff for AppEngine backend.
+                    throw new RuntimeException("Sorry, you need to delete everything and start over. :-(");
                 } else {
                     throw new RuntimeException(
                         "Got request to upgrade database to unknown version " + newVersion);
@@ -345,7 +357,7 @@ class SongDatabase {
         builder.add("Rating >= ?", minRating, false);
 
         String query =
-            "SELECT s.SongId, Artist, Title, Album, Filename, Length, s.TrackNumber, Rating " +
+            "SELECT s.SongId, Artist, Title, Album, Url, CoverUrl, Length, s.TrackNumber, s.DiscNumber, Rating " +
             "FROM Songs s " +
             (onlyCached ? "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " : "") +
             builder.getWhereClause() +
@@ -357,10 +369,16 @@ class SongDatabase {
         List<Song> songs = new ArrayList<Song>();
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
-            Song song = new Song(
-                cursor.getInt(0), cursor.getString(1), cursor.getString(2), cursor.getString(3),
-                cursor.getString(4), cursor.getInt(5), cursor.getInt(6), cursor.getFloat(7));
-            songs.add(song);
+            try {
+                Song song = new Song(
+                    cursor.getLong(0), cursor.getString(1), cursor.getString(2), cursor.getString(3),
+                    cursor.getString(4), cursor.getString(5), cursor.getInt(6), cursor.getInt(7), cursor.getInt(8),
+                    cursor.getFloat(9));
+                songs.add(song);
+            } catch (URISyntaxException e) {
+                Log.d(TAG, "skipping song " + cursor.getLong(0) + " with malformed URL(s) \"" +
+                      cursor.getString(4) + "\" and \"" + cursor.getString(5) + "\"");
+            }
             cursor.moveToNext();
         }
         cursor.close();
@@ -368,26 +386,26 @@ class SongDatabase {
     }
 
     // Record the fact that a song has been successfully cached.
-    public void handleSongCached(int songId) {
+    public void handleSongCached(long songId) {
         mUpdater.postUpdate(
             "REPLACE INTO CachedSongs (SongId) VALUES(?)", new Object[]{ songId });
     }
 
     // Record the fact that a song has been evicted from the cache.
-    public void handleSongEvicted(int songId) {
+    public void handleSongEvicted(long songId) {
         mUpdater.postUpdate(
             "DELETE FROM CachedSongs WHERE SongId = ?", new Object[]{ songId });
     }
 
     // Add an entry to the PendingPlaybackReports table.
-    public void addPendingPlaybackReport(int songId, Date startDate) {
+    public void addPendingPlaybackReport(long songId, Date startDate) {
         mUpdater.postUpdate(
             "REPLACE INTO PendingPlaybackReports (SongId, StartTime) VALUES(?, ?)",
             new Object[]{ songId, startDate.getTime() / 1000 });
     }
 
     // Remove an entry from the PendingPlaybackReports table.
-    public void removePendingPlaybackReport(int songId, Date startDate) {
+    public void removePendingPlaybackReport(long songId, Date startDate) {
         mUpdater.postUpdate(
             "DELETE FROM PendingPlaybackReports WHERE SongId = ? AND StartTime = ?",
             new Object[]{ songId, startDate.getTime() / 1000 });
@@ -395,10 +413,10 @@ class SongDatabase {
 
     // Simple struct representing a queued report of a song being played.
     public static class PendingPlaybackReport {
-        public int songId;
+        public long songId;
         public Date startDate;
 
-        PendingPlaybackReport(int songId, Date startDate) {
+        PendingPlaybackReport(long songId, Date startDate) {
             this.songId = songId;
             this.startDate = startDate;
         }
@@ -412,7 +430,7 @@ class SongDatabase {
         cursor.moveToFirst();
         List<PendingPlaybackReport> reports = new ArrayList<PendingPlaybackReport>();
         while (!cursor.isAfterLast()) {
-            reports.add(new PendingPlaybackReport(cursor.getInt(0), new Date(cursor.getLong(1) * 1000)));
+            reports.add(new PendingPlaybackReport(cursor.getLong(0), new Date(cursor.getLong(1) * 1000)));
             cursor.moveToNext();
         }
         cursor.close();
@@ -444,21 +462,22 @@ class SongDatabase {
             }
 
             // Start where we left off last time.
-            Cursor cursor = db.rawQuery("SELECT MaxLastModifiedUsec FROM LastUpdateTime", null);
-            cursor.moveToFirst();
-            long minLastModifiedUsec = cursor.getLong(0) + 1;
-            cursor.close();
+            Cursor dbCursor = db.rawQuery("SELECT MaxLastModifiedUsec FROM LastUpdateTime", null);
+            dbCursor.moveToFirst();
+            long minLastModifiedUsec = dbCursor.getLong(0) + 1;
+            dbCursor.close();
 
             // The server breaks its results up into batches instead of sending us a bunch of songs
-            // at once, so we store the highest song ID that we've seen here so we'll know where to
-            // start in the next request.
-            int maxSongId = 0;
+            // at once, so use the cursor that it returns to start in the correct place in the next requets.
+            String serverCursor = "";
 
-            while (true) {
+            while (numSongsUpdated == 0 || !serverCursor.isEmpty()) {
                 String response = Download.downloadString(
-                    mContext, "/songs", String.format("minSongId=%d&minLastModifiedUsec=%d", maxSongId + 1, minLastModifiedUsec), message);
+                    mContext, "/songs", String.format("minLastModifiedUsec=%d&cursor=%s", minLastModifiedUsec, serverCursor), message);
                 if (response == null)
                     return false;
+
+                serverCursor = "";
 
                 try {
                     JSONArray jsonSongs = (JSONArray) new JSONTokener(response).nextValue();
@@ -466,38 +485,44 @@ class SongDatabase {
                         break;
 
                     for (int i = 0; i < jsonSongs.length(); ++i) {
-                        JSONArray jsonSong = jsonSongs.getJSONArray(i);
-                        if (jsonSong.length() != 9) {
-                            message[0] = "Row " + numSongsUpdated + " from server had " + jsonSong.length() + " row(s); expected 11";
-                            return false;
+                        JSONObject jsonSong = jsonSongs.optJSONObject(i);
+                        if (jsonSong == null) {
+                            if (i == jsonSongs.length() - 1) {
+                                serverCursor = jsonSongs.getString(0);
+                                break;
+                            } else {
+                                message[0] = "Item " + i + " from server isn't a JSON object";
+                                return false;
+                            }
                         }
 
-                        int songId = jsonSong.getInt(0);
-                        boolean deleted = (jsonSong.getInt(8) != 0);
+                        long songId = jsonSong.getLong("songId");
+                        boolean deleted = false;  // TODO: Figure out how to do deletions.
 
                         if (!deleted) {
                             ContentValues values = new ContentValues(8);
                             values.put("SongId", songId);
-                            values.put("Filename", jsonSong.getString(1));
-                            values.put("Artist", jsonSong.getString(2));
-                            values.put("Title", jsonSong.getString(3));
-                            values.put("Album", jsonSong.getString(4));
-                            values.put("TrackNumber", jsonSong.getInt(5));
-                            values.put("Length", jsonSong.getInt(6));
-                            values.put("Rating", jsonSong.getDouble(7));
+                            values.put("Url", jsonSong.getString("url"));
+                            values.put("CoverUrl", jsonSong.has("coverUrl") ? jsonSong.getString("coverUrl") : "");
+                            values.put("Artist", jsonSong.getString("artist"));
+                            values.put("Title", jsonSong.getString("title"));
+                            values.put("Album", jsonSong.getString("album"));
+                            values.put("TrackNumber", jsonSong.getInt("track"));
+                            values.put("DiscNumber", jsonSong.getInt("disc"));
+                            values.put("Length", jsonSong.getDouble("length"));
+                            values.put("Rating", jsonSong.getDouble("rating"));
                             db.replace("Songs", "", values);
                         } else {
-                            db.delete("Songs", "SongId = ?", new String[]{ Integer.toString(songId) });
+                            db.delete("Songs", "SongId = ?", new String[]{ Long.toString(songId) });
                         }
-
                         numSongsUpdated++;
-                        maxSongId = Math.max(maxSongId, songId);
                     }
-                    listener.onSyncProgress(SyncState.UPDATING_SONGS, numSongsUpdated);
                 } catch (org.json.JSONException e) {
                     message[0] = "Couldn't parse response: " + e;
                     return false;
                 }
+
+                listener.onSyncProgress(SyncState.UPDATING_SONGS, numSongsUpdated);
             }
 
             ContentValues values = new ContentValues(2);

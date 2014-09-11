@@ -56,26 +56,32 @@ class DownloadRequest {
     private URI mUri;
     private String mBody;
 
-    DownloadRequest(Context context, Method method, String path, String query) throws PrefException {
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+    DownloadRequest(Context context, URI uri, Method method) {
+        mUri = uri;
         mMethod = method;
-
-        // Build a URI based on the server pref.
-        mUri = parseServerUrlIntoUri(prefs.getString(NupPreferences.SERVER_URL, ""), path, query);
 
         // When mUri is used to construct the request, we send the full URI in the request, like "GET http://...".
         // This seems to make the server sad in some cases -- it fails to parse the query parameters.
         // Just passing the path and query as a string avoids this; we'll just send "GET /path?query" instead.
-        String pathQuery = path + (query != null ? "?" + query : "");
+        String pathQuery = mUri.getPath();
+        if (mUri.getQuery() != null && !mUri.getQuery().isEmpty())
+            pathQuery += "?" + mUri.getQuery();
         mHttpRequest = (method == Method.GET) ? new HttpGet(pathQuery) : new HttpPost(pathQuery);
         mHttpRequest.addHeader("Host", mUri.getHost() + ":" + mUri.getPort());
         // TODO: Set User-Agent to something reasonable.
 
         // Add Authorization header if username and password prefs are set.
+        // FIXME: Need to set auth cookie instead, I think.
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         String username = prefs.getString(NupPreferences.USERNAME, "");
         String password = prefs.getString(NupPreferences.PASSWORD, "");
         if (!username.isEmpty() && !password.isEmpty())
             mHttpRequest.setHeader("Authorization", "Basic " + Base64.encodeToString((username + ":" + password).getBytes(), Base64.NO_WRAP));
+    }
+
+    public static URI getServerUri(Context context, String path, String query) throws PrefException {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        return parseServerUrlIntoUri(prefs.getString(NupPreferences.SERVER_URL, ""), path, query);
     }
 
     public static URI parseServerUrlIntoUri(String server, String path, String query) throws PrefException {
@@ -228,7 +234,8 @@ class Download {
 
     public static String downloadString(Context context, String path, String query, String[] error) {
         try {
-            DownloadRequest request = new DownloadRequest(context, DownloadRequest.Method.GET, path, query);
+            DownloadRequest request = new DownloadRequest(
+                context, DownloadRequest.getServerUri(context, path, query), DownloadRequest.Method.GET);
             request.setHeader("Accept-Encoding", "gzip");
             DownloadResult result = startDownload(request);
             if (result.getStatusCode() != 200) {

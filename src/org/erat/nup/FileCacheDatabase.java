@@ -35,7 +35,7 @@ class FileCacheDatabase {
     private final DatabaseOpener mOpener;
 
     // Map from an entry's song ID to the entry itself.
-    private final HashMap<Integer,FileCacheEntry> mEntries = new HashMap<Integer,FileCacheEntry>();
+    private final HashMap<Long,FileCacheEntry> mEntries = new HashMap<Long,FileCacheEntry>();
 
     // Update the database in a background thread.
     private final DatabaseUpdater mUpdater;
@@ -133,21 +133,21 @@ class FileCacheDatabase {
         mOpener.close();
     }
 
-    public synchronized FileCacheEntry getEntry(int songId) {
+    public synchronized FileCacheEntry getEntry(long songId) {
         return mEntries.get(songId);
     }
 
-    public synchronized FileCacheEntry addEntry(int songId) {
+    public synchronized FileCacheEntry addEntry(long songId) {
         final int accessTime = (int) (new Date().getTime() / 1000);
         FileCacheEntry entry = new FileCacheEntry(songId, 0, accessTime);
         mEntries.put(songId, entry);
         mUpdater.postUpdate(
-            "INSERT INTO CacheEntries (SongId, TotalBytes, LastAccessTime) VALUES(?, 0, ?)",
+            "REPLACE INTO CacheEntries (SongId, TotalBytes, LastAccessTime) VALUES(?, 0, ?)",
             new Object[]{ songId, accessTime });
         return entry;
     }
 
-    public synchronized void removeEntry(int songId) {
+    public synchronized void removeEntry(long songId) {
         FileCacheEntry entry = mEntries.get(songId);
         if (entry == null)
             return;
@@ -158,7 +158,7 @@ class FileCacheDatabase {
             new Object[]{ songId });
     }
 
-    public synchronized void setTotalBytes(int songId, long totalBytes) {
+    public synchronized void setTotalBytes(long songId, long totalBytes) {
         FileCacheEntry entry = mEntries.get(songId);
         if (entry == null)
             return;
@@ -169,7 +169,7 @@ class FileCacheDatabase {
             new Object[]{ totalBytes, songId });
     }
 
-    public synchronized void updateLastAccessTime(int songId) {
+    public synchronized void updateLastAccessTime(long songId) {
         FileCacheEntry entry = mEntries.get(songId);
         if (entry == null)
             return;
@@ -181,12 +181,12 @@ class FileCacheDatabase {
             new Object[]{ now, songId });
     }
 
-    public synchronized List<Integer> getSongIdsByAge() {
-        List<Integer> ids = new ArrayList<Integer>();
+    public synchronized List<Long> getSongIdsByAge() {
+        List<Long> ids = new ArrayList<Long>();
         ids.addAll(mEntries.keySet());
-        Collections.sort(ids, new Comparator<Integer>() {
+        Collections.sort(ids, new Comparator<Long>() {
             @Override
-            public int compare(Integer a, Integer b) {
+            public int compare(Long a, Long b) {
                 int aTime = (Integer) getEntry(a).getLastAccessTime();
                 int bTime = (Integer) getEntry(b).getLastAccessTime();
                 return (aTime == bTime) ? 0 : (aTime < bTime) ? -1 : 1;

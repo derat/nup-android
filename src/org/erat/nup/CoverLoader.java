@@ -6,7 +6,6 @@ package org.erat.nup;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
-import android.net.Uri;
 import android.os.Environment;
 import android.util.Log;
 
@@ -15,6 +14,7 @@ import java.io.FilenameFilter;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.IOException;
+import java.net.URI;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -25,8 +25,6 @@ class CoverLoader {
 
     // Size of buffer used to write data to disk, in bytes.
     private static final int BUFFER_SIZE = 8 * 1024;
-
-    private static final int MAX_ARTIST_OR_ALBUM_LENGTH_FOR_FILENAME = 64;
 
     // Application context.
     private final Context mContext;
@@ -62,15 +60,15 @@ class CoverLoader {
 
     // Load the cover for a song's artist and album.  Tries to find it locally
     // first; then goes to the server.  Returns null if unsuccessful.
-    public Bitmap loadCover(String artist, String album) {
+    public Bitmap loadCover(URI uri) {
         // Ensure that the cover dir exists.
         mCoverDir.mkdirs();
 
-        File file = lookForLocalCover(artist, album);
+        File file = lookForLocalCover(uri);
         if (file != null) {
             Log.d(TAG, "found local file " + file.getName());
         } else {
-            file = downloadCover(artist, album);
+            file = downloadCover(uri);
             if (file != null)
                 Log.d(TAG, "fetched remote file " + file.getName());
         }
@@ -87,8 +85,8 @@ class CoverLoader {
         }
     }
 
-    private File lookForLocalCover(final String artist, final String album) {
-        String filename = getDefaultFilename(artist, album);
+    private File lookForLocalCover(final URI uri) {
+        String filename = getFilenameForUri(uri);
         startLoad(filename);
         try {
             File file = new File(mCoverDir, filename);
@@ -97,42 +95,14 @@ class CoverLoader {
         } finally {
             finishLoad(filename);
         }
-
-        if (album.isEmpty())
-            return null;
-        final String suffix = getFilenameSuffixForAlbum(album);
-        String[] matchingFilenames = mCoverDir.list(new FilenameFilter() {
-            @Override
-            public boolean accept(File dir, String filename) {
-                if (!filename.endsWith(suffix))
-                    return false;
-
-                startLoad(filename);
-                try {
-                    return new File(dir, filename).exists();
-                } finally {
-                    finishLoad(filename);
-                }
-            }
-        });
-        return (matchingFilenames.length == 1) ?  new File(mCoverDir, matchingFilenames[0]) : null;
+        return null;
     }
 
-    private File downloadCover(String artist, String album) {
+    private File downloadCover(final URI uri) {
         if (!Util.isNetworkAvailable(mContext))
             return null;
 
-        String[] error = new String[1];
-        String remoteFilename = Download.downloadString(
-            mContext,
-            "/find_cover",
-            "artist=" + Uri.encode(artist) + "&album=" + Uri.encode(album),
-            error);
-        // No monkey business.
-        if (remoteFilename == null || remoteFilename.isEmpty())
-            return null;
-
-        String localFilename = getDefaultFilename(artist, album);
+        String localFilename = getFilenameForUri(uri);
         startLoad(localFilename);
 
         boolean success = false;
@@ -151,7 +121,7 @@ class CoverLoader {
             file.createNewFile();
             outputStream = new FileOutputStream(file);
 
-            request = new DownloadRequest(mContext, DownloadRequest.Method.GET, "/cover/" + Uri.encode(remoteFilename), null);
+            request = new DownloadRequest(mContext, uri, DownloadRequest.Method.GET);
             result = Download.startDownload(request);
             if (result.getStatusCode() != 200)
                 throw new IOException("got status code " + result.getStatusCode());
@@ -162,12 +132,10 @@ class CoverLoader {
             while ((bytesRead = inputStream.read(buffer)) != -1)
                 outputStream.write(buffer, 0, bytesRead);
             success = true;
-        } catch (DownloadRequest.PrefException e) {
-            Log.e(TAG, "got pref exception while fetching " + remoteFilename + ": " + e);
         } catch (org.apache.http.HttpException e) {
-            Log.e(TAG, "got HTTP error while fetching " + remoteFilename + ": " + e);
+            Log.e(TAG, "got HTTP error while fetching " + uri.toString() + ": " + e);
         } catch (IOException e) {
-            Log.e(TAG, "got IO error while fetching " + remoteFilename + ": " + e);
+            Log.e(TAG, "got IO error while fetching " + uri.toString() + ": " + e);
         } finally {
             if (outputStream != null) {
                 try {
@@ -186,6 +154,11 @@ class CoverLoader {
         }
 
         return success ? file : null;
+    }
+
+    private String getFilenameForUri(URI uri) {
+        String parts[] = uri.getPath().split("/");
+        return parts[parts.length-1];
     }
 
     // Call before checking for the existence of a local cover file and before
@@ -218,18 +191,5 @@ class CoverLoader {
         } finally {
             mLock.unlock();
         }
-    }
-
-    // Get the default file that we'd look for for a given artist and album.
-    private String getDefaultFilename(String artist, String album) {
-        artist = Util.truncateString(Util.escapeStringForFilename(artist), MAX_ARTIST_OR_ALBUM_LENGTH_FOR_FILENAME);
-        album = Util.truncateString(Util.escapeStringForFilename(album), MAX_ARTIST_OR_ALBUM_LENGTH_FOR_FILENAME);
-        return artist + "-" + album + ".jpg";
-    }
-
-    // Get the file suffix that we'd look for for a given album.
-    private String getFilenameSuffixForAlbum(String album) {
-        album = Util.truncateString(Util.escapeStringForFilename(album), MAX_ARTIST_OR_ALBUM_LENGTH_FOR_FILENAME);
-        return "-" + album + ".jpg";
     }
 }
