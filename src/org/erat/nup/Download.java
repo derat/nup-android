@@ -70,6 +70,7 @@ class DownloadRequest {
         mHttpRequest.addHeader("Host", mUri.getHost() + ":" + mUri.getPort());
         // TODO: Set User-Agent to something reasonable.
 
+        /*
         // Add Authorization header if username and password prefs are set.
         // FIXME: Need to set auth cookie instead, I think.
         SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
@@ -77,6 +78,7 @@ class DownloadRequest {
         String password = prefs.getString(NupPreferences.PASSWORD, "");
         if (!username.isEmpty() && !password.isEmpty())
             mHttpRequest.setHeader("Authorization", "Basic " + Base64.encodeToString((username + ":" + password).getBytes(), Base64.NO_WRAP));
+            */
     }
 
     public static URI getServerUri(Context context, String path, String query) throws PrefException {

@@ -27,9 +27,9 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
         pref.setOnPreferenceChangeListener(this);
         pref.setSummary(mPrefs.getString(NupPreferences.SERVER_URL, ""));
 
-        pref = findPreference(NupPreferences.USERNAME);
+        pref = findPreference(NupPreferences.ACCOUNT);
         pref.setOnPreferenceChangeListener(this);
-        pref.setSummary(mPrefs.getString(NupPreferences.USERNAME, ""));
+        pref.setSummary(mPrefs.getString(NupPreferences.ACCOUNT, ""));
 
         pref = findPreference(NupPreferences.SYNC_SONG_LIST);
         NupActivity.getService().addSongDatabaseUpdateListener((YesNoPreference) pref);
@@ -90,8 +90,8 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
             }
             findPreference(NupPreferences.SERVER_URL).setSummary(strValue);
             return true;
-        } else if (pref.getKey().equals(NupPreferences.USERNAME)) {
-            findPreference(NupPreferences.USERNAME).setSummary((String) value);
+        } else if (pref.getKey().equals(NupPreferences.ACCOUNT)) {
+            findPreference(NupPreferences.ACCOUNT).setSummary((String) value);
             return true;
         } else if (pref.getKey().equals(NupPreferences.CACHE_SIZE)) {
             int intValue = parseNonNegativeInt((String) value);

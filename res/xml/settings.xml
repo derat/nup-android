@@ -8,15 +8,9 @@
         android:singleLine="true"
         />
     <EditTextPreference
-        android:key="username"
-        android:title="@string/username"
-        android:dialogMessage="@string/username_description"
-        android:singleLine="true"
-        />
-    <EditTextPreference
-        android:key="password"
-        android:title="@string/password"
-        android:password="true"
+        android:key="account"
+        android:title="@string/account"
+        android:dialogMessage="@string/account_description"
         android:singleLine="true"
         />
     <org.erat.nup.YesNoPreference

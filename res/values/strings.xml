@@ -2,6 +2,8 @@
 <resources>
   <string name="app_name">nup</string>
 
+  <string name="account">Account</string>
+  <string name="account_description">Account used for authentication</string>
   <string name="album">Album</string>
   <string name="album_colon">Album:</string>
   <string name="albums">Albums</string>
@@ -86,8 +88,6 @@
   <string name="track_colon">Track:</string>
   <string name="truncate_list">Truncate list</string>
   <string name="unlimited">Unlimited</string>
-  <string name="username">Username</string>
-  <string name="username_description">Used for HTTP basic authentication, or blank if auth isn\'t needed.</string>
 
   <string-array name="min_rating_array">
     <item>0.00</item>
