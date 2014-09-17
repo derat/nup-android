@@ -158,6 +158,7 @@ public class NupActivity extends Activity
                 mPlaylistView.smoothScrollToPosition(mCurrentSongIndex);
             }
 
+            // TODO: Go to prefs page if server and account are unset.
             if (mSongs.isEmpty())
                 startActivity(new Intent(NupActivity.this, BrowseActivity.class));
         }

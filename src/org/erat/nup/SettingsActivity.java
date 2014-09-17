@@ -92,6 +92,7 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
             return true;
         } else if (pref.getKey().equals(NupPreferences.ACCOUNT)) {
             findPreference(NupPreferences.ACCOUNT).setSummary((String) value);
+            new AuthenticateTask(this).execute();
             return true;
         } else if (pref.getKey().equals(NupPreferences.CACHE_SIZE)) {
             int intValue = parseNonNegativeInt((String) value);

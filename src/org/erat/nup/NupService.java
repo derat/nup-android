@@ -27,6 +27,8 @@ import android.widget.RemoteViews;
 import android.widget.Toast;
 
 import java.io.File;
+import java.net.CookieHandler;
+import java.net.CookieManager;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
@@ -224,6 +226,9 @@ public class NupService extends Service
     public void onCreate() {
         Log.d(TAG, "service created");
         CrashLogger.register(new File(getExternalFilesDir(null), CRASH_SUBDIRECTORY));
+
+        CookieHandler.setDefault(new CookieManager());
+        new AuthenticateTask(this).execute();
 
         mNotification = new Notification(R.drawable.status, getString(R.string.startup_message), System.currentTimeMillis());
         mNotification.flags |= (Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR);
