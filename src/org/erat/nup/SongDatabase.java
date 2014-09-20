@@ -39,6 +39,8 @@ class SongDatabase {
     private static final String DATABASE_NAME = "NupSongs";
     private static final int DATABASE_VERSION = 10;
 
+    private static final int SERVER_SONG_BATCH_SIZE = 100;
+
     // IMPORTANT NOTE: When updating any of these, you must replace all previous references in
     // upgradeFromPreviousVersion() with the hardcoded older version of the string.
     private static final String CREATE_SONGS_SQL =
@@ -71,13 +73,9 @@ class SongDatabase {
         "CREATE INDEX AlbumSortKey ON ArtistAlbumStats (AlbumSortKey)";
 
     private static final String CREATE_LAST_UPDATE_TIME_SQL =
-        "CREATE TABLE LastUpdateTime (" +
-        "  Timestamp INTEGER NOT NULL, " +
-        "  MaxLastModifiedUsec INTEGER NOT NULL)";
+        "CREATE TABLE LastUpdateTime (ServerTimeNsec INTEGER NOT NULL)";
     private static final String INSERT_LAST_UPDATE_TIME_SQL =
-        "INSERT INTO LastUpdateTime " +
-        "  (Timestamp, MaxLastModifiedUsec) " +
-        "  VALUES(-1, -1)";
+        "INSERT INTO LastUpdateTime (ServerTimeNsec) VALUES(0)";
 
     private static final String CREATE_CACHED_SONGS_SQL =
         "CREATE TABLE CachedSongs (" +
@@ -447,33 +445,33 @@ class SongDatabase {
         SQLiteDatabase db = mOpener.getDb();
         db.beginTransaction();
         try {
-            // Ask the server for the max last modified time before we fetch anything.  We'll use this as the starting
-            // point for the next sync, to handle the case where some songs in the server are updated while we're doing this
-            // sync.
-            String maxLastModifiedUsecStr = Download.downloadString(mContext, "/songs", "getMaxLastModifiedUsec=1", message);
-            if (maxLastModifiedUsecStr == null)
+            // Ask the server for the current time before we fetch anything.  We'll use this as the starting point for
+            // the next sync, to handle the case where some songs in the server are updated while we're doing this sync.
+            String startTimeStr = Download.downloadString(mContext, "/now_nsec", "", message);
+            if (startTimeStr == null)
                 return false;
-            long maxLastModifiedUsec = 0;
+            long startTimeNsec = 0;
             try {
-                maxLastModifiedUsec = Long.valueOf(maxLastModifiedUsecStr);
+                startTimeNsec = Long.valueOf(startTimeStr);
             } catch (NumberFormatException e) {
-                message[0] = "Unable to parse max last-modified time: " + maxLastModifiedUsecStr;
+                message[0] = "Unable to parse time: " + startTimeStr;
                 return false;
             }
 
             // Start where we left off last time.
-            Cursor dbCursor = db.rawQuery("SELECT MaxLastModifiedUsec FROM LastUpdateTime", null);
+            Cursor dbCursor = db.rawQuery("SELECT ServerTimeNsec FROM LastUpdateTime", null);
             dbCursor.moveToFirst();
-            long minLastModifiedUsec = dbCursor.getLong(0) + 1;
+            long prevStartTimeNsec = dbCursor.getLong(0);
             dbCursor.close();
 
             // The server breaks its results up into batches instead of sending us a bunch of songs
-            // at once, so use the cursor that it returns to start in the correct place in the next requets.
+            // at once, so use the cursor that it returns to start in the correct place in the next request.
             String serverCursor = "";
 
             while (numSongsUpdated == 0 || !serverCursor.isEmpty()) {
                 String response = Download.downloadString(
-                    mContext, "/songs", String.format("minLastModifiedUsec=%d&cursor=%s", minLastModifiedUsec, serverCursor), message);
+                    mContext, "/songs",
+                    String.format("minLastModifiedNsec=%l&max=%d&cursor=%s", prevStartTimeNsec, SERVER_SONG_BATCH_SIZE, serverCursor), message);
                 if (response == null)
                     return false;
 
@@ -526,8 +524,7 @@ class SongDatabase {
             }
 
             ContentValues values = new ContentValues(2);
-            values.put("Timestamp", new Date().getTime() / 1000);
-            values.put("MaxLastModifiedUsec", maxLastModifiedUsec);
+            values.put("ServerTimeNsec", startTimeNsec);
             db.update("LastUpdateTime", values, null, null);
 
             if (numSongsUpdated > 0) {
