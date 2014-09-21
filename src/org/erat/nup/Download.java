@@ -38,6 +38,8 @@ import java.util.zip.GZIPInputStream;
 // Also does a lot of preparation like looking up server URL and authorization preferences
 // and constructing the HTTP request.
 class DownloadRequest {
+    private static String TAG = "DownloadRequest";
+
     public enum Auth {
         SERVER,
         STORAGE
@@ -85,7 +87,13 @@ class DownloadRequest {
             if (!username.isEmpty() && !password.isEmpty())
                 mHttpRequest.setHeader("Authorization", "Basic " + Base64.encodeToString((username + ":" + password).getBytes(), Base64.NO_WRAP));
         } else if (auth == Auth.STORAGE) {
-            // FIXME: Set "Authorization: Bearer ..." header with OAuth2 access token.
+            try {
+                String token = Authenticate.getAuthToken(mContext);
+                mHttpRequest.setHeader("Authorization", "Bearer " + token);
+                //Log.d(TAG, "requesting " + mUri.toString() + " with Authorization: " + mHttpRequest.getLastHeader("Authorization"));
+            } catch (Authenticate.AuthException e) {
+                Log.e(TAG, "failed to get auth token: " + e);
+            }
         }
     }
 
@@ -98,6 +106,7 @@ class DownloadRequest {
         if (server.isEmpty())
             throw new PrefException("Server URL is not configured");
 
+        // TODO: Unify this with Util.constructURI().
         URI serverUri;
         try {
             serverUri = new URI(server);

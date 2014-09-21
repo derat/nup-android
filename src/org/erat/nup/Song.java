@@ -32,8 +32,8 @@ class Song implements Serializable {
         mArtist = artist;
         mTitle = title;
         mAlbum = album;
-        mUri = constructURI(url);
-        mCoverUri = constructURI(coverUrl);
+        mUri = Util.constructURI(url);
+        mCoverUri = Util.constructURI(coverUrl);
         mLengthSec = lengthSec;
         mTrackNum = trackNum;
         mDiscNum = discNum;
@@ -65,22 +65,5 @@ class Song implements Serializable {
     public void updateBytes(FileCacheEntry entry) {
         mAvailableBytes = entry.getCachedBytes();
         mTotalBytes = entry.getTotalBytes();
-    }
-
-    private static URI constructURI(String url) throws URISyntaxException {
-        if (url.isEmpty())
-            return null;
-
-        // TODO: Lols.
-        String[] parts = url.split(":", 2);
-        if (parts.length != 2)
-            throw new URISyntaxException(url, "Didn't match scheme:[...] format");
-
-        URI uri = new URI(parts[0], parts[1], null);
-        if (uri.getPort() == -1) {
-            int port = uri.getScheme() == "https" ? 443 : 80;
-            uri = new URI(uri.getScheme(), uri.getUserInfo(), uri.getHost(), port, uri.getPath(), uri.getQuery(), uri.getFragment());
-        }
-        return uri;
     }
 }
