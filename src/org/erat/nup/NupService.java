@@ -228,7 +228,7 @@ public class NupService extends Service
         CrashLogger.register(new File(getExternalFilesDir(null), CRASH_SUBDIRECTORY));
 
         CookieHandler.setDefault(new CookieManager());
-        new AuthenticateTask(this).execute();
+        //new AuthenticateTask(this).execute();
 
         mNotification = new Notification(R.drawable.status, getString(R.string.startup_message), System.currentTimeMillis());
         mNotification.flags |= (Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR);

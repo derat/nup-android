@@ -27,6 +27,10 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
         pref.setOnPreferenceChangeListener(this);
         pref.setSummary(mPrefs.getString(NupPreferences.SERVER_URL, ""));
 
+        pref = findPreference(NupPreferences.USERNAME);
+        pref.setOnPreferenceChangeListener(this);
+        pref.setSummary(mPrefs.getString(NupPreferences.USERNAME, ""));
+
         pref = findPreference(NupPreferences.ACCOUNT);
         pref.setOnPreferenceChangeListener(this);
         pref.setSummary(mPrefs.getString(NupPreferences.ACCOUNT, ""));
@@ -90,9 +94,12 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
             }
             findPreference(NupPreferences.SERVER_URL).setSummary(strValue);
             return true;
+        } else if (pref.getKey().equals(NupPreferences.USERNAME)) {
+            findPreference(NupPreferences.USERNAME).setSummary((String) value);
+            return true;
         } else if (pref.getKey().equals(NupPreferences.ACCOUNT)) {
             findPreference(NupPreferences.ACCOUNT).setSummary((String) value);
-            new AuthenticateTask(this).execute();
+            //new AuthenticateTask(this).execute();
             return true;
         } else if (pref.getKey().equals(NupPreferences.CACHE_SIZE)) {
             int intValue = parseNonNegativeInt((String) value);

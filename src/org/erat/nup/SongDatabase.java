@@ -73,9 +73,11 @@ class SongDatabase {
         "CREATE INDEX AlbumSortKey ON ArtistAlbumStats (AlbumSortKey)";
 
     private static final String CREATE_LAST_UPDATE_TIME_SQL =
-        "CREATE TABLE LastUpdateTime (ServerTimeNsec INTEGER NOT NULL)";
+        "CREATE TABLE LastUpdateTime (" +
+        "  LocalTimeNsec INTEGER NOT NULL, " +
+        "  ServerTimeNsec INTEGER NOT NULL)";
     private static final String INSERT_LAST_UPDATE_TIME_SQL =
-        "INSERT INTO LastUpdateTime (ServerTimeNsec) VALUES(0)";
+        "INSERT INTO LastUpdateTime (LocalTimeNsec, ServerTimeNsec) VALUES(0, 0)";
 
     private static final String CREATE_CACHED_SONGS_SQL =
         "CREATE TABLE CachedSongs (" +
@@ -471,22 +473,22 @@ class SongDatabase {
             while (numSongsUpdated == 0 || !serverCursor.isEmpty()) {
                 String response = Download.downloadString(
                     mContext, "/songs",
-                    String.format("minLastModifiedNsec=%l&max=%d&cursor=%s", prevStartTimeNsec, SERVER_SONG_BATCH_SIZE, serverCursor), message);
+                    String.format("minLastModifiedNsec=%d&max=%d&cursor=%s", prevStartTimeNsec, SERVER_SONG_BATCH_SIZE, serverCursor), message);
                 if (response == null)
                     return false;
 
                 serverCursor = "";
 
                 try {
-                    JSONArray jsonSongs = (JSONArray) new JSONTokener(response).nextValue();
-                    if (jsonSongs.length() == 0)
+                    JSONArray objects = (JSONArray) new JSONTokener(response).nextValue();
+                    if (objects.length() == 0)
                         break;
 
-                    for (int i = 0; i < jsonSongs.length(); ++i) {
-                        JSONObject jsonSong = jsonSongs.optJSONObject(i);
+                    for (int i = 0; i < objects.length(); ++i) {
+                        JSONObject jsonSong = objects.optJSONObject(i);
                         if (jsonSong == null) {
-                            if (i == jsonSongs.length() - 1) {
-                                serverCursor = jsonSongs.getString(0);
+                            if (i == objects.length() - 1) {
+                                serverCursor = objects.getString(i);
                                 break;
                             } else {
                                 message[0] = "Item " + i + " from server isn't a JSON object";
@@ -495,10 +497,10 @@ class SongDatabase {
                         }
 
                         long songId = jsonSong.getLong("songId");
-                        boolean deleted = false;  // TODO: Figure out how to do deletions.
+                        boolean deleted = false;  // TODO: Figure out how to do deletions for App Engine.
 
                         if (!deleted) {
-                            ContentValues values = new ContentValues(8);
+                            ContentValues values = new ContentValues(10);
                             values.put("SongId", songId);
                             values.put("Url", jsonSong.getString("url"));
                             values.put("CoverUrl", jsonSong.has("coverUrl") ? jsonSong.getString("coverUrl") : "");
@@ -524,6 +526,7 @@ class SongDatabase {
             }
 
             ContentValues values = new ContentValues(2);
+            values.put("LocalTimeNsec", new Date().getTime()*1000*1000);
             values.put("ServerTimeNsec", startTimeNsec);
             db.update("LastUpdateTime", values, null, null);
 
@@ -617,9 +620,9 @@ class SongDatabase {
 
     private void loadAggregateData(boolean songsUpdated) {
         SQLiteDatabase db = mOpener.getDb();
-        Cursor cursor = db.rawQuery("SELECT Timestamp FROM LastUpdateTime", null);
+        Cursor cursor = db.rawQuery("SELECT LocalTimeNsec FROM LastUpdateTime", null);
         cursor.moveToFirst();
-        Date lastSyncDate = (cursor.getInt(0) > -1) ? new Date((long) cursor.getInt(0) * 1000) : null;
+        Date lastSyncDate = (cursor.getInt(0) > 0) ? new Date(cursor.getLong(0)/(1000*1000)) : null;
         cursor.close();
 
         // If the song data didn't change and we've already loaded it, bail out early.

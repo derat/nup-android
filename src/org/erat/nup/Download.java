@@ -38,6 +38,11 @@ import java.util.zip.GZIPInputStream;
 // Also does a lot of preparation like looking up server URL and authorization preferences
 // and constructing the HTTP request.
 class DownloadRequest {
+    public enum Auth {
+        SERVER,
+        STORAGE
+    }
+
     public enum Method {
         GET,
         POST
@@ -51,12 +56,14 @@ class DownloadRequest {
         }
     }
 
+    private Context mContext;
     private Method mMethod;
     private HttpRequest mHttpRequest;
     private URI mUri;
     private String mBody;
 
-    DownloadRequest(URI uri, Method method) {
+    DownloadRequest(Context context, URI uri, Method method, Auth auth) {
+        mContext = context;
         mUri = uri;
         mMethod = method;
 
@@ -69,6 +76,17 @@ class DownloadRequest {
         mHttpRequest = (method == Method.GET) ? new HttpGet(pathQuery) : new HttpPost(pathQuery);
         mHttpRequest.addHeader("Host", mUri.getHost() + ":" + mUri.getPort());
         // TODO: Set User-Agent to something reasonable.
+
+        if (auth == Auth.SERVER) {
+            // Add Authorization header if username and password prefs are set.
+            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+            String username = prefs.getString(NupPreferences.USERNAME, "");
+            String password = prefs.getString(NupPreferences.PASSWORD, "");
+            if (!username.isEmpty() && !password.isEmpty())
+                mHttpRequest.setHeader("Authorization", "Basic " + Base64.encodeToString((username + ":" + password).getBytes(), Base64.NO_WRAP));
+        } else if (auth == Auth.STORAGE) {
+            // FIXME: Set "Authorization: Bearer ..." header with OAuth2 access token.
+        }
     }
 
     public static URI getServerUri(Context context, String path, String query) throws PrefException {
@@ -227,7 +245,8 @@ class Download {
     public static String downloadString(Context context, String path, String query, String[] error) {
         try {
             DownloadRequest request = new DownloadRequest(
-                DownloadRequest.getServerUri(context, path, query), DownloadRequest.Method.GET);
+                context, DownloadRequest.getServerUri(context, path, query),
+                DownloadRequest.Method.GET, DownloadRequest.Auth.SERVER);
             request.setHeader("Accept-Encoding", "gzip");
             DownloadResult result = startDownload(request);
             if (result.getStatusCode() != 200) {

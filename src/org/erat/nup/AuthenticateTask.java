@@ -40,7 +40,7 @@ class AuthenticateTask extends AsyncTask<Void, Void, String> {
 
         try {
             URI uri = DownloadRequest.getServerUri(mContext, "/_ah/login", "continue=http://localhost/&auth=" + token);
-            DownloadRequest request = new DownloadRequest(uri, DownloadRequest.Method.GET);
+            DownloadRequest request = new DownloadRequest(mContext, uri, DownloadRequest.Method.GET, DownloadRequest.Auth.SERVER);
             DownloadResult result = Download.startDownload(request);
             if (result.getStatusCode() != 200 && result.getStatusCode() != 302) {
                 return "Server returned " + result.getStatusCode() + " while authenticating.";

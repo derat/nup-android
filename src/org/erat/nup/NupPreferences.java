@@ -5,6 +5,8 @@ package org.erat.nup;
 
 public class NupPreferences {
     public static final String SERVER_URL        = "server_url";
+    public static final String USERNAME          = "username";
+    public static final String PASSWORD          = "password";
     public static final String ACCOUNT           = "account";
     public static final String SYNC_SONG_LIST    = "sync_song_list";
     public static final String CACHE_SIZE        = "cache_size";

@@ -350,7 +350,7 @@ class FileCache implements Runnable {
         }
 
         private DownloadStatus startDownload() {
-            mRequest = new DownloadRequest(mUri, DownloadRequest.Method.GET);
+            mRequest = new DownloadRequest(mContext, mUri, DownloadRequest.Method.GET, DownloadRequest.Auth.STORAGE);
 
             if (mEntry.getCachedBytes() > 0 && mEntry.getCachedBytes() < mEntry.getTotalBytes()) {
                 Log.d(TAG, "attempting to resume download at byte " + mEntry.getCachedBytes());
