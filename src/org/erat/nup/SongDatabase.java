@@ -622,12 +622,11 @@ class SongDatabase {
         SQLiteDatabase db = mOpener.getDb();
         Cursor cursor = db.rawQuery("SELECT LocalTimeNsec FROM LastUpdateTime", null);
         cursor.moveToFirst();
-        Date lastSyncDate = (cursor.getInt(0) > 0) ? new Date(cursor.getLong(0)/(1000*1000)) : null;
+        mLastSyncDate = (cursor.getLong(0) > 0) ? new Date(cursor.getLong(0)/(1000*1000)) : null;
         cursor.close();
 
         // If the song data didn't change and we've already loaded it, bail out early.
         if (!songsUpdated && mAggregateDataLoaded) {
-            mLastSyncDate = lastSyncDate;
             mListener.onAggregateDataUpdate();
             return;
         }
@@ -684,7 +683,6 @@ class SongDatabase {
             }
         });
 
-        mLastSyncDate = lastSyncDate;
         mNumSongs = numSongs;
         mArtistsSortedAlphabetically = artistsSortedAlphabetically;
         mAlbumsSortedAlphabetically = albumsSortedAlphabetically;
