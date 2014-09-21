@@ -27,6 +27,7 @@ import org.apache.http.params.HttpParams;
 import org.apache.http.RequestLine;
 import org.apache.http.StatusLine;
 
+import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.IOException;
 import java.net.Socket;
@@ -75,7 +76,15 @@ class DownloadRequest {
         String pathQuery = mUri.getPath();
         if (mUri.getQuery() != null && !mUri.getQuery().isEmpty())
             pathQuery += "?" + mUri.getQuery();
-        mHttpRequest = (method == Method.GET) ? new HttpGet(pathQuery) : new HttpPost(pathQuery);
+
+        if (method == Method.GET) {
+            mHttpRequest = new HttpGet(pathQuery);
+        } else {
+            mHttpRequest = new HttpPost(pathQuery);
+            // Default to setting a zero content length; App Engine is unhappy if this is left out.
+            mHttpRequest.setHeader("Content-Length", "0");
+        }
+
         mHttpRequest.addHeader("Host", mUri.getHost() + ":" + mUri.getPort());
         // TODO: Set User-Agent to something reasonable.
 
@@ -90,7 +99,6 @@ class DownloadRequest {
             try {
                 String token = Authenticate.getAuthToken(mContext);
                 mHttpRequest.setHeader("Authorization", "Bearer " + token);
-                //Log.d(TAG, "requesting " + mUri.toString() + " with Authorization: " + mHttpRequest.getLastHeader("Authorization"));
             } catch (Authenticate.AuthException e) {
                 Log.e(TAG, "failed to get auth token: " + e);
             }
@@ -153,6 +161,7 @@ class DownloadRequest {
         entity.setContent(stream);
         entity.setContentLength(contentLength);
         ((HttpPost) mHttpRequest).setEntity(entity);
+        mHttpRequest.setHeader("Content-Length", Long.toString(contentLength));
     }
 }
 
@@ -206,6 +215,7 @@ class Download {
             .setBooleanParameter(CoreConnectionPNames.TCP_NODELAY, true);
 
         final URI uri = req.getUri();
+        Log.d(TAG, "starting " + req.getHttpRequest().getRequestLine().getMethod() + " to " + uri.toString());
         DefaultHttpClientConnection conn = new DefaultHttpClientConnection();
         Socket socket = new Socket(uri.getHost(), uri.getPort());
         if (uri.getScheme().equals("https")) {
@@ -215,6 +225,7 @@ class Download {
                 socket = factory.createSocket(socket, uri.getHost(), uri.getPort(), true);
             } catch (IOException e) {
                 socket.close();
+                Log.e(TAG, "failed to wrap SSL socket: " + e);
                 throw e;
             }
         }
@@ -223,6 +234,7 @@ class Download {
             conn.bind(socket, params);
         } catch (IOException e) {
             socket.close();
+            Log.e(TAG, "failed to bind connection to socket: " + e);
             throw e;
         }
 
@@ -238,15 +250,15 @@ class Download {
             conn.receiveResponseEntity(response);
             StatusLine statusLine = response.getStatusLine();
             BasicHttpEntity entity = (BasicHttpEntity) response.getEntity();
-            return new DownloadResult(statusLine.getStatusCode(),
-                                      statusLine.getReasonPhrase(),
-                                      entity,
-                                      conn);
+            Log.d(TAG, "got " + statusLine.getStatusCode() + " (" + statusLine.getReasonPhrase() + ") for " + uri.toString());
+            return new DownloadResult(statusLine.getStatusCode(), statusLine.getReasonPhrase(), entity, conn);
         } catch (HttpException e) {
             socket.close();
+            Log.e(TAG, "got HTTP exception for " + uri.toString() + ": " + e);
             throw e;
         } catch (IOException e) {
             socket.close();
+            Log.e(TAG, "got IO exception for " + uri.toString() + ": " + e);
             throw e;
         }
     }

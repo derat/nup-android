@@ -56,19 +56,22 @@ class PlaybackReporter {
         Log.d(TAG, "reporting song " + songId + " started at " + startDate);
         DownloadResult result = null;
 
+        String errorMessage;
         try {
             String params = "songId=" + songId + "&startTime=" + (startDate.getTime() / 1000);
             DownloadRequest request = new DownloadRequest(
                 mContext, DownloadRequest.getServerUri(mContext, "/report_played", params),
                 DownloadRequest.Method.POST, DownloadRequest.Auth.SERVER);
             result = Download.startDownload(request);
-            return true;
+            if (result.getStatusCode() == 200)
+                return true;
+            Log.e(TAG, "got " + result.getStatusCode() + " from server: " + result.getReason());
         } catch (DownloadRequest.PrefException e) {
-            Log.w(TAG, "got preferences error while reporting played song: " + e);
+            Log.e(TAG, "got preferences error: " + e);
         } catch (org.apache.http.HttpException e) {
-            Log.w(TAG, "got HTTP error while reporting played song: " + e);
+            Log.e(TAG, "got HTTP error: " + e);
         } catch (IOException e) {
-            Log.w(TAG, "got IO error while reporting played song: " + e);
+            Log.e(TAG, "got IO error: " + e);
         } finally {
             if (result != null)
                 result.close();
