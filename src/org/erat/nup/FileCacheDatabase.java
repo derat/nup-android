@@ -89,7 +89,7 @@ class FileCacheDatabase {
                     cursor.moveToFirst();
                     while (!cursor.isAfterLast()) {
                         File file = new File(cursor.getString(0));
-                        int songId = Integer.valueOf(file.getName().split("\\.")[0]);
+                        long songId = Integer.valueOf(file.getName().split("\\.")[0]);
                         db.execSQL("REPLACE INTO CacheEntries (SongId, TotalBytes, LastAccessTime) VALUES(?, ?, ?)",
                                    new Object[]{ songId, cursor.getInt(1), cursor.getInt(2) });
                         cursor.moveToNext();
@@ -117,7 +117,7 @@ class FileCacheDatabase {
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
             FileCacheEntry entry =
-                new FileCacheEntry(cursor.getInt(0), cursor.getLong(1), cursor.getInt(2));
+                new FileCacheEntry(cursor.getLong(0), cursor.getLong(1), cursor.getInt(2));
             File file = entry.getLocalFile(context);
             entry.setCachedBytes(file.exists() ? file.length() : 0);
             mEntries.put(entry.getSongId(), entry);
