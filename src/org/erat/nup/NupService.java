@@ -371,6 +371,16 @@ public class NupService extends Service
         startForeground(NOTIFICATION_ID, mNotification);
     }
 
+    // Update the track information displayed via Bluetooth.
+    private void updateBluetooth() {
+        final Song song = getCurrentSong();
+        Intent intent = new Intent("com.android.music.metachanged");
+        intent.putExtra("track", song != null ? song.getTitle() : "");
+        intent.putExtra("artist", song != null ? song.getArtist() : "");
+        intent.putExtra("album", song != null ? song.getAlbum() : "");
+        sendBroadcast(intent);
+    }
+
     // Toggle whether we're playing the current song or not.
     public void togglePause() {
         mPlayer.togglePause();
@@ -511,6 +521,7 @@ public class NupService extends Service
 
         fetchCoverForSongIfMissing(song);
         updateNotification();
+        updateBluetooth();
 
         if (mSongListener != null)
             mSongListener.onSongChange(song, mCurrentSongIndex);
