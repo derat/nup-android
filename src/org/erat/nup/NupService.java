@@ -225,7 +225,8 @@ public class NupService extends Service
         Log.d(TAG, "service created");
         CrashLogger.register(new File(getExternalFilesDir(null), CRASH_SUBDIRECTORY));
 
-        new AuthenticateTask(this).execute();
+        if (Util.isNetworkAvailable(this))
+            new AuthenticateTask(this).execute();
 
         mNotification = new Notification(R.drawable.status, getString(R.string.startup_message), System.currentTimeMillis());
         mNotification.flags |= (Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR);
