@@ -858,6 +858,7 @@ public class NupService extends Service
             mDownloadSongId = song.getSongId();
             mDownloadIndex = index;
             mCache.pinSongId(song.getSongId());
+            fetchCoverForSongIfMissing(song);
             return;
         }
     }
