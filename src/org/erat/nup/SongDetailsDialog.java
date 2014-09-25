@@ -49,12 +49,14 @@ class SongDetailsDialog {
         ((TextView) dialog.findViewById(R.id.length)).setText(
             Util.formatDurationString(bundle.getInt(BUNDLE_LENGTH_SEC)));
 
-        // Really, Java?  No way to repeat a string X times without using Apache Commons?
-        int numStars = (int) Math.round(bundle.getDouble(BUNDLE_RATING) * 4);
         String ratingStr = "";
-        if (numStars >= 0)
-            for (int i = 1; i <= 4; ++i)
+        double rating = bundle.getDouble(BUNDLE_RATING);
+        if (rating >= 0.0) {
+            // Really, Java?  No way to repeat a string X times without using Apache Commons?
+            int numStars = 1 + (int) Math.round(rating * 4.0);
+            for (int i = 1; i <= 5; ++i)
                 ratingStr += (i <= numStars) ? "\u2605" : "\u2606";
+        }
         ((TextView) dialog.findViewById(R.id.rating)).setText(ratingStr);
     }
 }

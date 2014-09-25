@@ -110,7 +110,7 @@ public class SearchFormActivity extends Activity
         intent.putExtra(SearchResultsActivity.BUNDLE_ALBUM,
                         mAlbumEdit.getText().toString().trim());
         intent.putExtra(SearchResultsActivity.BUNDLE_MIN_RATING,
-                        mMinRatingSpinner.getSelectedItem().toString());
+                        mMinRatingSpinner.getSelectedItemPosition() / 4.0);
         intent.putExtra(SearchResultsActivity.BUNDLE_SHUFFLE,
                         mShuffleCheckbox.isChecked());
         intent.putExtra(SearchResultsActivity.BUNDLE_SUBSTRING,

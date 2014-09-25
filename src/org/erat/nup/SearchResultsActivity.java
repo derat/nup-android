@@ -56,10 +56,11 @@ public class SearchResultsActivity extends Activity {
         setContentView(R.layout.search_results);
 
         class Query {
-            public String artist, title, album, minRating;
+            public String artist, title, album;
+            public double minRating;
             public boolean shuffle, substring, onlyCached;
 
-            Query(String artist, String title, String album, String minRating,
+            Query(String artist, String title, String album, double minRating,
                   boolean shuffle, boolean substring, boolean onlyCached) {
                 this.artist = artist;
                 this.title = title;
@@ -75,14 +76,14 @@ public class SearchResultsActivity extends Activity {
         final Intent intent = getIntent();
         if (Intent.ACTION_SEARCH.equals(intent.getAction())) {
             String queryString = intent.getStringExtra(SearchManager.QUERY);
-            queries.add(new Query(queryString, null, null, null, false, true, false));
-            queries.add(new Query(null, null, queryString, null, false, true, false));
-            queries.add(new Query(null, queryString, null, null, false, true, false));
+            queries.add(new Query(queryString, null, null, -1.0, false, true, false));
+            queries.add(new Query(null, null, queryString, -1.0, false, true, false));
+            queries.add(new Query(null, queryString, null, -1.0, false, true, false));
         } else {
             queries.add(new Query(intent.getStringExtra(BUNDLE_ARTIST),
                                   intent.getStringExtra(BUNDLE_TITLE),
                                   intent.getStringExtra(BUNDLE_ALBUM),
-                                  intent.getStringExtra(BUNDLE_MIN_RATING),
+                                  intent.getDoubleExtra(BUNDLE_MIN_RATING, -1.0),
                                   intent.getBooleanExtra(BUNDLE_SHUFFLE, false),
                                   intent.getBooleanExtra(BUNDLE_SUBSTRING, false),
                                   intent.getBooleanExtra(BUNDLE_CACHED, false)));

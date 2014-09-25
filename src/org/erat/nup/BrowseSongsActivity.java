@@ -46,7 +46,7 @@ public class BrowseSongsActivity extends Activity
     private String mAlbum = null;
 
     // Minimum rating that was passed to us.
-    private String mMinRating = null;
+    private double mMinRating = -1.0;
 
     // Songs that we're displaying.
     private List<Song> mSongs = new ArrayList<Song>();
@@ -59,7 +59,7 @@ public class BrowseSongsActivity extends Activity
         mArtist = getIntent().getStringExtra(BrowseActivity.BUNDLE_ARTIST);
         mAlbum = getIntent().getStringExtra(BrowseActivity.BUNDLE_ALBUM);
         mOnlyCached = getIntent().getBooleanExtra(BrowseActivity.BUNDLE_CACHED, false);
-        mMinRating = getIntent().getStringExtra(BrowseActivity.BUNDLE_MIN_RATING);
+        mMinRating = getIntent().getDoubleExtra(BrowseActivity.BUNDLE_MIN_RATING, -1.0);
 
         if (mAlbum != null) {
             setTitle(getString(mOnlyCached ?

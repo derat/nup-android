@@ -327,7 +327,7 @@ class SongDatabase {
         mOpener.close();
     }
 
-    public List<Song> query(String artist, String title, String album, String minRating, boolean shuffle, boolean substring, boolean onlyCached) {
+    public List<Song> query(String artist, String title, String album, double minRating, boolean shuffle, boolean substring, boolean onlyCached) {
         class QueryBuilder {
             public List<String> selections = new ArrayList<String>();
             public List<String> selectionArgs = new ArrayList<String>();
@@ -354,7 +354,7 @@ class SongDatabase {
         builder.add("Artist LIKE ?", artist, substring);
         builder.add("Title LIKE ?", title, substring);
         builder.add("Album LIKE ?", album, substring);
-        builder.add("Rating >= ?", minRating, false);
+        builder.add("Rating >= ?", minRating >= 0.0 ? Double.toString(minRating) : null, false);
 
         String query =
             "SELECT s.SongId, Artist, Title, Album, Url, CoverUrl, Length, s.TrackNumber, s.DiscNumber, Rating " +
