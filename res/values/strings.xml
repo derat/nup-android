@@ -28,7 +28,7 @@
   <string name="browse_songs">Browse songs</string>
   <string name="browse_songs_by_artist_fmt">Browse %s songs</string>
   <string name="browse_songs_from_album_fmt">Browse songs from %s</string>
-  <string name="browse_songs_with_75_rating">Browse songs &#x2265; 0.75</string>
+  <string name="browse_songs_four_stars">Browse four-star songs</string>
   <string name="cache_is_empty">Cache is empty</string>
   <string name="cache_current_usage">Current usage: %.1f MB</string>
   <string name="cache_size">Cache size</string>

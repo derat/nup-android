@@ -101,7 +101,7 @@ public class BrowseAlbumsActivity extends ListActivity
         StringIntPair album = mAlbums.get(position);
         if (album == null)
             return;
-        startBrowseSongsActivity(album.getString(), null);
+        startBrowseSongsActivity(album.getString(), -1.0);
     }
 
     @Override
@@ -109,7 +109,7 @@ public class BrowseAlbumsActivity extends ListActivity
         StringIntPair album = mAlbums.get(((AdapterView.AdapterContextMenuInfo) menuInfo).position);
         if (album != null)
             menu.setHeaderTitle(album.getString());
-        menu.add(0, MENU_ITEM_BROWSE_SONGS_WITH_RATING, 0, R.string.browse_songs_with_75_rating);
+        menu.add(0, MENU_ITEM_BROWSE_SONGS_WITH_RATING, 0, R.string.browse_songs_four_stars);
         menu.add(0, MENU_ITEM_BROWSE_SONGS, 0, R.string.browse_songs);
     }
 
@@ -121,10 +121,10 @@ public class BrowseAlbumsActivity extends ListActivity
             return false;
         switch (item.getItemId()) {
             case MENU_ITEM_BROWSE_SONGS_WITH_RATING:
-                startBrowseSongsActivity(album.getString(), "0.75");
+                startBrowseSongsActivity(album.getString(), 0.75);
                 return true;
             case MENU_ITEM_BROWSE_SONGS:
-                startBrowseSongsActivity(album.getString(), null);
+                startBrowseSongsActivity(album.getString(), -1.0);
                 return true;
             default:
                 return false;
@@ -175,13 +175,13 @@ public class BrowseAlbumsActivity extends ListActivity
     }
 
     // Launch BrowseSongsActivity for a given album.
-    private void startBrowseSongsActivity(String album, String minRating) {
+    private void startBrowseSongsActivity(String album, double minRating) {
         Intent intent = new Intent(this, BrowseSongsActivity.class);
         if (mArtist != null)
             intent.putExtra(BrowseActivity.BUNDLE_ARTIST, mArtist);
         intent.putExtra(BrowseActivity.BUNDLE_ALBUM, album);
         intent.putExtra(BrowseActivity.BUNDLE_CACHED, mOnlyCached);
-        if (minRating != null && !minRating.isEmpty())
+        if (minRating >= 0.0)
             intent.putExtra(BrowseActivity.BUNDLE_MIN_RATING, minRating);
         startActivityForResult(intent, BROWSE_SONGS_REQUEST_CODE);
     }

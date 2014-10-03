@@ -94,7 +94,7 @@ public class BrowseArtistsActivity extends ListActivity
         StringIntPair artist = mArtists.get(((AdapterView.AdapterContextMenuInfo) menuInfo).position);
         if (artist != null)
             menu.setHeaderTitle(artist.getString());
-        menu.add(0, MENU_ITEM_BROWSE_SONGS_WITH_RATING, 0, R.string.browse_songs_with_75_rating);
+        menu.add(0, MENU_ITEM_BROWSE_SONGS_WITH_RATING, 0, R.string.browse_songs_four_stars);
         menu.add(0, MENU_ITEM_BROWSE_SONGS, 0, R.string.browse_songs);
         menu.add(0, MENU_ITEM_BROWSE_ALBUMS, 0, R.string.browse_albums);
     }
@@ -107,10 +107,10 @@ public class BrowseArtistsActivity extends ListActivity
             return false;
         switch (item.getItemId()) {
             case MENU_ITEM_BROWSE_SONGS_WITH_RATING:
-                startBrowseSongsActivity(artist.getString(), "0.75");
+                startBrowseSongsActivity(artist.getString(), 0.75);
                 return true;
             case MENU_ITEM_BROWSE_SONGS:
-                startBrowseSongsActivity(artist.getString(), null);
+                startBrowseSongsActivity(artist.getString(), -1.0);
                 return true;
             case MENU_ITEM_BROWSE_ALBUMS:
                 startBrowseAlbumsActivity(artist.getString());
@@ -175,11 +175,11 @@ public class BrowseArtistsActivity extends ListActivity
     }
 
     // Launch BrowseSongsActivity for a given artist.
-    private void startBrowseSongsActivity(String artist, String minRating) {
+    private void startBrowseSongsActivity(String artist, double minRating) {
         Intent intent = new Intent(this, BrowseSongsActivity.class);
         intent.putExtra(BrowseActivity.BUNDLE_ARTIST, artist);
         intent.putExtra(BrowseActivity.BUNDLE_CACHED, mOnlyCached);
-        if (minRating != null && !minRating.isEmpty())
+        if (minRating >= 0)
             intent.putExtra(BrowseActivity.BUNDLE_MIN_RATING, minRating);
         startActivityForResult(intent, BROWSE_SONGS_REQUEST_CODE);
     }
