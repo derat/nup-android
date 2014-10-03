@@ -183,10 +183,10 @@ public class NupService extends Service
         }
     };
 
-    private BroadcastReceiver mHeadsetPlugReceiver = new BroadcastReceiver() {
+    private BroadcastReceiver mNoisyAudioReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (intent.getIntExtra("state", 0) == 0 && mCurrentSongIndex >= 0 && !mPaused) {
+            if (AudioManager.ACTION_AUDIO_BECOMING_NOISY.equals(intent.getAction()) && mCurrentSongIndex >= 0 && !mPaused) {
                 mPlayer.pause();
                 Toast.makeText(NupService.this, "Paused since unplugged.", Toast.LENGTH_SHORT).show();
             }
@@ -247,7 +247,7 @@ public class NupService extends Service
         mTelephonyManager = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
         mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
 
-        registerReceiver(mHeadsetPlugReceiver, new IntentFilter(Intent.ACTION_HEADSET_PLUG));
+        registerReceiver(mNoisyAudioReceiver, new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY));
 
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
 
@@ -270,7 +270,7 @@ public class NupService extends Service
         Log.d(TAG, "service destroyed");
         mAudioManager.abandonAudioFocus(mAudioFocusListener);
         mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_NONE);
-        unregisterReceiver(mHeadsetPlugReceiver);
+        unregisterReceiver(mNoisyAudioReceiver);
 
         mSongDb.quit();
         mPlayer.quit();
