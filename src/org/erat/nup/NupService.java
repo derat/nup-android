@@ -22,6 +22,7 @@ import android.preference.PreferenceManager;
 import android.telephony.PhoneStateListener;
 import android.telephony.TelephonyManager;
 import android.util.Log;
+import android.view.KeyEvent;
 import android.view.View;
 import android.widget.RemoteViews;
 import android.widget.Toast;
@@ -66,6 +67,7 @@ public class NupService extends Service
 
     // Intent actions.
     private static final String ACTION_TOGGLE_PAUSE = "nup_toggle_pause";
+    private static final String ACTION_MEDIA_BUTTON = "nup_media_button";
 
     interface SongListener {
         // Invoked when we switch to a new track in the playlist.
@@ -171,6 +173,8 @@ public class NupService extends Service
 
     private SharedPreferences mPrefs;
 
+    private PendingIntent mMediaButtonPendingIntent;
+
     // Pause when phone calls arrive.
     private PhoneStateListener mPhoneStateListener = new PhoneStateListener() {
         @Override
@@ -249,6 +253,11 @@ public class NupService extends Service
 
         registerReceiver(mNoisyAudioReceiver, new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY));
 
+        Intent mediaButtonIntent = new Intent(this, NupService.class);
+        mediaButtonIntent.setAction(ACTION_MEDIA_BUTTON);
+        mMediaButtonPendingIntent = PendingIntent.getService(this, 0, mediaButtonIntent, 0);
+        mAudioManager.registerMediaButtonEventReceiver(mMediaButtonPendingIntent);
+
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
 
         mPlayer = new Player(this);
@@ -271,6 +280,7 @@ public class NupService extends Service
         mAudioManager.abandonAudioFocus(mAudioFocusListener);
         mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_NONE);
         unregisterReceiver(mNoisyAudioReceiver);
+        mAudioManager.unregisterMediaButtonEventReceiver(mMediaButtonPendingIntent);
 
         mSongDb.quit();
         mPlayer.quit();
@@ -284,8 +294,15 @@ public class NupService extends Service
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
         Log.d(TAG, "received start id " + startId + ": " + intent);
-        if (intent != null && intent.getAction() != null && ACTION_TOGGLE_PAUSE.equals(intent.getAction()))
-            togglePause();
+        if (intent != null && intent.getAction() != null) {
+            if (ACTION_TOGGLE_PAUSE.equals(intent.getAction())) {
+                togglePause();
+            } else if (ACTION_MEDIA_BUTTON.equals(intent.getAction())) {
+                KeyEvent event = (KeyEvent) intent.getExtras().get(Intent.EXTRA_KEY_EVENT);
+                Toast.makeText(NupService.this, "Got key event " + event.getKeyCode(), Toast.LENGTH_SHORT).show();
+                // FIXME: Do something with it.
+            }
+        }
         return START_STICKY;
     }
 
