@@ -14,6 +14,10 @@ import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.AudioManager;
+import android.media.MediaMetadataRetriever;
+import android.media.Rating;
+import android.media.RemoteControlClient;
+import android.media.RemoteControlClient.MetadataEditor;
 import android.os.AsyncTask;
 import android.os.Binder;
 import android.os.Handler;
@@ -37,7 +41,8 @@ import java.util.List;
 public class NupService extends Service
                         implements Player.Listener,
                                    FileCache.Listener,
-                                   SongDatabase.Listener {
+                                   SongDatabase.Listener,
+                                   RemoteControlClient.OnGetPlaybackPositionListener {
     private static final String TAG = "NupService";
 
     // Identifier used for our "currently playing" notification.
@@ -174,6 +179,7 @@ public class NupService extends Service
     private SharedPreferences mPrefs;
 
     private PendingIntent mMediaButtonPendingIntent;
+    private RemoteControlClient mRemoteControlClient;
 
     // Pause when phone calls arrive.
     private PhoneStateListener mPhoneStateListener = new PhoneStateListener() {
@@ -257,6 +263,9 @@ public class NupService extends Service
         mediaButtonIntent.setAction(ACTION_MEDIA_BUTTON);
         mMediaButtonPendingIntent = PendingIntent.getService(this, 0, mediaButtonIntent, 0);
         mAudioManager.registerMediaButtonEventReceiver(mMediaButtonPendingIntent);
+        mRemoteControlClient = new RemoteControlClient(mMediaButtonPendingIntent);
+        mRemoteControlClient.setOnGetPlaybackPositionListener(this);
+        mAudioManager.registerRemoteControlClient(mRemoteControlClient);
 
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
 
@@ -272,6 +281,7 @@ public class NupService extends Service
         mSongDb = new SongDatabase(this, this, mCache);
         mCoverLoader = new CoverLoader(this);
         mPlaybackReporter = new PlaybackReporter(this, mSongDb);
+
     }
 
     @Override
@@ -409,14 +419,24 @@ public class NupService extends Service
         startForeground(NOTIFICATION_ID, mNotification);
     }
 
-    // Update the track information displayed via Bluetooth.
-    private void updateBluetooth() {
+    // Update the track metadata displayed via Bluetooth.
+    private void updateMetadata() {
+        MetadataEditor editor = mRemoteControlClient.editMetadata(true);
         final Song song = getCurrentSong();
-        Intent intent = new Intent("com.android.music.metachanged");
-        intent.putExtra("track", song != null ? song.getTitle() : "");
-        intent.putExtra("artist", song != null ? song.getArtist() : "");
-        intent.putExtra("album", song != null ? song.getAlbum() : "");
-        sendBroadcast(intent);
+        if (song != null) {
+            editor.putString(MediaMetadataRetriever.METADATA_KEY_ARTIST, song.getArtist());
+            editor.putString(MediaMetadataRetriever.METADATA_KEY_TITLE, song.getTitle());
+            editor.putString(MediaMetadataRetriever.METADATA_KEY_ALBUM, song.getAlbum());
+            editor.putLong(MediaMetadataRetriever.METADATA_KEY_DISC_NUMBER, (long) song.getDiscNum());
+            editor.putLong(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER, (long) song.getTrackNum());
+            editor.putLong(MediaMetadataRetriever.METADATA_KEY_DURATION, (long) song.getLengthSec() * 1000);
+            editor.putBitmap(MetadataEditor.BITMAP_KEY_ARTWORK, song.getCoverBitmap());
+            if (song.getRating() >= 0.0) {
+                editor.putObject(MetadataEditor.RATING_KEY_BY_USER,
+                                 Rating.newStarRating(Rating.RATING_5_STARS, (float) (1.0 + song.getRating() * 4.0)));
+            }
+        }
+        editor.apply();
     }
 
     // Toggle whether we're playing the current song or not.
@@ -543,6 +563,7 @@ public class NupService extends Service
                 mDownloadIndex = mCurrentSongIndex;
             }
             mWaitingForDownload = true;
+            mRemoteControlClient.setPlaybackState(RemoteControlClient.PLAYSTATE_BUFFERING, -1, 1.0f);
         }
 
         // Enqueue the next song if we already have it.
@@ -559,7 +580,7 @@ public class NupService extends Service
 
         fetchCoverForSongIfMissing(song);
         updateNotification();
-        updateBluetooth();
+        updateMetadata();
 
         if (mSongListener != null)
             mSongListener.onSongChange(song, mCurrentSongIndex);
@@ -624,6 +645,8 @@ public class NupService extends Service
             public void run() {
                 mPlaybackComplete = true;
                 updateNotification();
+                updateMetadata();
+                mRemoteControlClient.setPlaybackState(RemoteControlClient.PLAYSTATE_STOPPED, -1, 1.0f);
                 if (mCurrentSongIndex < mSongs.size() - 1)
                     playSongAtIndex(mCurrentSongIndex + 1);
             }
@@ -653,7 +676,9 @@ public class NupService extends Service
                         mReportedCurrentSong = true;
                     }
                 }
+
                 mCurrentSongLastPositionMs = positionMs;
+                mRemoteControlClient.setPlaybackState(RemoteControlClient.PLAYSTATE_PLAYING, positionMs, 1.0f);
             }
         });
     }
@@ -665,6 +690,9 @@ public class NupService extends Service
         updateNotification();
         if (mSongListener != null)
             mSongListener.onPauseStateChange(paused);
+        mRemoteControlClient.setPlaybackState(
+            paused ? RemoteControlClient.PLAYSTATE_PAUSED : RemoteControlClient.PLAYSTATE_PLAYING,
+            mCurrentSongLastPositionMs, 1.0f);
     }
 
     // Implements Player.Listener.
@@ -798,6 +826,12 @@ public class NupService extends Service
                     listener.onSongDatabaseUpdate();
             }
         });
+    }
+
+    // Implements RemoteControlClient.OnGetPlaybackPositionListener.
+    @Override
+    public long onGetPlaybackPosition() {
+        return mCurrentSongLastPositionMs;
     }
 
     // Insert a list of songs into the playlist at a particular position.
