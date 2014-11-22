@@ -299,8 +299,31 @@ public class NupService extends Service
                 togglePause();
             } else if (ACTION_MEDIA_BUTTON.equals(intent.getAction())) {
                 KeyEvent event = (KeyEvent) intent.getExtras().get(Intent.EXTRA_KEY_EVENT);
-                Toast.makeText(NupService.this, "Got key event " + event.getKeyCode(), Toast.LENGTH_SHORT).show();
-                // FIXME: Do something with it.
+                if (event.getAction() == KeyEvent.ACTION_DOWN) {
+                    switch (event.getKeyCode()) {
+                    case KeyEvent.KEYCODE_MEDIA_NEXT:
+                        playSongAtIndex(mCurrentSongIndex + 1);
+                        break;
+                    case KeyEvent.KEYCODE_MEDIA_PAUSE:
+                        mPlayer.pause();
+                        break;
+                    case KeyEvent.KEYCODE_MEDIA_PLAY:
+                        mPlayer.unpause();
+                        break;
+                    case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
+                        mPlayer.togglePause();
+                        break;
+                    case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
+                        playSongAtIndex(mCurrentSongIndex - 1);
+                        break;
+                    case KeyEvent.KEYCODE_MEDIA_STOP:
+                        mPlayer.pause();
+                        break;
+                    default:
+                        Toast.makeText(NupService.this, "Unhandled key event " + event.getKeyCode(), Toast.LENGTH_SHORT).show();
+                        break;
+                    }
+                }
             }
         }
         return START_STICKY;

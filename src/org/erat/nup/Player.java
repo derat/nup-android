@@ -65,6 +65,12 @@ class Player implements Runnable,
 
     private boolean mShouldQuit = false;
 
+    private enum PauseUpdateType {
+        PAUSE,
+        UNPAUSE,
+        TOGGLE_PAUSE,
+    }
+
     public Player(Listener listener) {
         mListener = listener;
     }
@@ -159,28 +165,40 @@ class Player implements Runnable,
     }
 
     public void pause() {
-        mHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                if (mPaused || mCurrentPlayer == null)
-                    return;
+        updatePauseState(PauseUpdateType.PAUSE);
+    }
 
-                mPaused = true;
-                mCurrentPlayer.pause();
-                stopPositionTimer();
-                mListener.onPauseStateChange(mPaused);
-            }
-        });
+    public void unpause() {
+        updatePauseState(PauseUpdateType.UNPAUSE);
     }
 
     public void togglePause() {
+        updatePauseState(PauseUpdateType.TOGGLE_PAUSE);
+    }
+
+    private void updatePauseState(final PauseUpdateType type) {
         mHandler.post(new Runnable() {
             @Override
             public void run() {
                 if (mCurrentPlayer == null)
                     return;
 
-                mPaused = !mPaused;
+                switch (type) {
+                case PAUSE:
+                    if (mPaused)
+                        return;
+                    mPaused = true;
+                    break;
+                case UNPAUSE:
+                    if (!mPaused)
+                        return;
+                    mPaused = false;
+                    break;
+                case TOGGLE_PAUSE:
+                    mPaused = !mPaused;
+                    break;
+                }
+
                 if (mPaused) {
                     mCurrentPlayer.pause();
                     stopPositionTimer();
