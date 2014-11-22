@@ -430,7 +430,14 @@ public class NupService extends Service
             editor.putLong(MediaMetadataRetriever.METADATA_KEY_DISC_NUMBER, (long) song.getDiscNum());
             editor.putLong(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER, (long) song.getTrackNum());
             editor.putLong(MediaMetadataRetriever.METADATA_KEY_DURATION, (long) song.getLengthSec() * 1000);
-            editor.putBitmap(MetadataEditor.BITMAP_KEY_ARTWORK, song.getCoverBitmap());
+
+            Bitmap bitmap = song.getCoverBitmap();
+            if (bitmap != null) {
+                // Pass a copy of the original bitmap. Apparently the later apply() call recycles the bitmap, which then
+                // causes a crash when we try to use it later: https://code.google.com/p/android/issues/detail?id=74967
+                editor.putBitmap(MetadataEditor.BITMAP_KEY_ARTWORK, bitmap.copy(bitmap.getConfig(), true));
+            }
+
             if (song.getRating() >= 0.0) {
                 editor.putObject(MetadataEditor.RATING_KEY_BY_USER,
                                  Rating.newStarRating(Rating.RATING_5_STARS, (float) (1.0 + song.getRating() * 4.0)));
