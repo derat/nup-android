@@ -84,7 +84,7 @@ class YesNoPreference extends DialogPreference
                 mContext,
                 mContext.getString(R.string.syncing_song_list),
                 mContext.getResources().getQuantityString(
-                    R.plurals.sync_progress_fmt, 0, 0),
+                    R.plurals.sync_update_fmt, 0, 0),
                 true,   // indeterminate
                 true);  // cancelable
             // FIXME: Support canceling.
@@ -99,15 +99,25 @@ class YesNoPreference extends DialogPreference
 
         @Override
         protected void onProgressUpdate(Integer... progress) {
-            int numSongs = progress[0];
-            if (numSongs >= 0) {
-                mDialog.setProgress(numSongs);
-                mDialog.setMessage(
-                    mContext.getResources().getQuantityString(
-                        R.plurals.sync_progress_fmt, numSongs, numSongs));
-            } else {
-                mDialog.setMessage(
-                    mContext.getString(R.string.sync_progress_rebuilding_stats_tables));
+            SongDatabase.SyncState state = SongDatabase.SyncState.values()[progress[0]];
+            int numSongs = progress[1];
+            switch (state) {
+                case UPDATING_SONGS:
+                    mDialog.setProgress(numSongs);
+                    mDialog.setMessage(
+                        mContext.getResources().getQuantityString(
+                            R.plurals.sync_update_fmt, numSongs, numSongs));
+                    break;
+                case DELETING_SONGS:
+                    mDialog.setProgress(numSongs);
+                    mDialog.setMessage(
+                        mContext.getResources().getQuantityString(
+                            R.plurals.sync_delete_fmt, numSongs, numSongs));
+                    break;
+                case UPDATING_STATS:
+                    mDialog.setMessage(
+                        mContext.getString(R.string.sync_progress_rebuilding_stats_tables));
+                    break;
             }
         }
 
@@ -127,7 +137,7 @@ class YesNoPreference extends DialogPreference
         // Implements SongDatabase.SyncProgressListener.
         @Override
         public void onSyncProgress(SongDatabase.SyncState state, int numSongs) {
-            publishProgress(state == SongDatabase.SyncState.UPDATING_STATS ? -1 : numSongs);
+            publishProgress(state.ordinal(), numSongs);
         }
     }
 }

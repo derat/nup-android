@@ -114,6 +114,7 @@ class SongDatabase {
 
     public enum SyncState {
         UPDATING_SONGS,
+        DELETING_SONGS,
         UPDATING_STATS
     }
     interface SyncProgressListener {
@@ -466,63 +467,11 @@ class SongDatabase {
             long prevStartTimeNsec = dbCursor.getLong(0);
             dbCursor.close();
 
-            // The server breaks its results up into batches instead of sending us a bunch of songs
-            // at once, so use the cursor that it returns to start in the correct place in the next request.
-            String serverCursor = "";
-
-            while (numSongsUpdated == 0 || !serverCursor.isEmpty()) {
-                String response = Download.downloadString(
-                    mContext, "/songs",
-                    String.format("minLastModifiedNsec=%d&max=%d&cursor=%s", prevStartTimeNsec, SERVER_SONG_BATCH_SIZE, serverCursor), message);
-                if (response == null)
-                    return false;
-
-                serverCursor = "";
-
-                try {
-                    JSONArray objects = (JSONArray) new JSONTokener(response).nextValue();
-                    if (objects.length() == 0)
-                        break;
-
-                    for (int i = 0; i < objects.length(); ++i) {
-                        JSONObject jsonSong = objects.optJSONObject(i);
-                        if (jsonSong == null) {
-                            if (i == objects.length() - 1) {
-                                serverCursor = objects.getString(i);
-                                break;
-                            } else {
-                                message[0] = "Item " + i + " from server isn't a JSON object";
-                                return false;
-                            }
-                        }
-
-                        long songId = jsonSong.getLong("songId");
-                        boolean deleted = false;  // TODO: Figure out how to do deletions for App Engine.
-
-                        if (!deleted) {
-                            ContentValues values = new ContentValues(10);
-                            values.put("SongId", songId);
-                            values.put("Url", jsonSong.getString("url"));
-                            values.put("CoverUrl", jsonSong.has("coverUrl") ? jsonSong.getString("coverUrl") : "");
-                            values.put("Artist", jsonSong.getString("artist"));
-                            values.put("Title", jsonSong.getString("title"));
-                            values.put("Album", jsonSong.getString("album"));
-                            values.put("TrackNumber", jsonSong.getInt("track"));
-                            values.put("DiscNumber", jsonSong.getInt("disc"));
-                            values.put("Length", jsonSong.getDouble("length"));
-                            values.put("Rating", jsonSong.getDouble("rating"));
-                            db.replace("Songs", "", values);
-                        } else {
-                            db.delete("Songs", "SongId = ?", new String[]{ Long.toString(songId) });
-                        }
-                        numSongsUpdated++;
-                    }
-                } catch (org.json.JSONException e) {
-                    message[0] = "Couldn't parse response: " + e;
-                    return false;
-                }
-
-                listener.onSyncProgress(SyncState.UPDATING_SONGS, numSongsUpdated);
+            try {
+                numSongsUpdated += queryServer(db, prevStartTimeNsec, false, listener, message);
+                numSongsUpdated += queryServer(db, prevStartTimeNsec, true, listener, message);
+            } catch (ServerException e) {
+                return false;
             }
 
             ContentValues values = new ContentValues(2);
@@ -544,6 +493,78 @@ class SongDatabase {
         loadAggregateData(numSongsUpdated > 0);
         message[0] = "Synchronization complete.";
         return true;
+    }
+
+    public static class ServerException extends Exception {
+        public ServerException(String reason) {
+            super(reason);
+        }
+    }
+
+    // Helper method for SyncWithServer. Returns number of updated songs.
+    private int queryServer(SQLiteDatabase db, long prevStartTimeNsec, boolean deleted, SyncProgressListener listener, String message[]) throws ServerException {
+        int numUpdates = 0;
+
+        // The server breaks its results up into batches instead of sending us a bunch of songs
+        // at once, so use the cursor that it returns to start in the correct place in the next request.
+        String serverCursor = "";
+
+        while (numUpdates == 0 || !serverCursor.isEmpty()) {
+            String response = Download.downloadString(
+                mContext, "/songs",
+                String.format("minLastModifiedNsec=%d&deleted=%d&max=%d&cursor=%s", prevStartTimeNsec, deleted ? 1 : 0, SERVER_SONG_BATCH_SIZE, serverCursor), message);
+            if (response == null)
+                throw new ServerException("download failed");
+
+            serverCursor = "";
+
+            try {
+                JSONArray objects = (JSONArray) new JSONTokener(response).nextValue();
+                if (objects.length() == 0)
+                    break;
+
+                for (int i = 0; i < objects.length(); ++i) {
+                    JSONObject jsonSong = objects.optJSONObject(i);
+                    if (jsonSong == null) {
+                        if (i == objects.length() - 1) {
+                            serverCursor = objects.getString(i);
+                            break;
+                        } else {
+                            message[0] = "Item " + i + " from server isn't a JSON object";
+                            throw new ServerException("list item not object");
+                        }
+                    }
+
+                    long songId = jsonSong.getLong("songId");
+
+                    if (deleted) {
+                        Log.d(TAG, "deleting song " + songId);
+                        db.delete("Songs", "SongId = ?", new String[]{ Long.toString(songId) });
+                    } else {
+                        ContentValues values = new ContentValues(10);
+                        values.put("SongId", songId);
+                        values.put("Url", jsonSong.getString("url"));
+                        values.put("CoverUrl", jsonSong.has("coverUrl") ? jsonSong.getString("coverUrl") : "");
+                        values.put("Artist", jsonSong.getString("artist"));
+                        values.put("Title", jsonSong.getString("title"));
+                        values.put("Album", jsonSong.getString("album"));
+                        values.put("TrackNumber", jsonSong.getInt("track"));
+                        values.put("DiscNumber", jsonSong.getInt("disc"));
+                        values.put("Length", jsonSong.getDouble("length"));
+                        values.put("Rating", jsonSong.getDouble("rating"));
+                        db.replace("Songs", "", values);
+                    }
+                    numUpdates++;
+                }
+            } catch (org.json.JSONException e) {
+                message[0] = "Couldn't parse response: " + e;
+                throw new ServerException("bad data");
+            }
+
+            listener.onSyncProgress(deleted ? SyncState.DELETING_SONGS : SyncState.UPDATING_SONGS, numUpdates);
+        }
+
+        return numUpdates;
     }
 
     private void updateStatsTables(SQLiteDatabase db) {
