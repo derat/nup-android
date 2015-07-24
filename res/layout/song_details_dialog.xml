@@ -10,12 +10,13 @@
         android:gravity="right"
         android:textSize="16dp"
         android:text="@string/artist_colon"
+        android:textColor="@color/secondary_text"
         />
     <TextView
         android:id="@+id/artist"
         android:textSize="16dp"
         android:textStyle="bold"
-        android:textColor="#fff"
+        android:textColor="@color/primary_text"
         />
   </TableRow>
 
@@ -26,12 +27,13 @@
         android:textSize="16dp"
         android:singleLine="false"
         android:text="@string/title_colon"
+        android:textColor="@color/secondary_text"
         />
     <TextView
         android:id="@+id/title"
         android:textSize="16dp"
         android:textStyle="bold"
-        android:textColor="#fff"
+        android:textColor="@color/primary_text"
         />
   </TableRow>
 
@@ -41,12 +43,13 @@
         android:gravity="right"
         android:textSize="16dp"
         android:text="@string/album_colon"
+        android:textColor="@color/secondary_text"
         />
     <TextView
         android:id="@+id/album"
         android:textSize="16dp"
         android:textStyle="bold"
-        android:textColor="#fff"
+        android:textColor="@color/primary_text"
         />
   </TableRow>
 
@@ -56,12 +59,13 @@
         android:gravity="right"
         android:textSize="16dp"
         android:text="@string/track_colon"
+        android:textColor="@color/secondary_text"
         />
     <TextView
         android:id="@+id/track"
         android:textSize="16dp"
         android:textStyle="bold"
-        android:textColor="#fff"
+        android:textColor="@color/primary_text"
         />
   </TableRow>
 
@@ -71,12 +75,13 @@
         android:gravity="right"
         android:textSize="16dp"
         android:text="@string/length_colon"
+        android:textColor="@color/secondary_text"
         />
     <TextView
         android:id="@+id/length"
         android:textSize="16dp"
         android:textStyle="bold"
-        android:textColor="#fff"
+        android:textColor="@color/primary_text"
         />
   </TableRow>
 
@@ -86,12 +91,13 @@
         android:gravity="right"
         android:textSize="16dp"
         android:text="@string/rating_colon"
+        android:textColor="@color/secondary_text"
         />
     <TextView
         android:id="@+id/rating"
         android:textSize="16dp"
         android:textStyle="bold"
-        android:textColor="#fff"
+        android:textColor="@color/primary_text"
         />
   </TableRow>
 </TableLayout>

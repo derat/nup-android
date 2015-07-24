@@ -8,7 +8,7 @@
       android:orientation="horizontal"
       android:layout_width="fill_parent"
       android:layout_height="90dp"
-      android:padding="5dp"
+      android:padding="@dimen/grid1"
       >
     <ImageView
         android:id="@+id/album_image"
@@ -16,7 +16,7 @@
         android:layout_height="80dp"
         android:adjustViewBounds="true"
         android:scaleType="centerInside"
-        android:paddingRight="5dp"
+        android:paddingRight="@dimen/grid1"
         />
     <LinearLayout
         android:orientation="vertical"
@@ -29,7 +29,8 @@
           android:layout_height="wrap_content"
           android:singleLine="true"
           android:textStyle="bold"
-          android:textSize="14dp"
+          android:textColor="@color/primary_text"
+          android:textSize="@dimen/material_text_body2"
           />
       <TextView
           android:id="@+id/title_label"
@@ -37,14 +38,16 @@
           android:layout_height="wrap_content"
           android:singleLine="true"
           android:textStyle="italic"
-          android:textSize="14dp"
+          android:textColor="@color/primary_text"
+          android:textSize="@dimen/material_text_body2"
           />
       <TextView
           android:id="@+id/album_label"
           android:layout_width="wrap_content"
           android:layout_height="wrap_content"
           android:singleLine="true"
-          android:textSize="14dp"
+          android:textColor="@color/primary_text"
+          android:textSize="@dimen/material_text_body2"
           />
       <LinearLayout
           android:orientation="horizontal"
@@ -57,8 +60,8 @@
             android:layout_height="wrap_content"
             android:singleLine="true"
             android:text=""
-            android:textSize="14dp"
-            android:textColor="#888"
+            android:textColor="@color/secondary_text"
+            android:textSize="@dimen/material_text_body2"
             />
         <TextView
             android:id="@+id/download_status_label"
@@ -67,8 +70,8 @@
             android:singleLine="true"
             android:gravity="right"
             android:text=""
-            android:textSize="14dp"
-            android:textColor="#555"
+            android:textColor="@color/secondary_text"
+            android:textSize="@dimen/material_text_body2"
             />
       </LinearLayout>
     </LinearLayout>
@@ -78,6 +81,7 @@
       android:orientation="horizontal"
       android:layout_width="fill_parent"
       android:layout_height="wrap_content"
+      android:padding="@dimen/grid1"
       >
     <Button
         android:id="@+id/pause_button"
@@ -85,7 +89,8 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="@string/pause"
-        android:textSize="16dp"
+        android:textSize="@dimen/material_text_button"
+        android:textStyle="bold"
         android:onClick="onPauseButtonClicked"
         />
     <Button
@@ -94,7 +99,8 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="@string/prev"
-        android:textSize="16dp"
+        android:textSize="@dimen/material_text_button"
+        android:textStyle="bold"
         android:onClick="onPrevButtonClicked"
         />
     <Button
@@ -103,7 +109,8 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="@string/next"
-        android:textSize="16dp"
+        android:textSize="@dimen/material_text_button"
+        android:textStyle="bold"
         android:onClick="onNextButtonClicked"
         />
   </LinearLayout>
@@ -118,9 +125,11 @@
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
         android:layout_weight="3"
-        android:paddingRight="5dp"
+        android:paddingLeft="@dimen/grid1"
+        android:paddingRight="2dp"
         android:singleLine="true"
         android:text="@string/artist"
+        android:textSize="@dimen/material_text_menu"
         android:textStyle="bold"
         />
     <TextView
@@ -129,6 +138,7 @@
         android:layout_weight="2"
         android:singleLine="true"
         android:text="@string/title"
+        android:textSize="@dimen/material_text_menu"
         android:textStyle="bold"
         />
   </LinearLayout>

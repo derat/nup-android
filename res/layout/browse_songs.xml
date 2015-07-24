@@ -8,7 +8,7 @@
       android:orientation="horizontal"
       android:layout_width="fill_parent"
       android:layout_height="wrap_content"
-      android:paddingTop="5dp"
+      android:padding="@dimen/grid1"
       >
     <Button
         android:id="@+id/append_button"
@@ -16,7 +16,8 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="@string/append_all"
-        android:textSize="14dp"
+        android:textSize="@dimen/material_text_button"
+        android:textStyle="bold"
         android:onClick="onAppendButtonClicked"
         />
     <Button
@@ -25,7 +26,8 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="@string/insert_all"
-        android:textSize="14dp"
+        android:textSize="@dimen/material_text_button"
+        android:textStyle="bold"
         android:onClick="onInsertButtonClicked"
         />
     <Button
@@ -34,7 +36,8 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="@string/replace_all"
-        android:textSize="14dp"
+        android:textSize="@dimen/material_text_button"
+        android:textStyle="bold"
         android:onClick="onReplaceButtonClicked"
         />
   </LinearLayout>

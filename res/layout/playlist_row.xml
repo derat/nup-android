@@ -9,9 +9,9 @@
       android:layout_width="fill_parent"
       android:layout_height="wrap_content"
       android:layout_weight="3"
-      android:paddingLeft="1dp"
-      android:paddingRight="5dp"
-      android:textSize="14dp"
+      android:paddingLeft="@dimen/grid1"
+      android:paddingRight="2dp"
+      android:textSize="@dimen/material_text_menu"
       android:singleLine="true"
       />
   <RelativeLayout
@@ -26,7 +26,7 @@
         android:layout_height="wrap_content"
         android:layout_alignParentLeft="true"
         android:layout_toLeftOf="@+id/percent"
-        android:textSize="14dp"
+        android:textSize="@dimen/material_text_menu"
         android:singleLine="true"
         />
     <TextView
@@ -36,9 +36,8 @@
         android:layout_alignParentRight="true"
         android:paddingTop="2dp"
         android:paddingLeft="2dp"
-        android:paddingRight="1dp"
-        android:textSize="11dp"
-        android:textColor="#888"
+        android:paddingRight="@dimen/grid2"
+        android:textSize="@dimen/material_text_caption"
         android:singleLine="true"
         />
   </RelativeLayout>

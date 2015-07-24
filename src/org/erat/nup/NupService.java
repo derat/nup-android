@@ -238,10 +238,15 @@ public class NupService extends Service
         if (Util.isNetworkAvailable(this))
             new AuthenticateTask(this).execute();
 
-        mNotification = new Notification(R.drawable.status, getString(R.string.startup_message), System.currentTimeMillis());
-        mNotification.flags |= (Notification.FLAG_ONGOING_EVENT | Notification.FLAG_NO_CLEAR);
-        mNotification.contentIntent = PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0);
-        mNotification.contentView = new RemoteViews(getPackageName(), R.layout.notification);
+        mNotification = new Notification.Builder(this)
+            .setContentTitle(getString(R.string.startup_message))
+            .setSmallIcon(R.drawable.status)
+            .setColor(getResources().getColor(R.color.primary))
+            .setContent(new RemoteViews(getPackageName(), R.layout.notification))
+            .setContentIntent(PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0))
+            .setOngoing(true)
+            .setWhen(System.currentTimeMillis())
+            .build();
 
         Intent pauseIntent = new Intent(this, NupService.class);
         pauseIntent.setAction(ACTION_TOGGLE_PAUSE);
@@ -394,6 +399,9 @@ public class NupService extends Service
     private void updateNotification() {
         final Song song = getCurrentSong();
 
+        // TODO: Figure out how to fix the status icon color. Notification's color field can be
+        // used to set the color of the circle behind the option, but I think it's getting
+        // ignored due to me using a custom view.
         Bitmap bitmap = (song != null) ? song.getCoverBitmap() : null;
         if (bitmap != null)
             mNotification.contentView.setImageViewBitmap(R.id.image, bitmap);

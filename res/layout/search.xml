@@ -13,6 +13,7 @@
         android:orientation="vertical"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
+        android:padding="@dimen/grid1"
         >
       <TextView
           android:layout_width="wrap_content"
@@ -112,6 +113,7 @@
       android:layout_width="fill_parent"
       android:layout_height="wrap_content"
       android:layout_alignParentBottom="true"
+      android:padding="@dimen/grid1"
       >
     <Button
         android:id="@+id/search_button"
@@ -119,6 +121,8 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="@string/search"
+        android:textSize="@dimen/material_text_button"
+        android:textStyle="bold"
         android:onClick="onSearchButtonClicked"
         />
     <Button
@@ -127,6 +131,8 @@
         android:layout_height="wrap_content"
         android:layout_weight="1"
         android:text="@string/reset"
+        android:textSize="@dimen/material_text_button"
+        android:textStyle="bold"
         android:onClick="onResetButtonClicked"
         />
   </LinearLayout>

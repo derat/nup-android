@@ -368,11 +368,15 @@ public class NupActivity extends Activity
                 view = inflater.inflate(R.layout.playlist_row, null);
             }
 
-            Song song = mSongs.get(position);
-            ((TextView) view.findViewById(R.id.artist)).setText(song.getArtist());
-            ((TextView) view.findViewById(R.id.title)).setText(song.getTitle());
-
+            TextView artistView = (TextView) view.findViewById(R.id.artist);
+            TextView titleView = (TextView) view.findViewById(R.id.title);
             TextView percentView = (TextView) view.findViewById(R.id.percent);
+
+            Song song = mSongs.get(position);
+
+            artistView.setText(song.getArtist());
+            titleView.setText(song.getTitle());
+
             if (song.getTotalBytes() > 0) {
                 if (song.getAvailableBytes() == song.getTotalBytes())
                     percentView.setText("\u2713");  // CHECK MARK from Dingbats
@@ -384,7 +388,11 @@ public class NupActivity extends Activity
             }
 
             boolean currentlyPlaying = (position == mCurrentSongIndex);
-            view.setBackgroundColor(getResources().getColor(currentlyPlaying ? R.color.playlist_highlight_bg : android.R.color.transparent));
+            view.setBackgroundColor(getResources().getColor(currentlyPlaying ? R.color.primary : android.R.color.transparent));
+            artistView.setTextColor(getResources().getColor(currentlyPlaying ? R.color.icons : R.color.primary_text));
+            titleView.setTextColor(getResources().getColor(currentlyPlaying ? R.color.icons : R.color.primary_text));
+            percentView.setTextColor(getResources().getColor(currentlyPlaying ? R.color.icons : R.color.primary_text));
+
             return view;
         }
     }
