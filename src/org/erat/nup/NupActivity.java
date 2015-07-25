@@ -320,7 +320,8 @@ public class NupActivity extends Activity
     public boolean onPrepareOptionsMenu(Menu menu) {
         MenuItem item = menu.findItem(R.id.download_all_menu_item);
         // TODO: This sometimes runs before the service is bound, resulting in a crash.
-        final boolean downloadAll = mService.getShouldDownloadAll();
+        // Find a better way to handle it.
+        final boolean downloadAll = mService != null ? mService.getShouldDownloadAll() : false;
         item.setTitle(downloadAll ? R.string.dont_download_all : R.string.download_all);
         item.setIcon(downloadAll ? R.drawable.ic_menu_stop : android.R.drawable.ic_menu_save);
         return true;
@@ -330,19 +331,24 @@ public class NupActivity extends Activity
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
         case R.id.browse_menu_item:
-            startActivity(new Intent(this, BrowseActivity.class));
+            if (mService != null)
+                startActivity(new Intent(this, BrowseActivity.class));
             return true;
         case R.id.search_menu_item:
-            startActivity(new Intent(this, SearchFormActivity.class));
+            if (mService != null)
+                startActivity(new Intent(this, SearchFormActivity.class));
             return true;
         case R.id.download_all_menu_item:
-            mService.setShouldDownloadAll(!mService.getShouldDownloadAll());
+            if (mService != null)
+                mService.setShouldDownloadAll(!mService.getShouldDownloadAll());
             return true;
         case R.id.settings_menu_item:
-            startActivity(new Intent(this, SettingsActivity.class));
+            if (mService != null)
+                startActivity(new Intent(this, SettingsActivity.class));
             return true;
         case R.id.exit_menu_item:
-            stopService(new Intent(this, NupService.class));
+            if (mService != null)
+                stopService(new Intent(this, NupService.class));
             finish();
             return true;
         default:
