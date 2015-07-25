@@ -319,6 +319,7 @@ public class NupActivity extends Activity
     @Override
     public boolean onPrepareOptionsMenu(Menu menu) {
         MenuItem item = menu.findItem(R.id.download_all_menu_item);
+        // TODO: This sometimes runs before the service is bound, resulting in a crash.
         final boolean downloadAll = mService.getShouldDownloadAll();
         item.setTitle(downloadAll ? R.string.dont_download_all : R.string.download_all);
         item.setIcon(downloadAll ? R.drawable.ic_menu_stop : android.R.drawable.ic_menu_save);

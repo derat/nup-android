@@ -72,6 +72,8 @@ public class NupService extends Service
 
     // Intent actions.
     private static final String ACTION_TOGGLE_PAUSE = "nup_toggle_pause";
+    private static final String ACTION_NEXT_TRACK = "nup_next_track";
+    private static final String ACTION_PREV_TRACK = "nup_prev_track";
     private static final String ACTION_MEDIA_BUTTON = "nup_media_button";
 
     interface SongListener {
@@ -132,8 +134,6 @@ public class NupService extends Service
 
     // Have we temporarily been told to download all queued songs?
     private boolean mShouldDownloadAll = false;
-
-    private Notification mNotification;
 
     // Current playlist.
     private List<Song> mSongs = new ArrayList<Song>();
@@ -238,21 +238,6 @@ public class NupService extends Service
         if (Util.isNetworkAvailable(this))
             new AuthenticateTask(this).execute();
 
-        mNotification = new Notification.Builder(this)
-            .setContentTitle(getString(R.string.startup_message))
-            .setSmallIcon(R.drawable.status)
-            .setColor(getResources().getColor(R.color.primary))
-            .setContent(new RemoteViews(getPackageName(), R.layout.notification))
-            .setContentIntent(PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0))
-            .setOngoing(true)
-            .setWhen(System.currentTimeMillis())
-            .build();
-
-        Intent pauseIntent = new Intent(this, NupService.class);
-        pauseIntent.setAction(ACTION_TOGGLE_PAUSE);
-        mNotification.contentView.setOnClickPendingIntent(
-            R.id.pause_button, PendingIntent.getService(this, 0, pauseIntent, 0));
-
         updateNotification();
 
         mAudioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
@@ -312,6 +297,10 @@ public class NupService extends Service
         if (intent != null && intent.getAction() != null) {
             if (ACTION_TOGGLE_PAUSE.equals(intent.getAction())) {
                 togglePause();
+            } else if (ACTION_NEXT_TRACK.equals(intent.getAction())) {
+                playSongAtIndex(mCurrentSongIndex + 1);
+            } else if (ACTION_PREV_TRACK.equals(intent.getAction())) {
+                playSongAtIndex(mCurrentSongIndex - 1);
             } else if (ACTION_MEDIA_BUTTON.equals(intent.getAction())) {
                 KeyEvent event = (KeyEvent) intent.getExtras().get(Intent.EXTRA_KEY_EVENT);
                 if (event.getAction() == KeyEvent.ACTION_DOWN) {
@@ -399,32 +388,49 @@ public class NupService extends Service
     private void updateNotification() {
         final Song song = getCurrentSong();
 
-        // TODO: Figure out how to fix the status icon color. Notification's color field can be
-        // used to set the color of the circle behind the option, but I think it's getting
-        // ignored due to me using a custom view.
-        Bitmap bitmap = (song != null) ? song.getCoverBitmap() : null;
-        if (bitmap != null)
-            mNotification.contentView.setImageViewBitmap(R.id.image, bitmap);
-        else
-            mNotification.contentView.setImageViewResource(R.id.image, R.drawable.status);
+        Notification.Builder builder = new Notification.Builder(this)
+            .setContentTitle(song != null ? song.getArtist() : getString(R.string.startup_message))
+            .setContentText(song != null ? song.getTitle() : "")
+            .setSmallIcon(R.drawable.status)
+            .setColor(getResources().getColor(R.color.primary))
+            .setContentIntent(PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0))
+            .setOngoing(true)
+            .setWhen(System.currentTimeMillis())
+            .setShowWhen(false);
 
-        mNotification.contentView.setTextViewText(
-            R.id.line_1,
-            song != null ? song.getArtist() : getString(R.string.app_name));
-        mNotification.contentView.setTextViewText(
-            R.id.line_2,
-            song != null ? song.getTitle() : getString(R.string.startup_message));
+        if (song != null) {
+            builder.setLargeIcon(song.getCoverBitmap());
 
-        if (song != null && !mPlaybackComplete) {
-            mNotification.contentView.setTextViewText(
-                R.id.pause_button,
-                getString(mPaused ? R.string.play : R.string.pause));
-            mNotification.contentView.setViewVisibility(R.id.pause_button, View.VISIBLE);
-        } else {
-            mNotification.contentView.setViewVisibility(R.id.pause_button, View.GONE);
+            boolean showPlayPause = !mPlaybackComplete;
+            boolean showPrev = mCurrentSongIndex > 0;
+            boolean showNext = !mSongs.isEmpty() && mCurrentSongIndex < mSongs.size() - 1;
+            int numActions = (showPlayPause ? 1 : 0) + (showPrev ? 1 : 0) + (showNext ? 1 : 0);
+            boolean showLabels = numActions < 3;
+
+            if (showPlayPause) {
+                Intent intent = new Intent(this, NupService.class);
+                intent.setAction(ACTION_TOGGLE_PAUSE);
+                builder.addAction(mPaused ? R.drawable.ic_play_arrow_black_36dp : R.drawable.ic_pause_black_36dp,
+                                  showLabels ? getString(mPaused ? R.string.play : R.string.pause) : "",
+                                  PendingIntent.getService(this, 0, intent, 0));
+            }
+            if (showPrev) {
+                Intent intent = new Intent(this, NupService.class);
+                intent.setAction(ACTION_PREV_TRACK);
+                builder.addAction(R.drawable.ic_skip_previous_black_36dp,
+                                  showLabels ? getString(R.string.prev) : "",
+                                  PendingIntent.getService(this, 0, intent, 0));
+            }
+            if (showNext) {
+                Intent intent = new Intent(this, NupService.class);
+                intent.setAction(ACTION_NEXT_TRACK);
+                builder.addAction(R.drawable.ic_skip_next_black_36dp,
+                                  showLabels ? getString(R.string.next) : "",
+                                  PendingIntent.getService(this, 0, intent, 0));
+            }
         }
 
-        startForeground(NOTIFICATION_ID, mNotification);
+        startForeground(NOTIFICATION_ID, builder.build());
     }
 
     // Update the track metadata displayed via Bluetooth.
