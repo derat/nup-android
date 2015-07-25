@@ -3,14 +3,15 @@
     android:orientation="horizontal"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
+    android:paddingLeft="@dimen/grid2"
+    android:paddingRight="@dimen/grid2"
     >
   <TextView
       android:id="@+id/artist"
       android:layout_width="fill_parent"
       android:layout_height="wrap_content"
       android:layout_weight="3"
-      android:paddingLeft="@dimen/grid1"
-      android:paddingRight="2dp"
+      android:paddingRight="@dimen/textgrid"
       android:textSize="@dimen/material_text_menu"
       android:singleLine="true"
       />
@@ -35,8 +36,7 @@
         android:layout_height="wrap_content"
         android:layout_alignParentRight="true"
         android:paddingTop="2dp"
-        android:paddingLeft="2dp"
-        android:paddingRight="@dimen/grid2"
+        android:paddingLeft="@dimen/textgrid"
         android:textSize="@dimen/material_text_caption"
         android:singleLine="true"
         />

@@ -98,7 +98,7 @@ public class NupActivity extends Activity
             new StrictMode.VmPolicy.Builder()
                 .detectLeakedClosableObjects()
                 .detectLeakedSqlLiteObjects()
-                // TODO: Not including detectActivityLeaks() since I'm getting leaks of Browser*Activity objects that I
+                // TODO: Not including detectActivityLeaks() since I'm getting leaks of Browse*Activity objects that I
                 // don't understand.
                 .penaltyLog()
                 .penaltyDeath()

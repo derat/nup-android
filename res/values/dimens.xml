@@ -14,6 +14,10 @@
   <dimen name="material_text_display3">56sp</dimen>
   <dimen name="material_text_display4">112sp</dimen>
 
+  <dimen name="textgrid">4dp</dimen>
   <dimen name="grid1">8dp</dimen>
   <dimen name="grid2">16dp</dimen>
+
+  <dimen name="height1">2dp</dimen>
+  <dimen name="height2">4dp</dimen>
 </resources>

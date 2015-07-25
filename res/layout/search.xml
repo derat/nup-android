@@ -13,7 +13,7 @@
         android:orientation="vertical"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:padding="@dimen/grid1"
+        android:padding="@dimen/grid2"
         >
       <TextView
           android:layout_width="wrap_content"
@@ -58,11 +58,12 @@
           >
         <CheckBox
             android:id="@+id/substring_checkbox"
+            android:checked="true"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/substring"
-            android:textSize="14dp"
+            android:textSize="@dimen/material_text_body1"
             />
         <CheckBox
             android:id="@+id/shuffle_checkbox"
@@ -70,7 +71,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/shuffle"
-            android:textSize="14dp"
+            android:textSize="@dimen/material_text_body1"
             />
         <CheckBox
             android:id="@+id/cached_checkbox"
@@ -78,7 +79,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:text="@string/cached"
-            android:textSize="14dp"
+            android:textSize="@dimen/material_text_body1"
             />
       </LinearLayout>
 
@@ -86,15 +87,15 @@
           android:orientation="horizontal"
           android:layout_width="fill_parent"
           android:layout_height="wrap_content"
-          android:paddingTop="6dp"
+          android:paddingTop="@dimen/grid1"
           >
         <TextView
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_toLeftOf="@+id/min_rating_spinner"
             android:layout_centerVertical="true"
-            android:paddingRight="4dp"
-            android:textSize="16dp"
+            android:paddingRight="@dimen/textgrid"
+            android:textSize="@dimen/material_text_body1"
             android:text="@string/minimum_rating_label"
             />
         <Spinner

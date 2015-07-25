@@ -9,4 +9,8 @@
   <color name="secondary_text">#727272</color>
   <color name="icons">#FFFFFF</color>
   <color name="divider">#B6B6B6</color>
+
+  <!-- http://www.google.com/design/spec/style/color.html#color-themes claims
+       #FAFAFA, but this seems to actually match the light theme. -->
+  <color name="background">#EEEEEE</color>
 </resources>

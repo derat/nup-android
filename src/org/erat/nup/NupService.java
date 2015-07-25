@@ -389,8 +389,8 @@ public class NupService extends Service
         final Song song = getCurrentSong();
 
         Notification.Builder builder = new Notification.Builder(this)
-            .setContentTitle(song != null ? song.getArtist() : getString(R.string.startup_message))
-            .setContentText(song != null ? song.getTitle() : "")
+            .setContentTitle(song != null ? song.getArtist() : getString(R.string.startup_message_title))
+            .setContentText(song != null ? song.getTitle() : getString(R.string.startup_message_text))
             .setSmallIcon(R.drawable.status)
             .setColor(getResources().getColor(R.color.primary))
             .setContentIntent(PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0))

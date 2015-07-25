@@ -364,6 +364,7 @@ class SongDatabase {
             builder.getWhereClause() +
             "ORDER BY " + (shuffle ? "RANDOM()" : "Album ASC, TrackNumber ASC") + " " +
             "LIMIT " + MAX_QUERY_RESULTS;
+        Log.d(TAG, "running query \"" + query + "\" with args " + TextUtils.join(", ", builder.selectionArgs));
         SQLiteDatabase db = mOpener.getDb();
         Cursor cursor = db.rawQuery(query, builder.selectionArgs.toArray(new String[]{}));
 

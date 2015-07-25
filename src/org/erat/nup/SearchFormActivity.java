@@ -88,7 +88,7 @@ public class SearchFormActivity extends Activity
         mAlbumEdit.setText("");
         mTitleEdit.setText("");
         mShuffleCheckbox.setChecked(false);
-        mSubstringCheckbox.setChecked(false);
+        mSubstringCheckbox.setChecked(true);
         mCachedCheckbox.setChecked(false);
         mMinRatingSpinner.setSelection(0, true);
     }
