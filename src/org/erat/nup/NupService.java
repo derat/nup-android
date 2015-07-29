@@ -398,6 +398,13 @@ public class NupService extends Service
     private void updateNotification() {
         final Song song = getCurrentSong();
 
+        // TODO: Navigate the labyrinth of new media playback classes:
+        // https://developer.android.com/about/versions/android-5.0.html#MediaPlaybackControl
+        // https://developer.android.com/guide/topics/ui/notifiers/notifications.html#controllingMedia
+        // https://developer.android.com/reference/android/app/Notification.MediaStyle.html
+        // https://developer.android.com/reference/android/media/session/MediaSession.html
+        // https://developer.android.com/reference/android/media/session/MediaController.html
+        // etc.
         Notification.Builder builder = new Notification.Builder(this)
             .setContentTitle(song != null ? song.getArtist() : getString(R.string.startup_message_title))
             .setContentText(song != null ? song.getTitle() : getString(R.string.startup_message_text))
