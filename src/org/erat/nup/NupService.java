@@ -18,6 +18,7 @@ import android.media.MediaMetadataRetriever;
 import android.media.Rating;
 import android.media.RemoteControlClient;
 import android.media.RemoteControlClient.MetadataEditor;
+import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Binder;
 import android.os.Handler;
@@ -173,6 +174,11 @@ public class NupService extends Service
     // Used to run tasks on our thread.
     private Handler mHandler = new Handler();
 
+    // Used to pass commands from the notification to this service.
+    private PendingIntent mTogglePauseIntent;
+    private PendingIntent mPrevTrackIntent;
+    private PendingIntent mNextTrackIntent;
+
     private AudioManager mAudioManager;
     private TelephonyManager mTelephonyManager;
 
@@ -237,6 +243,10 @@ public class NupService extends Service
 
         if (Util.isNetworkAvailable(this))
             new AuthenticateTask(this).execute();
+
+        mTogglePauseIntent = PendingIntent.getService(this, 0, new Intent(ACTION_TOGGLE_PAUSE, Uri.EMPTY, this, NupService.class), 0);
+        mPrevTrackIntent = PendingIntent.getService(this, 0, new Intent(ACTION_PREV_TRACK, Uri.EMPTY, this, NupService.class), 0);
+        mNextTrackIntent = PendingIntent.getService(this, 0, new Intent(ACTION_NEXT_TRACK, Uri.EMPTY, this, NupService.class), 0);
 
         updateNotification();
 
@@ -393,6 +403,7 @@ public class NupService extends Service
             .setContentText(song != null ? song.getTitle() : getString(R.string.startup_message_text))
             .setSmallIcon(R.drawable.status)
             .setColor(getResources().getColor(R.color.primary))
+            .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setContentIntent(PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0))
             .setOngoing(true)
             .setWhen(System.currentTimeMillis())
@@ -408,25 +419,19 @@ public class NupService extends Service
             boolean showLabels = numActions < 3;
 
             if (showPlayPause) {
-                Intent intent = new Intent(this, NupService.class);
-                intent.setAction(ACTION_TOGGLE_PAUSE);
                 builder.addAction(mPaused ? R.drawable.ic_play_arrow_black_36dp : R.drawable.ic_pause_black_36dp,
                                   showLabels ? getString(mPaused ? R.string.play : R.string.pause) : "",
-                                  PendingIntent.getService(this, 0, intent, 0));
+                                  mTogglePauseIntent);
             }
             if (showPrev) {
-                Intent intent = new Intent(this, NupService.class);
-                intent.setAction(ACTION_PREV_TRACK);
                 builder.addAction(R.drawable.ic_skip_previous_black_36dp,
                                   showLabels ? getString(R.string.prev) : "",
-                                  PendingIntent.getService(this, 0, intent, 0));
+                                  mPrevTrackIntent);
             }
             if (showNext) {
-                Intent intent = new Intent(this, NupService.class);
-                intent.setAction(ACTION_NEXT_TRACK);
                 builder.addAction(R.drawable.ic_skip_next_black_36dp,
                                   showLabels ? getString(R.string.next) : "",
-                                  PendingIntent.getService(this, 0, intent, 0));
+                                  mNextTrackIntent);
             }
         }
 
