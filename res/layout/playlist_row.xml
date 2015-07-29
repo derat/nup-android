@@ -8,12 +8,7 @@
     >
   <TextView
       android:id="@+id/artist"
-      android:layout_width="fill_parent"
-      android:layout_height="wrap_content"
-      android:layout_weight="3"
-      android:paddingRight="@dimen/textgrid"
-      android:textSize="@dimen/material_text_menu"
-      android:singleLine="true"
+      style="@style/SongListArtist"
       />
   <RelativeLayout
       android:orientation="horizontal"
@@ -23,12 +18,10 @@
       >
     <TextView
         android:id="@+id/title"
+        style="@style/SongListTitle"
         android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
         android:layout_alignParentLeft="true"
         android:layout_toLeftOf="@+id/percent"
-        android:textSize="@dimen/material_text_menu"
-        android:singleLine="true"
         />
     <TextView
         android:id="@+id/percent"

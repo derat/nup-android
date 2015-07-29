@@ -22,11 +22,8 @@
           />
       <AutoCompleteTextView
           android:id="@+id/artist_edit_text"
-          android:layout_width="fill_parent"
-          android:layout_height="wrap_content"
-          android:singleLine="true"
+          style="@style/SearchTextField"
           android:completionThreshold="1"
-          android:inputType="textNoSuggestions"
           />
       <TextView
           android:layout_width="wrap_content"
@@ -35,10 +32,7 @@
           />
       <EditText
           android:id="@+id/title_edit_text"
-          android:layout_width="fill_parent"
-          android:layout_height="wrap_content"
-          android:singleLine="true"
-          android:inputType="textNoSuggestions"
+          style="@style/SearchTextField"
           />
       <TextView
           android:layout_width="wrap_content"
@@ -47,11 +41,8 @@
           />
       <AutoCompleteTextView
           android:id="@+id/album_edit_text"
-          android:layout_width="fill_parent"
-          android:layout_height="wrap_content"
-          android:singleLine="true"
+          style="@style/SearchTextField"
           android:completionThreshold="1"
-          android:inputType="textNoSuggestions"
           />
 
       <LinearLayout
@@ -61,28 +52,19 @@
           >
         <CheckBox
             android:id="@+id/substring_checkbox"
+            style="@style/SearchCheckbox"
             android:checked="true"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
             android:text="@string/substring"
-            android:textSize="@dimen/material_text_body1"
             />
         <CheckBox
             android:id="@+id/shuffle_checkbox"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
+            style="@style/SearchCheckbox"
             android:text="@string/shuffle"
-            android:textSize="@dimen/material_text_body1"
             />
         <CheckBox
             android:id="@+id/cached_checkbox"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_weight="1"
+            style="@style/SearchCheckbox"
             android:text="@string/cached"
-            android:textSize="@dimen/material_text_body1"
             />
       </LinearLayout>
 
@@ -121,22 +103,14 @@
       >
     <Button
         android:id="@+id/search_button"
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
+        style="@style/Button"
         android:text="@string/search"
-        android:textSize="@dimen/material_text_button"
-        android:textStyle="bold"
         android:onClick="onSearchButtonClicked"
         />
     <Button
         android:id="@+id/reset_button"
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
+        style="@style/Button"
         android:text="@string/reset"
-        android:textSize="@dimen/material_text_button"
-        android:textStyle="bold"
         android:onClick="onResetButtonClicked"
         />
   </LinearLayout>

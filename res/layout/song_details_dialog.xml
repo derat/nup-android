@@ -6,98 +6,67 @@
     >
   <TableRow>
     <TextView
-        android:paddingRight="7dp"
-        android:gravity="right"
-        android:textSize="16dp"
+        style="@style/SongDetailsLabel"
         android:text="@string/artist_colon"
-        android:textColor="@color/secondary_text"
         />
     <TextView
         android:id="@+id/artist"
-        android:textSize="16dp"
-        android:textStyle="bold"
-        android:textColor="@color/primary_text"
+        style="@style/SongDetailsValue"
         />
   </TableRow>
 
   <TableRow>
     <TextView
-        android:paddingRight="7dp"
-        android:gravity="right"
-        android:textSize="16dp"
-        android:singleLine="false"
+        style="@style/SongDetailsLabel"
         android:text="@string/title_colon"
-        android:textColor="@color/secondary_text"
         />
     <TextView
         android:id="@+id/title"
-        android:textSize="16dp"
-        android:textStyle="bold"
-        android:textColor="@color/primary_text"
+        style="@style/SongDetailsValue"
         />
   </TableRow>
 
   <TableRow>
     <TextView
-        android:paddingRight="7dp"
-        android:gravity="right"
-        android:textSize="16dp"
+        style="@style/SongDetailsLabel"
         android:text="@string/album_colon"
-        android:textColor="@color/secondary_text"
         />
     <TextView
         android:id="@+id/album"
-        android:textSize="16dp"
-        android:textStyle="bold"
-        android:textColor="@color/primary_text"
+        style="@style/SongDetailsValue"
         />
   </TableRow>
 
   <TableRow>
     <TextView
-        android:paddingRight="7dp"
-        android:gravity="right"
-        android:textSize="16dp"
+        style="@style/SongDetailsLabel"
         android:text="@string/track_colon"
-        android:textColor="@color/secondary_text"
         />
     <TextView
         android:id="@+id/track"
-        android:textSize="16dp"
-        android:textStyle="bold"
-        android:textColor="@color/primary_text"
+        style="@style/SongDetailsValue"
         />
   </TableRow>
 
   <TableRow>
     <TextView
-        android:paddingRight="7dp"
-        android:gravity="right"
-        android:textSize="16dp"
+        style="@style/SongDetailsLabel"
         android:text="@string/length_colon"
-        android:textColor="@color/secondary_text"
         />
     <TextView
         android:id="@+id/length"
-        android:textSize="16dp"
-        android:textStyle="bold"
-        android:textColor="@color/primary_text"
+        style="@style/SongDetailsValue"
         />
   </TableRow>
 
   <TableRow>
     <TextView
-        android:paddingRight="7dp"
-        android:gravity="right"
-        android:textSize="16dp"
+        style="@style/SongDetailsLabel"
         android:text="@string/rating_colon"
-        android:textColor="@color/secondary_text"
         />
     <TextView
         android:id="@+id/rating"
-        android:textSize="16dp"
-        android:textStyle="bold"
-        android:textColor="@color/primary_text"
+        style="@style/SongDetailsValue"
         />
   </TableRow>
 </TableLayout>

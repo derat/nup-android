@@ -7,4 +7,63 @@
     <item name="android:textColorPrimary">@color/primary_text</item>
     <item name="android:textColorSecondary">@color/secondary_text</item>
   </style>
+  <style name="PlayingSongText">
+    <item name="android:layout_width">wrap_content</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:singleLine">true</item>
+    <item name="android:textColor">@color/primary_text</item>
+    <item name="android:textSize">@dimen/material_text_body2</item>
+  </style>
+  <style name="Button">
+    <item name="android:textSize">@dimen/material_text_button</item>
+    <item name="android:textStyle">bold</item>
+    <item name="android:layout_width">fill_parent</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:layout_weight">1</item>
+  </style>
+  <style name="SongListArtist">
+    <item name="android:layout_width">fill_parent</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:layout_weight">3</item>
+    <item name="android:paddingRight">@dimen/textgrid</item>
+    <item name="android:textSize">@dimen/material_text_menu</item>
+    <item name="android:singleLine">true</item>
+  </style>
+  <style name="SongListTitle">
+    <item name="android:layout_width">fill_parent</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:textSize">@dimen/material_text_menu</item>
+    <item name="android:singleLine">true</item>
+  </style>
+  <style name="BrowseRowText">
+    <item name="android:layout_width">wrap_content</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:paddingTop">@dimen/grid1</item>
+    <item name="android:paddingBottom">@dimen/grid1</item>
+    <item name="android:textSize">@dimen/material_text_menu</item>
+    <item name="android:singleLine">true</item>
+  </style>
+  <style name="SongDetailsLabel">
+    <item name="android:paddingRight">@dimen/grid1</item>
+    <item name="android:gravity">right</item>
+    <item name="android:textSize">@dimen/material_text_body2</item>
+    <item name="android:textColor">@color/secondary_text</item>
+  </style>
+  <style name="SongDetailsValue">
+    <item name="android:textSize">@dimen/material_text_body2</item>
+    <item name="android:textStyle">bold</item>
+    <item name="android:textColor">@color/primary_text</item>
+  </style>
+  <style name="SearchTextField">
+    <item name="android:layout_width">fill_parent</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:singleLine">true</item>
+    <item name="android:inputType">textNoSuggestions</item>
+  </style>
+  <style name="SearchCheckbox">
+    <item name="android:layout_width">wrap_content</item>
+    <item name="android:layout_height">wrap_content</item>
+    <item name="android:layout_weight">1</item>
+    <item name="android:textSize">@dimen/material_text_body1</item>
+  </style>
 </resources>

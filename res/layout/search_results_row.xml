@@ -8,19 +8,11 @@
     >
   <TextView
       android:id="@+id/artist"
-      android:layout_width="fill_parent"
-      android:layout_height="wrap_content"
-      android:layout_weight="3"
-      android:paddingRight="@dimen/textgrid"
-      android:textSize="@dimen/material_text_menu"
-      android:singleLine="true"
+      style="@style/SongListArtist"
       />
   <TextView
       android:id="@+id/title"
-      android:layout_width="fill_parent"
-      android:layout_height="wrap_content"
+      style="@style/SongListTitle"
       android:layout_weight="2"
-      android:textSize="@dimen/material_text_menu"
-      android:singleLine="true"
       />
 </LinearLayout>

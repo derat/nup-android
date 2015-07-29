@@ -29,29 +29,17 @@
         >
       <TextView
           android:id="@+id/artist_label"
-          android:layout_width="wrap_content"
-          android:layout_height="wrap_content"
-          android:singleLine="true"
+          style="@style/PlayingSongText"
           android:textStyle="bold"
-          android:textColor="@color/primary_text"
-          android:textSize="@dimen/material_text_body2"
           />
       <TextView
           android:id="@+id/title_label"
-          android:layout_width="wrap_content"
-          android:layout_height="wrap_content"
-          android:singleLine="true"
+          style="@style/PlayingSongText"
           android:textStyle="italic"
-          android:textColor="@color/primary_text"
-          android:textSize="@dimen/material_text_body2"
           />
       <TextView
           android:id="@+id/album_label"
-          android:layout_width="wrap_content"
-          android:layout_height="wrap_content"
-          android:singleLine="true"
-          android:textColor="@color/primary_text"
-          android:textSize="@dimen/material_text_body2"
+          style="@style/PlayingSongText"
           />
       <LinearLayout
           android:orientation="horizontal"
@@ -60,22 +48,15 @@
           >
         <TextView
             android:id="@+id/time_label"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:singleLine="true"
-            android:text=""
+            style="@style/PlayingSongText"
             android:textColor="@color/secondary_text"
-            android:textSize="@dimen/material_text_body2"
             />
         <TextView
             android:id="@+id/download_status_label"
+            style="@style/PlayingSongText"
             android:layout_width="fill_parent"
-            android:layout_height="wrap_content"
-            android:singleLine="true"
             android:gravity="right"
-            android:text=""
             android:textColor="@color/secondary_text"
-            android:textSize="@dimen/material_text_body2"
             />
       </LinearLayout>
     </LinearLayout>
@@ -94,32 +75,20 @@
       >
     <Button
         android:id="@+id/pause_button"
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
+        style="@style/Button"
         android:text="@string/pause"
-        android:textSize="@dimen/material_text_button"
-        android:textStyle="bold"
         android:onClick="onPauseButtonClicked"
         />
     <Button
         android:id="@+id/prev_button"
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
+        style="@style/Button"
         android:text="@string/prev"
-        android:textSize="@dimen/material_text_button"
-        android:textStyle="bold"
         android:onClick="onPrevButtonClicked"
         />
     <Button
         android:id="@+id/next_button"
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:layout_weight="1"
+        style="@style/Button"
         android:text="@string/next"
-        android:textSize="@dimen/material_text_button"
-        android:textStyle="bold"
         android:onClick="onNextButtonClicked"
         />
   </LinearLayout>
@@ -135,22 +104,14 @@
       android:elevation="@dimen/height1"
       >
     <TextView
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:layout_weight="3"
-        android:paddingRight="@dimen/textgrid"
-        android:singleLine="true"
+        style="@style/SongListArtist"
         android:text="@string/artist"
-        android:textSize="@dimen/material_text_menu"
         android:textStyle="bold"
         />
     <TextView
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
+        style="@style/SongListTitle"
         android:layout_weight="2"
-        android:singleLine="true"
         android:text="@string/title"
-        android:textSize="@dimen/material_text_menu"
         android:textStyle="bold"
         />
   </LinearLayout>
