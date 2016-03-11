@@ -148,7 +148,7 @@ public class SearchResultsActivity extends Activity {
                 if (mSongs.isEmpty())
                     finish();
             }
-        }.execute();
+        }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
 
     @Override

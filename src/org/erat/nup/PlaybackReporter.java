@@ -32,7 +32,7 @@ class PlaybackReporter {
                     }
                     return (Void) null;
                 }
-            }.execute();
+            }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
         }
     }
 
@@ -61,7 +61,7 @@ class PlaybackReporter {
             String params = "songId=" + songId + "&startTime=" + (startDate.getTime() / 1000);
             DownloadRequest request = new DownloadRequest(
                 mContext, DownloadRequest.getServerUri(mContext, "/report_played", params),
-                DownloadRequest.Method.POST, DownloadRequest.Auth.SERVER);
+                DownloadRequest.Method.POST, DownloadRequest.AuthType.SERVER);
             result = Download.startDownload(request);
             if (result.getStatusCode() == 200)
                 return true;

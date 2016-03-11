@@ -18,8 +18,8 @@ import com.google.android.gms.auth.UserRecoverableNotifiedException;
 import java.io.IOException;
 
 // Utility class for doing Oauth2 authenticate to read from Google Cloud Storage on behalf of the configure account.
-class Authenticate {
-    private static final String TAG = "Authenticate";
+class Auth {
+    private static final String TAG = "Auth";
 
     private static final String SCOPE = "oauth2:https://www.googleapis.com/auth/devstorage.read_only";
 
@@ -54,28 +54,21 @@ class Authenticate {
         Log.d(TAG, "got token");
         return token;
     }
-}
 
-// Task that attempts to authenticate in the background.
-class AuthenticateTask extends AsyncTask<Void, Void, String> {
-    private Context mContext;
+    public static void authenticateInBackground(final Context context) {
+        new AsyncTask<Void, Void, String>() {
+            @Override protected String doInBackground(Void... args) {
+                try {
+                    getAuthToken(context);
+                    return "Authenticated successfully.";
+                } catch (AuthException e) {
+                    return "Authentication failed: " + e;
+                }
+            }
 
-    public AuthenticateTask(Context context) {
-        mContext = context;
-    }
-
-    @Override
-    protected String doInBackground(Void... args) {
-        try {
-            Authenticate.getAuthToken(mContext);
-            return "Authenticated successfully.";
-        } catch (Authenticate.AuthException e) {
-            return "Authentication failed: " + e;
-        }
-    }
-
-    @Override
-    protected void onPostExecute(String message) {
-        Toast.makeText(mContext, message, Toast.LENGTH_SHORT).show();
+            @Override protected void onPostExecute(String message) {
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
+            }
+        }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
 }

@@ -277,7 +277,7 @@ class SongDatabase {
 
                 return (Void) null;
             }
-        }.execute();
+        }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
 
         mUpdater = new DatabaseUpdater(mOpener);
         mUpdaterThread = new Thread(mUpdater, "SongDatabase.DatabaseUpdater");

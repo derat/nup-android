@@ -41,7 +41,7 @@ import java.util.zip.GZIPInputStream;
 class DownloadRequest {
     private static String TAG = "DownloadRequest";
 
-    public enum Auth {
+    public enum AuthType {
         SERVER,
         STORAGE
     }
@@ -65,7 +65,7 @@ class DownloadRequest {
     private URI mUri;
     private String mBody;
 
-    DownloadRequest(Context context, URI uri, Method method, Auth auth) {
+    DownloadRequest(Context context, URI uri, Method method, AuthType authType) {
         mContext = context;
         mUri = uri;
         mMethod = method;
@@ -88,18 +88,18 @@ class DownloadRequest {
         mHttpRequest.addHeader("Host", mUri.getHost() + ":" + mUri.getPort());
         // TODO: Set User-Agent to something reasonable.
 
-        if (auth == Auth.SERVER) {
+        if (authType == AuthType.SERVER) {
             // Add Authorization header if username and password prefs are set.
             SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
             String username = prefs.getString(NupPreferences.USERNAME, "");
             String password = prefs.getString(NupPreferences.PASSWORD, "");
             if (!username.isEmpty() && !password.isEmpty())
                 mHttpRequest.setHeader("Authorization", "Basic " + Base64.encodeToString((username + ":" + password).getBytes(), Base64.NO_WRAP));
-        } else if (auth == Auth.STORAGE) {
+        } else if (authType == AuthType.STORAGE) {
             try {
-                String token = Authenticate.getAuthToken(mContext);
+                String token = Auth.getAuthToken(mContext);
                 mHttpRequest.setHeader("Authorization", "Bearer " + token);
-            } catch (Authenticate.AuthException e) {
+            } catch (Auth.AuthException e) {
                 Log.e(TAG, "failed to get auth token: " + e);
             }
         }
@@ -267,7 +267,7 @@ class Download {
         try {
             DownloadRequest request = new DownloadRequest(
                 context, DownloadRequest.getServerUri(context, path, query),
-                DownloadRequest.Method.GET, DownloadRequest.Auth.SERVER);
+                DownloadRequest.Method.GET, DownloadRequest.AuthType.SERVER);
             request.setHeader("Accept-Encoding", "gzip");
             DownloadResult result = startDownload(request);
             if (result.getStatusCode() != 200) {

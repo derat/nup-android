@@ -158,7 +158,7 @@ public class BrowseAlbumsActivity extends ListActivity
                 protected void onPostExecute(List<StringIntPair> albums) {
                     updateAlbums(albums);
                 }
-            }.execute();
+            }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
         }
     }
 

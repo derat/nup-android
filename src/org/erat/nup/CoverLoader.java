@@ -121,7 +121,7 @@ class CoverLoader {
             file.createNewFile();
             outputStream = new FileOutputStream(file);
 
-            request = new DownloadRequest(mContext, uri, DownloadRequest.Method.GET, DownloadRequest.Auth.STORAGE);
+            request = new DownloadRequest(mContext, uri, DownloadRequest.Method.GET, DownloadRequest.AuthType.STORAGE);
             result = Download.startDownload(request);
             if (result.getStatusCode() != 200)
                 throw new IOException("got status code " + result.getStatusCode());

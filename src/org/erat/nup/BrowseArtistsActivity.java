@@ -150,7 +150,7 @@ public class BrowseArtistsActivity extends ListActivity
                 protected void onPostExecute(List<StringIntPair> artists) {
                     updateArtists(artists);
                 }
-            }.execute();
+            }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
         }
     }
 

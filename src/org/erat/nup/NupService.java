@@ -241,8 +241,9 @@ public class NupService extends Service
         Log.d(TAG, "service created");
         CrashLogger.register(new File(getExternalFilesDir(null), CRASH_SUBDIRECTORY));
 
-        if (Util.isNetworkAvailable(this))
-            new AuthenticateTask(this).execute();
+        if (Util.isNetworkAvailable(this)) {
+            Auth.authenticateInBackground(this);
+        }
 
         mTogglePauseIntent = PendingIntent.getService(this, 0, new Intent(ACTION_TOGGLE_PAUSE, Uri.EMPTY, this, NupService.class), 0);
         mPrevTrackIntent = PendingIntent.getService(this, 0, new Intent(ACTION_PREV_TRACK, Uri.EMPTY, this, NupService.class), 0);
@@ -632,7 +633,7 @@ public class NupService extends Service
 
         if (!mSongCoverFetches.contains(song)) {
             mSongCoverFetches.add(song);
-            new CoverFetchTask(song).execute();
+            new CoverFetchTask(song).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
         }
     }
 

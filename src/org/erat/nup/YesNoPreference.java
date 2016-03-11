@@ -33,7 +33,7 @@ class YesNoPreference extends DialogPreference
         super.onDialogClosed(positiveResult);
         if (positiveResult) {
             if (NupPreferences.SYNC_SONG_LIST.equals(getKey())) {
-                new SyncSongListTask().execute((Void) null);
+                new SyncSongListTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
             } else if (NupPreferences.CLEAR_CACHE.equals(getKey())) {
                 NupActivity.getService().clearCache();
                 setSummary(mContext.getString(R.string.cache_is_empty));

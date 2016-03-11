@@ -136,7 +136,7 @@ public class BrowseSongsActivity extends Activity
                 view.setOnItemClickListener(BrowseSongsActivity.this);
                 registerForContextMenu(view);
             }
-        }.execute();
+        }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
 
     @Override
