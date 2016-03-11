@@ -92,10 +92,6 @@ class FileCache implements Runnable {
 
     private final Listener mListener;
 
-    public static File getMusicDir(Context context) {
-        return context.getExternalFilesDir(Environment.DIRECTORY_MUSIC);
-    }
-
     FileCache(Context context, Listener listener) {
         mContext = context;
         mListener = listener;
@@ -105,7 +101,8 @@ class FileCache implements Runnable {
         if (!state.equals(Environment.MEDIA_MOUNTED))
             Log.e(TAG, "media has state " + state + "; we need " + Environment.MEDIA_MOUNTED);
 
-        mMusicDir = getMusicDir(mContext);
+        // TODO: This shouldn't be running on the UI thread; it hits the disk at startup.
+        mMusicDir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC);
         mPrefs = PreferenceManager.getDefaultSharedPreferences(context);
 
         mWifiLock = ((WifiManager) mContext.getSystemService(Context.WIFI_SERVICE)).createWifiLock(
@@ -115,7 +112,7 @@ class FileCache implements Runnable {
 
     @Override
     public void run() {
-        mDb = new FileCacheDatabase(mContext);
+        mDb = new FileCacheDatabase(mContext, mMusicDir.getPath());
         Looper.prepare();
         mHandler = new Handler();
 
@@ -192,7 +189,7 @@ class FileCache implements Runnable {
                 for (long songId : songIds) {
                     FileCacheEntry entry = mDb.getEntry(songId);
                     mDb.removeEntry(songId);
-                    File file = entry.getLocalFile(mContext);
+                    File file = entry.getLocalFile();
                     file.delete();
                     mListener.onCacheEviction(entry);
                 }
@@ -224,7 +221,7 @@ class FileCache implements Runnable {
         }
 
         Log.d(TAG, "posting download of song " + songId + " from " +
-              song.getUri().toString() + " to " + entry.getLocalFile(mContext).getPath());
+              song.getUri().toString() + " to " + entry.getLocalFile().getPath());
         mHandler.post(new DownloadTask(entry, song.getUri()));
         return entry;
     }
@@ -387,7 +384,7 @@ class FileCache implements Runnable {
                 return DownloadStatus.FATAL_ERROR;
             }
 
-            File file = mEntry.getLocalFile(mContext);
+            File file = mEntry.getLocalFile();
             if (!file.exists()) {
                 file.getParentFile().mkdirs();
                 try {
@@ -608,7 +605,7 @@ class FileCache implements Runnable {
             }
 
             FileCacheEntry entry = mDb.getEntry(songId);
-            File file = entry.getLocalFile(mContext);
+            File file = entry.getLocalFile();
             Log.d(TAG, "deleting song " + songId + " (" + file.getPath() + ", " + file.length() + " bytes)");
             availableBytes += file.length();
             file.delete();

@@ -95,8 +95,7 @@ class Player implements Runnable,
             }
         }
         mHandler.post(new Runnable() {
-            @Override
-            public void run() {
+            @Override public void run() {
                 resetCurrent();
                 resetQueued();
                 Looper.myLooper().quit();
@@ -106,8 +105,7 @@ class Player implements Runnable,
 
     public void abortPlayback() {
         mHandler.post(new Runnable() {
-            @Override
-            public void run() {
+            @Override public void run() {
                 resetCurrent();
             }
         });
@@ -115,8 +113,7 @@ class Player implements Runnable,
 
     public void playFile(final String path, final long numBytes) {
         mHandler.post(new Runnable() {
-            @Override
-            public void run() {
+            @Override public void run() {
                 Log.d(TAG, "got request to play " + path);
                 resetCurrent();
                 if (mQueuedPath.equals(path)) {
@@ -142,8 +139,7 @@ class Player implements Runnable,
 
     public void queueFile(final String path, final long numBytes) {
         mHandler.post(new Runnable() {
-            @Override
-            public void run() {
+            @Override public void run() {
                 Log.d(TAG, "got request to queue " + path);
                 if (path.equals(mQueuedPath))
                     return;
@@ -178,8 +174,7 @@ class Player implements Runnable,
 
     private void updatePauseState(final PauseUpdateType type) {
         mHandler.post(new Runnable() {
-            @Override
-            public void run() {
+            @Override public void run() {
                 if (mCurrentPlayer == null)
                     return;
 
@@ -254,8 +249,7 @@ class Player implements Runnable,
     }
 
     // Implements MediaPlayer.OnCompletionListener.
-    @Override
-    public void onCompletion(final MediaPlayer player) {
+    @Override public void onCompletion(final MediaPlayer player) {
         try {
             long streamPosition = mCurrentStream.getChannel().position();
             Log.d(TAG, player + " completed playback at " + streamPosition + " of " + mCurrentNumBytes);
@@ -278,8 +272,7 @@ class Player implements Runnable,
     }
 
     // Implements MediaPlayer.OnErrorListener.
-    @Override
-    public boolean onError(MediaPlayer player, int what, int extra) {
+    @Override public boolean onError(MediaPlayer player, int what, int extra) {
         mListener.onPlaybackError("MediaPlayer reported a vague, not-very-useful error: what=" + what + " extra=" + extra);
         // Return false so the completion listener will get called.
         return false;

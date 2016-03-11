@@ -8,11 +8,13 @@ import android.content.Context;
 import java.io.File;
 
 class FileCacheEntry {
+    private final String mMusicDir;
     private final long mSongId;
     private long mCachedBytes, mTotalBytes;
     private int mLastAccessTime;
 
-    public FileCacheEntry(long songId, long totalBytes, int lastAccessTime) {
+    public FileCacheEntry(String musicDir, long songId, long totalBytes, int lastAccessTime) {
+        mMusicDir = musicDir;
         mSongId = songId;
         mCachedBytes = 0;
         mTotalBytes = totalBytes;
@@ -24,8 +26,8 @@ class FileCacheEntry {
     public long getTotalBytes() { return mTotalBytes; }
     public int getLastAccessTime() { return mLastAccessTime; }
 
-    public File getLocalFile(Context context) {
-        return new File(FileCache.getMusicDir(context), mSongId + ".mp3");
+    public File getLocalFile() {
+        return new File(mMusicDir, mSongId + ".mp3");
     }
 
     public void incrementCachedBytes(long bytes) { mCachedBytes += bytes; }

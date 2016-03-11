@@ -41,15 +41,17 @@ class FileCacheDatabase {
     private final DatabaseUpdater mUpdater;
     private final Thread mUpdaterThread;
 
-    public FileCacheDatabase(Context context) {
+    private final String mMusicDir;
+
+    public FileCacheDatabase(Context context, String musicDir) {
+        mMusicDir = musicDir;
+
         SQLiteOpenHelper helper = new SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
-            @Override
-            public void onCreate(SQLiteDatabase db) {
+            @Override public void onCreate(SQLiteDatabase db) {
                 db.execSQL(CREATE_CACHE_ENTRIES_SQL);
             }
 
-            @Override
-            public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
+            @Override public void onUpgrade(SQLiteDatabase db, int oldVersion, int newVersion) {
                 Log.d(TAG, "onUpgrade: " + oldVersion + " -> " + newVersion);
                 db.beginTransaction();
                 try {
@@ -117,8 +119,8 @@ class FileCacheDatabase {
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
             FileCacheEntry entry =
-                new FileCacheEntry(cursor.getLong(0), cursor.getLong(1), cursor.getInt(2));
-            File file = entry.getLocalFile(context);
+                new FileCacheEntry(mMusicDir, cursor.getLong(0), cursor.getLong(1), cursor.getInt(2));
+            File file = entry.getLocalFile();
             entry.setCachedBytes(file.exists() ? file.length() : 0);
             mEntries.put(entry.getSongId(), entry);
             cursor.moveToNext();
@@ -139,7 +141,7 @@ class FileCacheDatabase {
 
     public synchronized FileCacheEntry addEntry(long songId) {
         final int accessTime = (int) (new Date().getTime() / 1000);
-        FileCacheEntry entry = new FileCacheEntry(songId, 0, accessTime);
+        FileCacheEntry entry = new FileCacheEntry(mMusicDir, songId, 0, accessTime);
         mEntries.put(songId, entry);
         mUpdater.postUpdate(
             "REPLACE INTO CacheEntries (SongId, TotalBytes, LastAccessTime) VALUES(?, 0, ?)",
@@ -185,8 +187,7 @@ class FileCacheDatabase {
         List<Long> ids = new ArrayList<Long>();
         ids.addAll(mEntries.keySet());
         Collections.sort(ids, new Comparator<Long>() {
-            @Override
-            public int compare(Long a, Long b) {
+            @Override public int compare(Long a, Long b) {
                 int aTime = (Integer) getEntry(a).getLastAccessTime();
                 int bTime = (Integer) getEntry(b).getLastAccessTime();
                 return (aTime == bTime) ? 0 : (aTime < bTime) ? -1 : 1;

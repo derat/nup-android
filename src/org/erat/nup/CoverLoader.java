@@ -55,6 +55,7 @@ class CoverLoader {
         if (!state.equals(Environment.MEDIA_MOUNTED))
             Log.e(TAG, "media has state " + state + "; we need " + Environment.MEDIA_MOUNTED);
 
+        // TODO: This shouldn't be running on the UI thread; it hits the disk at startup.
         mCoverDir = new File(mContext.getExternalCacheDir(), "covers");
     }
 
