@@ -7,6 +7,7 @@ import android.content.Context;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.Uri;
+import android.os.Looper;
 import android.widget.ListView;
 import android.widget.FrameLayout;
 
@@ -24,6 +25,15 @@ import java.util.List;
 
 class Util {
     private static final String TRUNCATION_STRING = "...";
+
+    /**
+     * Crash if called from a thread besides the main/UI one.
+     */
+    public static void assertOnMainThread() {
+        if (Looper.getMainLooper().getThread() != Thread.currentThread()) {
+            throw new IllegalStateException("Not running on main thread");
+        }
+    }
 
     // Yay.
     public static String getStringFromInputStream(InputStream stream) throws IOException {

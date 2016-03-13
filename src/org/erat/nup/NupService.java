@@ -270,7 +270,7 @@ public class NupService extends Service
 
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
 
-        mPlayer = new Player(this);
+        mPlayer = new Player(this, mHandler);
         mPlayerThread = new Thread(mPlayer, "Player");
         mPlayerThread.setPriority(Thread.MAX_PRIORITY);
         mPlayerThread.start();
@@ -672,76 +672,59 @@ public class NupService extends Service
     }
 
     // Implements Player.Listener.
-    @Override
-    public void onPlaybackComplete() {
-        mHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                mPlaybackComplete = true;
-                updateNotification();
-                updateMetadata();
-                mRemoteControlClient.setPlaybackState(RemoteControlClient.PLAYSTATE_STOPPED, -1, 1.0f);
-                if (mCurrentSongIndex < mSongs.size() - 1)
-                    playSongAtIndex(mCurrentSongIndex + 1);
-            }
-        });
+    @Override public void onPlaybackComplete() {
+        Util.assertOnMainThread();
+        mPlaybackComplete = true;
+        updateNotification();
+        updateMetadata();
+        mRemoteControlClient.setPlaybackState(RemoteControlClient.PLAYSTATE_STOPPED, -1, 1.0f);
+        if (mCurrentSongIndex < mSongs.size() - 1) {
+            playSongAtIndex(mCurrentSongIndex + 1);
+        }
     }
 
     // Implements Player.Listener.
-    @Override
-    public void onPlaybackPositionChange(final String path, final int positionMs, final int durationMs) {
-        mHandler.post(new Runnable() {
-            @Override
-            public void run() {
-                if (!path.equals(mCurrentSongPath))
-                    return;
+    @Override public void onPlaybackPositionChange(final String path, final int positionMs, final int durationMs) {
+        Util.assertOnMainThread();
+        if (!path.equals(mCurrentSongPath))
+            return;
 
-                Song song = getCurrentSong();
-                if (mSongListener != null)
-                    mSongListener.onSongPositionChange(song, positionMs, durationMs);
+        Song song = getCurrentSong();
+        if (mSongListener != null)
+            mSongListener.onSongPositionChange(song, positionMs, durationMs);
 
-                if (positionMs > mCurrentSongLastPositionMs &&
-                    positionMs <= mCurrentSongLastPositionMs + MAX_POSITION_REPORT_MS) {
-                    mCurrentSongPlayedMs += (positionMs - mCurrentSongLastPositionMs);
-                    if (!mReportedCurrentSong &&
-                        (mCurrentSongPlayedMs >= Math.max(durationMs, song.getLengthSec() * 1000) / 2 ||
-                         mCurrentSongPlayedMs >= REPORT_PLAYBACK_THRESHOLD_MS)) {
-                        mPlaybackReporter.report(song.getSongId(), mCurrentSongStartDate);
-                        mReportedCurrentSong = true;
-                    }
-                }
-
-                mCurrentSongLastPositionMs = positionMs;
-                mRemoteControlClient.setPlaybackState(RemoteControlClient.PLAYSTATE_PLAYING, positionMs, 1.0f);
+        if (positionMs > mCurrentSongLastPositionMs &&
+            positionMs <= mCurrentSongLastPositionMs + MAX_POSITION_REPORT_MS) {
+            mCurrentSongPlayedMs += (positionMs - mCurrentSongLastPositionMs);
+            if (!mReportedCurrentSong &&
+                (mCurrentSongPlayedMs >= Math.max(durationMs, song.getLengthSec() * 1000) / 2 ||
+                 mCurrentSongPlayedMs >= REPORT_PLAYBACK_THRESHOLD_MS)) {
+                mPlaybackReporter.report(song.getSongId(), mCurrentSongStartDate);
+                mReportedCurrentSong = true;
             }
-        });
+        }
+
+        mCurrentSongLastPositionMs = positionMs;
+        mRemoteControlClient.setPlaybackState(RemoteControlClient.PLAYSTATE_PLAYING, positionMs, 1.0f);
     }
 
     // Implements Player.Listener.
-    @Override
-    public void onPauseStateChange(final boolean paused) {
-        mHandler.post(new Runnable() {
-            @Override public void run() {
-                mPaused = paused;
-                updateNotification();
-                if (mSongListener != null) {
-                    mSongListener.onPauseStateChange(paused);
-                }
-                mRemoteControlClient.setPlaybackState(
-                    paused ? RemoteControlClient.PLAYSTATE_PAUSED : RemoteControlClient.PLAYSTATE_PLAYING,
-                    mCurrentSongLastPositionMs, 1.0f);
-            }
-        });
+    @Override public void onPauseStateChange(final boolean paused) {
+        Util.assertOnMainThread();
+        mPaused = paused;
+        updateNotification();
+        if (mSongListener != null) {
+            mSongListener.onPauseStateChange(paused);
+        }
+        mRemoteControlClient.setPlaybackState(
+            paused ? RemoteControlClient.PLAYSTATE_PAUSED : RemoteControlClient.PLAYSTATE_PLAYING,
+            mCurrentSongLastPositionMs, 1.0f);
     }
 
     // Implements Player.Listener.
-    @Override
-    public void onPlaybackError(final String description) {
-        mHandler.post(new Runnable() {
-            public void run() {
-                Toast.makeText(NupService.this, description, Toast.LENGTH_LONG).show();
-            }
-        });
+    @Override public void onPlaybackError(final String description) {
+        Util.assertOnMainThread();
+        Toast.makeText(NupService.this, description, Toast.LENGTH_LONG).show();
     }
 
     // Implements FileCache.Listener.

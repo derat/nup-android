@@ -39,8 +39,8 @@ class Player implements Runnable,
     }
 
     // Plays the current song or queues the next one.
-    private MediaPlayer mCurrentPlayer = null;
-    private MediaPlayer mQueuedPlayer = null;
+    private MediaPlayer mCurrentPlayer;
+    private MediaPlayer mQueuedPlayer;
 
     // Paths currently loaded by |mCurrentPlayer| and |mQueuedPlayer|.
     private String mCurrentPath = "";
@@ -51,17 +51,20 @@ class Player implements Runnable,
     private long mQueuedNumBytes = 0;
 
     // InputStreams used by |mCurrentPlayer| and |mQueuedPlayer|.
-    private FileInputStream mCurrentStream = null;
-    private FileInputStream mQueuedStream = null;
+    private FileInputStream mCurrentStream;
+    private FileInputStream mQueuedStream;
 
     // Is playback paused?
     private boolean mPaused = false;
 
     // Used to run tasks on our own thread.
-    private Handler mHandler = null;
+    private Handler mHandler;
 
     // Notified when things change.
     private final Listener mListener;
+
+    // Used to post tasks to mListener.
+    private Handler mListenerHandler;
 
     private boolean mShouldQuit = false;
 
@@ -71,8 +74,9 @@ class Player implements Runnable,
         TOGGLE_PAUSE,
     }
 
-    public Player(Listener listener) {
+    public Player(Listener listener, Handler listenerHandler) {
         mListener = listener;
+        mListenerHandler = listenerHandler;
     }
 
     @Override
@@ -201,7 +205,11 @@ class Player implements Runnable,
                     mCurrentPlayer.start();
                     startPositionTimer();
                 }
-                mListener.onPauseStateChange(mPaused);
+                mListenerHandler.post(new Runnable() {
+                    @Override public void run() {
+                        mListener.onPauseStateChange(mPaused);
+                    }
+                });
             }
         });
     }
@@ -218,8 +226,12 @@ class Player implements Runnable,
             player.setDataSource(stream.getFD());
             player.prepare();
             return player;
-        } catch (IOException e) {
-            mListener.onPlaybackError("Got error while creating player: " + e);
+        } catch (final IOException e) {
+            mListenerHandler.post(new Runnable() {
+                @Override public void run() {
+                    mListener.onPlaybackError("Got error while creating player: " + e);
+                }
+            });
             return null;
         }
     }
@@ -231,8 +243,12 @@ class Player implements Runnable,
                 Log.w(TAG, "aborting position task; player is null");
                 return;
             }
-            mListener.onPlaybackPositionChange(
-                mCurrentPath, mCurrentPlayer.getCurrentPosition(), mCurrentPlayer.getDuration());
+            mListenerHandler.post(new Runnable() {
+                @Override public void run() {
+                    mListener.onPlaybackPositionChange(
+                        mCurrentPath, mCurrentPlayer.getCurrentPosition(), mCurrentPlayer.getDuration());
+                }
+            });
             mHandler.postDelayed(this, POSITION_CHANGE_REPORT_MS);
         }
     };
@@ -251,10 +267,14 @@ class Player implements Runnable,
     // Implements MediaPlayer.OnCompletionListener.
     @Override public void onCompletion(final MediaPlayer player) {
         try {
-            long streamPosition = mCurrentStream.getChannel().position();
+            final long streamPosition = mCurrentStream.getChannel().position();
             Log.d(TAG, player + " completed playback at " + streamPosition + " of " + mCurrentNumBytes);
             if (streamPosition < mCurrentNumBytes) {
-                mListener.onPlaybackError("Buffer underrun at " + streamPosition + " of " + mCurrentNumBytes);
+                mListenerHandler.post(new Runnable() {
+                    @Override public void run() {
+                        mListener.onPlaybackError("Buffer underrun at " + streamPosition + " of " + mCurrentNumBytes);
+                    }
+                });
                 int currentPositionMs = mCurrentPlayer.getCurrentPosition();
                 Log.w(TAG, player + " not done; resetting and seeking to " + currentPositionMs + " ms");
                 mCurrentPlayer.reset();
@@ -264,7 +284,11 @@ class Player implements Runnable,
                 mCurrentPlayer.start();
             } else {
                 resetCurrent();
-                mListener.onPlaybackComplete();
+                mListenerHandler.post(new Runnable() {
+                    @Override public void run() {
+                        mListener.onPlaybackComplete();
+                    }
+                });
             }
         } catch (IOException e) {
             Log.e(TAG, "got error while handling completion of " + player + ": " + e);
@@ -272,8 +296,12 @@ class Player implements Runnable,
     }
 
     // Implements MediaPlayer.OnErrorListener.
-    @Override public boolean onError(MediaPlayer player, int what, int extra) {
-        mListener.onPlaybackError("MediaPlayer reported a vague, not-very-useful error: what=" + what + " extra=" + extra);
+    @Override public boolean onError(MediaPlayer player, final int what, final int extra) {
+        mListenerHandler.post(new Runnable() {
+            @Override public void run() {
+                mListener.onPlaybackError("MediaPlayer reported a vague, not-very-useful error: what=" + what + " extra=" + extra);
+            }
+        });
         // Return false so the completion listener will get called.
         return false;
     }
@@ -331,7 +359,11 @@ class Player implements Runnable,
         startPositionTimer();
         if (mPaused) {
             mPaused = false;
-            mListener.onPauseStateChange(mPaused);
+            mListenerHandler.post(new Runnable() {
+                @Override public void run() {
+                    mListener.onPauseStateChange(mPaused);
+                }
+            });
         }
     }
 
@@ -340,8 +372,12 @@ class Player implements Runnable,
         FileInputStream stream = null;
         try {
             stream = new FileInputStream(path);
-        } catch (FileNotFoundException e) {
-            mListener.onPlaybackError("Unable to open " + path + ": " + e);
+        } catch (final FileNotFoundException e) {
+            mListenerHandler.post(new Runnable() {
+                @Override public void run() {
+                    mListener.onPlaybackError("Unable to open " + path + ": " + e);
+                }
+            });
         }
         return stream;
     }
@@ -350,8 +386,12 @@ class Player implements Runnable,
     private void closeStream(final FileInputStream stream) {
         try {
             stream.close();
-        } catch (IOException e) {
-            mListener.onPlaybackError("Unable close stream: " + e);
+        } catch (final IOException e) {
+            mListenerHandler.post(new Runnable() {
+                @Override public void run() {
+                    mListener.onPlaybackError("Unable close stream: " + e);
+                }
+            });
         }
     }
 }
