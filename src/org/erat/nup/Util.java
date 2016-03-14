@@ -26,13 +26,17 @@ import java.util.List;
 class Util {
     private static final String TRUNCATION_STRING = "...";
 
-    /**
-     * Crash if called from a thread besides the main/UI one.
-     */
-    public static void assertOnMainThread() {
-        if (Looper.getMainLooper().getThread() != Thread.currentThread()) {
-            throw new IllegalStateException("Not running on main thread");
+    /** Crash if not running on the given Looper. */
+    public static void assertOnLooper(Looper looper) {
+        if (looper.getThread() != Thread.currentThread()) {
+            throw new IllegalStateException(
+                "Running on " + Thread.currentThread() + " instead of " + looper.getThread());
         }
+    }
+
+    /** Crash if called from a thread besides the main/UI one. */
+    public static void assertOnMainThread() {
+        assertOnLooper(Looper.getMainLooper());
     }
 
     // Yay.
