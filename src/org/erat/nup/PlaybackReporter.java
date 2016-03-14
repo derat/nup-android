@@ -58,7 +58,7 @@ class PlaybackReporter {
 
         String errorMessage;
         try {
-            String params = "songId=" + songId + "&startTime=" + (startDate.getTime() / 1000);
+            String params = "songId=" + songId + "&startTime=" + String.format("%f", (startDate.getTime() / 1000.0));
             DownloadRequest request = new DownloadRequest(
                 mContext, DownloadRequest.getServerUri(mContext, "/report_played", params),
                 DownloadRequest.Method.POST, DownloadRequest.AuthType.SERVER);

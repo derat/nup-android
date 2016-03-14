@@ -104,7 +104,7 @@ class Player implements Runnable,
             try {
                 mStream = new FileInputStream(mPath);
                 mPlayer = new MediaPlayer();
-                Log.d(TAG, "created player " + mPlayer + " for " + mPath);
+                Log.d(TAG, "created " + mPlayer + " for " + mPath);
                 mPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
                 mPlayer.setOnCompletionListener(Player.this);
                 mPlayer.setOnErrorListener(Player.this);
@@ -191,7 +191,7 @@ class Player implements Runnable,
                 Log.d(TAG, "got request to play " + path);
                 resetCurrent();
                 if (mQueuedPlayer != null && mQueuedPlayer.getPath().equals(path)) {
-                    Log.d(TAG, "using queued player " + mQueuedPlayer.getMediaPlayer());
+                    Log.d(TAG, "using queued " + mQueuedPlayer.getMediaPlayer());
                     mCurrentPlayer = mQueuedPlayer;
                     mQueuedPlayer = null;
                 } else {
