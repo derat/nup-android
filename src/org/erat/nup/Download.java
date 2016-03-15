@@ -275,10 +275,15 @@ class Download {
                 return null;
             }
             InputStream stream = result.getEntity().getContent();
+            InputStream gzipStream = null;
             Header encoding = result.getEntity().getContentEncoding();
-            if (encoding != null && encoding.getValue().equals("gzip"))
-                stream = new GZIPInputStream(stream);
-            String output = Util.getStringFromInputStream(stream);
+            if (encoding != null && encoding.getValue().equals("gzip")) {
+                gzipStream = new GZIPInputStream(stream);
+            }
+            String output = Util.getStringFromInputStream(gzipStream != null ? gzipStream : stream);
+            if (gzipStream != null) {
+                gzipStream.close();
+            }
             result.close();
             return output;
         } catch (DownloadRequest.PrefException e) {
