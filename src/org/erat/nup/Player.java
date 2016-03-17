@@ -330,38 +330,41 @@ class Player implements Runnable,
 
     // Implements MediaPlayer.OnCompletionListener.
     @Override public void onCompletion(final MediaPlayer player) {
-        Util.assertOnLooper(mHandler.getLooper());
-        if (mCurrentPlayer == null || mCurrentPlayer.getMediaPlayer() != player) {
-            return;
-        }
-        try {
-            final long streamPosition = mCurrentPlayer.getStream().getChannel().position();
-            final long numBytes = mCurrentPlayer.getNumBytes();
-            Log.d(TAG, player + " completed playback at " + streamPosition + " of " + numBytes);
-            if (streamPosition < numBytes) {
-                mListenerHandler.post(new Runnable() {
-                    @Override public void run() {
-                        mListener.onPlaybackError("Buffer underrun at " + streamPosition + " of " + numBytes);
+        mHandler.post(new Runnable() {
+            @Override public void run() {
+                if (mCurrentPlayer == null || mCurrentPlayer.getMediaPlayer() != player) {
+                    return;
+                }
+                try {
+                    final long streamPosition = mCurrentPlayer.getStream().getChannel().position();
+                    final long numBytes = mCurrentPlayer.getNumBytes();
+                    Log.d(TAG, player + " completed playback at " + streamPosition + " of " + numBytes);
+                    if (streamPosition < numBytes) {
+                        mListenerHandler.post(new Runnable() {
+                            @Override public void run() {
+                                mListener.onPlaybackError("Buffer underrun at " + streamPosition + " of " + numBytes);
+                            }
+                        });
+                        int currentPositionMs = player.getCurrentPosition();
+                        Log.w(TAG, player + " not done; resetting and seeking to " + currentPositionMs + " ms");
+                        player.reset();
+                        player.setDataSource(mCurrentPlayer.getStream().getFD());
+                        player.prepare();
+                        player.seekTo(currentPositionMs);
+                        player.start();
+                    } else {
+                        resetCurrent();
+                        mListenerHandler.post(new Runnable() {
+                            @Override public void run() {
+                                mListener.onPlaybackComplete();
+                            }
+                        });
                     }
-                });
-                int currentPositionMs = player.getCurrentPosition();
-                Log.w(TAG, player + " not done; resetting and seeking to " + currentPositionMs + " ms");
-                player.reset();
-                player.setDataSource(mCurrentPlayer.getStream().getFD());
-                player.prepare();
-                player.seekTo(currentPositionMs);
-                player.start();
-            } else {
-                resetCurrent();
-                mListenerHandler.post(new Runnable() {
-                    @Override public void run() {
-                        mListener.onPlaybackComplete();
-                    }
-                });
+                } catch (IOException e) {
+                    Log.e(TAG, "got error while handling completion of " + player + ": " + e);
+                }
             }
-        } catch (IOException e) {
-            Log.e(TAG, "got error while handling completion of " + player + ": " + e);
-        }
+        });
     }
 
     // Implements MediaPlayer.OnErrorListener.
