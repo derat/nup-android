@@ -6,23 +6,27 @@
         android:title="@string/server_url"
         android:dialogMessage="@string/server_url_description"
         android:singleLine="true"
+        android:inputType="textNoSuggestions"
         />
     <EditTextPreference
         android:key="username"
         android:title="@string/username"
         android:dialogMessage="@string/username_description"
         android:singleLine="true"
+        android:inputType="textNoSuggestions"
         />
     <EditTextPreference
         android:key="password"
         android:title="@string/password"
-        android:password="true"
+        android:singleLine="true"
+        android:inputType="textPassword"
         />
     <EditTextPreference
         android:key="account"
         android:title="@string/account"
         android:dialogMessage="@string/account_description"
         android:singleLine="true"
+        android:inputType="textNoSuggestions"
         />
     <org.erat.nup.YesNoPreference
         android:key="sync_song_list"
@@ -39,6 +43,7 @@
         android:title="@string/cache_size"
         android:dialogMessage="@string/cache_size_description"
         android:singleLine="true"
+        android:numeric="integer"
         />
     <org.erat.nup.YesNoPreference
         android:key="clear_cache"
