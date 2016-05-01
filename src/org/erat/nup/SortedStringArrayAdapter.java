@@ -21,6 +21,9 @@ class SortedStringArrayAdapter extends ArrayAdapter<StringIntPair>
     // Are all items in the list enabled?  If false, all are disabled.
     private boolean mEnabled = true;
 
+    // Manner in which to sort strings, as a Util.SORT_* value.
+    private int mSortType = Util.SORT_ARTIST;
+
     private static final String NUMBER_SECTION = "#";
     private static final String OTHER_SECTION = "\u2668";  // HOT SPRINGS (Android isn't snowman-compatible)
 
@@ -31,9 +34,11 @@ class SortedStringArrayAdapter extends ArrayAdapter<StringIntPair>
 
     SortedStringArrayAdapter(Context context,
                              int textViewResourceId,
-                             List<StringIntPair> items) {
+                             List<StringIntPair> items,
+                             int sortType) {
         super(context, textViewResourceId, items);
         mItems = items;
+        mSortType = sortType;
         initSections();
     }
 
@@ -126,8 +131,9 @@ class SortedStringArrayAdapter extends ArrayAdapter<StringIntPair>
         if (str.isEmpty())
             return NUMBER_SECTION;
 
-        str = Util.getSortingKey(str);
-        char ch = str.charAt(0);
+        String sortStr = Util.getSortingKey(str, mSortType);
+        Log.i(TAG, sortStr + " (" + str + ", " + mSortType + ")");
+        char ch = sortStr.charAt(0);
         if (ch < 'a')
             return NUMBER_SECTION;
         if (ch >= 'a' && ch <= 'z')

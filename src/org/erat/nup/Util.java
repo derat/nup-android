@@ -26,6 +26,11 @@ import java.util.List;
 class Util {
     private static final String TRUNCATION_STRING = "...";
 
+    // Different sort types that can be passed to getSortingKey().
+    public static int SORT_ARTIST = 1;
+    public static int SORT_TITLE = 2;
+    public static int SORT_ALBUM = 3;
+
     /** Crash if not running on the given Looper. */
     public static void assertOnLooper(Looper looper) {
         if (looper.getThread() != Thread.currentThread()) {
@@ -91,34 +96,57 @@ class Util {
 
     // Get a key that can be used for sorting a string.
     // The string is converted to lowercase and common leading articles are removed.
-    public static String getSortingKey(String str) {
+    // |sortType| is a SORT_* value.
+    //
+    // If this method is changed, SongDatabase.updateStatsTables() must be called on the next run,
+    // as sorting keys are cached in the database.
+    public static String getSortingKey(String str, int sortType) {
         str = str.toLowerCase();
 
-        // Strip off some leading punctuation.
-        int startingIndex = 0;
-        for (; startingIndex < str.length(); ++startingIndex) {
-            char ch = str.charAt(startingIndex);
-            if (ch != ' ' && ch != '"' && ch != '\'')
-                break;
+        if (sortType == SORT_ARTIST) {
+            if (str.equals("[dialogue]") || str.equals("[no artist]") || str.equals("[unknown]")) {
+                // Strings used by MusicBrainz and/or Picard.
+                return "!" + str;
+            }
+        } else if (sortType == SORT_ALBUM) {
+            if (str.equals("[non-album tracks]") || str.equals("[unset]")) {
+                // Strings used by MusicBrainz and/or Picard.
+                return "!" + str;
+            } else if (str.startsWith("( )")) {
+                // Weird album title.
+                return str;
+            }
         }
-        if (startingIndex > 0)
-            str = str.substring(startingIndex);
 
-        // Remove common articles and other junk.
-        String[] prefixes = { "...", "a ", "an ", "the " };
-        for (int i = 0; i < prefixes.length; ++i) {
-            String prefix = prefixes[i];
-            if (str.startsWith(prefix))
-                str = str.substring(prefix.length());
+        // Strip off leading punctuation, common articles, and other junk.
+        final String[] prefixes = { " ", "\"", "'", "’", "(", "[", "<", "...", "a ", "an ", "the " };
+        int start = 0;
+        while (start < str.length()) {
+            boolean found = false;
+            for (int i = 0; i < prefixes.length; ++i) {
+                String prefix = prefixes[i];
+                if (str.startsWith(prefix, start)) {
+                    start += prefix.length();
+                    found = true;
+                    break;
+                }
+            }
+            if (!found) {
+                break;
+            }
         }
+        if (start > 0) {
+            str = str.substring(start);
+        }
+
         return str;
     }
 
     // Sort a list of StringIntPair objects.
-    public static void sortStringIntPairList(List<StringIntPair> items) {
+    public static void sortStringIntPairList(List<StringIntPair> items, int sortType) {
         final HashMap<String,String> sortKeys = new HashMap<String,String>();
         for (StringIntPair item : items)
-            sortKeys.put(item.getString(), getSortingKey(item.getString()));
+            sortKeys.put(item.getString(), getSortingKey(item.getString(), sortType));
         Collections.sort(items, new Comparator<StringIntPair>() {
             @Override
             public int compare(StringIntPair a, StringIntPair b) {

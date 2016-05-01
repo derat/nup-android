@@ -53,7 +53,7 @@ public class BrowseAlbumsActivity extends ListActivity
             getString(mOnlyCached ? R.string.browse_cached_albums_fmt : R.string.browse_albums_fmt, mArtist) :
             getString(mOnlyCached ? R.string.browse_cached_albums: R.string.browse_albums));
 
-        mAdapter = new SortedStringArrayAdapter(this, R.layout.browse_row, mAlbums);
+        mAdapter = new SortedStringArrayAdapter(this, R.layout.browse_row, mAlbums, Util.SORT_ALBUM);
         setListAdapter(mAdapter);
         registerForContextMenu(getListView());
 

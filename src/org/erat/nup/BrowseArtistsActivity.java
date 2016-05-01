@@ -46,7 +46,7 @@ public class BrowseArtistsActivity extends ListActivity
         mOnlyCached = getIntent().getBooleanExtra(BrowseActivity.BUNDLE_CACHED, false);
         setTitle(mOnlyCached ? R.string.browse_cached_artists : R.string.browse_artists);
 
-        mAdapter = new SortedStringArrayAdapter(this, R.layout.browse_row, mArtists);
+        mAdapter = new SortedStringArrayAdapter(this, R.layout.browse_row, mArtists, Util.SORT_ARTIST);
         setListAdapter(mAdapter);
         registerForContextMenu(getListView());
 

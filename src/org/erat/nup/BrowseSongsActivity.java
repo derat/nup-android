@@ -110,8 +110,8 @@ public class BrowseSongsActivity extends Activity
                     Collections.sort(songs, new Comparator<Song>() {
                         @Override
                         public int compare(Song a, Song b) {
-                            return Util.getSortingKey(a.getTitle()).compareTo(
-                                Util.getSortingKey(b.getTitle()));
+                            return Util.getSortingKey(a.getTitle(), Util.SORT_TITLE).compareTo(
+                                Util.getSortingKey(b.getTitle(), Util.SORT_TITLE));
                         }
                     });
                 }

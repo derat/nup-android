@@ -37,7 +37,7 @@ class SongDatabase {
     private static final String MAX_QUERY_RESULTS = "250";
 
     private static final String DATABASE_NAME = "NupSongs";
-    private static final int DATABASE_VERSION = 10;
+    private static final int DATABASE_VERSION = 13;
 
     private static final int SERVER_SONG_BATCH_SIZE = 100;
 
@@ -253,6 +253,9 @@ class SongDatabase {
                 } else if (newVersion == 11) {
                     // Version 11: Change way too much stuff for AppEngine backend.
                     throw new RuntimeException("Sorry, you need to delete everything and start over. :-(");
+                } else if (newVersion == 12 || newVersion == 13) {
+                    // Versions 12 and 13: Update sort ordering.
+                    updateStatsTables(db);
                 } else {
                     throw new RuntimeException(
                         "Got request to upgrade database to unknown version " + newVersion);
@@ -302,7 +305,7 @@ class SongDatabase {
             "SELECT s.Artist, COUNT(*) FROM Songs s " +
             "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
             "GROUP BY 1",
-            null);
+            null, Util.SORT_ARTIST);
     }
 
     public List<StringIntPair> getCachedAlbumsSortedAlphabetically() {
@@ -310,7 +313,7 @@ class SongDatabase {
             "SELECT s.Album, COUNT(*) FROM Songs s " +
             "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
             "GROUP BY 1",
-            null);
+            null, Util.SORT_ALBUM);
     }
 
     public List<StringIntPair> getCachedAlbumsByArtist(String artist) {
@@ -319,7 +322,7 @@ class SongDatabase {
             "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
             "WHERE LOWER(s.Artist) = LOWER(?) " +
             "GROUP BY 1",
-            new String[]{ artist });
+            new String[]{ artist }, Util.SORT_ALBUM);
     }
 
     public synchronized void quit() {
@@ -609,7 +612,7 @@ class SongDatabase {
 
         db.delete("ArtistAlbumStats", null, null);
         for (String artist : artistAlbums.keySet()) {
-            String artistSortKey = Util.getSortingKey(artist);
+            String artistSortKey = Util.getSortingKey(artist, Util.SORT_ARTIST);
             HashMap<String,Integer> albumMap = artistAlbums.get(artist);
             for (String album : albumMap.keySet()) {
                 ContentValues values = new ContentValues(5);
@@ -617,7 +620,7 @@ class SongDatabase {
                 values.put("Album", album);
                 values.put("NumSongs", albumMap.get(album));
                 values.put("ArtistSortKey", artistSortKey);
-                values.put("AlbumSortKey", Util.getSortingKey(album));
+                values.put("AlbumSortKey", Util.getSortingKey(album, Util.SORT_ALBUM));
                 db.insert("ArtistAlbumStats", "", values);
             }
         }
@@ -717,7 +720,7 @@ class SongDatabase {
 
     // Given a query that returns strings in its first column and ints in its second column, returns its results in
     // sorted order (on the first column only).
-    private List<StringIntPair> getSortedItems(String query, String[] selectionArgs) {
+    private List<StringIntPair> getSortedItems(String query, String[] selectionArgs, int sortType) {
         SQLiteDatabase db = mOpener.getDb();
         Cursor cursor = db.rawQuery(query, selectionArgs);
 
@@ -732,7 +735,7 @@ class SongDatabase {
         }
         cursor.close();
 
-        Util.sortStringIntPairList(items);
+        Util.sortStringIntPairList(items, sortType);
         return items;
     }
 }
