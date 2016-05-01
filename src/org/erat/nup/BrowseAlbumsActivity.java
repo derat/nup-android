@@ -76,10 +76,10 @@ public class BrowseAlbumsActivity extends ListActivity
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
-        case R.id.pause_menu_item:
-            NupActivity.getService().togglePause();
+        case R.id.browse_pause_menu_item:
+            NupActivity.getService().pause();
             return true;
-        case R.id.return_menu_item:
+        case R.id.browse_return_menu_item:
             setResult(RESULT_OK);
             finish();
             return true;

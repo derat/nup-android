@@ -8,6 +8,9 @@
         android:icon="@drawable/ic_search_white_24dp"
         android:title="@string/search"
         android:showAsAction="ifRoom|withText" />
+  <item android:id="@+id/pause_menu_item"
+        android:icon="@drawable/ic_pause_white_24dp"
+        android:title="@string/pause" />
   <item android:id="@+id/download_all_menu_item"
         android:icon="@drawable/ic_cloud_download_white_24dp"
         android:title="@string/download_all" />

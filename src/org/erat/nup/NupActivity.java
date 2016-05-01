@@ -162,8 +162,9 @@ public class NupActivity extends Activity
             }
 
             // TODO: Go to prefs page if server and account are unset.
-            if (mSongs.isEmpty())
+            if (mSongs.isEmpty()) {
                 startActivity(new Intent(NupActivity.this, BrowseActivity.class));
+            }
         }
 
         public void onServiceDisconnected(ComponentName className) {
@@ -323,7 +324,7 @@ public class NupActivity extends Activity
         // Find a better way to handle it.
         final boolean downloadAll = mService != null ? mService.getShouldDownloadAll() : false;
         item.setTitle(downloadAll ? R.string.dont_download_all : R.string.download_all);
-        item.setIcon(downloadAll ? R.drawable.ic_menu_stop : android.R.drawable.ic_menu_save);
+        item.setIcon(downloadAll ? R.drawable.ic_cloud_off_white_24dp : R.drawable.ic_cloud_download_white_24dp);
         return true;
     }
 
@@ -331,24 +332,34 @@ public class NupActivity extends Activity
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
         case R.id.browse_menu_item:
-            if (mService != null)
+            if (mService != null) {
                 startActivity(new Intent(this, BrowseActivity.class));
+            }
             return true;
         case R.id.search_menu_item:
-            if (mService != null)
+            if (mService != null) {
                 startActivity(new Intent(this, SearchFormActivity.class));
+            }
+            return true;
+        case R.id.pause_menu_item:
+            if (mService != null) {
+                mService.pause();
+            }
             return true;
         case R.id.download_all_menu_item:
-            if (mService != null)
+            if (mService != null) {
                 mService.setShouldDownloadAll(!mService.getShouldDownloadAll());
+            }
             return true;
         case R.id.settings_menu_item:
-            if (mService != null)
+            if (mService != null) {
                 startActivity(new Intent(this, SettingsActivity.class));
+            }
             return true;
         case R.id.exit_menu_item:
-            if (mService != null)
+            if (mService != null) {
                 stopService(new Intent(this, NupService.class));
+            }
             finish();
             return true;
         default:

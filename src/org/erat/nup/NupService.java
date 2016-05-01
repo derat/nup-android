@@ -437,6 +437,10 @@ public class NupService extends Service
         mPlayer.togglePause();
     }
 
+    public void pause() {
+        mPlayer.pause();
+    }
+
     public void clearPlaylist() {
         removeRangeFromPlaylist(0, mSongs.size() - 1);
     }
