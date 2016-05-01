@@ -457,14 +457,11 @@ public class NupService extends Service
         addSongsToPlaylist(songs, play);
     }
 
-    public void addSongsToPlaylist(List<Song> songs, boolean play) {
-        if (mCurrentSongIndex < 0) {
-            // This should play automatically.
-            insertSongs(songs, 0);
-        } else {
-            boolean alreadyPlayed = insertSongs(songs, mCurrentSongIndex + 1);
-            if (play && !alreadyPlayed)
-                playSongAtIndex(mCurrentSongIndex + 1);
+    public void addSongsToPlaylist(List<Song> songs, boolean forcePlay) {
+        int index = mCurrentSongIndex;
+        boolean alreadyPlayed = insertSongs(songs, index < 0 ? 0 : index + 1);
+        if (forcePlay && !alreadyPlayed) {
+            playSongAtIndex(index < 0 ? 0 : index + 1);
         }
     }
 

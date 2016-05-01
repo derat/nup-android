@@ -15,6 +15,7 @@ import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.TimeUnit;
@@ -217,15 +218,9 @@ class Player implements Runnable,
                     mCurrentPlayer.setLowVolume(mLowVolume);
                 }
 
-                mCurrentPlayer.getMediaPlayer().start();
-                startPositionTimer();
-                if (mPaused) {
-                    mPaused = false;
-                    mListenerHandler.post(new Runnable() {
-                        @Override public void run() {
-                            mListener.onPauseStateChange(mPaused);
-                        }
-                    });
+                if (!mPaused) {
+                    mCurrentPlayer.getMediaPlayer().start();
+                    startPositionTimer();
                 }
             }
         });
@@ -274,10 +269,6 @@ class Player implements Runnable,
     private void updatePauseState(final PauseUpdateType type) {
         mHandler.post(new Runnable() {
             @Override public void run() {
-                if (mCurrentPlayer == null) {
-                    return;
-                }
-
                 switch (type) {
                     case PAUSE:
                         if (mPaused) {
@@ -296,12 +287,14 @@ class Player implements Runnable,
                         break;
                 }
 
-                if (mPaused) {
-                    mCurrentPlayer.getMediaPlayer().pause();
-                    stopPositionTimer();
-                } else {
-                    mCurrentPlayer.getMediaPlayer().start();
-                    startPositionTimer();
+                if (mCurrentPlayer != null) {
+                    if (mPaused) {
+                        mCurrentPlayer.getMediaPlayer().pause();
+                        stopPositionTimer();
+                    } else {
+                        mCurrentPlayer.getMediaPlayer().start();
+                        startPositionTimer();
+                    }
                 }
                 mListenerHandler.post(new Runnable() {
                     @Override public void run() {
