@@ -34,6 +34,10 @@ public class MediaSessionManager {
         mSession.release();
     }
 
+    public MediaSession.Token getToken() {
+        return mSession.getSessionToken();
+    }
+
     public void updateSong(Song song) {
         MediaMetadata.Builder builder = new MediaMetadata.Builder();
         if (song != null) {

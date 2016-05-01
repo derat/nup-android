@@ -119,6 +119,9 @@ public class NupService extends Service
     // Publishes song metadata and handles remote commands.
     private MediaSessionManager mMediaSessionManager;
 
+    // Token identifying the session managed by |mMediaSessionManager|.
+    private MediaSession.Token mMediaSessionToken;
+
     // Points from song ID to Song.
     // This is the canonical set of songs that we've seen.
     private HashMap<Long,Song> mSongIdToSong = new HashMap<Long,Song>();
@@ -288,6 +291,7 @@ public class NupService extends Service
                 mPlayer.pause();
             }
         });
+        mMediaSessionToken = mMediaSessionManager.getToken();
     }
 
     @Override
@@ -377,13 +381,6 @@ public class NupService extends Service
     private void updateNotification() {
         final Song song = getCurrentSong();
 
-        // TODO: Navigate the labyrinth of new media playback classes:
-        // https://developer.android.com/about/versions/android-5.0.html#MediaPlaybackControl
-        // https://developer.android.com/guide/topics/ui/notifiers/notifications.html#controllingMedia
-        // https://developer.android.com/reference/android/app/Notification.MediaStyle.html
-        // https://developer.android.com/reference/android/media/session/MediaSession.html
-        // https://developer.android.com/reference/android/media/session/MediaController.html
-        // etc.
         Notification.Builder builder = new Notification.Builder(this)
             .setContentTitle(song != null ? song.getArtist() : getString(R.string.startup_message_title))
             .setContentText(song != null ? song.getTitle() : getString(R.string.startup_message_text))
@@ -394,6 +391,9 @@ public class NupService extends Service
             .setOngoing(true)
             .setWhen(System.currentTimeMillis())
             .setShowWhen(false);
+
+        Notification.MediaStyle style = new Notification.MediaStyle();
+        style.setMediaSession(mMediaSessionToken);
 
         if (song != null) {
             builder.setLargeIcon(song.getCoverBitmap());
@@ -419,7 +419,14 @@ public class NupService extends Service
                                   showLabels ? getString(R.string.next) : "",
                                   mNextTrackIntent);
             }
+
+            if (numActions > 0) {
+                // This is silly.
+                style.setShowActionsInCompactView(numActions == 3 ? new int[]{0, 1, 2} : (numActions == 2 ? new int[]{0, 1} : new  int[]{0}));
+            }
         }
+
+        builder.setStyle(style);
 
         startForeground(NOTIFICATION_ID, builder.build());
     }
