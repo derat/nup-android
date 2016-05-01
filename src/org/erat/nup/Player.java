@@ -29,6 +29,9 @@ class Player implements Runnable,
 
     private static final int SHUTDOWN_TIMEOUT_MS = 1000;
 
+    // Reduced volume level to use, in the range [0.0, 1.0].
+    private static final float LOW_VOLUME_FRACTION = 0.2f;
+
     interface Listener {
         // Invoked on completion of the currently-playing file.
         void onPlaybackComplete();
@@ -50,6 +53,9 @@ class Player implements Runnable,
 
     // Is playback paused?
     private boolean mPaused = false;
+
+    // Is the volume currently lowered?
+    private boolean mLowVolume = false;
 
     // Used to run tasks on our own thread.
     private Handler mHandler;
@@ -138,6 +144,14 @@ class Player implements Runnable,
                 });
             }
         }
+
+        public void setLowVolume(boolean lowVolume) {
+            if (mPlayer == null) {
+                return;
+            }
+            float volume = lowVolume ? LOW_VOLUME_FRACTION : 1.0f;
+            mPlayer.setVolume(volume, volume);
+        }
     }
 
     public Player(Listener listener, Handler listenerHandler) {
@@ -200,6 +214,7 @@ class Player implements Runnable,
                         mCurrentPlayer = null;
                         return;
                     }
+                    mCurrentPlayer.setLowVolume(mLowVolume);
                 }
 
                 mCurrentPlayer.getMediaPlayer().start();
@@ -235,6 +250,7 @@ class Player implements Runnable,
                                 Log.d(TAG, "finished preparing queued file " + path);
                                 resetQueued();
                                 mQueuedPlayer = player;
+                                mQueuedPlayer.setLowVolume(mLowVolume);
                             }
                         });
                     }
@@ -292,6 +308,24 @@ class Player implements Runnable,
                         mListener.onPauseStateChange(mPaused);
                     }
                 });
+            }
+        });
+    }
+
+    public void setLowVolume(final boolean lowVolume) {
+        mHandler.post(new Runnable() {
+            @Override public void run() {
+                if (mLowVolume == lowVolume) {
+                    return;
+                }
+
+                mLowVolume = lowVolume;
+                if (mCurrentPlayer != null) {
+                    mCurrentPlayer.setLowVolume(lowVolume);
+                }
+                if (mQueuedPlayer != null) {
+                    mQueuedPlayer.setLowVolume(lowVolume);
+                }
             }
         });
     }

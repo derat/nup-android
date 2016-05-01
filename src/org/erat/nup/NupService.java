@@ -211,22 +211,23 @@ public class NupService extends Service
     private AudioManager.OnAudioFocusChangeListener mAudioFocusListener = new AudioManager.OnAudioFocusChangeListener() {
         @Override
         public void onAudioFocusChange(int focusChange) {
-            // TODO: Actually do something in response to focus changes.
             switch (focusChange) {
             case AudioManager.AUDIOFOCUS_GAIN:
-                Log.d(TAG, "audio focus gain");
+                Log.d(TAG, "Gained audio focus");
+                mPlayer.setLowVolume(false);
                 break;
             case AudioManager.AUDIOFOCUS_LOSS:
-                Log.d(TAG, "audio focus loss");
+                Log.d(TAG, "Lost audio focus");
                 break;
             case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT:
-                Log.d(TAG, "audio focus loss transient");
+                Log.d(TAG, "Transiently lost audio focus");
                 break;
             case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
-                Log.d(TAG, "audio focus loss transient can duck");
+                Log.d(TAG, "Transiently lost audio focus (but can duck)");
+                mPlayer.setLowVolume(true);
                 break;
             default:
-                Log.d(TAG, "audio focus " + focusChange);
+                Log.d(TAG, "Unhandled audio focus change " + focusChange);
                 break;
             }
         }
