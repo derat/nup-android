@@ -14,10 +14,7 @@ import android.content.SharedPreferences;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.media.AudioManager;
-import android.media.MediaMetadataRetriever;
-import android.media.Rating;
-import android.media.RemoteControlClient;
-import android.media.RemoteControlClient.MetadataEditor;
+import android.media.session.MediaSession;
 import android.net.Uri;
 import android.os.AsyncTask;
 import android.os.Binder;
@@ -42,8 +39,7 @@ import java.util.List;
 public class NupService extends Service
                         implements Player.Listener,
                                    FileCache.Listener,
-                                   SongDatabase.Listener,
-                                   RemoteControlClient.OnGetPlaybackPositionListener {
+                                   SongDatabase.Listener {
     private static final String TAG = "NupService";
 
     // Identifier used for our "currently playing" notification.
@@ -120,6 +116,9 @@ public class NupService extends Service
     // Reports song playback to the music server.
     private PlaybackReporter mPlaybackReporter;
 
+    // Publishes song metadata and handles remote commands.
+    private MediaSessionManager mMediaSessionManager;
+
     // Points from song ID to Song.
     // This is the canonical set of songs that we've seen.
     private HashMap<Long,Song> mSongIdToSong = new HashMap<Long,Song>();
@@ -183,9 +182,6 @@ public class NupService extends Service
     private TelephonyManager mTelephonyManager;
 
     private SharedPreferences mPrefs;
-
-    private PendingIntent mMediaButtonPendingIntent;
-    private RemoteControlClient mRemoteControlClient;
 
     // Pause when phone calls arrive.
     private PhoneStateListener mPhoneStateListener = new PhoneStateListener() {
@@ -260,14 +256,6 @@ public class NupService extends Service
 
         registerReceiver(mNoisyAudioReceiver, new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY));
 
-        Intent mediaButtonIntent = new Intent(this, NupService.class);
-        mediaButtonIntent.setAction(ACTION_MEDIA_BUTTON);
-        mMediaButtonPendingIntent = PendingIntent.getService(this, 0, mediaButtonIntent, 0);
-        mAudioManager.registerMediaButtonEventReceiver(mMediaButtonPendingIntent);
-        mRemoteControlClient = new RemoteControlClient(mMediaButtonPendingIntent);
-        mRemoteControlClient.setOnGetPlaybackPositionListener(this);
-        mAudioManager.registerRemoteControlClient(mRemoteControlClient);
-
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
 
         mPlayer = new Player(this, mHandler);
@@ -283,6 +271,23 @@ public class NupService extends Service
         mCoverLoader = new CoverLoader(this);
         mPlaybackReporter = new PlaybackReporter(this, mSongDb);
 
+        mMediaSessionManager = new MediaSessionManager(this, new MediaSession.Callback() {
+            @Override public void onPause() {
+                mPlayer.pause();
+            }
+            @Override public void onPlay() {
+                mPlayer.unpause();
+            }
+            @Override public void onSkipToNext() {
+                playSongAtIndex(mCurrentSongIndex + 1);
+            }
+            @Override public void onSkipToPrevious() {
+                playSongAtIndex(mCurrentSongIndex - 1);
+            }
+            @Override public void onStop() {
+                mPlayer.pause();
+            }
+        });
     }
 
     @Override
@@ -291,8 +296,8 @@ public class NupService extends Service
         mAudioManager.abandonAudioFocus(mAudioFocusListener);
         mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_NONE);
         unregisterReceiver(mNoisyAudioReceiver);
-        mAudioManager.unregisterMediaButtonEventReceiver(mMediaButtonPendingIntent);
 
+        mMediaSessionManager.cleanUp();
         mSongDb.quit();
         mPlayer.quit();
         mCache.quit();
@@ -312,33 +317,6 @@ public class NupService extends Service
                 playSongAtIndex(mCurrentSongIndex + 1);
             } else if (ACTION_PREV_TRACK.equals(intent.getAction())) {
                 playSongAtIndex(mCurrentSongIndex - 1);
-            } else if (ACTION_MEDIA_BUTTON.equals(intent.getAction())) {
-                KeyEvent event = (KeyEvent) intent.getExtras().get(Intent.EXTRA_KEY_EVENT);
-                if (event.getAction() == KeyEvent.ACTION_DOWN) {
-                    switch (event.getKeyCode()) {
-                    case KeyEvent.KEYCODE_MEDIA_NEXT:
-                        playSongAtIndex(mCurrentSongIndex + 1);
-                        break;
-                    case KeyEvent.KEYCODE_MEDIA_PAUSE:
-                        mPlayer.pause();
-                        break;
-                    case KeyEvent.KEYCODE_MEDIA_PLAY:
-                        mPlayer.unpause();
-                        break;
-                    case KeyEvent.KEYCODE_MEDIA_PLAY_PAUSE:
-                        mPlayer.togglePause();
-                        break;
-                    case KeyEvent.KEYCODE_MEDIA_PREVIOUS:
-                        playSongAtIndex(mCurrentSongIndex - 1);
-                        break;
-                    case KeyEvent.KEYCODE_MEDIA_STOP:
-                        mPlayer.pause();
-                        break;
-                    default:
-                        Toast.makeText(NupService.this, "Unhandled key event " + event.getKeyCode(), Toast.LENGTH_SHORT).show();
-                        break;
-                    }
-                }
             }
         }
         return START_STICKY;
@@ -446,33 +424,6 @@ public class NupService extends Service
         startForeground(NOTIFICATION_ID, builder.build());
     }
 
-    // Update the track metadata displayed via Bluetooth.
-    private void updateMetadata() {
-        MetadataEditor editor = mRemoteControlClient.editMetadata(true);
-        final Song song = getCurrentSong();
-        if (song != null) {
-            editor.putString(MediaMetadataRetriever.METADATA_KEY_ARTIST, song.getArtist());
-            editor.putString(MediaMetadataRetriever.METADATA_KEY_TITLE, song.getTitle());
-            editor.putString(MediaMetadataRetriever.METADATA_KEY_ALBUM, song.getAlbum());
-            editor.putLong(MediaMetadataRetriever.METADATA_KEY_DISC_NUMBER, (long) song.getDiscNum());
-            editor.putLong(MediaMetadataRetriever.METADATA_KEY_CD_TRACK_NUMBER, (long) song.getTrackNum());
-            editor.putLong(MediaMetadataRetriever.METADATA_KEY_DURATION, (long) song.getLengthSec() * 1000);
-
-            Bitmap bitmap = song.getCoverBitmap();
-            if (bitmap != null) {
-                // Pass a copy of the original bitmap. Apparently the later apply() call recycles the bitmap, which then
-                // causes a crash when we try to use it later: https://code.google.com/p/android/issues/detail?id=74967
-                editor.putBitmap(MetadataEditor.BITMAP_KEY_ARTWORK, bitmap.copy(bitmap.getConfig(), true));
-            }
-
-            if (song.getRating() >= 0.0) {
-                editor.putObject(MetadataEditor.RATING_KEY_BY_USER,
-                                 Rating.newStarRating(Rating.RATING_5_STARS, (float) (1.0 + song.getRating() * 4.0)));
-            }
-        }
-        editor.apply();
-    }
-
     // Toggle whether we're playing the current song or not.
     public void togglePause() {
         mPlayer.togglePause();
@@ -550,6 +501,7 @@ public class NupService extends Service
 
         if (mSongListener != null)
             mSongListener.onPlaylistChange(mSongs);
+        mMediaSessionManager.updatePlaylist(mSongs);
     }
 
     // Play the song at a particular position in the playlist.
@@ -597,7 +549,7 @@ public class NupService extends Service
                 mDownloadIndex = mCurrentSongIndex;
             }
             mWaitingForDownload = true;
-            mRemoteControlClient.setPlaybackState(RemoteControlClient.PLAYSTATE_BUFFERING, -1, 1.0f);
+            updatePlaybackState();
         }
 
         // Enqueue the next song if we already have it.
@@ -614,8 +566,8 @@ public class NupService extends Service
 
         fetchCoverForSongIfMissing(song);
         updateNotification();
-        updateMetadata();
-
+        mMediaSessionManager.updateSong(song);
+        updatePlaybackState();
         if (mSongListener != null)
             mSongListener.onSongChange(song, mCurrentSongIndex);
     }
@@ -657,8 +609,10 @@ public class NupService extends Service
             if (mSong.getCoverBitmap() != null) {
                 if (mSongListener != null)
                     mSongListener.onSongCoverLoad(mSong);
-                if (mSong == getCurrentSong())
+                if (mSong == getCurrentSong()) {
                     updateNotification();
+                    mMediaSessionManager.updateSong(mSong);
+                }
             }
         }
     }
@@ -676,8 +630,7 @@ public class NupService extends Service
         Util.assertOnMainThread();
         mPlaybackComplete = true;
         updateNotification();
-        updateMetadata();
-        mRemoteControlClient.setPlaybackState(RemoteControlClient.PLAYSTATE_STOPPED, -1, 1.0f);
+        updatePlaybackState();
         if (mCurrentSongIndex < mSongs.size() - 1) {
             playSongAtIndex(mCurrentSongIndex + 1);
         }
@@ -705,7 +658,7 @@ public class NupService extends Service
         }
 
         mCurrentSongLastPositionMs = positionMs;
-        mRemoteControlClient.setPlaybackState(RemoteControlClient.PLAYSTATE_PLAYING, positionMs, 1.0f);
+        updatePlaybackState();
     }
 
     // Implements Player.Listener.
@@ -716,9 +669,7 @@ public class NupService extends Service
         if (mSongListener != null) {
             mSongListener.onPauseStateChange(paused);
         }
-        mRemoteControlClient.setPlaybackState(
-            paused ? RemoteControlClient.PLAYSTATE_PAUSED : RemoteControlClient.PLAYSTATE_PLAYING,
-            mCurrentSongLastPositionMs, 1.0f);
+        updatePlaybackState();
     }
 
     // Implements Player.Listener.
@@ -850,12 +801,6 @@ public class NupService extends Service
         });
     }
 
-    // Implements RemoteControlClient.OnGetPlaybackPositionListener.
-    @Override
-    public long onGetPlaybackPosition() {
-        return mCurrentSongLastPositionMs;
-    }
-
     // Insert a list of songs into the playlist at a particular position.
     // Plays the first one, if no song is already playing or if we were previously at the end of the
     // playlist and we've appended to it.  Returns true if we started playing.
@@ -890,6 +835,7 @@ public class NupService extends Service
 
         if (mSongListener != null)
             mSongListener.onPlaylistChange(mSongs);
+        mMediaSessionManager.updatePlaylist(mSongs);
 
         for (Song song : newSongs) {
             mSongIdToSong.put(song.getSongId(), song);
@@ -935,6 +881,7 @@ public class NupService extends Service
         mCurrentSongStartDate = new Date();
         mCache.updateLastAccessTime(entry.getSongId());
         updateNotification();
+        updatePlaybackState();
     }
 
     // Try to download the next not-yet-downloaded song in the playlist.
@@ -1001,5 +948,12 @@ public class NupService extends Service
     // of the remote path, but I think I saw a problem -- didn't investigate much).
     private static String chooseLocalFilenameForSong(Song song) {
         return String.format("%d.mp3", song.getSongId());
+    }
+
+    // Notifies mMediaSessionManager about the current playback state.
+    private void updatePlaybackState() {
+        mMediaSessionManager.updatePlaybackState(getCurrentSong(), mPaused, mPlaybackComplete,
+                                                 mWaitingForDownload, mCurrentSongLastPositionMs,
+                                                 mCurrentSongIndex, mSongs.size());
     }
 }

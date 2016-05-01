@@ -48,7 +48,8 @@
         android:value="@integer/google_play_services_version" />
   </application>
 
-  <uses-sdk android:minSdkVersion="22" android:targetSdkVersion="22" />
+  <!-- 23 (M) is needed for MediaSession. -->
+  <uses-sdk android:minSdkVersion="23" android:targetSdkVersion="23" />
 
   <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
   <uses-permission android:name="android.permission.BLUETOOTH" />
