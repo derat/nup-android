@@ -501,14 +501,23 @@ public class NupService extends Service
 
         if (removedPlaying) {
             updateNotification();
-            if (mCurrentSongIndex < mSongs.size())
+            if (!mSongs.isEmpty() && mCurrentSongIndex < mSongs.size()) {
                 playSongAtIndex(mCurrentSongIndex);
-            else
+            } else {
                 mCurrentSongIndex = -1;
+                mMediaSessionManager.updateSong(null);
+                updatePlaybackState();
+            }
         }
 
-        if (mSongListener != null)
+        // Maybe the e.g. now-next-to-be-played song isn't downloaded yet.
+        if (mDownloadSongId == -1 && !mSongs.isEmpty() && mCurrentSongIndex < mSongs.size() - 1) {
+            maybeDownloadAnotherSong(mCurrentSongIndex + 1);
+        }
+
+        if (mSongListener != null) {
             mSongListener.onPlaylistChange(mSongs);
+        }
         mMediaSessionManager.updatePlaylist(mSongs);
     }
 
