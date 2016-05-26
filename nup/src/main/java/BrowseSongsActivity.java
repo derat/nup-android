@@ -24,6 +24,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 
+// This class doesn't extend BrowseActivityBase since it displays a different menu.
 public class BrowseSongsActivity extends Activity
                                  implements AdapterView.OnItemClickListener {
     private static final String TAG = "BrowseSongsActivity";
@@ -56,10 +57,10 @@ public class BrowseSongsActivity extends Activity
         super.onCreate(savedInstanceState);
         setContentView(R.layout.browse_songs);
 
-        mArtist = getIntent().getStringExtra(BrowseActivity.BUNDLE_ARTIST);
-        mAlbum = getIntent().getStringExtra(BrowseActivity.BUNDLE_ALBUM);
-        mOnlyCached = getIntent().getBooleanExtra(BrowseActivity.BUNDLE_CACHED, false);
-        mMinRating = getIntent().getDoubleExtra(BrowseActivity.BUNDLE_MIN_RATING, -1.0);
+        mArtist = getIntent().getStringExtra(BrowseActivityBase.BUNDLE_ARTIST);
+        mAlbum = getIntent().getStringExtra(BrowseActivityBase.BUNDLE_ALBUM);
+        mOnlyCached = getIntent().getBooleanExtra(BrowseActivityBase.BUNDLE_CACHED, false);
+        mMinRating = getIntent().getDoubleExtra(BrowseActivityBase.BUNDLE_MIN_RATING, -1.0);
 
         if (mAlbum != null) {
             setTitle(getString(mOnlyCached ?

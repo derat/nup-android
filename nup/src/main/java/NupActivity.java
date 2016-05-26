@@ -163,7 +163,7 @@ public class NupActivity extends Activity
 
             // TODO: Go to prefs page if server and account are unset.
             if (mSongs.isEmpty()) {
-                startActivity(new Intent(NupActivity.this, BrowseActivity.class));
+                startActivity(new Intent(NupActivity.this, BrowseTopActivity.class));
             }
         }
 
@@ -333,7 +333,7 @@ public class NupActivity extends Activity
         switch (item.getItemId()) {
         case R.id.browse_menu_item:
             if (mService != null) {
-                startActivity(new Intent(this, BrowseActivity.class));
+                startActivity(new Intent(this, BrowseTopActivity.class));
             }
             return true;
         case R.id.search_menu_item:

@@ -3,12 +3,10 @@
 
 package org.erat.nup;
 
-import android.app.ListActivity;
 import android.content.Intent;
 import android.os.AsyncTask;
 import android.os.Bundle;
 import android.view.ContextMenu;
-import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.widget.AdapterView;
@@ -19,7 +17,7 @@ import android.widget.ListView;
 import java.util.ArrayList;
 import java.util.List;
 
-public class BrowseArtistsActivity extends ListActivity
+public class BrowseArtistsActivity extends BrowseActivityBase
                                    implements NupService.SongDatabaseUpdateListener {
     private static final String TAG = "BrowseArtistsActivity";
 
@@ -39,10 +37,9 @@ public class BrowseArtistsActivity extends ListActivity
 
     private SortedStringArrayAdapter mAdapter;
 
-    @Override
-    public void onCreate(Bundle savedInstanceState) {
+    @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        mOnlyCached = getIntent().getBooleanExtra(BrowseActivity.BUNDLE_CACHED, false);
+        mOnlyCached = getIntent().getBooleanExtra(BUNDLE_CACHED, false);
         setTitle(mOnlyCached ? R.string.browse_cached_artists : R.string.browse_artists);
 
         mAdapter = new SortedStringArrayAdapter(this, R.layout.browse_row, mArtists, Util.SORT_ARTIST);
@@ -53,43 +50,19 @@ public class BrowseArtistsActivity extends ListActivity
         onSongDatabaseUpdate();
     }
 
-    @Override
-    protected void onDestroy() {
+    @Override protected void onDestroy() {
         NupActivity.getService().removeSongDatabaseUpdateListener(this);
         super.onDestroy();
     }
 
-    @Override
-    public boolean onCreateOptionsMenu(Menu menu) {
-        getMenuInflater().inflate(R.menu.browse_menu, menu);
-        return true;
-    }
-
-    @Override
-    public boolean onOptionsItemSelected(MenuItem item) {
-        switch (item.getItemId()) {
-        case R.id.browse_pause_menu_item:
-            NupActivity.getService().pause();
-            return true;
-        case R.id.browse_return_menu_item:
-            setResult(RESULT_OK);
-            finish();
-            return true;
-        default:
-            return false;
-        }
-    }
-
-    @Override
-    protected void onListItemClick(ListView listView, View view, int position, long id) {
+    @Override protected void onListItemClick(ListView listView, View view, int position, long id) {
         StringIntPair artist = mArtists.get(position);
         if (artist == null)
             return;
         startBrowseAlbumsActivity(artist.getString());
     }
 
-    @Override
-    public void onCreateContextMenu(ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
+    @Override public void onCreateContextMenu(ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
         StringIntPair artist = mArtists.get(((AdapterView.AdapterContextMenuInfo) menuInfo).position);
         if (artist != null)
             menu.setHeaderTitle(artist.getString());
@@ -98,8 +71,7 @@ public class BrowseArtistsActivity extends ListActivity
         menu.add(0, MENU_ITEM_BROWSE_ALBUMS, 0, R.string.browse_albums);
     }
 
-    @Override
-    public boolean onContextItemSelected(MenuItem item) {
+    @Override public boolean onContextItemSelected(MenuItem item) {
         AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
         StringIntPair artist = mArtists.get(info.position);
         if (artist == null)
@@ -119,17 +91,8 @@ public class BrowseArtistsActivity extends ListActivity
         }
     }
 
-    @Override
-    protected void onActivityResult(int requestCode, int resultCode, Intent data) {
-        if (resultCode == RESULT_OK) {
-            setResult(RESULT_OK);
-            finish();
-        }
-    }
-
     // Implements NupService.SongDatabaseUpdateListener.
-    @Override
-    public void onSongDatabaseUpdate() {
+    @Override public void onSongDatabaseUpdate() {
         if (!NupActivity.getService().getSongDb().getAggregateDataLoaded()) {
             mArtists.add(new StringIntPair(getString(R.string.loading), -1));
             mAdapter.setEnabled(false);
@@ -168,18 +131,17 @@ public class BrowseArtistsActivity extends ListActivity
     // Launch BrowseAlbumsActivity for a given artist.
     private void startBrowseAlbumsActivity(String artist) {
         Intent intent = new Intent(this, BrowseAlbumsActivity.class);
-        intent.putExtra(BrowseActivity.BUNDLE_ARTIST, artist);
-        intent.putExtra(BrowseActivity.BUNDLE_CACHED, mOnlyCached);
+        intent.putExtra(BUNDLE_ARTIST, artist);
+        intent.putExtra(BUNDLE_CACHED, mOnlyCached);
         startActivityForResult(intent, BROWSE_ALBUMS_REQUEST_CODE);
     }
 
     // Launch BrowseSongsActivity for a given artist.
     private void startBrowseSongsActivity(String artist, double minRating) {
         Intent intent = new Intent(this, BrowseSongsActivity.class);
-        intent.putExtra(BrowseActivity.BUNDLE_ARTIST, artist);
-        intent.putExtra(BrowseActivity.BUNDLE_CACHED, mOnlyCached);
-        if (minRating >= 0)
-            intent.putExtra(BrowseActivity.BUNDLE_MIN_RATING, minRating);
+        intent.putExtra(BUNDLE_ARTIST, artist);
+        intent.putExtra(BUNDLE_CACHED, mOnlyCached);
+        if (minRating >= 0) intent.putExtra(BUNDLE_MIN_RATING, minRating);
         startActivityForResult(intent, BROWSE_SONGS_REQUEST_CODE);
     }
 }
