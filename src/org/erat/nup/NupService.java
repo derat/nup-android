@@ -57,11 +57,11 @@ public class NupService extends Service
     // Maximum number of cover bitmaps to keep in memory at once.
     private static final int MAX_LOADED_COVERS = 3;
 
-    // If we receive a playback position report with a timestamp more than this many milliseconds beyond the last
-    // on we received, we assume that something has gone wrong and ignore it.
-    private static final long MAX_POSITION_REPORT_MS = 1000;
+    // If we receive a playback update with a position more than this many milliseconds beyond the last one we received,
+    // we assume that something has gone wrong and ignore it.
+    private static final long MAX_POSITION_REPORT_MS = 5000;
 
-    // Report a song if we've played it for this many milliseconds.
+    // Report a song unconditionally if we've played it for this many milliseconds.
     private static final long REPORT_PLAYBACK_THRESHOLD_MS = 240 * 1000;
 
     // Subdirectory where crash reports are written.
@@ -664,9 +664,9 @@ public class NupService extends Service
         if (mSongListener != null)
             mSongListener.onSongPositionChange(song, positionMs, durationMs);
 
-        if (positionMs > mCurrentSongLastPositionMs &&
-            positionMs <= mCurrentSongLastPositionMs + MAX_POSITION_REPORT_MS) {
-            mCurrentSongPlayedMs += (positionMs - mCurrentSongLastPositionMs);
+        int elapsed = positionMs - mCurrentSongLastPositionMs;
+        if (elapsed > 0 && elapsed <= MAX_POSITION_REPORT_MS) {
+            mCurrentSongPlayedMs += elapsed;
             if (!mReportedCurrentSong &&
                 (mCurrentSongPlayedMs >= Math.max(durationMs, song.getLengthSec() * 1000) / 2 ||
                  mCurrentSongPlayedMs >= REPORT_PLAYBACK_THRESHOLD_MS)) {
