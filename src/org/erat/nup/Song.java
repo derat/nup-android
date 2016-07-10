@@ -8,15 +8,15 @@ import android.graphics.Bitmap;
 import org.json.JSONObject;
 
 import java.io.Serializable;
-import java.net.URI;
-import java.net.URISyntaxException;
+import java.net.MalformedURLException;
+import java.net.URL;
 
 class Song implements Serializable {
     private final long mSongId;
     private final String mArtist, mTitle, mAlbum;
     private final int mLengthSec, mTrackNum, mDiscNum;
     private final double mRating;
-    private URI mUri = null, mCoverUri = null;
+    private URL mUrl = null, mCoverUrl = null;
     private Bitmap mCoverBitmap = null;
 
     // Number of bytes available to us (i.e. what we have on disk).
@@ -27,13 +27,13 @@ class Song implements Serializable {
     private long mTotalBytes = 0;
 
     public Song(long songId, String artist, String title, String album, String url, String coverUrl,
-                int lengthSec, int trackNum, int discNum, double rating) throws URISyntaxException {
+                int lengthSec, int trackNum, int discNum, double rating) throws MalformedURLException {
         mSongId = songId;
         mArtist = artist;
         mTitle = title;
         mAlbum = album;
-        mUri = Util.constructURI(url);
-        mCoverUri = Util.constructURI(coverUrl);
+        mUrl = url.isEmpty() ? null : new URL(url);
+        mCoverUrl = coverUrl.isEmpty() ? null : new URL(coverUrl);
         mLengthSec = lengthSec;
         mTrackNum = trackNum;
         mDiscNum = discNum;
@@ -47,8 +47,8 @@ class Song implements Serializable {
     public String getArtist() { return mArtist; }
     public String getTitle() { return mTitle; }
     public String getAlbum() { return mAlbum; }
-    public URI getUri() { return mUri; }
-    public URI getCoverUri() { return mCoverUri; }
+    public URL getUrl() { return mUrl; }
+    public URL getCoverUrl() { return mCoverUrl; }
     public Bitmap getCoverBitmap() { return mCoverBitmap; }
     public int getLengthSec() { return mLengthSec; }
     public int getTrackNum() { return mTrackNum; }

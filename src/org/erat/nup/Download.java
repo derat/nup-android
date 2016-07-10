@@ -5,296 +5,152 @@ package org.erat.nup;
 
 import android.content.Context;
 import android.content.SharedPreferences;
-import android.net.SSLCertificateSocketFactory;
 import android.preference.PreferenceManager;
 import android.util.Base64;
 import android.util.Log;
 
-import org.apache.http.client.methods.HttpGet;
-import org.apache.http.client.methods.HttpPost;
-import org.apache.http.conn.ssl.SSLSocketFactory;
-import org.apache.http.entity.BasicHttpEntity;
-import org.apache.http.Header;
-import org.apache.http.HttpException;
-import org.apache.http.HttpHost;
-import org.apache.http.HttpRequest;
-import org.apache.http.HttpResponse;
-import org.apache.http.impl.DefaultHttpClientConnection;
-import org.apache.http.message.BasicHttpResponse;
-import org.apache.http.params.BasicHttpParams;
-import org.apache.http.params.CoreConnectionPNames;
-import org.apache.http.params.HttpParams;
-import org.apache.http.RequestLine;
-import org.apache.http.StatusLine;
-
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.io.IOException;
-import java.net.Socket;
-import java.net.URI;
-import java.net.URISyntaxException;
-import java.util.zip.GZIPInputStream;
+import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
+import java.net.SocketTimeoutException;
+import java.net.URL;
+import java.util.Map;
 
-// Encapsulates a request to download a particular URL.
-// Also does a lot of preparation like looking up server URL and authorization preferences
-// and constructing the HTTP request.
-class DownloadRequest {
-    private static String TAG = "DownloadRequest";
+import javax.net.ssl.HttpsURLConnection;
 
-    public enum AuthType {
-        SERVER,
-        STORAGE
-    }
+class Download {
+    private static final String TAG = "Download";
+    private static final int CONNECT_TIMEOUT_MS = 10000;
+    private static final int READ_TIMEOUT_MS = 10000;
 
-    public enum Method {
-        GET,
-        POST
-    }
-
-    // Thrown when the request couldn't be constructed because some preferences that we need
-    // are either unset or incorrect.
+    /* Thrown when the request couldn't be constructed because some preferences that we need are
+     * either unset or incorrect. */
     public static class PrefException extends Exception {
         public PrefException(String reason) {
             super(reason);
         }
     }
 
-    private Context mContext;
-    private Method mMethod;
-    private HttpRequest mHttpRequest;
-    private URI mUri;
-    private String mBody;
+    public enum AuthType {
+        SERVER,
+        STORAGE
+    }
 
-    DownloadRequest(Context context, URI uri, Method method, AuthType authType) {
-        mContext = context;
-        mUri = uri;
-        mMethod = method;
+    /**
+     * Starts a download of a given URL.
+     *
+     * @param context context
+     * @param url URL to download
+     * @param method HTTP method, e.g. "GET" or "POST"
+     * @param authType authentication type to use
+     * @param headers additional HTTP headers (may be null)
+     * @return active HTTP connection; <code>disconnect</code> must be called
+     */
+    public static HttpURLConnection download(Context context, URL url, String method,
+                                             AuthType authType, Map<String, String> headers)
+        throws IOException {
+        Log.d(TAG, "starting " + method + " to " + url.toString());
 
-        // When mUri is used to construct the request, we send the full URI in the request, like "GET http://...".
-        // This seems to make the server sad in some cases -- it fails to parse the query parameters.
-        // Just passing the path and query as a string avoids this; we'll just send "GET /path?query" instead.
-        String pathQuery = mUri.getPath();
-        if (mUri.getQuery() != null && !mUri.getQuery().isEmpty())
-            pathQuery += "?" + mUri.getQuery();
-
-        if (method == Method.GET) {
-            mHttpRequest = new HttpGet(pathQuery);
-        } else {
-            mHttpRequest = new HttpPost(pathQuery);
-            // Default to setting a zero content length; App Engine is unhappy if this is left out.
-            mHttpRequest.setHeader("Content-Length", "0");
+        HttpsURLConnection conn = (HttpsURLConnection) url.openConnection();
+        conn.setConnectTimeout(CONNECT_TIMEOUT_MS);
+        conn.setReadTimeout(READ_TIMEOUT_MS);
+        conn.setRequestMethod(method);
+        if (headers != null) {
+            for (Map.Entry<String, String> entry : headers.entrySet()) {
+                conn.setRequestProperty(entry.getKey(), entry.getValue());
+            }
         }
-
-        mHttpRequest.addHeader("Host", mUri.getHost() + ":" + mUri.getPort());
-        // TODO: Set User-Agent to something reasonable.
 
         if (authType == AuthType.SERVER) {
             // Add Authorization header if username and password prefs are set.
             SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
             String username = prefs.getString(NupPreferences.USERNAME, "");
             String password = prefs.getString(NupPreferences.PASSWORD, "");
-            if (!username.isEmpty() && !password.isEmpty())
-                mHttpRequest.setHeader("Authorization", "Basic " + Base64.encodeToString((username + ":" + password).getBytes(), Base64.NO_WRAP));
+            if (!username.isEmpty() && !password.isEmpty()) {
+                conn.setRequestProperty("Authorization",
+                                        "Basic " + Base64.encodeToString(
+                                            (username + ":" + password).getBytes(),
+                                            Base64.NO_WRAP));
+            }
         } else if (authType == AuthType.STORAGE) {
             try {
-                String token = Auth.getAuthToken(mContext);
-                mHttpRequest.setHeader("Authorization", "Bearer " + token);
+                String token = Auth.getAuthToken(context);
+                conn.setRequestProperty("Authorization", "Bearer " + token);
             } catch (Auth.AuthException e) {
                 Log.e(TAG, "failed to get auth token: " + e);
             }
         }
-    }
 
-    public static URI getServerUri(Context context, String path, String query) throws PrefException {
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-        return parseServerUrlIntoUri(prefs.getString(NupPreferences.SERVER_URL, ""), path, query);
-    }
-
-    public static URI parseServerUrlIntoUri(String server, String path, String query) throws PrefException {
-        if (server.isEmpty())
-            throw new PrefException("Server URL is not configured");
-
-        // TODO: Unify this with Util.constructURI().
-        URI serverUri;
         try {
-            serverUri = new URI(server);
-        } catch (URISyntaxException e) {
-            throw new PrefException("Unable to parse server URL \"" + server + "\" (" + e.getMessage() + ")");
-        }
-
-        // Check scheme and set port.
-        String scheme = serverUri.getScheme();
-        int port;
-        if (scheme == null || scheme.equals("http")) {
-            port = (serverUri.getPort() > 0) ? serverUri.getPort() : 80;
-        } else if (scheme.equals("https")) {
-            port = (serverUri.getPort() > 0) ? serverUri.getPort() : 443;
-        } else {
-            throw new PrefException("Unknown server URL scheme \"" + scheme + "\" (should be \"http\" or \"https\")");
-        }
-
-        // Now build the real URI.
-        URI uri;
-        try {
-            uri = new URI(scheme, null, serverUri.getHost(), port, path, query, null);
-        } catch (URISyntaxException e) {
-            throw new PrefException("Unable to parse URL: " + e.getMessage());
-        }
-
-        return uri;
-    }
-
-    public Method getMethod() { return mMethod; }
-    public HttpRequest getHttpRequest() { return mHttpRequest; }
-    public URI getUri() { return mUri; }
-
-    // Add an additional HTTP header (replacing it if it's already present).
-    public void setHeader(String name, String value) {
-        mHttpRequest.setHeader(name, value);
-    }
-
-    // Set the body for us to send to the server.
-    public void setBody(InputStream stream, long contentLength) {
-        if (mMethod != Method.POST)
-            throw new RuntimeException("attempting to set body on non-POST HTTP request");
-        BasicHttpEntity entity = new BasicHttpEntity();
-        entity.setContent(stream);
-        entity.setContentLength(contentLength);
-        ((HttpPost) mHttpRequest).setEntity(entity);
-        mHttpRequest.setHeader("Content-Length", Long.toString(contentLength));
-    }
-}
-
-// Encapsulates the response to a download attempt.
-class DownloadResult {
-    private static final String TAG = "DownloadResult";
-
-    // HTTP status code returned by the server.
-    private final int mStatusCode;
-
-    // Reason accompanying the status code.
-    private final String mReason;
-
-    // Data from the server.
-    private final BasicHttpEntity mEntity;
-
-    private final DefaultHttpClientConnection mConn;
-
-    DownloadResult(int statusCode, String reason, BasicHttpEntity entity, DefaultHttpClientConnection conn) {
-        mStatusCode = statusCode;
-        mReason = reason;
-        mEntity = entity;
-        mConn = conn;
-    }
-
-    public int getStatusCode() { return mStatusCode; }
-    public String getReason() { return mReason; }
-    public BasicHttpEntity getEntity() { return mEntity; }
-
-    // Must be called once the result has been read to close the connection to the server.
-    public void close() {
-        try {
-            mConn.close();
+            conn.connect();
+            Log.d(TAG, "got " + conn.getResponseCode() + " (" + conn.getResponseMessage() +
+                  ") for " + url.toString());
+            return conn;
+        } catch (SocketTimeoutException e) {
+            Log.e(TAG, "got timeout for " + url.toString(), e);
+            throw new IOException(e.toString());
         } catch (IOException e) {
-            Log.e(TAG, "got IO exception while closing connection");
-        }
-    }
-}
-
-class Download {
-    private static final String TAG = "Download";
-    private static final int TIMEOUT_MS = 10000;
-
-    public static DownloadResult startDownload(DownloadRequest req) throws HttpException, IOException {
-        // TODO: from Apache's ElementalReverseProxy.java example -- dunno how important any of these are for us.
-        HttpParams params = new BasicHttpParams();
-        params
-            .setIntParameter(CoreConnectionPNames.SO_TIMEOUT, TIMEOUT_MS)
-            .setIntParameter(CoreConnectionPNames.SOCKET_BUFFER_SIZE, 8 * 1024)
-            .setBooleanParameter(CoreConnectionPNames.STALE_CONNECTION_CHECK, false)
-            .setBooleanParameter(CoreConnectionPNames.TCP_NODELAY, true);
-
-        final URI uri = req.getUri();
-        Log.d(TAG, "starting " + req.getHttpRequest().getRequestLine().getMethod() + " to " + uri.toString());
-        DefaultHttpClientConnection conn = new DefaultHttpClientConnection();
-        Socket socket = new Socket(uri.getHost(), uri.getPort());
-        if (uri.getScheme().equals("https")) {
-            // Wrap an SSL socket around the non-SSL one.
-            SSLSocketFactory factory = SSLCertificateSocketFactory.getHttpSocketFactory(TIMEOUT_MS, null);
-            try {
-                socket = factory.createSocket(socket, uri.getHost(), uri.getPort(), true);
-            } catch (IOException e) {
-                socket.close();
-                Log.e(TAG, "failed to wrap SSL socket: " + e);
-                throw e;
-            }
-        }
-
-        try {
-            conn.bind(socket, params);
-        } catch (IOException e) {
-            socket.close();
-            Log.e(TAG, "failed to bind connection to socket: " + e);
-            throw e;
-        }
-
-        // Now send the request and read the response.
-        // We pass through exceptions while trying not to leak the socket.
-        try {
-            conn.sendRequestHeader(req.getHttpRequest());
-            if (req.getMethod() == DownloadRequest.Method.POST)
-                conn.sendRequestEntity((HttpPost) req.getHttpRequest());
-            conn.flush();
-
-            HttpResponse response = conn.receiveResponseHeader();
-            conn.receiveResponseEntity(response);
-            StatusLine statusLine = response.getStatusLine();
-            BasicHttpEntity entity = (BasicHttpEntity) response.getEntity();
-            Log.d(TAG, "got " + statusLine.getStatusCode() + " (" + statusLine.getReasonPhrase() + ") for " + uri.toString());
-            return new DownloadResult(statusLine.getStatusCode(), statusLine.getReasonPhrase(), entity, conn);
-        } catch (HttpException e) {
-            socket.close();
-            Log.e(TAG, "got HTTP exception for " + uri.toString() + ": " + e);
-            throw e;
-        } catch (IOException e) {
-            socket.close();
-            Log.e(TAG, "got IO exception for " + uri.toString() + ": " + e);
+            Log.e(TAG, "got IO exception for " + url.toString(), e);
             throw e;
         }
     }
 
-    public static String downloadString(Context context, String path, String query, String[] error) {
+    public static String downloadString(Context context, String path, String[] error) {
+        HttpURLConnection conn = null;
         try {
-            DownloadRequest request = new DownloadRequest(
-                context, DownloadRequest.getServerUri(context, path, query),
-                DownloadRequest.Method.GET, DownloadRequest.AuthType.SERVER);
-            request.setHeader("Accept-Encoding", "gzip");
-            DownloadResult result = startDownload(request);
-            if (result.getStatusCode() != 200) {
-                error[0] = "Got " + result.getStatusCode() + " status code from server (" + result.getReason() + ")";
+            conn = download(context, getServerUrl(context, path), "GET", AuthType.SERVER, null);
+            final int status = conn.getResponseCode();
+            if (status != 200) {
+                error[0] = "Got " + status + " from server (" + conn.getResponseMessage() + ")";
                 return null;
             }
-            InputStream stream = result.getEntity().getContent();
-            InputStream gzipStream = null;
-            Header encoding = result.getEntity().getContentEncoding();
-            if (encoding != null && encoding.getValue().equals("gzip")) {
-                gzipStream = new GZIPInputStream(stream);
-            }
-            String output = Util.getStringFromInputStream(gzipStream != null ? gzipStream : stream);
-            if (gzipStream != null) {
-                gzipStream.close();
-            }
-            result.close();
+            final String output = Util.getStringFromInputStream(conn.getInputStream());
             return output;
-        } catch (DownloadRequest.PrefException e) {
+        } catch (PrefException e) {
             error[0] = e.getMessage();
-            return null;
-        } catch (HttpException e) {
-            error[0] = "HTTP error (" + e + ")";
             return null;
         } catch (IOException e) {
             error[0] = "IO error (" + e + ")";
             return null;
+        } finally {
+            if (conn != null) {
+                conn.disconnect();
+            }
+        }
+    }
+
+    public static URL getServerUrl(Context context, String path) throws PrefException {
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
+        String server = prefs.getString(NupPreferences.SERVER_URL, "");
+        if (server.isEmpty()) {
+            throw new PrefException("Server URL is not configured");
+        }
+
+        URL serverUrl;
+        try {
+            serverUrl = new URL(server);
+        } catch (MalformedURLException e) {
+            throw new PrefException("Unable to parse server URL \"" + server + "\" (" + e.getMessage() + ")");
+        }
+
+        // Check protocol and set port.
+        final String protocol = serverUrl.getProtocol();
+        int port;
+        if (protocol.equals("http")) {
+            port = (serverUrl.getPort() > 0) ? serverUrl.getPort() : 80;
+        } else if (protocol.equals("https")) {
+            port = (serverUrl.getPort() > 0) ? serverUrl.getPort() : 443;
+        } else {
+            throw new PrefException("Unknown server URL scheme \"" + protocol + "\" (should be \"http\" or \"https\")");
+        }
+
+        // Now build the real URL.
+        try {
+            return new URL(protocol, serverUrl.getHost(), port, path);
+        } catch (MalformedURLException e) {
+            throw new PrefException("Unable to parse URL: " + e.getMessage());
         }
     }
 }

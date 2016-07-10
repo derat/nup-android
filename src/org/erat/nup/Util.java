@@ -15,8 +15,6 @@ import java.io.BufferedReader;
 import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.io.IOException;
-import java.net.URI;
-import java.net.URISyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -177,30 +175,5 @@ class Util {
             new FrameLayout.LayoutParams(
                 view.getWidth() - 1, FrameLayout.LayoutParams.FILL_PARENT);
         view.setLayoutParams(layoutParams);
-    }
-
-    public static URI constructURI(String url) throws URISyntaxException {
-        if (url.isEmpty())
-            return null;
-
-        // TODO: Lols.
-        String[] parts = url.split(":", 2);
-        if (parts.length != 2)
-            throw new URISyntaxException(url, "Didn't match scheme:[...] format");
-
-        URI uri = new URI(parts[0], parts[1], null);
-        if (uri.getPort() == -1) {
-            int port;
-            String scheme = uri.getScheme();
-            if (scheme == null || scheme.equals("http")) {
-                port = 80;
-            } else if (scheme.equals("https")) {
-                port = 443;
-            } else {
-                throw new URISyntaxException(url, "Unknown scheme (should be \"http\" or \"https\")");
-            }
-            uri = new URI(uri.getScheme(), uri.getUserInfo(), uri.getHost(), port, uri.getPath(), uri.getQuery(), uri.getFragment());
-        }
-        return uri;
     }
 }

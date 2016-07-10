@@ -15,16 +15,20 @@ import android.preference.PreferenceManager;
 import android.util.Log;
 
 import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.IOException;
-import java.net.URI;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 
 class FileCache implements Runnable {
     private static final String TAG = "FileCache";
@@ -221,8 +225,8 @@ class FileCache implements Runnable {
         }
 
         Log.d(TAG, "posting download of song " + songId + " from " +
-              song.getUri().toString() + " to " + entry.getLocalFile().getPath());
-        mHandler.post(new DownloadTask(entry, song.getUri()));
+              song.getUrl().toString() + " to " + entry.getLocalFile().getPath());
+        mHandler.post(new DownloadTask(entry, song.getUrl()));
         return entry;
     }
 
@@ -251,7 +255,7 @@ class FileCache implements Runnable {
         private final FileCacheEntry mEntry;
 
         // File that we're downloading.
-        private final URI mUri;
+        private final URL mUrl;
 
         // How long we should wait before retrying after an error, in milliseconds.
         // We start at 0 but back off exponentially after errors where we haven't made any progress.
@@ -260,13 +264,12 @@ class FileCache implements Runnable {
         // Reason for the failure.
         private String mReason;
 
-        private DownloadRequest mRequest = null;
-        private DownloadResult mResult = null;
+        private HttpURLConnection mConn;
         private FileOutputStream mOutputStream = null;
 
-        public DownloadTask(FileCacheEntry entry, URI uri) {
+        public DownloadTask(FileCacheEntry entry, URL url) {
             mEntry = entry;
-            mUri = uri;
+            mUrl = url;
         }
 
         @Override
@@ -330,9 +333,9 @@ class FileCache implements Runnable {
                     handleSuccess();
                     return;
                 } finally {
-                    if (mResult != null) {
-                        mResult.close();
-                        mResult = null;
+                    if (mConn != null) {
+                        mConn.disconnect();
+                        mConn = null;
                     }
                     if (mOutputStream != null) {
                         try {
@@ -347,40 +350,41 @@ class FileCache implements Runnable {
         }
 
         private DownloadStatus startDownload() {
-            mRequest = new DownloadRequest(mContext, mUri, DownloadRequest.Method.GET, DownloadRequest.AuthType.STORAGE);
-
-            if (mEntry.getCachedBytes() > 0 && mEntry.getCachedBytes() < mEntry.getTotalBytes()) {
-                Log.d(TAG, "attempting to resume download at byte " + mEntry.getCachedBytes());
-                mRequest.setHeader("Range", "bytes=" + new Long(mEntry.getCachedBytes()).toString() + "-");
-            }
-
             try {
-                mResult = Download.startDownload(mRequest);
-            } catch (org.apache.http.HttpException e) {
-                mReason = "HTTP error while connecting";
-                return DownloadStatus.RETRYABLE_ERROR;
+                Map<String, String> headers = new HashMap<String, String>();
+                if (mEntry.getCachedBytes() > 0 && mEntry.getCachedBytes() < mEntry.getTotalBytes()) {
+                    Log.d(TAG, "attempting to resume download at byte " + mEntry.getCachedBytes());
+                    headers.put("Range", String.format("bytes=%d-", mEntry.getCachedBytes()));
+                }
+
+                mConn = Download.download(mContext, mUrl, "GET", Download.AuthType.STORAGE, headers);
+                final int status = mConn.getResponseCode();
+                Log.d(TAG, "got " + status + " from server");
+                if (status != 200 && status != 206) {
+                    mReason = "Got status code " + status;
+                    return DownloadStatus.FATAL_ERROR;
+                }
+
+                // Update the cache entry with the total file size.
+                if (status == 200) {
+                    if (mConn.getContentLength() <= 1) {
+                        mReason = "Got invalid content length " + mConn.getContentLength();
+                        return DownloadStatus.FATAL_ERROR;
+                    }
+                    mDb.setTotalBytes(mEntry.getSongId(), mConn.getContentLength());
+                }
             } catch (IOException e) {
-                mReason = "IO error while connecting";
+                mReason = "IO error while starting download";
                 return DownloadStatus.RETRYABLE_ERROR;
             }
-
-            Log.d(TAG, "got " + mResult.getStatusCode() + " from server");
-            if (mResult.getStatusCode() != 200 && mResult.getStatusCode() != 206) {
-                mReason = "Got status code " + mResult.getStatusCode();
-                return DownloadStatus.FATAL_ERROR;
-            }
-
-            // Update the cache entry with the total file size.
-            if (mResult.getStatusCode() == 200)
-                mDb.setTotalBytes(mEntry.getSongId(), mResult.getEntity().getContentLength());
 
             return DownloadStatus.SUCCESS;
         }
 
         private DownloadStatus writeFile() {
             // Make space for whatever we're planning to download.
-            if (!makeSpace(mResult.getEntity().getContentLength())) {
-                mReason = "Unable to make space for " + mResult.getEntity().getContentLength() + "-byte download";
+            if (!makeSpace(mConn.getContentLength())) {
+                mReason = "Unable to make space for " + mConn.getContentLength() + "-byte download";
                 return DownloadStatus.FATAL_ERROR;
             }
 
@@ -395,13 +399,22 @@ class FileCache implements Runnable {
                 }
             }
 
+            int statusCode;
+            try {
+                statusCode = mConn.getResponseCode();
+            } catch (IOException e) {
+                mReason = "Unable to get status code";
+                return DownloadStatus.RETRYABLE_ERROR;
+            }
+
             try {
                 // TODO: Also check the Content-Range header.
-                boolean append = (mResult.getStatusCode() == 206);
+                boolean append = (statusCode == 206);
                 mOutputStream = new FileOutputStream(file, append);
-                if (!append)
+                if (!append) {
                     mEntry.setCachedBytes(0);
-            } catch (java.io.FileNotFoundException e) {
+                }
+            } catch (FileNotFoundException e) {
                 mReason = "Unable to create output stream to local file";
                 return DownloadStatus.FATAL_ERROR;
             }
@@ -419,10 +432,11 @@ class FileCache implements Runnable {
 
                 int bytesRead = 0, bytesWritten = 0;
                 byte[] buffer = new byte[BUFFER_SIZE];
-                InputStream inputStream = mResult.getEntity().getContent();
+                InputStream inputStream = mConn.getInputStream();
                 while ((bytesRead = inputStream.read(buffer)) != -1) {
-                    if (!isActive())
+                    if (!isActive()) {
                         return DownloadStatus.ABORTED;
+                    }
 
                     mOutputStream.write(buffer, 0, bytesRead);
                     bytesWritten += bytesRead;
@@ -443,8 +457,8 @@ class FileCache implements Runnable {
                       file.getAbsolutePath() + " in " + (endDate.getTime() - startDate.getTime()) + " ms)");
 
                 // I see this happen when I kill the server midway through the download.
-                if (bytesWritten != mResult.getEntity().getContentLength()) {
-                    mReason = "Expected " + mResult.getEntity().getContentLength() + " bytes but got " + bytesWritten;
+                if (bytesWritten != mConn.getContentLength()) {
+                    mReason = "Expected " + mConn.getContentLength() + " bytes but got " + bytesWritten;
                     return DownloadStatus.RETRYABLE_ERROR;
                 }
             } catch (IOException e) {

@@ -17,7 +17,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 import org.json.JSONTokener;
 
-import java.net.URISyntaxException;
+import java.net.MalformedURLException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
@@ -380,7 +380,7 @@ class SongDatabase {
                     cursor.getString(4), cursor.getString(5), cursor.getInt(6), cursor.getInt(7), cursor.getInt(8),
                     cursor.getFloat(9));
                 songs.add(song);
-            } catch (URISyntaxException e) {
+            } catch (MalformedURLException e) {
                 Log.d(TAG, "skipping song " + cursor.getLong(0) + " with malformed URL(s) \"" +
                       cursor.getString(4) + "\" and \"" + cursor.getString(5) + "\"");
             }
@@ -454,7 +454,7 @@ class SongDatabase {
         try {
             // Ask the server for the current time before we fetch anything.  We'll use this as the starting point for
             // the next sync, to handle the case where some songs in the server are updated while we're doing this sync.
-            String startTimeStr = Download.downloadString(mContext, "/now_nsec", "", message);
+            String startTimeStr = Download.downloadString(mContext, "/now_nsec", message);
             if (startTimeStr == null)
                 return false;
             long startTimeNsec = 0;
@@ -514,11 +514,13 @@ class SongDatabase {
         String serverCursor = "";
 
         while (numUpdates == 0 || !serverCursor.isEmpty()) {
-            String response = Download.downloadString(
-                mContext, "/songs",
-                String.format("minLastModifiedNsec=%d&deleted=%d&max=%d&cursor=%s", prevStartTimeNsec, deleted ? 1 : 0, SERVER_SONG_BATCH_SIZE, serverCursor), message);
-            if (response == null)
+            String path = String.format("/songs?minLastModifiedNsec=%d&deleted=%d&max=%d&cursor=%s",
+                                        prevStartTimeNsec, deleted ? 1 : 0, SERVER_SONG_BATCH_SIZE,
+                                        serverCursor);
+            String response = Download.downloadString(mContext, path, message);
+            if (response == null) {
                 throw new ServerException("download failed");
+            }
 
             serverCursor = "";
 

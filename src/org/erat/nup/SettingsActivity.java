@@ -10,6 +10,9 @@ import android.preference.PreferenceManager;
 import android.os.Bundle;
 import android.widget.Toast;
 
+import java.net.MalformedURLException;
+import java.net.URL;
+
 public class SettingsActivity extends PreferenceActivity implements Preference.OnPreferenceChangeListener {
     private static final String TAG = "SettingsActivity";
 
@@ -86,9 +89,10 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
             // Validate the URL now to avoid heartbreak later.
             String strValue = (String) value;
             try {
-                if (!strValue.isEmpty())
-                    DownloadRequest.parseServerUrlIntoUri(strValue, null, null);
-            } catch (DownloadRequest.PrefException e) {
+                if (!strValue.isEmpty()) {
+                    new URL(strValue);
+                }
+            } catch (MalformedURLException e) {
                 Toast.makeText(this, e.getMessage(), Toast.LENGTH_LONG).show();
                 return false;
             }

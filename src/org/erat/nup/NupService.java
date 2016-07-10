@@ -541,7 +541,7 @@ public class NupService extends Service
         // If we've already downloaded the whole file, start playing it.
         FileCacheEntry cacheEntry = mCache.getEntry(getCurrentSong().getSongId());
         if (cacheEntry != null && cacheEntry.isFullyCached()) {
-            Log.d(TAG, "file " + getCurrentSong().getUri().toString() + " already downloaded; playing");
+            Log.d(TAG, "file " + getCurrentSong().getUrl().toString() + " already downloaded; playing");
             playCacheEntry(cacheEntry);
 
             // If we're downloading some other song (maybe we were downloading the
@@ -598,7 +598,7 @@ public class NupService extends Service
 
     // Start fetching the cover for a song if it's not loaded already.
     public void fetchCoverForSongIfMissing(Song song) {
-        if (song.getCoverBitmap() != null || song.getCoverUri() == null)
+        if (song.getCoverBitmap() != null || song.getCoverUrl() == null)
             return;
 
         if (!mSongCoverFetches.contains(song)) {
@@ -617,7 +617,7 @@ public class NupService extends Service
 
         @Override
         protected Bitmap doInBackground(Void... args) {
-            return mCoverLoader.loadCover(mSong.getCoverUri());
+            return mCoverLoader.loadCover(mSong.getCoverUrl());
         }
 
         @Override
@@ -714,7 +714,7 @@ public class NupService extends Service
             @Override
             public void run() {
                 Log.d(TAG, "got notification that download of song " + entry.getSongId() + " failed: " + reason);
-                Toast.makeText(NupService.this, "Download of " + mSongIdToSong.get(entry.getSongId()).getUri().toString() +
+                Toast.makeText(NupService.this, "Download of " + mSongIdToSong.get(entry.getSongId()).getUrl().toString() +
                                " failed: " + reason, Toast.LENGTH_LONG).show();
                 if (entry.getSongId() == mDownloadSongId) {
                     mDownloadSongId = -1;

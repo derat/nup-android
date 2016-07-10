@@ -14,7 +14,8 @@ import java.io.FilenameFilter;
 import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.io.IOException;
-import java.net.URI;
+import java.net.HttpURLConnection;
+import java.net.URL;
 import java.util.concurrent.locks.Condition;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
@@ -61,15 +62,15 @@ class CoverLoader {
 
     // Load the cover for a song's artist and album.  Tries to find it locally
     // first; then goes to the server.  Returns null if unsuccessful.
-    public Bitmap loadCover(URI uri) {
+    public Bitmap loadCover(URL url) {
         // Ensure that the cover dir exists.
         mCoverDir.mkdirs();
 
-        File file = lookForLocalCover(uri);
+        File file = lookForLocalCover(url);
         if (file != null) {
             Log.d(TAG, "found local file " + file.getName());
         } else {
-            file = downloadCover(uri);
+            file = downloadCover(url);
             if (file != null)
                 Log.d(TAG, "fetched remote file " + file.getName());
         }
@@ -86,8 +87,8 @@ class CoverLoader {
         }
     }
 
-    private File lookForLocalCover(final URI uri) {
-        String filename = getFilenameForUri(uri);
+    private File lookForLocalCover(final URL url) {
+        String filename = getFilenameForUrl(url);
         startLoad(filename);
         try {
             File file = new File(mCoverDir, filename);
@@ -99,18 +100,17 @@ class CoverLoader {
         return null;
     }
 
-    private File downloadCover(final URI uri) {
+    private File downloadCover(final URL url) {
         if (!Util.isNetworkAvailable(mContext))
             return null;
 
-        String localFilename = getFilenameForUri(uri);
+        String localFilename = getFilenameForUrl(url);
         startLoad(localFilename);
 
         boolean success = false;
         File file = new File(mCoverDir, localFilename);
         FileOutputStream outputStream = null;
-        DownloadRequest request = null;
-        DownloadResult result = null;
+        HttpURLConnection conn = null;
 
         try {
             // Check if another thread downloaded it while we were waiting.
@@ -122,21 +122,20 @@ class CoverLoader {
             file.createNewFile();
             outputStream = new FileOutputStream(file);
 
-            request = new DownloadRequest(mContext, uri, DownloadRequest.Method.GET, DownloadRequest.AuthType.STORAGE);
-            result = Download.startDownload(request);
-            if (result.getStatusCode() != 200)
-                throw new IOException("got status code " + result.getStatusCode());
+            conn = Download.download(mContext, url, "GET", Download.AuthType.STORAGE, null);
+            if (conn.getResponseCode() != 200) {
+                throw new IOException("got status code " + conn.getResponseCode());
+            }
 
             byte[] buffer = new byte[BUFFER_SIZE];
-            InputStream inputStream = result.getEntity().getContent();
+            InputStream inputStream = conn.getInputStream();
             int bytesRead;
-            while ((bytesRead = inputStream.read(buffer)) != -1)
+            while ((bytesRead = inputStream.read(buffer)) != -1) {
                 outputStream.write(buffer, 0, bytesRead);
+            }
             success = true;
-        } catch (org.apache.http.HttpException e) {
-            Log.e(TAG, "got HTTP error while fetching " + uri.toString() + ": " + e);
         } catch (IOException e) {
-            Log.e(TAG, "got IO error while fetching " + uri.toString() + ": " + e);
+            Log.e(TAG, "got IO error while fetching " + url.toString() + ": " + e);
         } finally {
             if (outputStream != null) {
                 try {
@@ -145,20 +144,20 @@ class CoverLoader {
                     // !@#!@$!@
                 }
             }
-
-            if (result != null)
-                result.close();
-            if (!success && file.exists())
+            if (conn != null) {
+                conn.disconnect();
+            }
+            if (!success && file.exists()) {
                 file.delete();
-
+            }
             finishLoad(localFilename);
         }
 
         return success ? file : null;
     }
 
-    private String getFilenameForUri(URI uri) {
-        String parts[] = uri.getPath().split("/");
+    private String getFilenameForUrl(URL url) {
+        String parts[] = url.getPath().split("/");
         return parts[parts.length-1];
     }
 
