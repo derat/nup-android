@@ -1,7 +1,6 @@
 package org.erat.nup;
 
 import android.content.Context;
-import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -132,7 +131,6 @@ class SortedStringArrayAdapter extends ArrayAdapter<StringIntPair>
             return NUMBER_SECTION;
 
         String sortStr = Util.getSortingKey(str, mSortType);
-        Log.i(TAG, sortStr + " (" + str + ", " + mSortType + ")");
         char ch = sortStr.charAt(0);
         if (ch < 'a')
             return NUMBER_SECTION;
