@@ -74,7 +74,7 @@ class FileCache implements Runnable {
     private final Context mContext;
 
     // Directory where we write music files.
-    private final File mMusicDir;
+    private File mMusicDir;
 
     // Used to run tasks on our own thread.
     private Handler mHandler;
@@ -100,14 +100,7 @@ class FileCache implements Runnable {
         mContext = context;
         mListener = listener;
 
-        // FIXME: display a message here
-        String state = Environment.getExternalStorageState();
-        if (!state.equals(Environment.MEDIA_MOUNTED))
-            Log.e(TAG, "media has state " + state + "; we need " + Environment.MEDIA_MOUNTED);
-
-        // TODO: This shouldn't be running on the UI thread; it hits the disk at startup.
-        mMusicDir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC);
-        mPrefs = PreferenceManager.getDefaultSharedPreferences(context);
+        mPrefs = PreferenceManager.getDefaultSharedPreferences(mContext);
 
         mWifiLock = ((WifiManager) mContext.getSystemService(Context.WIFI_SERVICE)).createWifiLock(
             WifiManager.WIFI_MODE_FULL, mContext.getString(R.string.app_name));
@@ -116,6 +109,13 @@ class FileCache implements Runnable {
 
     @Override
     public void run() {
+        String state = Environment.getExternalStorageState();
+        if (!state.equals(Environment.MEDIA_MOUNTED)) {
+            Log.e(TAG, "media has state " + state + "; we need " + Environment.MEDIA_MOUNTED);
+        }
+
+        mMusicDir = mContext.getExternalFilesDir(Environment.DIRECTORY_MUSIC);
+
         mDb = new FileCacheDatabase(mContext, mMusicDir.getPath());
         Looper.prepare();
         mHandler = new Handler();

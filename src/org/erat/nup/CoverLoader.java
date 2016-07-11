@@ -6,6 +6,7 @@ package org.erat.nup;
 import android.content.Context;
 import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
+import android.os.AsyncTask;
 import android.os.Environment;
 import android.util.Log;
 
@@ -24,6 +25,9 @@ import java.util.HashSet;
 class CoverLoader {
     private static final String TAG = "CoverLoader";
 
+    // Name of cover subdirectory.
+    private static final String DIR_NAME = "covers";
+
     // Size of buffer used to write data to disk, in bytes.
     private static final int BUFFER_SIZE = 8 * 1024;
 
@@ -31,7 +35,7 @@ class CoverLoader {
     private final Context mContext;
 
     // Directory where we write cover images.
-    private final File mCoverDir;
+    private File mCoverDir;
 
     // Guards |mFilesBeingLoaded|.
     private final Lock mLock = new ReentrantLock();
@@ -51,18 +55,29 @@ class CoverLoader {
     public CoverLoader(Context context) {
         mContext = context;
 
-        // FIXME: display a message here
-        String state = Environment.getExternalStorageState();
-        if (!state.equals(Environment.MEDIA_MOUNTED))
-            Log.e(TAG, "media has state " + state + "; we need " + Environment.MEDIA_MOUNTED);
+        new AsyncTask<Void, Void, Void>() {
+            @Override protected Void doInBackground(Void... args) {
+                String state = Environment.getExternalStorageState();
+                if (!state.equals(Environment.MEDIA_MOUNTED)) {
+                    Log.e(TAG, "media has state " + state + "; we need " + Environment.MEDIA_MOUNTED);
+                }
 
-        // TODO: This shouldn't be running on the UI thread; it hits the disk at startup.
-        mCoverDir = new File(mContext.getExternalCacheDir(), "covers");
+                mCoverDir = new File(mContext.getExternalCacheDir(), DIR_NAME);
+                return null;
+            }
+        }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
 
     // Load the cover for a song's artist and album.  Tries to find it locally
     // first; then goes to the server.  Returns null if unsuccessful.
     public Bitmap loadCover(URL url) {
+        Util.assertNotOnMainThread();
+
+        if (mCoverDir == null) {
+            Log.e(TAG, "got request for " + url.toString() + " before initialized");
+            return null;
+        }
+
         // Ensure that the cover dir exists.
         mCoverDir.mkdirs();
 

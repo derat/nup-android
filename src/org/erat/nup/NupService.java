@@ -239,7 +239,16 @@ public class NupService extends Service
     @Override
     public void onCreate() {
         Log.d(TAG, "service created");
-        CrashLogger.register(new File(getExternalFilesDir(null), CRASH_SUBDIRECTORY));
+
+        // It'd be nice to set this up before we do anything else, but getExternalFilesDir() blocks. :-/
+        new AsyncTask<Void, Void, File>() {
+            @Override protected File doInBackground(Void... args) {
+                return new File(getExternalFilesDir(null), CRASH_SUBDIRECTORY);
+            }
+            @Override protected void onPostExecute(File dir) {
+                CrashLogger.register(dir);
+            }
+        }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
 
         if (Util.isNetworkAvailable(this)) {
             Auth.authenticateInBackground(this);

@@ -42,6 +42,13 @@ class Util {
         assertOnLooper(Looper.getMainLooper());
     }
 
+    /** Crash if called from the main thread. */
+    public static void assertNotOnMainThread() {
+        if (Looper.myLooper() == Looper.getMainLooper()) {
+            throw new IllegalStateException("Running on main thread; shouldn't be");
+        }
+    }
+
     // Yay.
     public static String getStringFromInputStream(InputStream stream) throws IOException {
         StringBuilder sb = new StringBuilder();
