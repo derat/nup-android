@@ -122,6 +122,9 @@ public class NupService extends Service
     // Token identifying the session managed by |mMediaSessionManager|.
     private MediaSession.Token mMediaSessionToken;
 
+    // Updates the notification.
+    private NotificationManager mNotificationManager;
+
     // Points from song ID to Song.
     // This is the canonical set of songs that we've seen.
     private HashMap<Long,Song> mSongIdToSong = new HashMap<Long,Song>();
@@ -175,11 +178,6 @@ public class NupService extends Service
 
     // Used to run tasks on our thread.
     private Handler mHandler = new Handler();
-
-    // Used to pass commands from the notification to this service.
-    private PendingIntent mTogglePauseIntent;
-    private PendingIntent mPrevTrackIntent;
-    private PendingIntent mNextTrackIntent;
 
     private AudioManager mAudioManager;
     private TelephonyManager mTelephonyManager;
@@ -254,12 +252,6 @@ public class NupService extends Service
             Auth.authenticateInBackground(this);
         }
 
-        mTogglePauseIntent = PendingIntent.getService(this, 0, new Intent(ACTION_TOGGLE_PAUSE, Uri.EMPTY, this, NupService.class), 0);
-        mPrevTrackIntent = PendingIntent.getService(this, 0, new Intent(ACTION_PREV_TRACK, Uri.EMPTY, this, NupService.class), 0);
-        mNextTrackIntent = PendingIntent.getService(this, 0, new Intent(ACTION_NEXT_TRACK, Uri.EMPTY, this, NupService.class), 0);
-
-        updateNotification();
-
         mAudioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
         int result = mAudioManager.requestAudioFocus(mAudioFocusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN);
         Log.d(TAG, "requested audio focus; got " + result);
@@ -302,6 +294,14 @@ public class NupService extends Service
             }
         });
         mMediaSessionToken = mMediaSessionManager.getToken();
+
+        mNotificationManager = new NotificationManager(
+            this, mMediaSessionToken,
+            PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0),
+            PendingIntent.getService(this, 0, new Intent(ACTION_TOGGLE_PAUSE, Uri.EMPTY, this, NupService.class), 0),
+            PendingIntent.getService(this, 0, new Intent(ACTION_PREV_TRACK, Uri.EMPTY, this, NupService.class), 0),
+            PendingIntent.getService(this, 0, new Intent(ACTION_NEXT_TRACK, Uri.EMPTY, this, NupService.class), 0));
+        updateNotification();
     }
 
     @Override
@@ -387,58 +387,13 @@ public class NupService extends Service
         }
     }
 
-    // Update the notification text.
+    /** Updates the currently-displayed notification if needed. */
     private void updateNotification() {
-        final Song song = getCurrentSong();
-
-        Notification.Builder builder = new Notification.Builder(this)
-            .setContentTitle(song != null ? song.getArtist() : getString(R.string.startup_message_title))
-            .setContentText(song != null ? song.getTitle() : getString(R.string.startup_message_text))
-            .setSmallIcon(R.drawable.status)
-            .setColor(getResources().getColor(R.color.primary))
-            .setVisibility(Notification.VISIBILITY_PUBLIC)
-            .setContentIntent(PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0))
-            .setOngoing(true)
-            .setWhen(System.currentTimeMillis())
-            .setShowWhen(false);
-
-        Notification.MediaStyle style = new Notification.MediaStyle();
-        style.setMediaSession(mMediaSessionToken);
-
-        if (song != null) {
-            builder.setLargeIcon(song.getCoverBitmap());
-
-            boolean showPlayPause = !mPlaybackComplete;
-            boolean showPrev = mCurrentSongIndex > 0;
-            boolean showNext = !mSongs.isEmpty() && mCurrentSongIndex < mSongs.size() - 1;
-            int numActions = (showPlayPause ? 1 : 0) + (showPrev ? 1 : 0) + (showNext ? 1 : 0);
-            boolean showLabels = numActions < 3;
-
-            if (showPlayPause) {
-                builder.addAction(mPaused ? R.drawable.ic_play_arrow_black_36dp : R.drawable.ic_pause_black_36dp,
-                                  showLabels ? getString(mPaused ? R.string.play : R.string.pause) : "",
-                                  mTogglePauseIntent);
-            }
-            if (showPrev) {
-                builder.addAction(R.drawable.ic_skip_previous_black_36dp,
-                                  showLabels ? getString(R.string.prev) : "",
-                                  mPrevTrackIntent);
-            }
-            if (showNext) {
-                builder.addAction(R.drawable.ic_skip_next_black_36dp,
-                                  showLabels ? getString(R.string.next) : "",
-                                  mNextTrackIntent);
-            }
-
-            if (numActions > 0) {
-                // This is silly.
-                style.setShowActionsInCompactView(numActions == 3 ? new int[]{0, 1, 2} : (numActions == 2 ? new int[]{0, 1} : new  int[]{0}));
-            }
+        Notification notification = mNotificationManager.createNotificationIfChanged(
+            getCurrentSong(), mPaused, mPlaybackComplete, mCurrentSongIndex, mSongs.size());
+        if (notification != null) {
+            startForeground(NOTIFICATION_ID, notification);
         }
-
-        builder.setStyle(style);
-
-        startForeground(NOTIFICATION_ID, builder.build());
     }
 
     // Toggle whether we're playing the current song or not.
@@ -510,7 +465,6 @@ public class NupService extends Service
         }
 
         if (removedPlaying) {
-            updateNotification();
             if (!mSongs.isEmpty() && mCurrentSongIndex < mSongs.size()) {
                 playSongAtIndex(mCurrentSongIndex);
             } else {
@@ -524,10 +478,10 @@ public class NupService extends Service
         if (mDownloadSongId == -1 && !mSongs.isEmpty() && mCurrentSongIndex < mSongs.size() - 1) {
             maybeDownloadAnotherSong(mCurrentSongIndex + 1);
         }
-
         if (mSongListener != null) {
             mSongListener.onPlaylistChange(mSongs);
         }
+        updateNotification();
         mMediaSessionManager.updatePlaylist(mSongs);
     }
 
@@ -595,8 +549,9 @@ public class NupService extends Service
         updateNotification();
         mMediaSessionManager.updateSong(song);
         updatePlaybackState();
-        if (mSongListener != null)
+        if (mSongListener != null) {
             mSongListener.onSongChange(song, mCurrentSongIndex);
+        }
     }
 
     // Stop playing the current song, if any.
@@ -855,13 +810,16 @@ public class NupService extends Service
         songs = tmpSongs;
 
         mSongs.addAll(index, songs);
-        if (mCurrentSongIndex >= 0 && index <= mCurrentSongIndex)
+        if (mCurrentSongIndex >= 0 && index <= mCurrentSongIndex) {
             mCurrentSongIndex += songs.size();
-        if (mDownloadIndex >= 0 && index <= mDownloadIndex)
+        }
+        if (mDownloadIndex >= 0 && index <= mDownloadIndex) {
             mDownloadIndex += songs.size();
+        }
 
-        if (mSongListener != null)
+        if (mSongListener != null) {
             mSongListener.onPlaylistChange(mSongs);
+        }
         mMediaSessionManager.updatePlaylist(mSongs);
 
         for (Song song : newSongs) {
@@ -869,8 +827,9 @@ public class NupService extends Service
             FileCacheEntry entry = mCache.getEntry(song.getSongId());
             if (entry != null) {
                 song.updateBytes(entry);
-                if (mSongListener != null)
+                if (mSongListener != null) {
                     mSongListener.onSongFileSizeChange(song);
+                }
             }
         }
 
@@ -888,6 +847,7 @@ public class NupService extends Service
             // Otherwise, consider downloading the new songs if we're not already downloading something.
             maybeDownloadAnotherSong(index);
         }
+        updateNotification();
         return played;
     }
 
