@@ -1,3 +1,6 @@
+/.gradle/
+/gradle/
 /local.properties
 /bin/
+/build/
 /gen/
