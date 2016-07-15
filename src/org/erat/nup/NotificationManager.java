@@ -81,11 +81,12 @@ class NotificationManager {
             .setWhen(System.currentTimeMillis())
             .setShowWhen(false);
 
-        Notification.MediaStyle style = new Notification.MediaStyle();
-        style.setMediaSession(mMediaSessionToken);
-
         if (song != null) {
             builder.setLargeIcon(song.getCoverBitmap());
+
+            Notification.MediaStyle style = new Notification.MediaStyle();
+            style.setMediaSession(mMediaSessionToken);
+            builder.setStyle(style);
 
             int numActions = (showPlayPause ? 1 : 0) + (showPrev ? 1 : 0) + (showNext ? 1 : 0);
             boolean showLabels = numActions < 3;
@@ -112,7 +113,6 @@ class NotificationManager {
             }
         }
 
-        builder.setStyle(style);
         return builder.build();
     }
 }
