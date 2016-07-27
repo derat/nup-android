@@ -64,6 +64,9 @@ public class NupService extends Service
     // Report a song unconditionally if we've played it for this many milliseconds.
     private static final long REPORT_PLAYBACK_THRESHOLD_MS = 240 * 1000;
 
+    // Ignore AUDIO_BECOMING_NOISY broadcast intents for this long after a user switch.
+    private static final long IGNORE_NOISY_AUDIO_AFTER_USER_SWITCH_MS = 1000;
+
     // Subdirectory where crash reports are written.
     private static final String CRASH_SUBDIRECTORY = "crashes";
 
@@ -176,6 +179,9 @@ public class NupService extends Service
     // Songs whose covers we're currently keeping in memory.
     private List<Song> mSongsWithCovers = new ArrayList<Song>();
 
+    // Last time at which the user was foregrounded or backgrounded.
+    private Date mLastUserSwitchTime;
+
     // Used to run tasks on our thread.
     private Handler mHandler = new Handler();
 
@@ -196,12 +202,29 @@ public class NupService extends Service
         }
     };
 
-    private BroadcastReceiver mNoisyAudioReceiver = new BroadcastReceiver() {
+    private BroadcastReceiver mBroadcastReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
-            if (AudioManager.ACTION_AUDIO_BECOMING_NOISY.equals(intent.getAction()) && mCurrentSongIndex >= 0 && !mPaused) {
-                mPlayer.pause();
-                Toast.makeText(NupService.this, "Paused since unplugged.", Toast.LENGTH_SHORT).show();
+            if (AudioManager.ACTION_AUDIO_BECOMING_NOISY.equals(intent.getAction())) {
+                Log.d(TAG, "Audio becoming noisy");
+
+                // Switching users apparently triggers an AUDIO_BECOMING_NOISY broadcast intent (which usually indicates
+                // that headphones have been disconnected). AudioManager.isWiredHeadsetOn() returns true when the
+                // notification is sent due to headphones being unplugged (why?), so that doesn't seem to help for
+                // ignoring this. Instead, ignore these intents for a brief period after user-switch broadcast intents.
+                final boolean userSwitchedRecently = (mLastUserSwitchTime == null) ? true :
+                    (new Date()).getTime() - mLastUserSwitchTime.getTime() <= IGNORE_NOISY_AUDIO_AFTER_USER_SWITCH_MS;
+
+                if (mCurrentSongIndex >= 0 && !mPaused && !userSwitchedRecently) {
+                    mPlayer.pause();
+                    Toast.makeText(NupService.this, "Paused since unplugged.", Toast.LENGTH_SHORT).show();
+                }
+            } else if (Intent.ACTION_USER_BACKGROUND.equals(intent.getAction())) {
+                Log.d(TAG, "User is backgrounded");
+                mLastUserSwitchTime = new Date();
+            } else if (Intent.ACTION_USER_FOREGROUND.equals(intent.getAction())) {
+                Log.d(TAG, "User is foregrounded");
+                mLastUserSwitchTime = new Date();
             }
         }
     };
@@ -259,7 +282,11 @@ public class NupService extends Service
         mTelephonyManager = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
         mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
 
-        registerReceiver(mNoisyAudioReceiver, new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY));
+        final IntentFilter filter = new IntentFilter();
+        filter.addAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
+        filter.addAction(Intent.ACTION_USER_BACKGROUND);
+        filter.addAction(Intent.ACTION_USER_FOREGROUND);
+        registerReceiver(mBroadcastReceiver, filter);
 
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
 
@@ -309,7 +336,7 @@ public class NupService extends Service
         Log.d(TAG, "service destroyed");
         mAudioManager.abandonAudioFocus(mAudioFocusListener);
         mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_NONE);
-        unregisterReceiver(mNoisyAudioReceiver);
+        unregisterReceiver(mBroadcastReceiver);
 
         mMediaSessionManager.cleanUp();
         mSongDb.quit();
