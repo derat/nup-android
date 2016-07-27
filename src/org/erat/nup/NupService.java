@@ -263,7 +263,7 @@ public class NupService extends Service
 
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
 
-        mPlayer = new Player(this, mHandler);
+        mPlayer = new Player(this, this, mHandler);
         mPlayerThread = new Thread(mPlayer, "Player");
         mPlayerThread.setPriority(Thread.MAX_PRIORITY);
         mPlayerThread.start();

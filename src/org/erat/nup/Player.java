@@ -4,11 +4,13 @@
 package org.erat.nup;
 
 import android.app.Activity;
+import android.content.Context;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.os.AsyncTask;
 import android.os.Handler;
 import android.os.Looper;
+import android.os.PowerManager;
 import android.util.Log;
 
 import java.io.FileDescriptor;
@@ -47,6 +49,8 @@ class Player implements Runnable,
         // Invoked when an error occurs.
         void onPlaybackError(String description);
     }
+
+    private Context mContext;
 
     // Currently-playing and queued songs.
     private FilePlayer mCurrentPlayer;
@@ -112,6 +116,7 @@ class Player implements Runnable,
                 mStream = new FileInputStream(mPath);
                 mPlayer = new MediaPlayer();
                 Log.d(TAG, "created " + mPlayer + " for " + mPath);
+                mPlayer.setWakeMode(mContext, PowerManager.PARTIAL_WAKE_LOCK);
                 mPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
                 mPlayer.setOnCompletionListener(Player.this);
                 mPlayer.setOnErrorListener(Player.this);
@@ -155,7 +160,8 @@ class Player implements Runnable,
         }
     }
 
-    public Player(Listener listener, Handler listenerHandler) {
+    public Player(Context context, Listener listener, Handler listenerHandler) {
+        mContext = context;
         mListener = listener;
         mListenerHandler = listenerHandler;
     }
