@@ -425,7 +425,7 @@ public class SongDatabase {
         public long songId;
         public Date startDate;
 
-        PendingPlaybackReport(long songId, Date startDate) {
+        public PendingPlaybackReport(long songId, Date startDate) {
             this.songId = songId;
             this.startDate = startDate;
         }
