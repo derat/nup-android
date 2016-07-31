@@ -28,6 +28,12 @@ android {
       proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
     }
   }
+
+  testOptions {
+    // http://g.co/androidstudio/not-mocked (because why would anyone ever want
+    // to call Log.d from code that's being tested?)
+    unitTests.returnDefaultValues = true
+  }
 }
 
 dependencies {

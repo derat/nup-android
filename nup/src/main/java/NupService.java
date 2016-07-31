@@ -102,6 +102,9 @@ public class NupService extends Service
         void onSongDatabaseUpdate();
     }
 
+    // Abstracts running background tasks.
+    private TaskRunner mTaskRunner;
+
     // Authenticates with Google Cloud Storage.
     private Authenticator mAuthenticator;
 
@@ -279,6 +282,7 @@ public class NupService extends Service
             }
         }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
 
+        mTaskRunner = new TaskRunner();
         mNetworkHelper = new NetworkHelper(this);
         mAuthenticator = new Authenticator(this);
         if (mNetworkHelper.isNetworkAvailable()) {
@@ -313,7 +317,7 @@ public class NupService extends Service
 
         mSongDb = new SongDatabase(this, this, mCache, mDownloader, mNetworkHelper);
         mCoverLoader = new CoverLoader(this, mDownloader, mNetworkHelper);
-        mPlaybackReporter = new PlaybackReporter(mSongDb, mDownloader, mNetworkHelper);
+        mPlaybackReporter = new PlaybackReporter(mSongDb, mDownloader, mTaskRunner, mNetworkHelper);
 
         mMediaSessionManager = new MediaSessionManager(this, new MediaSession.Callback() {
             @Override public void onPause() {

@@ -1,7 +1,6 @@
 package org.erat.nup;
 
 import android.content.Context;
-import android.os.AsyncTask;
 import android.util.Log;
 
 import java.io.ByteArrayInputStream;
@@ -15,11 +14,14 @@ public class PlaybackReporter {
 
     private final SongDatabase mSongDb;
     private final Downloader mDownloader;
+    private final TaskRunner mTaskRunner;
     private final NetworkHelper mNetworkHelper;
 
-    public PlaybackReporter(SongDatabase songDb, Downloader downloader, NetworkHelper networkHelper) {
+    public PlaybackReporter(SongDatabase songDb, Downloader downloader, TaskRunner taskRunner,
+                            NetworkHelper networkHelper) {
         mSongDb = songDb;
         mDownloader = downloader;
+        mTaskRunner = taskRunner;
         mNetworkHelper = networkHelper;
 
         // FIXME: Listen for the network coming up and send pending reports then, or maybe just try
@@ -27,9 +29,8 @@ public class PlaybackReporter {
 
         // Retry all of the pending reports in the background.
         if (mNetworkHelper.isNetworkAvailable()) {
-            new AsyncTask<Void, Void, Void>() {
-                @Override
-                protected Void doInBackground(Void... args) {
+            mTaskRunner.runInBackground(new Runnable() {
+                @Override public void run() {
                     List<SongDatabase.PendingPlaybackReport> reports =
                         mSongDb.getAllPendingPlaybackReports();
                     for (SongDatabase.PendingPlaybackReport report : reports) {
@@ -37,24 +38,21 @@ public class PlaybackReporter {
                             mSongDb.removePendingPlaybackReport(report.songId, report.startDate);
                         }
                     }
-                    return (Void) null;
                 }
-            }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+            });
         }
     }
 
     // Asynchronously report the playback of a song.
     public void report(final long songId, final Date startDate) {
-        new AsyncTask<Void, Void, Void>() {
-            @Override
-            protected Void doInBackground(Void... args) {
+        mTaskRunner.runInBackground(new Runnable() {
+            @Override public void run() {
                 // FIXME: Add the pending report first and then remove it on success.
                 if (!reportInternal(songId, startDate)) {
                     mSongDb.addPendingPlaybackReport(songId, startDate);
                 }
-                return (Void) null;
             }
-        }.execute();
+        });
     }
 
     // Synchronously report the playback of a song.
