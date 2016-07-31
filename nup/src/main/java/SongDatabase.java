@@ -26,7 +26,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 
-class SongDatabase {
+public class SongDatabase {
     private static final String TAG = "SongDatabase";
 
     // Special string that we use to represent a blank field.

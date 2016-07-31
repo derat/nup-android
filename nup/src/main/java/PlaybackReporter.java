@@ -10,13 +10,13 @@ import java.net.HttpURLConnection;
 import java.util.Date;
 import java.util.List;
 
-class PlaybackReporter {
+public class PlaybackReporter {
     private static final String TAG = "PlaybackReporter";
 
     private final Context mContext;
     private final SongDatabase mSongDb;
 
-    PlaybackReporter(Context context, SongDatabase songDb) {
+    public PlaybackReporter(Context context, SongDatabase songDb) {
         mContext = context;
         mSongDb = songDb;
 
