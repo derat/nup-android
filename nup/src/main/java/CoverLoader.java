@@ -31,8 +31,9 @@ class CoverLoader {
     // Size of buffer used to write data to disk, in bytes.
     private static final int BUFFER_SIZE = 8 * 1024;
 
-    // Application context.
     private final Context mContext;
+    private final Downloader mDownloader;
+    private final NetworkHelper mNetworkHelper;
 
     // Directory where we write cover images.
     private File mCoverDir;
@@ -52,8 +53,10 @@ class CoverLoader {
     private String mLastCoverPath = "";
     private Bitmap mLastCoverBitmap = null;
 
-    public CoverLoader(Context context) {
+    public CoverLoader(Context context, Downloader downloader, NetworkHelper networkHelper) {
         mContext = context;
+        mDownloader = downloader;
+        mNetworkHelper = networkHelper;
 
         new AsyncTask<Void, Void, Void>() {
             @Override protected Void doInBackground(Void... args) {
@@ -116,7 +119,7 @@ class CoverLoader {
     }
 
     private File downloadCover(final URL url) {
-        if (!Util.isNetworkAvailable(mContext))
+        if (!mNetworkHelper.isNetworkAvailable())
             return null;
 
         String localFilename = getFilenameForUrl(url);
@@ -137,7 +140,7 @@ class CoverLoader {
             file.createNewFile();
             outputStream = new FileOutputStream(file);
 
-            conn = Download.download(mContext, url, "GET", Download.AuthType.STORAGE, null);
+            conn = mDownloader.download(url, "GET", Downloader.AuthType.STORAGE, null);
             if (conn.getResponseCode() != 200) {
                 throw new IOException("got status code " + conn.getResponseCode());
             }

@@ -90,6 +90,10 @@ public class SongDatabase {
         "  PRIMARY KEY (SongId, StartTime))";
 
     private final Context mContext;
+    private final Listener mListener;
+    private final FileCache mCache;
+    private final Downloader mDownloader;
+    private final NetworkHelper mNetworkHelper;
 
     private final DatabaseOpener mOpener;
 
@@ -105,9 +109,6 @@ public class SongDatabase {
     private List<StringIntPair> mArtistsSortedByNumSongs = new ArrayList<StringIntPair>();
     private HashMap<String,List<StringIntPair>> mArtistAlbums = new HashMap<String,List<StringIntPair>>();
 
-    private final Listener mListener;
-    private final FileCache mCache;
-
     interface Listener {
         void onAggregateDataUpdate();
     }
@@ -121,10 +122,13 @@ public class SongDatabase {
         void onSyncProgress(SyncState state, int numSongs);
     }
 
-    public SongDatabase(Context context, Listener listener, FileCache cache) {
+    public SongDatabase(Context context, Listener listener, FileCache cache, Downloader downloader,
+                        NetworkHelper networkHelper) {
         mContext = context;
         mListener = listener;
         mCache = cache;
+        mDownloader = downloader;
+        mNetworkHelper = networkHelper;
 
         SQLiteOpenHelper helper = new SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
             @Override
@@ -443,7 +447,7 @@ public class SongDatabase {
     }
 
     public boolean syncWithServer(SyncProgressListener listener, String message[]) {
-        if (!Util.isNetworkAvailable(mContext)) {
+        if (!mNetworkHelper.isNetworkAvailable()) {
             message[0] = mContext.getString(R.string.network_is_unavailable);
             return false;
         }
@@ -454,7 +458,7 @@ public class SongDatabase {
         try {
             // Ask the server for the current time before we fetch anything.  We'll use this as the starting point for
             // the next sync, to handle the case where some songs in the server are updated while we're doing this sync.
-            String startTimeStr = Download.downloadString(mContext, "/now_nsec", message);
+            String startTimeStr = mDownloader.downloadString("/now_nsec", message);
             if (startTimeStr == null)
                 return false;
             long startTimeNsec = 0;
@@ -517,7 +521,7 @@ public class SongDatabase {
             String path = String.format("/songs?minLastModifiedNsec=%d&deleted=%d&max=%d&cursor=%s",
                                         prevStartTimeNsec, deleted ? 1 : 0, SERVER_SONG_BATCH_SIZE,
                                         serverCursor);
-            String response = Download.downloadString(mContext, path, message);
+            String response = mDownloader.downloadString(path, message);
             if (response == null) {
                 throw new ServerException("download failed");
             }

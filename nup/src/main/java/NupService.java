@@ -102,11 +102,17 @@ public class NupService extends Service
         void onSongDatabaseUpdate();
     }
 
+    // Authenticates with Google Cloud Storage.
+    private Authenticator mAuthenticator;
+
+    // Downloads files.
+    private Downloader mDownloader;
+
     // Plays songs.
     private Player mPlayer;
     private Thread mPlayerThread;
 
-    // Downloads files.
+    // Caches songs.
     private FileCache mCache;
     private Thread mCacheThread;
 
@@ -127,6 +133,8 @@ public class NupService extends Service
 
     // Updates the notification.
     private NotificationManager mNotificationManager;
+
+    private NetworkHelper mNetworkHelper;
 
     // Points from song ID to Song.
     // This is the canonical set of songs that we've seen.
@@ -271,8 +279,10 @@ public class NupService extends Service
             }
         }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
 
-        if (Util.isNetworkAvailable(this)) {
-            Auth.authenticateInBackground(this);
+        mNetworkHelper = new NetworkHelper(this);
+        mAuthenticator = new Authenticator(this);
+        if (mNetworkHelper.isNetworkAvailable()) {
+            authenticateInBackground();
         }
 
         mAudioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
@@ -290,18 +300,20 @@ public class NupService extends Service
 
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
 
+        mDownloader = new Downloader(mAuthenticator, mPrefs);
+
         mPlayer = new Player(this, this, mHandler);
         mPlayerThread = new Thread(mPlayer, "Player");
         mPlayerThread.setPriority(Thread.MAX_PRIORITY);
         mPlayerThread.start();
 
-        mCache = new FileCache(this, this);
+        mCache = new FileCache(this, this, mDownloader, mNetworkHelper);
         mCacheThread = new Thread(mCache, "FileCache");
         mCacheThread.start();
 
-        mSongDb = new SongDatabase(this, this, mCache);
-        mCoverLoader = new CoverLoader(this);
-        mPlaybackReporter = new PlaybackReporter(this, mSongDb);
+        mSongDb = new SongDatabase(this, this, mCache, mDownloader, mNetworkHelper);
+        mCoverLoader = new CoverLoader(this, mDownloader, mNetworkHelper);
+        mPlaybackReporter = new PlaybackReporter(mSongDb, mDownloader, mNetworkHelper);
 
         mMediaSessionManager = new MediaSessionManager(this, new MediaSession.Callback() {
             @Override public void onPause() {
@@ -808,6 +820,11 @@ public class NupService extends Service
                     listener.onSongDatabaseUpdate();
             }
         });
+    }
+
+    /** Starts authenticating with Google Cloud Storage in the background. */
+    public void authenticateInBackground() {
+        mAuthenticator.authenticateInBackground();
     }
 
     // Insert a list of songs into the playlist at a particular position.

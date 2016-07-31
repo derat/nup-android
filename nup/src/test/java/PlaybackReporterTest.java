@@ -1,7 +1,7 @@
 package org.erat.nup.test;
 
-import android.test.mock.MockContext;
-
+import org.erat.nup.Downloader;
+import org.erat.nup.NetworkHelper;
 import org.erat.nup.PlaybackReporter;
 import org.erat.nup.SongDatabase;
 import org.junit.Before;
@@ -13,15 +13,15 @@ import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 public class PlaybackReporterTest {
-    @Mock private MockContext mContext;
     @Mock private SongDatabase mSongDb;
+    @Mock private Downloader mDownloader;
+    @Mock private NetworkHelper mNetworkHelper;
 
     private PlaybackReporter mReporter;
 
     @Before public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
-        // FIXME: This crashes due to mContext not returning real services.
-        mReporter = new PlaybackReporter(mContext, mSongDb);
+        mReporter = new PlaybackReporter(mSongDb, mDownloader, mNetworkHelper);
     }
 
     @Test public void trueIsTrue() throws Exception {

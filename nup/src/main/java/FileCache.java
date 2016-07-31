@@ -65,13 +65,16 @@ class FileCache implements Runnable {
         INACTIVE,
     }
 
+    private final Context mContext;
+    private final SharedPreferences mPrefs;
+    private final Listener mListener;
+    private final Downloader mDownloader;
+    private final NetworkHelper mNetworkHelper;
+
     // Are we ready to service requests?  This is blocked on |mDb| being initialized.
     private boolean mIsReady = false;
     private final Lock mIsReadyLock = new ReentrantLock();
     private final Condition mIsReadyCond = mIsReadyLock.newCondition();
-
-    // Application context.
-    private final Context mContext;
 
     // Directory where we write music files.
     private File mMusicDir;
@@ -88,17 +91,15 @@ class FileCache implements Runnable {
     // Persistent information about cached items.
     private FileCacheDatabase mDb = null;
 
-    private final SharedPreferences mPrefs;
-
     private WifiState mWifiState;
     private final WifiLock mWifiLock;
     private Runnable mUpdateWifiLockTask = null;
 
-    private final Listener mListener;
-
-    FileCache(Context context, Listener listener) {
+    FileCache(Context context, Listener listener, Downloader downloader, NetworkHelper networkHelper) {
         mContext = context;
         mListener = listener;
+        mDownloader = downloader;
+        mNetworkHelper = networkHelper;
 
         mPrefs = PreferenceManager.getDefaultSharedPreferences(mContext);
 
@@ -277,7 +278,7 @@ class FileCache implements Runnable {
             if (!isActive())
                 return;
 
-            if (!Util.isNetworkAvailable(mContext)) {
+            if (!mNetworkHelper.isNetworkAvailable()) {
                 mReason = mContext.getString(R.string.network_is_unavailable);
                 handleFailure();
                 return;
@@ -357,7 +358,7 @@ class FileCache implements Runnable {
                     headers.put("Range", String.format("bytes=%d-", mEntry.getCachedBytes()));
                 }
 
-                mConn = Download.download(mContext, mUrl, "GET", Download.AuthType.STORAGE, headers);
+                mConn = mDownloader.download(mUrl, "GET", Downloader.AuthType.STORAGE, headers);
                 final int status = mConn.getResponseCode();
                 Log.d(TAG, "got " + status + " from server");
                 if (status != 200 && status != 206) {

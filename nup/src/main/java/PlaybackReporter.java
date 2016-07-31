@@ -13,18 +13,20 @@ import java.util.List;
 public class PlaybackReporter {
     private static final String TAG = "PlaybackReporter";
 
-    private final Context mContext;
     private final SongDatabase mSongDb;
+    private final Downloader mDownloader;
+    private final NetworkHelper mNetworkHelper;
 
-    public PlaybackReporter(Context context, SongDatabase songDb) {
-        mContext = context;
+    public PlaybackReporter(SongDatabase songDb, Downloader downloader, NetworkHelper networkHelper) {
         mSongDb = songDb;
+        mDownloader = downloader;
+        mNetworkHelper = networkHelper;
 
         // FIXME: Listen for the network coming up and send pending reports then, or maybe just try
         // to go through the pending reports whenever report() is successful?
 
         // Retry all of the pending reports in the background.
-        if (Util.isNetworkAvailable(mContext)) {
+        if (mNetworkHelper.isNetworkAvailable()) {
             new AsyncTask<Void, Void, Void>() {
                 @Override
                 protected Void doInBackground(Void... args) {
@@ -57,7 +59,7 @@ public class PlaybackReporter {
 
     // Synchronously report the playback of a song.
     private boolean reportInternal(long songId, Date startDate) {
-        if (!Util.isNetworkAvailable(mContext)) {
+        if (!mNetworkHelper.isNetworkAvailable()) {
             return false;
         }
 
@@ -65,13 +67,13 @@ public class PlaybackReporter {
         HttpURLConnection conn = null;
         try {
             String params = String.format("songId=%d&startTime=%f", songId, startDate.getTime() / 1000.0);
-            conn = Download.download(mContext, Download.getServerUrl(mContext, "/report_played?" + params),
-                                     "POST", Download.AuthType.SERVER, null);
+            conn = mDownloader.download(mDownloader.getServerUrl("/report_played?" + params),
+                                        "POST", Downloader.AuthType.SERVER, null);
             if (conn.getResponseCode() != 200) {
                 Log.e(TAG, "got " + conn.getResponseCode() + " from server: " + conn.getResponseMessage());
                 return false;
             }
-        } catch (Download.PrefException e) {
+        } catch (Downloader.PrefException e) {
             Log.e(TAG, "got preferences error: " + e);
         } catch (IOException e) {
             Log.e(TAG, "got IO error: " + e);

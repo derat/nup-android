@@ -20,7 +20,7 @@ import java.util.Map;
 
 import javax.net.ssl.HttpsURLConnection;
 
-class Download {
+public class Downloader {
     private static final String TAG = "Download";
     private static final int CONNECT_TIMEOUT_MS = 10000;
     private static final int READ_TIMEOUT_MS = 10000;
@@ -38,18 +38,25 @@ class Download {
         STORAGE
     }
 
+    private final Authenticator mAuthenticator;
+    private final SharedPreferences mPrefs;
+
+    public Downloader(Authenticator authenticator, SharedPreferences prefs) {
+        mAuthenticator = authenticator;
+        mPrefs = prefs;
+    }
+
     /**
      * Starts a download of a given URL.
      *
-     * @param context context
      * @param url URL to download
      * @param method HTTP method, e.g. "GET" or "POST"
      * @param authType authentication type to use
      * @param headers additional HTTP headers (may be null)
      * @return active HTTP connection; <code>disconnect</code> must be called
      */
-    public static HttpURLConnection download(Context context, URL url, String method,
-                                             AuthType authType, Map<String, String> headers)
+    public HttpURLConnection download(URL url, String method, AuthType authType,
+                                      Map<String, String> headers)
         throws IOException {
         Log.d(TAG, "starting " + method + " to " + url.toString());
 
@@ -65,9 +72,8 @@ class Download {
 
         if (authType == AuthType.SERVER) {
             // Add Authorization header if username and password prefs are set.
-            SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-            String username = prefs.getString(NupPreferences.USERNAME, "");
-            String password = prefs.getString(NupPreferences.PASSWORD, "");
+            String username = mPrefs.getString(NupPreferences.USERNAME, "");
+            String password = mPrefs.getString(NupPreferences.PASSWORD, "");
             if (!username.isEmpty() && !password.isEmpty()) {
                 conn.setRequestProperty("Authorization",
                                         "Basic " + Base64.encodeToString(
@@ -76,9 +82,9 @@ class Download {
             }
         } else if (authType == AuthType.STORAGE) {
             try {
-                String token = Auth.getAuthToken(context);
+                String token = mAuthenticator.getAuthToken();
                 conn.setRequestProperty("Authorization", "Bearer " + token);
-            } catch (Auth.AuthException e) {
+            } catch (Authenticator.AuthException e) {
                 Log.e(TAG, "failed to get auth token: " + e);
             }
         }
@@ -97,10 +103,10 @@ class Download {
         }
     }
 
-    public static String downloadString(Context context, String path, String[] error) {
+    public String downloadString(String path, String[] error) {
         HttpURLConnection conn = null;
         try {
-            conn = download(context, getServerUrl(context, path), "GET", AuthType.SERVER, null);
+            conn = download(getServerUrl(path), "GET", AuthType.SERVER, null);
             final int status = conn.getResponseCode();
             if (status != 200) {
                 error[0] = "Got " + status + " from server (" + conn.getResponseMessage() + ")";
@@ -121,9 +127,8 @@ class Download {
         }
     }
 
-    public static URL getServerUrl(Context context, String path) throws PrefException {
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
-        String server = prefs.getString(NupPreferences.SERVER_URL, "");
+    public URL getServerUrl(String path) throws PrefException {
+        String server = mPrefs.getString(NupPreferences.SERVER_URL, "");
         if (server.isEmpty()) {
             throw new PrefException("Server URL is not configured");
         }
