@@ -23,30 +23,24 @@ import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 public class PlaybackReporterTest {
-    // Timeout for verifying async tasks in milliseconds.
-    private final long TIMEOUT_MS = 1000;
-
     private final long SONG_ID = 1234;
     private final Date START_DATE = new Date(1000 * 1469974953);
-
-    private final FakeTaskRunner mTaskRunner = new FakeTaskRunner();
 
     @Mock private SongDatabase mSongDb;
     @Mock private Downloader mDownloader;
     @Mock private NetworkHelper mNetworkHelper;
+    @Mock private HttpURLConnection mSuccessConn;
+    @Mock private HttpURLConnection mServerErrorConn;
 
-    private HttpURLConnection mSuccessConn;
-    private HttpURLConnection mServerErrorConn;
+    private FakeTaskRunner mTaskRunner;
 
     private URL mReportUrl;
 
     @Before public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
+        mTaskRunner = new FakeTaskRunner();
 
-        mSuccessConn = Mockito.mock(HttpURLConnection.class);
         when(mSuccessConn.getResponseCode()).thenReturn(200);
-
-        mServerErrorConn = Mockito.mock(HttpURLConnection.class);
         when(mServerErrorConn.getResponseCode()).thenReturn(500);
 
         String reportPath = getReportPath(SONG_ID, START_DATE);

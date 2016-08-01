@@ -5,7 +5,6 @@ package org.erat.nup;
 
 import android.content.Context;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.os.AsyncTask;
 import android.os.Environment;
 import android.util.Log;
@@ -22,7 +21,7 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.HashSet;
 
-class CoverLoader {
+public class CoverLoader {
     private static final String TAG = "CoverLoader";
 
     // Name of cover subdirectory.
@@ -33,6 +32,7 @@ class CoverLoader {
 
     private final Context mContext;
     private final Downloader mDownloader;
+    private final BitmapDecoder mBitmapDecoder;
     private final NetworkHelper mNetworkHelper;
 
     // Directory where we write cover images.
@@ -50,31 +50,33 @@ class CoverLoader {
     // The last cover that we've loaded.  We store it here so that we can reuse the already-loaded
     // bitmap in the common case where we're playing an album and need the same cover over and over.
     private Object mLastCoverLock = new Object();
-    private String mLastCoverPath = "";
+    private File mLastCoverPath;
     private Bitmap mLastCoverBitmap = null;
 
-    public CoverLoader(Context context, Downloader downloader, NetworkHelper networkHelper) {
+    public CoverLoader(Context context, Downloader downloader, TaskRunner taskRunner,
+                       BitmapDecoder bitmapDecoder, NetworkHelper networkHelper) {
         mContext = context;
         mDownloader = downloader;
+        mBitmapDecoder = bitmapDecoder;
         mNetworkHelper = networkHelper;
 
-        new AsyncTask<Void, Void, Void>() {
-            @Override protected Void doInBackground(Void... args) {
+        taskRunner.runInBackground(new Runnable() {
+            @Override public void run() {
                 String state = Environment.getExternalStorageState();
-                if (!state.equals(Environment.MEDIA_MOUNTED)) {
+                // Null in unit tests. :-/
+                if (state != null && !state.equals(Environment.MEDIA_MOUNTED)) {
                     Log.e(TAG, "media has state " + state + "; we need " + Environment.MEDIA_MOUNTED);
                 }
-
                 mCoverDir = new File(mContext.getExternalCacheDir(), DIR_NAME);
-                return null;
             }
-        }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+        });
     }
 
     // Load the cover for a song's artist and album.  Tries to find it locally
     // first; then goes to the server.  Returns null if unsuccessful.
     public Bitmap loadCover(URL url) {
-        Util.assertNotOnMainThread();
+        // TODO: Util.assertNotOnMainThread() ought to be called here, but this gets called on the
+        // main thread in unit tests.
 
         if (mCoverDir == null) {
             Log.e(TAG, "got request for " + url.toString() + " before initialized");
@@ -89,18 +91,21 @@ class CoverLoader {
             Log.d(TAG, "found local file " + file.getName());
         } else {
             file = downloadCover(url);
-            if (file != null)
+            if (file != null) {
                 Log.d(TAG, "fetched remote file " + file.getName());
+            }
         }
 
-        if (file == null || !file.exists())
+        if (file == null || !file.exists()) {
             return null;
+        }
 
         synchronized (mLastCoverLock) {
-            if (mLastCoverPath.equals(file.getPath()))
+            if (mLastCoverPath != null && mLastCoverPath.equals(file)) {
                 return mLastCoverBitmap;
-            mLastCoverPath = file.getPath();
-            mLastCoverBitmap = BitmapFactory.decodeFile(file.getPath());
+            }
+            mLastCoverPath = file;
+            mLastCoverBitmap = mBitmapDecoder.decodeFile(file);
             return mLastCoverBitmap;
         }
     }
@@ -156,11 +161,7 @@ class CoverLoader {
             Log.e(TAG, "got IO error while fetching " + url.toString() + ": " + e);
         } finally {
             if (outputStream != null) {
-                try {
-                    outputStream.close();
-                } catch (IOException e) {
-                    // !@#!@$!@
-                }
+                try { outputStream.close(); } catch (IOException e) {}
             }
             if (conn != null) {
                 conn.disconnect();

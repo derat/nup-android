@@ -12,7 +12,6 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.graphics.Bitmap;
-import android.graphics.BitmapFactory;
 import android.media.AudioManager;
 import android.media.session.MediaSession;
 import android.net.Uri;
@@ -316,7 +315,7 @@ public class NupService extends Service
         mCacheThread.start();
 
         mSongDb = new SongDatabase(this, this, mCache, mDownloader, mNetworkHelper);
-        mCoverLoader = new CoverLoader(this, mDownloader, mNetworkHelper);
+        mCoverLoader = new CoverLoader(this, mDownloader, mTaskRunner, new BitmapDecoder(), mNetworkHelper);
         mPlaybackReporter = new PlaybackReporter(mSongDb, mDownloader, mTaskRunner, mNetworkHelper);
 
         mMediaSessionManager = new MediaSessionManager(this, new MediaSession.Callback() {

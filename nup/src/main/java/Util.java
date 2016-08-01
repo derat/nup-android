@@ -18,7 +18,7 @@ import java.util.Comparator;
 import java.util.HashMap;
 import java.util.List;
 
-class Util {
+public class Util {
     private static final String TRUNCATION_STRING = "...";
 
     // Different sort types that can be passed to getSortingKey().
