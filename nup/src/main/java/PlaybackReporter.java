@@ -6,6 +6,7 @@ import android.util.Log;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.net.HttpURLConnection;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.Date;
 import java.util.List;
 
@@ -17,6 +18,8 @@ public class PlaybackReporter {
     private final TaskRunner mTaskRunner;
     private final NetworkHelper mNetworkHelper;
 
+    private final ReentrantLock mLock = new ReentrantLock();
+
     public PlaybackReporter(SongDatabase songDb, Downloader downloader, TaskRunner taskRunner,
                             NetworkHelper networkHelper) {
         mSongDb = songDb;
@@ -24,38 +27,67 @@ public class PlaybackReporter {
         mTaskRunner = taskRunner;
         mNetworkHelper = networkHelper;
 
-        // FIXME: Listen for the network coming up and send pending reports then, or maybe just try
-        // to go through the pending reports whenever report() is successful?
+        // TODO: Listen for the network coming up and send pending reports then?
 
         // Retry all of the pending reports in the background.
         if (mNetworkHelper.isNetworkAvailable()) {
             mTaskRunner.runInBackground(new Runnable() {
                 @Override public void run() {
-                    List<SongDatabase.PendingPlaybackReport> reports =
-                        mSongDb.getAllPendingPlaybackReports();
-                    for (SongDatabase.PendingPlaybackReport report : reports) {
-                        if (reportInternal(report.songId, report.startDate)) {
-                            mSongDb.removePendingPlaybackReport(report.songId, report.startDate);
-                        }
+                    mLock.lock();
+                    try {
+                        reportPendingSongs();
+                    } finally {
+                        mLock.unlock();
                     }
                 }
             });
         }
     }
 
-    // Asynchronously report the playback of a song.
+    /**
+     * Asynchronously reports the playback of a song.
+     *
+     * @param songId ID of played song
+     * @param startDate time at which playback started
+     */
     public void report(final long songId, final Date startDate) {
         mTaskRunner.runInBackground(new Runnable() {
             @Override public void run() {
-                // FIXME: Add the pending report first and then remove it on success.
-                if (!reportInternal(songId, startDate)) {
+                mLock.lock();
+                try {
                     mSongDb.addPendingPlaybackReport(songId, startDate);
+                    if (mNetworkHelper.isNetworkAvailable()) {
+                        reportPendingSongs();
+                    }
+                } finally {
+                    mLock.unlock();
                 }
             }
         });
     }
 
-    // Synchronously report the playback of a song.
+    /** Reports all unreported songs. */
+    public void reportPendingSongs() {
+        if (!mLock.isHeldByCurrentThread()) {
+            throw new IllegalStateException("Lock not held");
+        }
+
+        List<SongDatabase.PendingPlaybackReport> reports =
+            mSongDb.getAllPendingPlaybackReports();
+        for (SongDatabase.PendingPlaybackReport report : reports) {
+            if (reportInternal(report.songId, report.startDate)) {
+                mSongDb.removePendingPlaybackReport(report.songId, report.startDate);
+            }
+        }
+    }
+
+    /**
+     * Synchronously reports the playback of a song.
+     *
+     * @param songId ID of played song
+     * @param startDate time at which playback started
+     * @return <code>true</code> if the report was successfully received by the server
+     */
     private boolean reportInternal(long songId, Date startDate) {
         if (!mNetworkHelper.isNetworkAvailable()) {
             return false;
@@ -64,9 +96,8 @@ public class PlaybackReporter {
         Log.d(TAG, "reporting song " + songId + " started at " + startDate);
         HttpURLConnection conn = null;
         try {
-            String params = String.format("songId=%d&startTime=%f", songId, startDate.getTime() / 1000.0);
-            conn = mDownloader.download(mDownloader.getServerUrl("/report_played?" + params),
-                                        "POST", Downloader.AuthType.SERVER, null);
+            String path = String.format("/report_played?songId=%d&startTime=%f", songId, startDate.getTime() / 1000.0);
+            conn = mDownloader.download(mDownloader.getServerUrl(path), "POST", Downloader.AuthType.SERVER, null);
             if (conn.getResponseCode() != 200) {
                 Log.e(TAG, "got " + conn.getResponseCode() + " from server: " + conn.getResponseMessage());
                 return false;
