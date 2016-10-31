@@ -365,11 +365,11 @@ public class SongDatabase {
         builder.add("Rating >= ?", minRating >= 0.0 ? Double.toString(minRating) : null, false);
 
         String query =
-            "SELECT s.SongId, Artist, Title, Album, Url, CoverUrl, Length, s.TrackNumber, s.DiscNumber, Rating " +
+            "SELECT s.SongId, Artist, Title, Album, Url, CoverUrl, Length, TrackNumber, DiscNumber, Rating " +
             "FROM Songs s " +
             (onlyCached ? "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " : "") +
             builder.getWhereClause() +
-            "ORDER BY " + (shuffle ? "RANDOM()" : "Album ASC, TrackNumber ASC") + " " +
+            "ORDER BY " + (shuffle ? "RANDOM()" : "Album ASC, DiscNumber ASC, TrackNumber ASC") + " " +
             "LIMIT " + MAX_QUERY_RESULTS;
         Log.d(TAG, "running query \"" + query + "\" with args " + TextUtils.join(", ", builder.selectionArgs));
         SQLiteDatabase db = mOpener.getDb();
