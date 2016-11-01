@@ -13,7 +13,7 @@ import android.os.Looper;
 import android.os.PowerManager;
 import android.util.Log;
 
-import java.io.FileDescriptor;
+import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -113,14 +113,27 @@ class Player implements Runnable,
 
         public boolean prepare() {
             try {
-                mStream = new FileInputStream(mPath);
+                final long currentBytes = (new File(mPath)).length();
                 mPlayer = new MediaPlayer();
-                Log.d(TAG, "created " + mPlayer + " for " + mPath);
+                Log.d(TAG, "created " + mPlayer + " for " + mPath
+                        + " (have " + currentBytes + " of " + mNumBytes + ")");
+
                 mPlayer.setWakeMode(mContext, PowerManager.PARTIAL_WAKE_LOCK);
                 mPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
                 mPlayer.setOnCompletionListener(Player.this);
                 mPlayer.setOnErrorListener(Player.this);
-                mPlayer.setDataSource(mStream.getFD());
+
+                // TODO: I am totally jinxing this, but passing MediaPlayer a path rather than an FD
+                // seems to maybe make it finally stop skipping. If this is really the case,
+                // investigate whether it's possible to also pass a path even when the file isn't
+                // fully downloaded yet. I think I tried this before and it made it stop when it got
+                // to the initial end of the file, even if more had been downloaded by then, though.
+                if (currentBytes == mNumBytes) {
+                    mPlayer.setDataSource(mPath);
+                } else {
+                    mStream = new FileInputStream(mPath);
+                    mPlayer.setDataSource(mStream.getFD());
+                }
                 mPlayer.prepare();
                 return true;
             } catch (final IOException e) {
@@ -369,7 +382,12 @@ class Player implements Runnable,
                     return;
                 }
                 try {
-                    final long streamPosition = mCurrentPlayer.getStream().getChannel().position();
+                    // TODO: Any way to get the current position when we're playing a path rather
+                    // than an FD? May be unnecessary if playing a path actually doesn't have buffer
+                    // underruns that result in premature end of playback being reported.
+                    final long streamPosition = mCurrentPlayer.getStream() != null
+                        ? mCurrentPlayer.getStream().getChannel().position()
+                        : mCurrentPlayer.getNumBytes();
                     final long numBytes = mCurrentPlayer.getNumBytes();
                     Log.d(TAG, player + " completed playback at " + streamPosition + " of " + numBytes);
                     if (streamPosition < numBytes) {
