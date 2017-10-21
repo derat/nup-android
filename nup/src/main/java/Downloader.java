@@ -96,9 +96,11 @@ public class Downloader {
             return conn;
         } catch (SocketTimeoutException e) {
             Log.e(TAG, "got timeout for " + url.toString(), e);
+            conn.disconnect();
             throw new IOException(e.toString());
         } catch (IOException e) {
             Log.e(TAG, "got IO exception for " + url.toString(), e);
+            conn.disconnect();
             throw e;
         }
     }
