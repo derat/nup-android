@@ -171,6 +171,33 @@ class Player implements Runnable,
             float volume = lowVolume ? LOW_VOLUME_FRACTION : 1.0f;
             mPlayer.setVolume(volume, volume);
         }
+
+        // Restarts playback after a buffer underrun.
+        // Returns true if we switched to the complete file.
+        public boolean restartPlayback() throws IOException {
+            final int currentPositionMs = mPlayer.getCurrentPosition();
+            final long currentBytes = (new File(mPath)).length();
+            Log.w(TAG, "restarting " + mPlayer + " at " + currentPositionMs + " ms");
+
+            boolean switchedToFile = false;
+            mPlayer.reset();
+
+            if (currentBytes == mNumBytes) {
+                Log.w(TAG, "switching " + mPlayer + " from stream to complete file " + mPath);
+                mStream.close();
+                mStream = null;
+                mPlayer.setDataSource(mPath);
+                switchedToFile = true;
+            } else {
+                Log.w(TAG, "setting " + mPlayer + " to reuse current stream");
+                mPlayer.setDataSource(getStream().getFD());
+            }
+
+            mPlayer.prepare();
+            mPlayer.seekTo(currentPositionMs);
+            mPlayer.start();
+            return switchedToFile;
+        }
     }
 
     public Player(Context context, Listener listener, Handler listenerHandler) {
@@ -390,19 +417,17 @@ class Player implements Runnable,
                         : mCurrentPlayer.getNumBytes();
                     final long numBytes = mCurrentPlayer.getNumBytes();
                     Log.d(TAG, player + " completed playback at " + streamPosition + " of " + numBytes);
-                    if (streamPosition < numBytes) {
+
+                    if (streamPosition < numBytes && mCurrentPlayer.getStream() != null) {
+                        final boolean switchedToFile = mCurrentPlayer.restartPlayback();
                         mListenerHandler.post(new Runnable() {
                             @Override public void run() {
-                                mListener.onPlaybackError("Buffer underrun at " + streamPosition + " of " + numBytes);
+                                mListener.onPlaybackError(
+                                        switchedToFile ?
+                                        "Switched to file after buffer underrun" :
+                                        "Reloaded stream after buffer underrun");
                             }
                         });
-                        int currentPositionMs = player.getCurrentPosition();
-                        Log.w(TAG, player + " not done; resetting and seeking to " + currentPositionMs + " ms");
-                        player.reset();
-                        player.setDataSource(mCurrentPlayer.getStream().getFD());
-                        player.prepare();
-                        player.seekTo(currentPositionMs);
-                        player.start();
                     } else {
                         resetCurrent();
                         mListenerHandler.post(new Runnable() {
