@@ -98,10 +98,10 @@ public class PlaybackReporter {
         try {
             String path = String.format("/report_played?songId=%d&startTime=%f", songId, startDate.getTime() / 1000.0);
             conn = mDownloader.download(mDownloader.getServerUrl(path), "POST", Downloader.AuthType.SERVER, null);
-            if (conn.getResponseCode() != 200) {
-                Log.e(TAG, "got " + conn.getResponseCode() + " from server: " + conn.getResponseMessage());
-                return false;
+            if (conn.getResponseCode() == 200) {
+                return true;
             }
+            Log.e(TAG, "got " + conn.getResponseCode() + " from server: " + conn.getResponseMessage());
         } catch (Downloader.PrefException e) {
             Log.e(TAG, "got preferences error: " + e);
         } catch (IOException e) {
@@ -111,6 +111,6 @@ public class PlaybackReporter {
                 conn.disconnect();
             }
         }
-        return true;
+        return false;
     }
 }
