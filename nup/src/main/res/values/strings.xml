@@ -35,6 +35,8 @@
   <string name="cache_size_invalid">Cache must be at least %d MB.</string>
   <string name="cache_size_value">%d MB</string>
   <string name="cached">Cached</string>
+  <string name="channel_name">nup</string>
+  <string name="channel_description">Music playback status</string>
   <string name="clear_cache">Clear cache</string>
   <string name="clear_cache_message">Delete all cached music from the SD card?</string>
   <string name="dont_download_all">Don\'t download all</string>

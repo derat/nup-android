@@ -4,11 +4,15 @@
 package org.erat.nup;
 
 import android.app.Notification;
+import android.app.NotificationChannel;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.content.Context;
 import android.media.session.MediaSession;
 
-class NotificationManager {
+class NotificationCreator {
+    private static final String CHANNEL_ID = "NupService";
+
     private final Context mContext;
 
     private final MediaSession.Token mMediaSessionToken;
@@ -25,7 +29,7 @@ class NotificationManager {
     private boolean mShowingPrev;
     private boolean mShowingNext;
 
-    public NotificationManager(Context context, MediaSession.Token mediaSessionToken,
+    public NotificationCreator(Context context, NotificationManager manager, MediaSession.Token mediaSessionToken,
                                PendingIntent launchActivityIntent, PendingIntent togglePauseIntent,
                                PendingIntent prevTrackIntent, PendingIntent nextTrackIntent) {
         mContext = context;
@@ -34,6 +38,12 @@ class NotificationManager {
         mTogglePauseIntent = togglePauseIntent;
         mPrevTrackIntent = prevTrackIntent;
         mNextTrackIntent = nextTrackIntent;
+
+        NotificationChannel channel = new NotificationChannel(
+                CHANNEL_ID, mContext.getString(R.string.channel_name),
+                NotificationManager.IMPORTANCE_DEFAULT);
+        channel.setDescription(mContext.getString(R.string.channel_description));
+        manager.createNotificationChannel(channel);
     }
 
     /**
@@ -46,14 +56,16 @@ class NotificationManager {
      * @param numSongs total number of songs in playlist
      * @return new notification, or null if notification is unchanged
      */
-    public Notification createNotificationIfChanged(Song song, boolean paused,
-                                                    boolean playbackComplete,
-                                                    int songIndex, int numSongs) {
+    public Notification createNotification(boolean onlyIfChanged,
+                                           Song song, boolean paused,
+                                           boolean playbackComplete,
+                                           int songIndex, int numSongs) {
         final boolean showPlayPause = song != null && !playbackComplete;
         final boolean showPrev = songIndex > 0;
         final boolean showNext = numSongs > 0 && songIndex < numSongs - 1;
 
-        if (song != null &&
+        if (onlyIfChanged &&
+            song != null &&
             song.getSongId() == mSongId &&
             paused == mPaused &&
             (song.getCoverBitmap() != null) == mShowingCoverBitmap &&
@@ -74,6 +86,7 @@ class NotificationManager {
             .setContentTitle(song != null ? song.getArtist() : mContext.getString(R.string.startup_message_title))
             .setContentText(song != null ? song.getTitle() : mContext.getString(R.string.startup_message_text))
             .setSmallIcon(R.drawable.status)
+            .setChannelId(CHANNEL_ID)
             .setColor(mContext.getResources().getColor(R.color.primary))
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setContentIntent(mLaunchActivityIntent)

@@ -4,6 +4,7 @@
 package org.erat.nup;
 
 import android.app.Notification;
+import android.app.NotificationManager;
 import android.app.PendingIntent;
 import android.app.Service;
 import android.content.BroadcastReceiver;
@@ -135,6 +136,7 @@ public class NupService extends Service
 
     // Updates the notification.
     private NotificationManager mNotificationManager;
+    private NotificationCreator mNotificationCreator;
 
     private NetworkHelper mNetworkHelper;
 
@@ -337,13 +339,16 @@ public class NupService extends Service
         });
         mMediaSessionToken = mMediaSessionManager.getToken();
 
-        mNotificationManager = new NotificationManager(
-            this, mMediaSessionToken,
+        mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        mNotificationCreator = new NotificationCreator(
+            this, mNotificationManager, mMediaSessionToken,
             PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0),
             PendingIntent.getService(this, 0, new Intent(ACTION_TOGGLE_PAUSE, Uri.EMPTY, this, NupService.class), 0),
             PendingIntent.getService(this, 0, new Intent(ACTION_PREV_TRACK, Uri.EMPTY, this, NupService.class), 0),
             PendingIntent.getService(this, 0, new Intent(ACTION_NEXT_TRACK, Uri.EMPTY, this, NupService.class), 0));
-        updateNotification();
+        Notification notification = mNotificationCreator.createNotification(
+            false, getCurrentSong(), mPaused, mPlaybackComplete, mCurrentSongIndex, mSongs.size());
+        startForeground(NOTIFICATION_ID, notification);
     }
 
     @Override
@@ -431,14 +436,14 @@ public class NupService extends Service
 
     /** Updates the currently-displayed notification if needed. */
     private void updateNotification() {
-        Notification notification = mNotificationManager.createNotificationIfChanged(
-            getCurrentSong(), mPaused, mPlaybackComplete, mCurrentSongIndex, mSongs.size());
+        Notification notification = mNotificationCreator.createNotification(
+            true, getCurrentSong(), mPaused, mPlaybackComplete, mCurrentSongIndex, mSongs.size());
         if (notification != null) {
-            startForeground(NOTIFICATION_ID, notification);
+            mNotificationManager.notify(NOTIFICATION_ID, notification);
         }
     }
 
-    // Toggle whether we're playing the current song or not.
+    /** Toggle whether we're playing the current song or not. */
     public void togglePause() {
         mPlayer.togglePause();
     }
