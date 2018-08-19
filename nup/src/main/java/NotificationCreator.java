@@ -39,11 +39,13 @@ class NotificationCreator {
         mPrevTrackIntent = prevTrackIntent;
         mNextTrackIntent = nextTrackIntent;
 
-        NotificationChannel channel = new NotificationChannel(
-                CHANNEL_ID, mContext.getString(R.string.channel_name),
-                NotificationManager.IMPORTANCE_DEFAULT);
-        channel.setDescription(mContext.getString(R.string.channel_description));
-        manager.createNotificationChannel(channel);
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            NotificationChannel channel = new NotificationChannel(
+                    CHANNEL_ID, mContext.getString(R.string.channel_name),
+                    NotificationManager.IMPORTANCE_DEFAULT);
+            channel.setDescription(mContext.getString(R.string.channel_description));
+            manager.createNotificationChannel(channel);
+        }
     }
 
     /**
@@ -86,13 +88,16 @@ class NotificationCreator {
             .setContentTitle(song != null ? song.getArtist() : mContext.getString(R.string.startup_message_title))
             .setContentText(song != null ? song.getTitle() : mContext.getString(R.string.startup_message_text))
             .setSmallIcon(R.drawable.status)
-            .setChannelId(CHANNEL_ID)
             .setColor(mContext.getResources().getColor(R.color.primary))
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setContentIntent(mLaunchActivityIntent)
             .setOngoing(true)
             .setWhen(System.currentTimeMillis())
             .setShowWhen(false);
+
+        if (android.os.Build.VERSION.SDK_INT >= 26) {
+            builder.setChannelId(CHANNEL_ID);
+        }
 
         if (song != null) {
             builder.setLargeIcon(song.getCoverBitmap());
