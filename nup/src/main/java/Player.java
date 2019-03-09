@@ -84,10 +84,13 @@ class Player implements Runnable,
 
     /** Wraps an individual file. */
     private class FilePlayer {
-        private final String mPath;
-        private final long mNumBytes;
+        private final String mPath;    // File containing song.
+        private final long mNumBytes;  // Total expected size of song (mPath may be incomplete).
 
+        // Ideally only used if we haven't downloaded the complete file, since MediaPlayer
+        // skips all the time when playing from a stream.
         private FileInputStream mStream;
+
         private MediaPlayer mPlayer;
 
         public FilePlayer(String path, long numBytes) {
@@ -99,6 +102,12 @@ class Player implements Runnable,
             return mPath;
         }
 
+        // Returns the current size of mPath.
+        public long getFileBytes() {
+            return (new File(mPath)).length();
+        }
+
+        // Returns the total expected size of the song.
         public long getNumBytes() {
             return mNumBytes;
         }
@@ -176,7 +185,7 @@ class Player implements Runnable,
         // Returns true if we switched to the complete file.
         public boolean restartPlayback() throws IOException {
             final int currentPositionMs = mPlayer.getCurrentPosition();
-            final long currentBytes = (new File(mPath)).length();
+            final long currentBytes = getFileBytes();
             Log.w(TAG, "restarting " + mPlayer + " at " + currentPositionMs + " ms");
 
             boolean switchedToFile = false;
@@ -338,7 +347,19 @@ class Player implements Runnable,
                         mCurrentPlayer.getMediaPlayer().pause();
                         stopPositionTimer();
                     } else {
-                        mCurrentPlayer.getMediaPlayer().start();
+                        // If the file is already fully loaded, play from it instead of a stream.
+                        boolean switchedToFile = false;
+                        if (mCurrentPlayer.getStream() != null && mCurrentPlayer.getFileBytes() == mCurrentPlayer.getNumBytes()) {
+                            try {
+                                mCurrentPlayer.restartPlayback();
+                                switchedToFile = true;
+                            } catch (IOException e) {
+                                Log.e(TAG, "got error while trying to switch to file on unpause: " + e);
+                            }
+                        }
+                        if (!switchedToFile) {
+                            mCurrentPlayer.getMediaPlayer().start();
+                        }
                         startPositionTimer();
                     }
                 }
