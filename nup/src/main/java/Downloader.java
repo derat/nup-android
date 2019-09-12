@@ -114,8 +114,44 @@ public class Downloader {
                 error[0] = "Got " + status + " from server (" + conn.getResponseMessage() + ")";
                 return null;
             }
-            final String output = Util.getStringFromInputStream(conn.getInputStream());
-            return output;
+            final InputStream stream = conn.getInputStream();
+            try {
+                return Util.getStringFromInputStream(stream);
+            } finally {
+                // This isn't documented as being necessary, but it seems to be needed to avoid a
+                // StrictMode crash caused by a resource leak when syncing songs:
+                //
+                // StrictMode policy violation: android.os.strictmode.LeakedClosableViolation: A
+                // resource was acquired at attached stack trace but never released. See
+                // java.io.Closeable for information on avoiding resource leaks.
+                //    at android.os.StrictMode$AndroidCloseGuardReporter.report(StrictMode.java:1786)
+                //    at dalvik.system.CloseGuard.warnIfOpen(CloseGuard.java:264)
+                //    at java.util.zip.Inflater.finalize(Inflater.java:398)
+                //    at java.lang.Daemons$FinalizerDaemon.doFinalize(Daemons.java:250)
+                //    at java.lang.Daemons$FinalizerDaemon.runInternal(Daemons.java:237)
+                //    at java.lang.Daemons$Daemon.run(Daemons.java:103)
+                //    at java.lang.Thread.run(Thread.java:764)
+                // Caused by: java.lang.Throwable: Explicit termination method 'end' not called
+                //    at dalvik.system.CloseGuard.open(CloseGuard.java:221)
+                //    at java.util.zip.Inflater.<init>(Inflater.java:114)
+                //    at com.android.okhttp.okio.GzipSource.<init>(GzipSource.java:62)
+                //    at com.android.okhttp.internal.http.HttpEngine.unzip(HttpEngine.java:473)
+                //    at com.android.okhttp.internal.http.HttpEngine.readResponse(HttpEngine.java:648)
+                //    at com.android.okhttp.internal.huc.HttpURLConnectionImpl.execute(HttpURLConnectionImpl.java:471)
+                //    at com.android.okhttp.internal.huc.HttpURLConnectionImpl.getResponse(HttpURLConnectionImpl.java:407)
+                //    at com.android.okhttp.internal.huc.HttpURLConnectionImpl.getResponseCode(HttpURLConnectionImpl.java:538)
+                //    at com.android.okhttp.internal.huc.DelegatingHttpsURLConnection.getResponseCode(DelegatingHttpsURLConnection.java:105)
+                //    at com.android.okhttp.internal.huc.HttpsURLConnectionImpl.getResponseCode(HttpsURLConnectionImpl.java:26)
+                //    at org.erat.nup.Downloader.download(Downloader.java:94)
+                //    at org.erat.nup.Downloader.downloadString(Downloader.java:111)
+                //    at org.erat.nup.SongDatabase.queryServer(SongDatabase.java:524)
+                //    at org.erat.nup.SongDatabase.syncWithServer(SongDatabase.java:479)
+                //    ...
+                //
+                // Oddly, this only started happening after I upgraded the AppEngine app to use the
+                // go111 runtime (?!).
+                stream.close();
+            }
         } catch (PrefException e) {
             error[0] = e.getMessage();
             return null;
