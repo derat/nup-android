@@ -37,7 +37,7 @@ public class SongDatabase {
     private static final String MAX_QUERY_RESULTS = "250";
 
     private static final String DATABASE_NAME = "NupSongs";
-    private static final int DATABASE_VERSION = 13;
+    private static final int DATABASE_VERSION = 14;
 
     private static final int SERVER_SONG_BATCH_SIZE = 100;
 
@@ -51,14 +51,20 @@ public class SongDatabase {
         "  Artist VARCHAR(256) NOT NULL, " +
         "  Title VARCHAR(256) NOT NULL, " +
         "  Album VARCHAR(256) NOT NULL, " +
+        "  AlbumId VARCHAR(256) NOT NULL, " +
         "  TrackNumber INTEGER NOT NULL, " +
         "  DiscNumber INTEGER NOT NULL, " +
         "  Length INTEGER NOT NULL, " +
+        "  TrackGain FLOAT NOT NULL, " +
+        "  AlbumGain FLOAT NOT NULL, " +
+        "  PeakAmp FLOAT NOT NULL, " +
         "  Rating FLOAT NOT NULL)";
     private static final String CREATE_SONGS_ARTIST_INDEX_SQL =
         "CREATE INDEX Artist ON Songs (Artist)";
     private static final String CREATE_SONGS_ALBUM_INDEX_SQL =
         "CREATE INDEX Album ON Songs (Album)";
+    private static final String CREATE_SONGS_ALBUM_ID_INDEX_SQL =
+        "CREATE INDEX AlbumId ON Songs (AlbumId)";
 
     private static final String CREATE_ARTIST_ALBUM_STATS_SQL =
         "CREATE TABLE ArtistAlbumStats (" +
@@ -109,7 +115,7 @@ public class SongDatabase {
     private List<StringIntPair> mArtistsSortedByNumSongs = new ArrayList<StringIntPair>();
     private HashMap<String,List<StringIntPair>> mArtistAlbums = new HashMap<String,List<StringIntPair>>();
 
-    interface Listener {
+    public interface Listener {
         void onAggregateDataUpdate();
     }
 
@@ -118,7 +124,7 @@ public class SongDatabase {
         DELETING_SONGS,
         UPDATING_STATS
     }
-    interface SyncProgressListener {
+    public interface SyncProgressListener {
         void onSyncProgress(SyncState state, int numSongs);
     }
 
@@ -136,6 +142,7 @@ public class SongDatabase {
                 db.execSQL(CREATE_SONGS_SQL);
                 db.execSQL(CREATE_SONGS_ARTIST_INDEX_SQL);
                 db.execSQL(CREATE_SONGS_ALBUM_INDEX_SQL);
+                db.execSQL(CREATE_SONGS_ALBUM_ID_INDEX_SQL);
                 db.execSQL(CREATE_ARTIST_ALBUM_STATS_SQL);
                 db.execSQL(CREATE_ARTIST_ALBUM_STATS_ARTIST_SORT_KEY_INDEX_SQL);
                 db.execSQL(CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL);
@@ -159,6 +166,7 @@ public class SongDatabase {
             }
 
             // Upgrade the database from the version before |newVersion| to |newVersion|.
+            // The only reason I'm keeping the old upgrade steps is for reference when writing new ones.
             private void upgradeFromPreviousVersion(SQLiteDatabase db, int newVersion) {
                 if (newVersion == 2) {
                     // Version 2: Create LastUpdateTime table.
@@ -260,6 +268,35 @@ public class SongDatabase {
                 } else if (newVersion == 12 || newVersion == 13) {
                     // Versions 12 and 13: Update sort ordering.
                     updateStatsTables(db);
+                } else if (newVersion == 14) {
+                    // Version 14: Add AlbumId, TrackGain, AlbumGain, and PeakAmp to Songs.
+                    db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp");
+                    db.execSQL("CREATE TABLE Songs (" +
+                               "  SongId INTEGER PRIMARY KEY NOT NULL, " +
+                               "  Url VARCHAR(256) NOT NULL, " +
+                               "  CoverUrl VARCHAR(256) NOT NULL, " +
+                               "  Artist VARCHAR(256) NOT NULL, " +
+                               "  Title VARCHAR(256) NOT NULL, " +
+                               "  Album VARCHAR(256) NOT NULL, " +
+                               "  AlbumId VARCHAR(256) NOT NULL, " +
+                               "  TrackNumber INTEGER NOT NULL, " +
+                               "  DiscNumber INTEGER NOT NULL, " +
+                               "  Length INTEGER NOT NULL, " +
+                               "  TrackGain FLOAT NOT NULL, " +
+                               "  AlbumGain FLOAT NOT NULL, " +
+                               "  PeakAmp FLOAT NOT NULL, " +
+                               "  Rating FLOAT NOT NULL)");
+                    db.execSQL("INSERT INTO Songs " +
+                               "SELECT SongId, Url, CoverUrl, Artist, Title, Album, '', " +
+                               "    TrackNumber, DiscNumber, Length, 0, 0, 0, Rating " +
+                               "FROM SongsTmp");
+                    db.execSQL("DROP TABLE SongsTmp");
+                    // Sigh, I think I should've been recreating indexes after previous upgrades.
+                    // From testing with the sqlite3 command, it looks like the old indexes will
+                    // probably be updated to point at SongsTmp and then dropped.
+                    db.execSQL(CREATE_SONGS_ARTIST_INDEX_SQL);
+                    db.execSQL(CREATE_SONGS_ALBUM_INDEX_SQL);
+                    db.execSQL(CREATE_SONGS_ALBUM_ID_INDEX_SQL);
                 } else {
                     throw new RuntimeException(
                         "Got request to upgrade database to unknown version " + newVersion);
@@ -335,7 +372,8 @@ public class SongDatabase {
         mOpener.close();
     }
 
-    public List<Song> query(String artist, String title, String album, double minRating, boolean shuffle, boolean substring, boolean onlyCached) {
+    public List<Song> query(String artist, String title, String album, double minRating,
+                            boolean shuffle, boolean substring, boolean onlyCached) {
         class QueryBuilder {
             public List<String> selections = new ArrayList<String>();
             public List<String> selectionArgs = new ArrayList<String>();
@@ -365,11 +403,12 @@ public class SongDatabase {
         builder.add("Rating >= ?", minRating >= 0.0 ? Double.toString(minRating) : null, false);
 
         String query =
-            "SELECT s.SongId, Artist, Title, Album, Url, CoverUrl, Length, TrackNumber, DiscNumber, Rating " +
+            "SELECT s.SongId, Artist, Title, Album, AlbumId, Url, CoverUrl, Length, " +
+            "TrackNumber, DiscNumber, TrackGain, AlbumGain, PeakAmp, Rating " +
             "FROM Songs s " +
             (onlyCached ? "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " : "") +
             builder.getWhereClause() +
-            "ORDER BY " + (shuffle ? "RANDOM()" : "Album ASC, DiscNumber ASC, TrackNumber ASC") + " " +
+            "ORDER BY " + (shuffle ? "RANDOM()" : "Album ASC, AlbumId ASC, DiscNumber ASC, TrackNumber ASC") + " " +
             "LIMIT " + MAX_QUERY_RESULTS;
         Log.d(TAG, "running query \"" + query + "\" with args " + TextUtils.join(", ", builder.selectionArgs));
         SQLiteDatabase db = mOpener.getDb();
@@ -380,9 +419,20 @@ public class SongDatabase {
         while (!cursor.isAfterLast()) {
             try {
                 Song song = new Song(
-                    cursor.getLong(0), cursor.getString(1), cursor.getString(2), cursor.getString(3),
-                    cursor.getString(4), cursor.getString(5), cursor.getInt(6), cursor.getInt(7), cursor.getInt(8),
-                    cursor.getFloat(9));
+                    cursor.getLong(0),    // songId
+                    cursor.getString(1),  // artist
+                    cursor.getString(2),  // title
+                    cursor.getString(3),  // album
+                    cursor.getString(4),  // albumId
+                    cursor.getString(5),  // url
+                    cursor.getString(6),  // coverUrl
+                    cursor.getInt(7),     // length
+                    cursor.getInt(8),     // trackNumber
+                    cursor.getInt(9),     // discNumber
+                    cursor.getFloat(10),  // trackGain
+                    cursor.getFloat(11),  // albumGain
+                    cursor.getFloat(12),  // peakAmp
+                    cursor.getFloat(13)); // rating
                 songs.add(song);
             } catch (MalformedURLException e) {
                 Log.d(TAG, "skipping song " + cursor.getLong(0) + " with malformed URL(s) \"" +
@@ -510,7 +560,8 @@ public class SongDatabase {
     }
 
     // Helper method for SyncWithServer. Returns number of updated songs.
-    private int queryServer(SQLiteDatabase db, long prevStartTimeNsec, boolean deleted, SyncProgressListener listener, String message[]) throws ServerException {
+    private int queryServer(SQLiteDatabase db, long prevStartTimeNsec, boolean deleted,
+                            SyncProgressListener listener, String message[]) throws ServerException {
         int numUpdates = 0;
 
         // The server breaks its results up into batches instead of sending us a bunch of songs
@@ -551,16 +602,20 @@ public class SongDatabase {
                         Log.d(TAG, "deleting song " + songId);
                         db.delete("Songs", "SongId = ?", new String[]{ Long.toString(songId) });
                     } else {
-                        ContentValues values = new ContentValues(10);
+                        ContentValues values = new ContentValues(14);
                         values.put("SongId", songId);
                         values.put("Url", jsonSong.getString("url"));
                         values.put("CoverUrl", jsonSong.has("coverUrl") ? jsonSong.getString("coverUrl") : "");
                         values.put("Artist", jsonSong.getString("artist"));
                         values.put("Title", jsonSong.getString("title"));
                         values.put("Album", jsonSong.getString("album"));
+                        values.put("AlbumId", jsonSong.has("albumId") ? jsonSong.getString("albumId") : "");
                         values.put("TrackNumber", jsonSong.getInt("track"));
                         values.put("DiscNumber", jsonSong.getInt("disc"));
                         values.put("Length", jsonSong.getDouble("length"));
+                        values.put("TrackGain", jsonSong.has("trackGain") ? jsonSong.getDouble("trackGain") : 0.0);
+                        values.put("AlbumGain", jsonSong.has("albumGain") ? jsonSong.getDouble("albumGain") : 0.0);
+                        values.put("PeakAmp", jsonSong.has("peakAmp") ? jsonSong.getDouble("peakAmp") : 0.0);
                         values.put("Rating", jsonSong.getDouble("rating"));
                         db.replace("Songs", "", values);
                     }

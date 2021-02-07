@@ -13,8 +13,9 @@ import java.net.URL;
 
 class Song implements Serializable {
     private final long mSongId;
-    private final String mArtist, mTitle, mAlbum;
+    private final String mArtist, mTitle, mAlbum, mAlbumId;
     private final int mLengthSec, mTrackNum, mDiscNum;
+    private final double mTrackGain, mAlbumGain, mPeakAmp;
     private final double mRating;
     private URL mUrl = null, mCoverUrl = null;
     private Bitmap mCoverBitmap = null;
@@ -26,17 +27,23 @@ class Song implements Serializable {
     // 0 if the song doesn't have a cache entry.
     private long mTotalBytes = 0;
 
-    public Song(long songId, String artist, String title, String album, String url, String coverUrl,
-                int lengthSec, int trackNum, int discNum, double rating) throws MalformedURLException {
+    public Song(long songId, String artist, String title, String album, String albumId,
+                String url, String coverUrl, int lengthSec, int trackNum, int discNum,
+                double trackGain, double albumGain, double peakAmp, double rating)
+                throws MalformedURLException {
         mSongId = songId;
         mArtist = artist;
         mTitle = title;
         mAlbum = album;
+        mAlbumId = albumId;
         mUrl = url.isEmpty() ? null : new URL(url);
         mCoverUrl = coverUrl.isEmpty() ? null : new URL(coverUrl);
         mLengthSec = lengthSec;
         mTrackNum = trackNum;
         mDiscNum = discNum;
+        mTrackGain = trackGain;
+        mAlbumGain = albumGain;
+        mPeakAmp = peakAmp;
         mRating = rating;
 
         // TODO: Tags.
@@ -47,12 +54,16 @@ class Song implements Serializable {
     public String getArtist() { return mArtist; }
     public String getTitle() { return mTitle; }
     public String getAlbum() { return mAlbum; }
+    public String getAlbumId() { return mAlbumId; }
     public URL getUrl() { return mUrl; }
     public URL getCoverUrl() { return mCoverUrl; }
     public Bitmap getCoverBitmap() { return mCoverBitmap; }
     public int getLengthSec() { return mLengthSec; }
     public int getTrackNum() { return mTrackNum; }
     public int getDiscNum() { return mDiscNum; }
+    public double getTrackGain() { return mTrackGain; }
+    public double getAlbumGain() { return mAlbumGain; }
+    public double getPeakAmp() { return mPeakAmp; }
     public double getRating() { return mRating; }
     public long getAvailableBytes() { return mAvailableBytes; }
     public long getTotalBytes() { return mTotalBytes; }

@@ -30,7 +30,7 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
-class FileCache implements Runnable {
+public class FileCache implements Runnable {
     private static final String TAG = "FileCache";
 
     // How long should we hold the wifi lock after noticing that there are no current downloads?

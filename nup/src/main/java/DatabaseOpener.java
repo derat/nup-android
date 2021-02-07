@@ -5,7 +5,7 @@ package org.erat.nup;
 
 import android.content.Context;
 import android.database.sqlite.SQLiteDatabase;
-import android.database.sqlite.SQLiteException;
+import android.database.sqlite.SQLiteDatabaseLockedException;
 import android.database.sqlite.SQLiteOpenHelper;
 import android.util.Log;
 
@@ -42,8 +42,7 @@ class DatabaseOpener {
                     SQLiteDatabase db = mOpenHelper.getWritableDatabase();
                     db.close();
                     break;
-                // TODO: Catch SQLiteDatabaseLockedException instead, introduced at API level 11.
-                } catch (SQLiteException e) {
+                } catch (SQLiteDatabaseLockedException e) {
                     Log.e(TAG, "database " + mDatabaseName + " was locked while trying to create/upgrade it: " + e);
                 }
             }
@@ -52,8 +51,7 @@ class DatabaseOpener {
                 try {
                     mDb = mContext.openOrCreateDatabase(mDatabaseName, 0, null);
                     break;
-                // TODO: Catch SQLiteDatabaseLockedException instead, introduced at API level 11.
-                } catch (SQLiteException e) {
+                } catch (SQLiteDatabaseLockedException e) {
                     Log.e(TAG, "database " + mDatabaseName + " was locked while trying to open it: " + e);
                 }
             }
