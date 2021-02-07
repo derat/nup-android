@@ -585,7 +585,8 @@ public class NupService extends Service
         if (nextSong != null) {
             FileCacheEntry nextEntry = mCache.getEntry(nextSong.getSongId());
             if (nextEntry != null && nextEntry.isFullyCached()) {
-                mPlayer.queueFile(nextEntry.getLocalFile().getPath(), nextEntry.getTotalBytes());
+                mPlayer.queueFile(nextEntry.getLocalFile().getPath(), nextEntry.getTotalBytes(),
+                                  nextSong.getAlbumGain(), nextSong.getPeakAmp());
             }
         }
 
@@ -755,7 +756,8 @@ public class NupService extends Service
                     mWaitingForDownload = false;
                     playCacheEntry(entry);
                 } else if (song == getNextSong()) {
-                    mPlayer.queueFile(entry.getLocalFile().getPath(), entry.getTotalBytes());
+                    mPlayer.queueFile(entry.getLocalFile().getPath(), entry.getTotalBytes(),
+                                      song.getAlbumGain(), song.getPeakAmp());
                 }
 
                 if (mSongListener != null)
@@ -910,13 +912,21 @@ public class NupService extends Service
             return true;
         double bytesPerMs = (double) downloadedBytes / elapsedMs;
         long remainingMs = (long) ((entry.getTotalBytes() - entry.getCachedBytes()) / bytesPerMs);
-        return (entry.getCachedBytes() >= MIN_BYTES_BEFORE_PLAYING && remainingMs + EXTRA_BUFFER_MS <= songLengthSec * 1000);
+        return entry.getCachedBytes() >= MIN_BYTES_BEFORE_PLAYING &&
+               remainingMs + EXTRA_BUFFER_MS <= songLengthSec * 1000;
     }
 
     // Play the local file where a cache entry is stored.
     private void playCacheEntry(FileCacheEntry entry) {
+        Song song = getCurrentSong();
+        if (song.getSongId() != entry.getSongId()) {
+            Log.e(TAG, "not playing: cache entry " + entry.getSongId() +
+                  " doesn't match current song " + song.getSongId());
+            return;
+        }
         mCurrentSongPath = entry.getLocalFile().getPath();
-        mPlayer.playFile(mCurrentSongPath, entry.getTotalBytes());
+        mPlayer.playFile(mCurrentSongPath, entry.getTotalBytes(),
+                         song.getAlbumGain(), song.getPeakAmp());
         mCurrentSongStartDate = new Date();
         mCache.updateLastAccessTime(entry.getSongId());
         updateNotification();

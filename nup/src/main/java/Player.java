@@ -5,6 +5,7 @@ package org.erat.nup;
 
 import android.app.Activity;
 import android.content.Context;
+import android.media.audiofx.LoudnessEnhancer;
 import android.media.AudioManager;
 import android.media.MediaPlayer;
 import android.os.AsyncTask;
@@ -62,6 +63,9 @@ class Player implements Runnable,
     // Is the volume currently lowered?
     private boolean mLowVolume = false;
 
+    // Pre-amp gain adjustment in decibels.
+    private double mPreAmpGain = 0;
+
     // Used to run tasks on our own thread.
     private Handler mHandler;
 
@@ -84,18 +88,27 @@ class Player implements Runnable,
 
     /** Wraps an individual file. */
     private class FilePlayer {
-        private final String mPath;    // File containing song.
-        private final long mNumBytes;  // Total expected size of song (mPath may be incomplete).
+        private final String mPath;     // File containing song.
+        private final long mNumBytes;   // Total expected size of song (mPath may be incomplete).
+        private final double mSongGain; // Song-specific gain adjustment in decibels.
+        private final double mPeakAmp;  // Song's peak amplitude, with 1.0 being max without clipping.
 
         // Ideally only used if we haven't downloaded the complete file, since MediaPlayer
         // skips all the time when playing from a stream.
         private FileInputStream mStream;
 
         private MediaPlayer mPlayer;
+        private LoudnessEnhancer mLoudnessEnhancer;
 
-        public FilePlayer(String path, long numBytes) {
+        private boolean mLowVolume = false; // True if the song's volume is temporarily lowered.
+        private double mPreAmpGain = 0;     // Pre-amp gain adjustment in decibels.
+
+        public FilePlayer(String path, long numBytes, double preAmpGain, double songGain, double peakAmp) {
             mPath = path;
             mNumBytes = numBytes;
+            mSongGain = songGain;
+            mPeakAmp = peakAmp;
+            mPreAmpGain = preAmpGain;
         }
 
         public String getPath() {
@@ -144,6 +157,12 @@ class Player implements Runnable,
                     mPlayer.setDataSource(mStream.getFD());
                 }
                 mPlayer.prepare();
+
+                // This should happen after preparing the MediaPlayer,
+                // per https://stackoverflow.com/q/23342655/6882947.
+                mLoudnessEnhancer = new LoudnessEnhancer(mPlayer.getAudioSessionId());
+                adjustVolume();
+
                 return true;
             } catch (final IOException e) {
                 close();
@@ -160,6 +179,7 @@ class Player implements Runnable,
             try {
                 if (mPlayer != null) {
                     mPlayer.release();
+                    mLoudnessEnhancer.release();
                 }
                 if (mStream != null) {
                     mStream.close();
@@ -174,11 +194,42 @@ class Player implements Runnable,
         }
 
         public void setLowVolume(boolean lowVolume) {
-            if (mPlayer == null) {
+            mLowVolume = lowVolume;
+            adjustVolume();
+        }
+
+        public void setPreAmpGain(double preAmpGain) {
+            mPreAmpGain = preAmpGain;
+            adjustVolume();
+        }
+
+        // Adjusts |mPlayer|'s volume appropriately.
+        private void adjustVolume() {
+            if (mPlayer == null || mLoudnessEnhancer == null) {
                 return;
             }
-            float volume = lowVolume ? LOW_VOLUME_FRACTION : 1.0f;
-            mPlayer.setVolume(volume, volume);
+
+            // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_specification
+            double pct = Math.pow(10, (mPreAmpGain + mSongGain) / 20);
+            if (mLowVolume) {
+                pct *= LOW_VOLUME_FRACTION;
+            }
+            if (mPeakAmp > 0) {
+                pct = Math.min(pct, mPeakAmp);
+            }
+
+            Log.d(TAG, "setting " + mPath + " volume to " + pct);
+
+            // Hooray: MediaPlayer only accepts volumes in the range [0.0, 1.0],
+            // while LoudnessEnhancer seems to only accept positive gains (in mB).
+            if (pct <= 1) {
+                mPlayer.setVolume((float) pct, (float) pct);
+                mLoudnessEnhancer.setTargetGain(0);
+            } else {
+                mPlayer.setVolume(1, 1);
+                int gainmB = (int) Math.round(Math.log10(pct) * 20000);
+                mLoudnessEnhancer.setTargetGain(gainmB);
+            }
         }
 
         // Restarts playback after a buffer underrun.
@@ -255,7 +306,8 @@ class Player implements Runnable,
         });
     }
 
-    public void playFile(final String path, final long numBytes) {
+    public void playFile(final String path, final long numBytes,
+                         final double gain, final double peakAmp) {
         mHandler.post(new Runnable() {
             @Override public void run() {
                 Log.d(TAG, "got request to play " + path);
@@ -265,7 +317,7 @@ class Player implements Runnable,
                     mCurrentPlayer = mQueuedPlayer;
                     mQueuedPlayer = null;
                 } else {
-                    mCurrentPlayer = new FilePlayer(path, numBytes);
+                    mCurrentPlayer = new FilePlayer(path, numBytes, mPreAmpGain, gain, peakAmp);
                     if (!mCurrentPlayer.prepare()) {
                         mCurrentPlayer = null;
                         return;
@@ -281,7 +333,8 @@ class Player implements Runnable,
         });
     }
 
-    public void queueFile(final String path, final long numBytes) {
+    public void queueFile(final String path, final long numBytes,
+                          final double gain, final double peakAmp) {
         mHandler.post(new Runnable() {
             @Override public void run() {
                 Log.d(TAG, "got request to queue " + path);
@@ -291,7 +344,7 @@ class Player implements Runnable,
 
                 mBackgroundLoader.submit(new Runnable() {
                     @Override public void run() {
-                        final FilePlayer player = new FilePlayer(path, numBytes);
+                        final FilePlayer player = new FilePlayer(path, numBytes, mPreAmpGain, gain, peakAmp);
                         if (!player.prepare()) {
                             return;
                         }
@@ -385,6 +438,24 @@ class Player implements Runnable,
                 }
                 if (mQueuedPlayer != null) {
                     mQueuedPlayer.setLowVolume(lowVolume);
+                }
+            }
+        });
+    }
+
+    public void setPreAmpGain(final double preAmpGain) {
+        mHandler.post(new Runnable() {
+            @Override public void run() {
+                if (mPreAmpGain == preAmpGain) {
+                    return;
+                }
+
+                mPreAmpGain = preAmpGain;
+                if (mCurrentPlayer != null) {
+                    mCurrentPlayer.setPreAmpGain(preAmpGain);
+                }
+                if (mQueuedPlayer != null) {
+                    mQueuedPlayer.setPreAmpGain(preAmpGain);
                 }
             }
         });
