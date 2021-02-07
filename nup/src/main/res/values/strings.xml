@@ -59,6 +59,9 @@
   <string name="pause">Pause</string>
   <string name="play">Play</string>
   <string name="prev">Prev</string>
+  <string name="pre_amp_gain">Pre-amp gain</string>
+  <string name="pre_amp_gain_description">Pre-amp gain in dB</string>
+  <string name="pre_amp_gain_value">%+.1f dB</string>
   <string name="querying_database">Querying database.</string>
   <string name="rating_colon">Rating:</string>
   <string name="reset">Reset</string>

@@ -42,9 +42,16 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
         NupActivity.getService().addSongDatabaseUpdateListener((YesNoPreference) pref);
         ((YesNoPreference) pref).onSongDatabaseUpdate();
 
+        pref = findPreference(NupPreferences.PRE_AMP_GAIN);
+        pref.setOnPreferenceChangeListener(this);
+        double gain = Double.parseDouble(
+            mPrefs.getString(NupPreferences.PRE_AMP_GAIN,
+                             NupPreferences.PRE_AMP_GAIN_DEFAULT));
+        pref.setSummary(getString(R.string.pre_amp_gain_value, gain));
+
         pref = findPreference(NupPreferences.CACHE_SIZE);
         pref.setOnPreferenceChangeListener(this);
-        int maxCacheMb = Integer.valueOf(
+        int maxCacheMb = Integer.parseInt(
             mPrefs.getString(NupPreferences.CACHE_SIZE,
                              NupPreferences.CACHE_SIZE_DEFAULT));
         pref.setSummary(getString(R.string.cache_size_value, maxCacheMb));
@@ -57,7 +64,7 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
 
         pref = findPreference(NupPreferences.SONGS_TO_PRELOAD);
         pref.setOnPreferenceChangeListener(this);
-        int songsToPreload = Integer.valueOf(
+        int songsToPreload = Integer.parseInt(
             mPrefs.getString(NupPreferences.SONGS_TO_PRELOAD,
                              NupPreferences.SONGS_TO_PRELOAD_DEFAULT));
         pref.setSummary(
@@ -68,7 +75,7 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
 
         pref = findPreference(NupPreferences.DOWNLOAD_RATE);
         pref.setOnPreferenceChangeListener(this);
-        int downloadRate = Integer.valueOf(
+        int downloadRate = Integer.parseInt(
             mPrefs.getString(NupPreferences.DOWNLOAD_RATE,
                              NupPreferences.DOWNLOAD_RATE_DEFAULT));
         pref.setSummary(downloadRate == 0 ?
@@ -105,10 +112,20 @@ public class SettingsActivity extends PreferenceActivity implements Preference.O
             findPreference(NupPreferences.ACCOUNT).setSummary((String) value);
             NupActivity.getService().authenticateInBackground();
             return true;
+        } else if (pref.getKey().equals(NupPreferences.PRE_AMP_GAIN)) {
+            try {
+                double gain = Double.parseDouble((String) value);
+                findPreference(NupPreferences.PRE_AMP_GAIN).setSummary(
+                    getString(R.string.pre_amp_gain_value, gain));
+                return true;
+            } catch (NumberFormatException e) {
+                return false;
+            }
         } else if (pref.getKey().equals(NupPreferences.CACHE_SIZE)) {
             int intValue = parseNonNegativeInt((String) value);
             if (intValue < NupPreferences.CACHE_SIZE_MINIMUM) {
-                Toast.makeText(this, getString(R.string.cache_size_invalid, NupPreferences.CACHE_SIZE_MINIMUM), Toast.LENGTH_LONG).show();
+                String msg = getString(R.string.cache_size_invalid, NupPreferences.CACHE_SIZE_MINIMUM);
+                Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
                 return false;
             }
             findPreference(NupPreferences.CACHE_SIZE).setSummary(

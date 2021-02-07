@@ -36,6 +36,20 @@
         />
   </PreferenceCategory>
 
+  <PreferenceCategory android:title="Playback">
+    <!-- TODO: This really ought to be using androidx.preference.SeekBarPreference,
+         but AndroidX requires Android 9.0 (API level 28) and I haven't upgraded.
+         As a consequence of using EditTextPreference, the saved pref is a string
+         rather than a float. -->
+    <EditTextPreference
+        android:key="pre_amp_gain"
+        android:title="@string/pre_amp_gain"
+        android:dialogMessage="@string/pre_amp_gain_description"
+        android:singleLine="true"
+        android:inputType="number|numberDecimal|numberSigned"
+        />
+  </PreferenceCategory>
+
   <PreferenceCategory android:title="Cache">
     <EditTextPreference
         android:key="cache_size"

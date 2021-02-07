@@ -12,6 +12,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.SharedPreferences;
+import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.graphics.Bitmap;
 import android.media.AudioManager;
 import android.media.session.MediaSession;
@@ -266,6 +267,17 @@ public class NupService extends Service
         }
     };
 
+    private OnSharedPreferenceChangeListener mPrefsListener = new OnSharedPreferenceChangeListener() {
+        @Override
+        public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
+            if (key.equals(NupPreferences.PRE_AMP_GAIN)) {
+                double gain = Double.parseDouble(
+                    prefs.getString(key, NupPreferences.PRE_AMP_GAIN_DEFAULT));
+                mPlayer.setPreAmpGain(gain);
+            }
+        }
+    };
+
     private SongListener mSongListener = null;
     private HashSet<SongDatabaseUpdateListener> mSongDatabaseUpdateListeners = new HashSet<SongDatabaseUpdateListener>();
 
@@ -304,10 +316,13 @@ public class NupService extends Service
         registerReceiver(mBroadcastReceiver, filter);
 
         mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
+        mPrefs.registerOnSharedPreferenceChangeListener(mPrefsListener);
 
         mDownloader = new Downloader(mAuthenticator, mPrefs);
 
-        mPlayer = new Player(this, this, mHandler);
+        double gain = Double.parseDouble(
+            mPrefs.getString(NupPreferences.PRE_AMP_GAIN, NupPreferences.PRE_AMP_GAIN_DEFAULT));
+        mPlayer = new Player(this, this, mHandler, gain);
         mPlayerThread = new Thread(mPlayer, "Player");
         mPlayerThread.setPriority(Thread.MAX_PRIORITY);
         mPlayerThread.start();
@@ -355,6 +370,7 @@ public class NupService extends Service
     public void onDestroy() {
         Log.d(TAG, "service destroyed");
         mAudioManager.abandonAudioFocus(mAudioFocusListener);
+        mPrefs.unregisterOnSharedPreferenceChangeListener(mPrefsListener);
         mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_NONE);
         unregisterReceiver(mBroadcastReceiver);
 

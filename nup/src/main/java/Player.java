@@ -260,10 +260,11 @@ class Player implements Runnable,
         }
     }
 
-    public Player(Context context, Listener listener, Handler listenerHandler) {
+    public Player(Context context, Listener listener, Handler listenerHandler, double preAmpGain) {
         mContext = context;
         mListener = listener;
         mListenerHandler = listenerHandler;
+        mPreAmpGain = preAmpGain;
     }
 
     @Override
