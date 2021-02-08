@@ -6,7 +6,7 @@ package org.erat.nup;
 import android.app.Activity;
 import android.content.Context;
 import android.media.audiofx.LoudnessEnhancer;
-import android.media.AudioManager;
+import android.media.AudioAttributes;
 import android.media.MediaPlayer;
 import android.os.AsyncTask;
 import android.os.Handler;
@@ -141,7 +141,11 @@ class Player implements Runnable,
                         + " (have " + currentBytes + " of " + mNumBytes + ")");
 
                 mPlayer.setWakeMode(mContext, PowerManager.PARTIAL_WAKE_LOCK);
-                mPlayer.setAudioStreamType(AudioManager.STREAM_MUSIC);
+                mPlayer.setAudioAttributes(
+                        new AudioAttributes.Builder()
+                            .setUsage(AudioAttributes.USAGE_MEDIA)
+                            .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                            .build());
                 mPlayer.setOnCompletionListener(Player.this);
                 mPlayer.setOnErrorListener(Player.this);
 
