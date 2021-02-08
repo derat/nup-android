@@ -231,7 +231,7 @@ class Player implements Runnable,
                 mLoudnessEnhancer.setTargetGain(0);
             } else {
                 mPlayer.setVolume(1, 1);
-                int gainmB = (int) Math.round(Math.log10(pct) * 20000);
+                int gainmB = (int) Math.round(Math.log10(pct) * 2000);
                 mLoudnessEnhancer.setTargetGain(gainmB);
             }
         }
