@@ -24,8 +24,9 @@ public class BrowseAlbumsActivity extends BrowseActivityBase
     // Identifier for the BrowseSongsActivity that we start.
     private static final int BROWSE_SONGS_REQUEST_CODE = 1;
 
-    private static final int MENU_ITEM_BROWSE_SONGS_WITH_RATING = 1;
-    private static final int MENU_ITEM_BROWSE_SONGS = 2;
+    private static final int MENU_ITEM_BROWSE_SONGS_BY_ARTIST = 1;
+    private static final int MENU_ITEM_BROWSE_SONGS_WITH_RATING = 2;
+    private static final int MENU_ITEM_BROWSE_SONGS = 3;
 
     // Are we displaying only cached songs?
     private boolean mOnlyCached = false;
@@ -33,8 +34,8 @@ public class BrowseAlbumsActivity extends BrowseActivityBase
     // Artist that was passed to us, or null if we were started directly from BrowseTopActivity.
     private String mArtist = null;
 
-    // Albums that we're displaying along with number of tracks.  Just the albums featuring |mArtist| if it's non-null,
-    // or all albums on the server otherwise.
+    // Albums that we're displaying along with number of tracks.
+    // Just the albums featuring |mArtist| if it's non-null, or all albums on the server otherwise.
     private List<StatsRow> mRows = new ArrayList<StatsRow>();
 
     private SortedStatsRowArrayAdapter mAdapter;
@@ -65,8 +66,10 @@ public class BrowseAlbumsActivity extends BrowseActivityBase
     @Override protected void onListItemClick(ListView listView, View view, int position, long id) {
         StatsRow row = mRows.get(position);
         if (row == null) return;
-        // TODO: Use album ID instead.
-        startBrowseSongsActivity(row.key.album, -1.0);
+
+        // TODO: Right now, we show the full album by default instead of limiting it to songs by
+        // |mArtist|. Decide if this makes sense.
+        startBrowseSongsActivity(null, row.key.album, row.key.albumId, -1.0);
     }
 
     @Override public void onCreateContextMenu(ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
@@ -74,6 +77,10 @@ public class BrowseAlbumsActivity extends BrowseActivityBase
         StatsRow row = mRows.get(pos);
         if (row != null) menu.setHeaderTitle(row.key.album);
 
+        if (mArtist != null) {
+            String msg = getString(R.string.browse_songs_by_artist_fmt, mArtist);
+            menu.add(0, MENU_ITEM_BROWSE_SONGS_BY_ARTIST, 0, msg);
+        }
         menu.add(0, MENU_ITEM_BROWSE_SONGS_WITH_RATING, 0, R.string.browse_songs_four_stars);
         menu.add(0, MENU_ITEM_BROWSE_SONGS, 0, R.string.browse_songs);
     }
@@ -83,13 +90,15 @@ public class BrowseAlbumsActivity extends BrowseActivityBase
         StatsRow row = mRows.get(info.position);
         if (row == null) return false;
 
-        // TODO: Pass album ID instead of album.
         switch (item.getItemId()) {
+            case MENU_ITEM_BROWSE_SONGS_BY_ARTIST:
+                startBrowseSongsActivity(mArtist, row.key.album, row.key.albumId, -1.0);
+                return true;
             case MENU_ITEM_BROWSE_SONGS_WITH_RATING:
-                startBrowseSongsActivity(row.key.album, 0.75);
+                startBrowseSongsActivity("", row.key.album, row.key.albumId, 0.75);
                 return true;
             case MENU_ITEM_BROWSE_SONGS:
-                startBrowseSongsActivity(row.key.album, -1.0);
+                startBrowseSongsActivity("", row.key.album, row.key.albumId, -1.0);
                 return true;
             default:
                 return false;
@@ -137,11 +146,11 @@ public class BrowseAlbumsActivity extends BrowseActivityBase
     }
 
     // Launch BrowseSongsActivity for a given album.
-    // TODO: Update this to take album ID.
-    private void startBrowseSongsActivity(String album, double minRating) {
+    private void startBrowseSongsActivity(String artist, String album, String albumId, double minRating) {
         Intent intent = new Intent(this, BrowseSongsActivity.class);
-        if (mArtist != null) intent.putExtra(BUNDLE_ARTIST, mArtist);
+        if (artist != null) intent.putExtra(BUNDLE_ARTIST, artist);
         intent.putExtra(BUNDLE_ALBUM, album);
+        intent.putExtra(BUNDLE_ALBUM_ID, albumId);
         intent.putExtra(BUNDLE_CACHED, mOnlyCached);
         if (minRating >= 0.0) intent.putExtra(BUNDLE_MIN_RATING, minRating);
         startActivityForResult(intent, BROWSE_SONGS_REQUEST_CODE);

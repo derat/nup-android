@@ -11,6 +11,7 @@ import android.view.MenuItem;
 public class BrowseActivityBase extends ListActivity {
     public static final String BUNDLE_ARTIST = "artist";
     public static final String BUNDLE_ALBUM = "album";
+    public static final String BUNDLE_ALBUM_ID = "album_id";
     public static final String BUNDLE_MIN_RATING = "min_rating";
     public static final String BUNDLE_CACHED = "cached";
 

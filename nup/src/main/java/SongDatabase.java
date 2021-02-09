@@ -395,8 +395,8 @@ public class SongDatabase {
         mOpener.close();
     }
 
-    public List<Song> query(String artist, String title, String album, double minRating,
-                            boolean shuffle, boolean substring, boolean onlyCached) {
+    public List<Song> query(String artist, String title, String album, String albumId,
+                            double minRating, boolean shuffle, boolean substring, boolean onlyCached) {
         class QueryBuilder {
             public List<String> selections = new ArrayList<String>();
             public List<String> selectionArgs = new ArrayList<String>();
@@ -409,7 +409,7 @@ public class SongDatabase {
                 if (selectionArg.equals(UNSET_STRING))
                     selectionArgs.add("");
                 else
-                    selectionArgs.add(substring ? "%" + selectionArg + "%" : selectionArg);
+                    selectionArgs.add(substring ? ("%" + selectionArg + "%") : selectionArg);
             }
 
             // Get a WHERE clause (plus trailing space) if |selections| is non-empty, or just an empty string otherwise.
@@ -423,6 +423,7 @@ public class SongDatabase {
         builder.add("Artist LIKE ?", artist, substring);
         builder.add("Title LIKE ?", title, substring);
         builder.add("Album LIKE ?", album, substring);
+        builder.add("AlbumId = ?", albumId, false);
         builder.add("Rating >= ?", minRating >= 0.0 ? Double.toString(minRating) : null, false);
 
         String query =
@@ -774,6 +775,8 @@ public class SongDatabase {
         }
         cursor.close();
 
+        // TODO: Consider aggregating by album ID so that we have the full count from
+        // each album rather than just songs exactly matching the artist.
         HashMap<String,List<StatsRow>> artistAlbums = new HashMap<String,List<StatsRow>>();
         cursor = db.rawQuery("SELECT Artist, Album, AlbumId, NumSongs " +
                              "FROM ArtistAlbumStats " +

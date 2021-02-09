@@ -60,6 +60,7 @@ public class SearchResultsActivity extends Activity {
             public double minRating;
             public boolean shuffle, substring, onlyCached;
 
+            // TODO: Include albumId somehow.
             Query(String artist, String title, String album, double minRating,
                   boolean shuffle, boolean substring, boolean onlyCached) {
                 this.artist = artist;
@@ -109,7 +110,7 @@ public class SearchResultsActivity extends Activity {
                 for (Query query : queries) {
                     songs.addAll(
                         NupActivity.getService().getSongDb().query(
-                            query.artist, query.title, query.album, query.minRating,
+                            query.artist, query.title, query.album, null, query.minRating,
                             query.shuffle, query.substring, query.onlyCached));
                 }
                 return songs;

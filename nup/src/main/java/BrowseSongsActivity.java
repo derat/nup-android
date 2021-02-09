@@ -37,16 +37,11 @@ public class BrowseSongsActivity extends Activity
 
     private static final int DIALOG_SONG_DETAILS = 1;
 
-    // Are we displaying only cached songs?
-    private boolean mOnlyCached = false;
-
-    // Artist that was passed to us.
+    // Passed-in criteria specifying which songs to display.
     private String mArtist = null;
-
-    // Album that was passed to us.
     private String mAlbum = null;
-
-    // Minimum rating that was passed to us.
+    private String mAlbumId = null;
+    private boolean mOnlyCached = false;
     private double mMinRating = -1.0;
 
     // Songs that we're displaying.
@@ -59,6 +54,7 @@ public class BrowseSongsActivity extends Activity
 
         mArtist = getIntent().getStringExtra(BrowseActivityBase.BUNDLE_ARTIST);
         mAlbum = getIntent().getStringExtra(BrowseActivityBase.BUNDLE_ALBUM);
+        mAlbumId = getIntent().getStringExtra(BrowseActivityBase.BUNDLE_ALBUM_ID);
         mOnlyCached = getIntent().getBooleanExtra(BrowseActivityBase.BUNDLE_CACHED, false);
         mMinRating = getIntent().getDoubleExtra(BrowseActivityBase.BUNDLE_MIN_RATING, -1.0);
 
@@ -101,13 +97,13 @@ public class BrowseSongsActivity extends Activity
             @Override
             protected List<Song> doInBackground(Void... args) {
                 return NupActivity.getService().getSongDb().query(
-                    mArtist, null, mAlbum, mMinRating, false, false, mOnlyCached);
+                    mArtist, null, mAlbum, mAlbumId, mMinRating, false, false, mOnlyCached);
             }
             @Override
             protected void onPostExecute(List<Song> songs) {
                 // The results come back in album order.  If we're viewing all songs by
                 // an artist, sort them alphabetically instead.
-                if (mAlbum == null || mAlbum.isEmpty()) {
+                if ((mAlbum == null || mAlbum.isEmpty()) && (mAlbumId == null || mAlbumId.isEmpty())) {
                     Collections.sort(songs, new Comparator<Song>() {
                         @Override
                         public int compare(Song a, Song b) {
