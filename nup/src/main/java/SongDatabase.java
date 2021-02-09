@@ -366,16 +366,20 @@ public class SongDatabase {
             "SELECT s.Artist, '' AS Album, '' AS AlbumId, COUNT(*) " +
             "FROM Songs s " +
             "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
-            "GROUP BY 1, 2, 3",
+            "GROUP BY LOWER(TRIM(s.Artist))",
             null, Util.SORT_ARTIST);
     }
 
     public List<StatsRow> getCachedAlbumsSortedAlphabetically() {
+        // TODO: It'd be better to use most-frequent-artist logic here similar
+        // to what loadAggregateData() does for |mAlbumsSortedAlphabetically|.
+        // I haven't figured out how to do that solely with SQL, though, and
+        // I'd rather not write one-off code here.
         return getSortedRows(
-            "SELECT '' AS Artist, s.Album, s.AlbumId, COUNT(*) " +
+            "SELECT MIN(s.Artist), s.Album, s.AlbumId, COUNT(*) " +
             "FROM Songs s " +
             "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
-            "GROUP BY 1, 2, 3",
+            "GROUP BY LOWER(TRIM(s.Album)), s.AlbumId",
             null, Util.SORT_ALBUM);
     }
 
@@ -385,7 +389,7 @@ public class SongDatabase {
             "FROM Songs s " +
             "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
             "WHERE LOWER(s.Artist) = LOWER(?) " +
-            "GROUP BY 1, 2, 3",
+            "GROUP BY LOWER(TRIM(s.Album)), s.AlbumId",
             new String[]{ artist }, Util.SORT_ALBUM);
     }
 
@@ -664,7 +668,9 @@ public class SongDatabase {
         HashMap<String,HashMap<StatsKey,Integer>> artistAlbums =
             new HashMap<String,HashMap<StatsKey,Integer>>();
 
-        Cursor cursor = db.rawQuery("SELECT Artist, Album, AlbumId, COUNT(*) FROM Songs GROUP BY 1, 2, 3", null);
+        Cursor cursor = db.rawQuery("SELECT Artist, Album, AlbumId, COUNT(*) " +
+                                    "  FROM Songs " +
+                                    "  GROUP BY Artist, Album, AlbumId", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
             String origArtist = cursor.getString(0);
@@ -752,7 +758,7 @@ public class SongDatabase {
         List<StatsRow> artistsSortedAlphabetically = new ArrayList<StatsRow>();
         cursor = db.rawQuery("SELECT Artist, SUM(NumSongs) " +
                              "FROM ArtistAlbumStats " +
-                             "GROUP BY 1 " +
+                             "GROUP BY LOWER(TRIM(Artist)) " +
                              "ORDER BY ArtistSortKey ASC", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
@@ -761,33 +767,36 @@ public class SongDatabase {
         }
         cursor.close();
 
+        // Aggregate by (album, albumId) while storing the most-frequent artist for each album.
         List<StatsRow> albumsSortedAlphabetically = new ArrayList<StatsRow>();
-        cursor = db.rawQuery("SELECT Album, AlbumId, SUM(NumSongs) " +
-                             "FROM ArtistAlbumStats " +
-                             "GROUP BY 1, 2 " +
-                             "ORDER BY AlbumSortKey ASC, AlbumId ASC", null);
-        cursor.moveToFirst();
-        while (!cursor.isAfterLast()) {
-            // TODO: Include the most-common artist from the album.
-            StatsRow stats = new StatsRow("", cursor.getString(0), cursor.getString(1), cursor.getInt(2));
-            albumsSortedAlphabetically.add(stats);
-            cursor.moveToNext();
-        }
-        cursor.close();
-
-        // TODO: Consider aggregating by album ID so that we have the full count from
-        // each album rather than just songs exactly matching the artist.
         HashMap<String,List<StatsRow>> artistAlbums = new HashMap<String,List<StatsRow>>();
-        cursor = db.rawQuery("SELECT Artist, Album, AlbumId, NumSongs " +
+        StatsRow lastRow = null; // last row added to |albumsSortedAlphabetically|
+        cursor = db.rawQuery("SELECT Artist, Album, AlbumId, SUM(NumSongs) " +
                              "FROM ArtistAlbumStats " +
-                             "ORDER BY AlbumSortKey ASC, AlbumId ASC", null);
+                             "GROUP BY LOWER(TRIM(Artist)), LOWER(TRIM(Album)), AlbumId " +
+                             "ORDER BY AlbumSortKey ASC, AlbumId ASC, 4 DESC", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
             String artist = cursor.getString(0);
             String album = cursor.getString(1);
             String albumId = cursor.getString(2);
             int count = cursor.getInt(3);
+            cursor.moveToNext();
 
+            if (lastRow != null
+                    && lastRow.key.albumId.equals(albumId)
+                    && lastRow.key.album.trim().toLowerCase().equals(album.trim().toLowerCase())) {
+                lastRow.count += count;
+            } else {
+                StatsRow row = new StatsRow(artist, album, albumId, count);
+                albumsSortedAlphabetically.add(row);
+                lastRow = row;
+            }
+
+            // TODO: Consider aggregating by album ID so that we have the full count from
+            // each album rather than just songs exactly matching the artist. This will
+            // affect the count displayed when navigating from BrowseArtistsActivity to
+            // BrowseAlbumsActivity.
             String lowerArtist = artist.toLowerCase();
             List<StatsRow> albums = artistAlbums.get(lowerArtist);
             if (albums == null) {
@@ -795,8 +804,6 @@ public class SongDatabase {
                 artistAlbums.put(lowerArtist, albums);
             }
             albums.add(new StatsRow(artist, album, albumId, count));
-
-            cursor.moveToNext();
         }
         cursor.close();
 

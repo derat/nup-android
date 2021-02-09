@@ -35,14 +35,16 @@ public class BrowseArtistsActivity extends BrowseActivityBase
     // Artists that we're displaying.
     private List<StatsRow> mRows = new ArrayList<StatsRow>();
 
-    private SortedStatsRowArrayAdapter mAdapter;
+    private StatsRowArrayAdapter mAdapter;
 
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         mOnlyCached = getIntent().getBooleanExtra(BUNDLE_CACHED, false);
         setTitle(mOnlyCached ? R.string.browse_cached_artists : R.string.browse_artists);
 
-        mAdapter = new SortedStatsRowArrayAdapter(this, R.layout.browse_row, mRows, Util.SORT_ARTIST);
+        mAdapter = new StatsRowArrayAdapter(this, R.layout.browse_row, mRows,
+                                            StatsRowArrayAdapter.DISPLAY_ARTIST,
+                                            Util.SORT_ARTIST);
         setListAdapter(mAdapter);
         registerForContextMenu(getListView());
 

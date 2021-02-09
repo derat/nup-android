@@ -11,9 +11,14 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.List;
 
-class SortedStatsRowArrayAdapter extends ArrayAdapter<StatsRow>
-                                 implements SectionIndexer {
-    private static final String TAG = "SortedStatsRowArrayAdapter";
+class StatsRowArrayAdapter extends ArrayAdapter<StatsRow>
+                           implements SectionIndexer {
+    private static final String TAG = "StatsRowArrayAdapter";
+
+    // Different information to display.
+    public static int DISPLAY_ARTIST = 1;
+    public static int DISPLAY_ALBUM = 2;
+    public static int DISPLAY_ALBUM_ARTIST = 3;
 
     private static final String NUMBER_SECTION = "#";
     private static final String OTHER_SECTION = "\u2668";  // HOT SPRINGS (Android isn't snowman-compatible)
@@ -24,6 +29,9 @@ class SortedStatsRowArrayAdapter extends ArrayAdapter<StatsRow>
     // Are all rows in the list enabled?  If false, all are disabled.
     private boolean mEnabled = true;
 
+    // Information to display from |mRows|.
+    private int mDisplayType = DISPLAY_ARTIST;
+
     // Manner in which |mRows| are sorted, as a Util.SORT_* value.
     private int mSortType = Util.SORT_ARTIST;
 
@@ -32,12 +40,14 @@ class SortedStatsRowArrayAdapter extends ArrayAdapter<StatsRow>
     // Position of the first row in each section.
     private ArrayList<Integer> mSectionStartingPositions = new ArrayList<Integer>();
 
-    SortedStatsRowArrayAdapter(Context context,
-                               int textViewResourceId,
-                               List<StatsRow> rows,
-                               int sortType) {
+    StatsRowArrayAdapter(Context context,
+                         int textViewResourceId,
+                         List<StatsRow> rows,
+                         int displayType,
+                         int sortType) {
         super(context, textViewResourceId, rows);
         mRows = rows;
+        mDisplayType = displayType;
         mSortType = sortType;
         initSections();
     }
@@ -93,18 +103,19 @@ class SortedStatsRowArrayAdapter extends ArrayAdapter<StatsRow>
         }
 
         StatsRow row = mRows.get(position);
-        ((TextView) view.findViewById(R.id.main)).setText(getString(row.key));
+        ((TextView) view.findViewById(R.id.main)).setText(getDisplayString(row.key));
         ((TextView) view.findViewById(R.id.extra)).setText(row.count >= 0 ? "" + row.count : "");
         return view;
     }
 
     // Returns the string to display for the supplied key.
-    private String getString(StatsKey key) {
-        if (mSortType == Util.SORT_ARTIST) {
+    private String getDisplayString(StatsKey key) {
+        if (mDisplayType == DISPLAY_ARTIST) {
             return key.artist;
-        } else if (mSortType == Util.SORT_ALBUM) {
-            // TODO: Add a way to configure whether artist is also displayed.
+        } else if (mDisplayType == DISPLAY_ALBUM) {
             return key.album;
+        } else if (mDisplayType == DISPLAY_ALBUM_ARTIST) {
+            return key.album + " (" + key.artist + ")";
         }
         throw new IllegalArgumentException("invalid sort type");
     }
@@ -122,7 +133,8 @@ class SortedStatsRowArrayAdapter extends ArrayAdapter<StatsRow>
 
         int sectionIndex = -1;
         for (int rowIndex = 0; rowIndex < mRows.size(); ++rowIndex) {
-            String sectionName = getSectionNameForString(getString(mRows.get(rowIndex).key));
+            StatsKey key = mRows.get(rowIndex).key;
+            String sectionName = getSectionNameForString(mSortType == Util.SORT_ARTIST ? key.artist : key.album);
 
             int prevSectionIndex = sectionIndex;
             while (sectionIndex == -1 || !sectionName.equals(sections.get(sectionIndex)))

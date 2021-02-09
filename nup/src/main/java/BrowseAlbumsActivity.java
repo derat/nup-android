@@ -38,7 +38,7 @@ public class BrowseAlbumsActivity extends BrowseActivityBase
     // Just the albums featuring |mArtist| if it's non-null, or all albums on the server otherwise.
     private List<StatsRow> mRows = new ArrayList<StatsRow>();
 
-    private SortedStatsRowArrayAdapter mAdapter;
+    private StatsRowArrayAdapter mAdapter;
 
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -50,7 +50,11 @@ public class BrowseAlbumsActivity extends BrowseActivityBase
             getString(mOnlyCached ? R.string.browse_cached_albums_fmt : R.string.browse_albums_fmt, mArtist) :
             getString(mOnlyCached ? R.string.browse_cached_albums: R.string.browse_albums));
 
-        mAdapter = new SortedStatsRowArrayAdapter(this, R.layout.browse_row, mRows, Util.SORT_ALBUM);
+        mAdapter = new StatsRowArrayAdapter(this, R.layout.browse_row, mRows,
+                                            mArtist == null
+                                                ? StatsRowArrayAdapter.DISPLAY_ALBUM_ARTIST
+                                                : StatsRowArrayAdapter.DISPLAY_ALBUM,
+                                            Util.SORT_ALBUM);
         setListAdapter(mAdapter);
         registerForContextMenu(getListView());
 

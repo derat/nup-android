@@ -6,7 +6,7 @@ package org.erat.nup;
 // Holds song count for a specific key.
 class StatsRow {
     public final StatsKey key;
-    public final int count;
+    public int count;
 
     public StatsRow(StatsKey key, int count) {
         this.key = key;
