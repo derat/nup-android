@@ -49,22 +49,24 @@ public class SearchFormActivity extends Activity
                 if (hasFocus) {
                     String artist = mArtistEdit.getText().toString();
                     List<String> albums = new ArrayList<String>();
-                    List<StringIntPair> albumsWithCounts =
+                    List<StatsRow> albumsWithCounts =
                         artist.trim().isEmpty() ?
                         NupActivity.getService().getSongDb().getAlbumsSortedAlphabetically() :
                         NupActivity.getService().getSongDb().getAlbumsByArtist(artist);
                     if (albumsWithCounts != null) {
-                        for (StringIntPair pair : albumsWithCounts) {
-                            albums.add(pair.getString());
+                        for (StatsRow stats : albumsWithCounts) {
+                            albums.add(stats.key.album);
                         }
                     }
-                    mAlbumEdit.setAdapter(new ArrayAdapter<String>(SearchFormActivity.this, android.R.layout.simple_dropdown_item_1line, albums));
+                    mAlbumEdit.setAdapter(new ArrayAdapter<String>(SearchFormActivity.this,
+                                          android.R.layout.simple_dropdown_item_1line, albums));
                 }
             }
         });
 
         mMinRatingSpinner = (Spinner) findViewById(R.id.min_rating_spinner);
-        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(this, R.array.min_rating_array, android.R.layout.simple_spinner_item);
+        ArrayAdapter<CharSequence> adapter = ArrayAdapter.createFromResource(
+                this, R.array.min_rating_array, android.R.layout.simple_spinner_item);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
         mMinRatingSpinner.setAdapter(adapter);
 
@@ -128,12 +130,11 @@ public class SearchFormActivity extends Activity
     @Override
     public void onSongDatabaseUpdate() {
         List<String> artists = new ArrayList<String>();
-        List<StringIntPair> artistsWithCounts = NupActivity.getService().getSongDb().getArtistsSortedByNumSongs();
+        List<StatsRow> artistsWithCounts = NupActivity.getService().getSongDb().getArtistsSortedByNumSongs();
         if (artistsWithCounts != null) {
-            for (StringIntPair pair : artistsWithCounts) {
-                artists.add(pair.getString());
-            }
+            for (StatsRow stats : artistsWithCounts) artists.add(stats.key.artist);
         }
-        mArtistEdit.setAdapter(new ArrayAdapter<String>(SearchFormActivity.this, android.R.layout.simple_dropdown_item_1line, artists));
+        mArtistEdit.setAdapter(new ArrayAdapter<String>(SearchFormActivity.this,
+                               android.R.layout.simple_dropdown_item_1line, artists));
     }
 }

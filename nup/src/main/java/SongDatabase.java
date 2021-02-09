@@ -29,7 +29,7 @@ import java.util.List;
 public class SongDatabase {
     private static final String TAG = "SongDatabase";
 
-    // Special string that we use to represent a blank field.
+    // Special user-visible string that we use to represent a blank field.
     // It should be something that doesn't legitimately appear in any fields,
     // so "[unknown]" is out (MusicBrainz uses it for unknown artists).
     public static final String UNSET_STRING = "[unset]";
@@ -37,7 +37,7 @@ public class SongDatabase {
     private static final String MAX_QUERY_RESULTS = "250";
 
     private static final String DATABASE_NAME = "NupSongs";
-    private static final int DATABASE_VERSION = 14;
+    private static final int DATABASE_VERSION = 15;
 
     private static final int SERVER_SONG_BATCH_SIZE = 100;
 
@@ -70,6 +70,7 @@ public class SongDatabase {
         "CREATE TABLE ArtistAlbumStats (" +
         "  Artist VARCHAR(256) NOT NULL, " +
         "  Album VARCHAR(256) NOT NULL, " +
+        "  AlbumId VARCHAR(256) NOT NULL, " +
         "  NumSongs INTEGER NOT NULL, " +
         "  ArtistSortKey VARCHAR(256) NOT NULL, " +
         "  AlbumSortKey VARCHAR(256) NOT NULL)";
@@ -110,10 +111,12 @@ public class SongDatabase {
     private boolean mAggregateDataLoaded = false;
     private int mNumSongs = 0;
     private Date mLastSyncDate = null;
-    private List<StringIntPair> mArtistsSortedAlphabetically = new ArrayList<StringIntPair>();
-    private List<StringIntPair> mAlbumsSortedAlphabetically = new ArrayList<StringIntPair>();
-    private List<StringIntPair> mArtistsSortedByNumSongs = new ArrayList<StringIntPair>();
-    private HashMap<String,List<StringIntPair>> mArtistAlbums = new HashMap<String,List<StringIntPair>>();
+
+    // Int values in these maps are numbers of songs.
+    private List<StatsRow> mArtistsSortedAlphabetically = new ArrayList<StatsRow>();
+    private List<StatsRow> mArtistsSortedByNumSongs = new ArrayList<StatsRow>();
+    private List<StatsRow> mAlbumsSortedAlphabetically = new ArrayList<StatsRow>();
+    private HashMap<String,List<StatsRow>> mArtistAlbums = new HashMap<String,List<StatsRow>>();
 
     public interface Listener {
         void onAggregateDataUpdate();
@@ -267,6 +270,9 @@ public class SongDatabase {
                     throw new RuntimeException("Sorry, you need to delete everything and start over. :-(");
                 } else if (newVersion == 12 || newVersion == 13) {
                     // Versions 12 and 13: Update sort ordering.
+                    // It isn't actually safe to call updateStatsTables() like this, since it could
+                    // be now be assuming a schema different than the one used in these old
+                    // versions.
                     updateStatsTables(db);
                 } else if (newVersion == 14) {
                     // Version 14: Add AlbumId, TrackGain, AlbumGain, and PeakAmp to Songs.
@@ -297,6 +303,19 @@ public class SongDatabase {
                     db.execSQL(CREATE_SONGS_ARTIST_INDEX_SQL);
                     db.execSQL(CREATE_SONGS_ALBUM_INDEX_SQL);
                     db.execSQL(CREATE_SONGS_ALBUM_ID_INDEX_SQL);
+                } else if (newVersion == 15) {
+                    // Version 15: Add AlbumId to ArtistAlbumStats.
+                    db.execSQL("DROP TABLE ArtistAlbumStats");
+                    db.execSQL("CREATE TABLE ArtistAlbumStats (" +
+                               "  Artist VARCHAR(256) NOT NULL, " +
+                               "  Album VARCHAR(256) NOT NULL, " +
+                               "  AlbumId VARCHAR(256) NOT NULL, " +
+                               "  NumSongs INTEGER NOT NULL, " +
+                               "  ArtistSortKey VARCHAR(256) NOT NULL, " +
+                               "  AlbumSortKey VARCHAR(256) NOT NULL)");
+                    db.execSQL(CREATE_ARTIST_ALBUM_STATS_ARTIST_SORT_KEY_INDEX_SQL);
+                    db.execSQL(CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL);
+                    updateStatsTables(db);
                 } else {
                     throw new RuntimeException(
                         "Got request to upgrade database to unknown version " + newVersion);
@@ -332,37 +351,41 @@ public class SongDatabase {
     public int getNumSongs() { return mNumSongs; }
     public Date getLastSyncDate() { return mLastSyncDate; }
 
-    public List<StringIntPair> getAlbumsSortedAlphabetically() { return mAlbumsSortedAlphabetically; }
-    public List<StringIntPair> getArtistsSortedAlphabetically() { return mArtistsSortedAlphabetically; }
-    public List<StringIntPair> getArtistsSortedByNumSongs() { return mArtistsSortedByNumSongs; }
-
-    public List<StringIntPair> getAlbumsByArtist(String artist) {
+    public List<StatsRow> getAlbumsSortedAlphabetically() { return mAlbumsSortedAlphabetically; }
+    public List<StatsRow> getArtistsSortedAlphabetically() { return mArtistsSortedAlphabetically; }
+    public List<StatsRow> getArtistsSortedByNumSongs() { return mArtistsSortedByNumSongs; }
+    public List<StatsRow> getAlbumsByArtist(String artist) {
         String lowerArtist = artist.toLowerCase();
-        return mArtistAlbums.containsKey(lowerArtist) ? mArtistAlbums.get(lowerArtist) : new ArrayList<StringIntPair>();
+        return mArtistAlbums.containsKey(lowerArtist)
+            ? mArtistAlbums.get(lowerArtist)
+            : new ArrayList<StatsRow>();
     }
 
-    public List<StringIntPair> getCachedArtistsSortedAlphabetically() {
-        return getSortedItems(
-            "SELECT s.Artist, COUNT(*) FROM Songs s " +
+    public List<StatsRow> getCachedArtistsSortedAlphabetically() {
+        return getSortedRows(
+            "SELECT s.Artist, '' AS Album, '' AS AlbumId, COUNT(*) " +
+            "FROM Songs s " +
             "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
-            "GROUP BY 1",
+            "GROUP BY 1, 2, 3",
             null, Util.SORT_ARTIST);
     }
 
-    public List<StringIntPair> getCachedAlbumsSortedAlphabetically() {
-        return getSortedItems(
-            "SELECT s.Album, COUNT(*) FROM Songs s " +
+    public List<StatsRow> getCachedAlbumsSortedAlphabetically() {
+        return getSortedRows(
+            "SELECT '' AS Artist, s.Album, s.AlbumId, COUNT(*) " +
+            "FROM Songs s " +
             "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
-            "GROUP BY 1",
+            "GROUP BY 1, 2, 3",
             null, Util.SORT_ALBUM);
     }
 
-    public List<StringIntPair> getCachedAlbumsByArtist(String artist) {
-        return getSortedItems(
-            "SELECT s.Album, COUNT(*) FROM Songs s " +
+    public List<StatsRow> getCachedAlbumsByArtist(String artist) {
+        return getSortedRows(
+            "SELECT '' AS Artist, s.Album, s.AlbumId, COUNT(*) " +
+            "FROM Songs s " +
             "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
             "WHERE LOWER(s.Artist) = LOWER(?) " +
-            "GROUP BY 1",
+            "GROUP BY 1, 2, 3",
             new String[]{ artist }, Util.SORT_ALBUM);
     }
 
@@ -636,15 +659,19 @@ public class SongDatabase {
         // Map from lowercased artist name to the first row that we saw in its original case.
         HashMap<String,String> artistCaseMap = new HashMap<String,String>();
 
-        // Map from artist name to map from album name to number of songs.
-        HashMap<String,HashMap<String,Integer>> artistAlbums = new HashMap<String,HashMap<String,Integer>>();
+        // Map from artist name to map from album to number of songs.
+        HashMap<String,HashMap<StatsKey,Integer>> artistAlbums =
+            new HashMap<String,HashMap<StatsKey,Integer>>();
 
-        Cursor cursor = db.rawQuery("SELECT Artist, Album, COUNT(*) FROM Songs GROUP BY 1, 2", null);
+        Cursor cursor = db.rawQuery("SELECT Artist, Album, AlbumId, COUNT(*) FROM Songs GROUP BY 1, 2, 3", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
             String origArtist = cursor.getString(0);
             if (origArtist.isEmpty())
                 origArtist = UNSET_STRING;
+
+            // Normalize the artist case so that we'll still group all their songs together
+            // even if some use different capitalization.
             String lowerArtist = origArtist.toLowerCase();
             if (!artistCaseMap.containsKey(lowerArtist))
                 artistCaseMap.put(lowerArtist, origArtist);
@@ -653,19 +680,17 @@ public class SongDatabase {
             String album = cursor.getString(1);
             if (album.isEmpty())
                 album = UNSET_STRING;
+            String albumId = cursor.getString(2);
+            int numSongs = cursor.getInt(3);
 
-            int numSongsInAlbum = cursor.getInt(2);
-
-            HashMap<String,Integer> albumMap;
+            HashMap<StatsKey,Integer> albumMap;
             if (artistAlbums.containsKey(artist)) {
                 albumMap = artistAlbums.get(artist);
             } else {
-                albumMap = new HashMap<String,Integer>();
+                albumMap = new HashMap<StatsKey,Integer>();
                 artistAlbums.put(artist, albumMap);
             }
-
-            int totalSongsInAlbum = (albumMap.containsKey(album) ? albumMap.get(album) : 0) + numSongsInAlbum;
-            albumMap.put(album, totalSongsInAlbum);
+            albumMap.put(new StatsKey(origArtist, album, albumId), numSongs);
 
             cursor.moveToNext();
         }
@@ -674,14 +699,15 @@ public class SongDatabase {
         db.delete("ArtistAlbumStats", null, null);
         for (String artist : artistAlbums.keySet()) {
             String artistSortKey = Util.getSortingKey(artist, Util.SORT_ARTIST);
-            HashMap<String,Integer> albumMap = artistAlbums.get(artist);
-            for (String album : albumMap.keySet()) {
-                ContentValues values = new ContentValues(5);
+            HashMap<StatsKey,Integer> albumMap = artistAlbums.get(artist);
+            for (StatsKey key : albumMap.keySet()) {
+                ContentValues values = new ContentValues(6);
                 values.put("Artist", artist);
-                values.put("Album", album);
-                values.put("NumSongs", albumMap.get(album));
+                values.put("Album", key.album);
+                values.put("AlbumId", key.albumId);
+                values.put("NumSongs", albumMap.get(key));
                 values.put("ArtistSortKey", artistSortKey);
-                values.put("AlbumSortKey", Util.getSortingKey(album, Util.SORT_ALBUM));
+                values.put("AlbumSortKey", Util.getSortingKey(key.album, Util.SORT_ALBUM));
                 db.insert("ArtistAlbumStats", "", values);
             }
         }
@@ -722,50 +748,60 @@ public class SongDatabase {
         int numSongs = cursor.getInt(0);
         cursor.close();
 
-        List<StringIntPair> artistsSortedAlphabetically = new ArrayList<StringIntPair>();
-        cursor = db.rawQuery("SELECT Artist, SUM(NumSongs) FROM ArtistAlbumStats GROUP BY 1 ORDER BY ArtistSortKey ASC", null);
+        List<StatsRow> artistsSortedAlphabetically = new ArrayList<StatsRow>();
+        cursor = db.rawQuery("SELECT Artist, SUM(NumSongs) " +
+                             "FROM ArtistAlbumStats " +
+                             "GROUP BY 1 " +
+                             "ORDER BY ArtistSortKey ASC", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
-            artistsSortedAlphabetically.add(new StringIntPair(cursor.getString(0), cursor.getInt(1)));
+            artistsSortedAlphabetically.add(new StatsRow(cursor.getString(0), "", "", cursor.getInt(1)));
             cursor.moveToNext();
         }
         cursor.close();
 
-        List<StringIntPair> albumsSortedAlphabetically = new ArrayList<StringIntPair>();
-        cursor = db.rawQuery("SELECT Album, SUM(NumSongs) FROM ArtistAlbumStats GROUP BY 1 ORDER BY AlbumSortKey ASC", null);
+        List<StatsRow> albumsSortedAlphabetically = new ArrayList<StatsRow>();
+        cursor = db.rawQuery("SELECT Album, AlbumId, SUM(NumSongs) " +
+                             "FROM ArtistAlbumStats " +
+                             "GROUP BY 1, 2 " +
+                             "ORDER BY AlbumSortKey ASC, AlbumId ASC", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
-            albumsSortedAlphabetically.add(new StringIntPair(cursor.getString(0), cursor.getInt(1)));
+            // TODO: Include the most-common artist from the album.
+            StatsRow stats = new StatsRow("", cursor.getString(0), cursor.getString(1), cursor.getInt(2));
+            albumsSortedAlphabetically.add(stats);
             cursor.moveToNext();
         }
         cursor.close();
 
-        HashMap<String,List<StringIntPair>> artistAlbums = new HashMap<String,List<StringIntPair>>();
-        cursor = db.rawQuery("SELECT Artist, Album, NumSongs FROM ArtistAlbumStats ORDER BY AlbumSortKey ASC", null);
+        HashMap<String,List<StatsRow>> artistAlbums = new HashMap<String,List<StatsRow>>();
+        cursor = db.rawQuery("SELECT Artist, Album, AlbumId, NumSongs " +
+                             "FROM ArtistAlbumStats " +
+                             "ORDER BY AlbumSortKey ASC, AlbumId ASC", null);
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
             String artist = cursor.getString(0);
             String album = cursor.getString(1);
-            int numSongsForArtistAlbum = cursor.getInt(2);
+            String albumId = cursor.getString(2);
+            int count = cursor.getInt(3);
 
             String lowerArtist = artist.toLowerCase();
-            List<StringIntPair> albums = artistAlbums.get(lowerArtist);
+            List<StatsRow> albums = artistAlbums.get(lowerArtist);
             if (albums == null) {
-                albums = new ArrayList<StringIntPair>();
+                albums = new ArrayList<StatsRow>();
                 artistAlbums.put(lowerArtist, albums);
             }
-            albums.add(new StringIntPair(album, numSongsForArtistAlbum));
+            albums.add(new StatsRow(artist, album, albumId, count));
 
             cursor.moveToNext();
         }
         cursor.close();
 
-        List<StringIntPair> artistsSortedByNumSongs = new ArrayList<StringIntPair>();
+        List<StatsRow> artistsSortedByNumSongs = new ArrayList<StatsRow>();
         artistsSortedByNumSongs.addAll(artistsSortedAlphabetically);
-        Collections.sort(artistsSortedByNumSongs, new Comparator<StringIntPair>() {
-            @Override
-            public int compare(StringIntPair a, StringIntPair b) {
-                return b.getInt() - a.getInt();
+        Collections.sort(artistsSortedByNumSongs, new Comparator<StatsRow>() {
+            @Override public int compare(StatsRow a, StatsRow b) {
+                return b.count - a.count;
             }
         });
 
@@ -779,24 +815,28 @@ public class SongDatabase {
         mListener.onAggregateDataUpdate();
     }
 
-    // Given a query that returns strings in its first column and ints in its second column, returns its results in
-    // sorted order (on the first column only).
-    private List<StringIntPair> getSortedItems(String query, String[] selectionArgs, int sortType) {
+    // Given a query that returns artist, album, album ID, and num songs,
+    // returns its results in sorted order.
+    private List<StatsRow> getSortedRows(String query, String[] selectionArgs, int sortType) {
         SQLiteDatabase db = mOpener.getDb();
         Cursor cursor = db.rawQuery(query, selectionArgs);
 
-        List<StringIntPair> items = new ArrayList<StringIntPair>();
+        List<StatsRow> rows = new ArrayList<StatsRow>();
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
-            String string = cursor.getString(0);
-            if (string.isEmpty())
-                string = UNSET_STRING;
-            items.add(new StringIntPair(string, cursor.getInt(1)));
+            String artist = cursor.getString(0);
+            if (artist.isEmpty()) artist = UNSET_STRING;
+            String album = cursor.getString(1);
+            if (album.isEmpty()) album = UNSET_STRING;
+            String albumId = cursor.getString(2);
+            int count = cursor.getInt(3);
+
+            rows.add(new StatsRow(artist, album, albumId, count));
             cursor.moveToNext();
         }
         cursor.close();
 
-        Util.sortStringIntPairList(items, sortType);
-        return items;
+        Util.sortStatsRowList(rows, sortType);
+        return rows;
     }
 }

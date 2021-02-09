@@ -33,16 +33,16 @@ public class BrowseArtistsActivity extends BrowseActivityBase
     private boolean mOnlyCached = false;
 
     // Artists that we're displaying.
-    private List<StringIntPair> mArtists = new ArrayList<StringIntPair>(); 
+    private List<StatsRow> mRows = new ArrayList<StatsRow>();
 
-    private SortedStringArrayAdapter mAdapter;
+    private SortedStatsRowArrayAdapter mAdapter;
 
     @Override public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         mOnlyCached = getIntent().getBooleanExtra(BUNDLE_CACHED, false);
         setTitle(mOnlyCached ? R.string.browse_cached_artists : R.string.browse_artists);
 
-        mAdapter = new SortedStringArrayAdapter(this, R.layout.browse_row, mArtists, Util.SORT_ARTIST);
+        mAdapter = new SortedStatsRowArrayAdapter(this, R.layout.browse_row, mRows, Util.SORT_ARTIST);
         setListAdapter(mAdapter);
         registerForContextMenu(getListView());
 
@@ -56,16 +56,16 @@ public class BrowseArtistsActivity extends BrowseActivityBase
     }
 
     @Override protected void onListItemClick(ListView listView, View view, int position, long id) {
-        StringIntPair artist = mArtists.get(position);
-        if (artist == null)
-            return;
-        startBrowseAlbumsActivity(artist.getString());
+        StatsRow row = mRows.get(position);
+        if (row == null) return;
+        startBrowseAlbumsActivity(row.key.artist);
     }
 
     @Override public void onCreateContextMenu(ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
-        StringIntPair artist = mArtists.get(((AdapterView.AdapterContextMenuInfo) menuInfo).position);
-        if (artist != null)
-            menu.setHeaderTitle(artist.getString());
+        int pos = ((AdapterView.AdapterContextMenuInfo) menuInfo).position;
+        StatsRow row = mRows.get(pos);
+        if (row != null) menu.setHeaderTitle(row.key.artist);
+
         menu.add(0, MENU_ITEM_BROWSE_SONGS_WITH_RATING, 0, R.string.browse_songs_four_stars);
         menu.add(0, MENU_ITEM_BROWSE_SONGS, 0, R.string.browse_songs);
         menu.add(0, MENU_ITEM_BROWSE_ALBUMS, 0, R.string.browse_albums);
@@ -73,18 +73,18 @@ public class BrowseArtistsActivity extends BrowseActivityBase
 
     @Override public boolean onContextItemSelected(MenuItem item) {
         AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
-        StringIntPair artist = mArtists.get(info.position);
-        if (artist == null)
-            return false;
+        StatsRow row = mRows.get(info.position);
+        if (row == null) return false;
+
         switch (item.getItemId()) {
             case MENU_ITEM_BROWSE_SONGS_WITH_RATING:
-                startBrowseSongsActivity(artist.getString(), 0.75);
+                startBrowseSongsActivity(row.key.artist, 0.75);
                 return true;
             case MENU_ITEM_BROWSE_SONGS:
-                startBrowseSongsActivity(artist.getString(), -1.0);
+                startBrowseSongsActivity(row.key.artist, -1.0);
                 return true;
             case MENU_ITEM_BROWSE_ALBUMS:
-                startBrowseAlbumsActivity(artist.getString());
+                startBrowseAlbumsActivity(row.key.artist);
                 return true;
             default:
                 return false;
@@ -94,33 +94,31 @@ public class BrowseArtistsActivity extends BrowseActivityBase
     // Implements NupService.SongDatabaseUpdateListener.
     @Override public void onSongDatabaseUpdate() {
         if (!NupActivity.getService().getSongDb().getAggregateDataLoaded()) {
-            mArtists.add(new StringIntPair(getString(R.string.loading), -1));
+            mRows.add(new StatsRow(getString(R.string.loading), "", "", -1));
             mAdapter.setEnabled(false);
             mAdapter.notifyDataSetChanged();
             return;
         }
 
         if (!mOnlyCached) {
-            updateArtists(NupActivity.getService().getSongDb().getArtistsSortedAlphabetically());
+            updateRows(NupActivity.getService().getSongDb().getArtistsSortedAlphabetically());
         } else {
-            new AsyncTask<Void, Void, List<StringIntPair>>() {
-                @Override
-                protected List<StringIntPair> doInBackground(Void... args) {
+            new AsyncTask<Void, Void, List<StatsRow>>() {
+                @Override protected List<StatsRow> doInBackground(Void... args) {
                     return NupActivity.getService().getSongDb().getCachedArtistsSortedAlphabetically();
                 }
-                @Override
-                protected void onPostExecute(List<StringIntPair> artists) {
-                    updateArtists(artists);
+                @Override protected void onPostExecute(List<StatsRow> rows) {
+                    updateRows(rows);
                 }
             }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
         }
     }
 
     // Show a new list of artists.
-    private void updateArtists(List<StringIntPair> artists) {
+    private void updateRows(List<StatsRow> rows) {
         final ListView listView = getListView();
-        mArtists.clear();
-        mArtists.addAll(artists);
+        mRows.clear();
+        mRows.addAll(rows);
         listView.setFastScrollEnabled(false);
         mAdapter.setEnabled(true);
         mAdapter.notifyDataSetChanged();

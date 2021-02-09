@@ -144,15 +144,27 @@ public class Util {
         return str;
     }
 
-    // Sort a list of StringIntPair objects.
-    public static void sortStringIntPairList(List<StringIntPair> items, int sortType) {
-        final HashMap<String,String> sortKeys = new HashMap<String,String>();
-        for (StringIntPair item : items)
-            sortKeys.put(item.getString(), getSortingKey(item.getString(), sortType));
-        Collections.sort(items, new Comparator<StringIntPair>() {
-            @Override
-            public int compare(StringIntPair a, StringIntPair b) {
-                return sortKeys.get(a.getString()).compareTo(sortKeys.get(b.getString()));
+    // Sort the supplied list by its keys.
+    public static void sortStatsRowList(List<StatsRow> stats, int sortType) {
+        // Getting sorting keys is expensive, so just do it once.
+        final HashMap<StatsKey,String> keys = new HashMap<StatsKey,String>();
+        if (sortType == SORT_ALBUM) {
+            for (StatsRow s : stats) {
+                String key = getSortingKey(s.key.album, sortType);
+                key += " " + s.key.albumId;
+                keys.put(s.key, key);
+            }
+        } else if (sortType == SORT_ARTIST) {
+            for (StatsRow s : stats) {
+                keys.put(s.key, getSortingKey(s.key.artist, sortType));
+            }
+        } else {
+            throw new IllegalArgumentException("invalid sort type");
+        }
+
+        Collections.sort(stats, new Comparator<StatsRow>() {
+            @Override public int compare(StatsRow a, StatsRow b) {
+                return keys.get(a.key).compareTo(keys.get(b.key));
             }
         });
     }

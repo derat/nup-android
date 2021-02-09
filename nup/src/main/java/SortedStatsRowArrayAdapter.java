@@ -11,37 +11,38 @@ import android.widget.TextView;
 import java.util.ArrayList;
 import java.util.List;
 
-class SortedStringArrayAdapter extends ArrayAdapter<StringIntPair>
-                               implements SectionIndexer {
-    private static final String TAG = "SortedStringArrayAdapter";
-
-    private List<StringIntPair> mItems;
-
-    // Are all items in the list enabled?  If false, all are disabled.
-    private boolean mEnabled = true;
-
-    // Manner in which to sort strings, as a Util.SORT_* value.
-    private int mSortType = Util.SORT_ARTIST;
+class SortedStatsRowArrayAdapter extends ArrayAdapter<StatsRow>
+                                 implements SectionIndexer {
+    private static final String TAG = "SortedStatsRowArrayAdapter";
 
     private static final String NUMBER_SECTION = "#";
     private static final String OTHER_SECTION = "\u2668";  // HOT SPRINGS (Android isn't snowman-compatible)
 
+    // Rows to display.
+    private List<StatsRow> mRows;
+
+    // Are all rows in the list enabled?  If false, all are disabled.
+    private boolean mEnabled = true;
+
+    // Manner in which |mRows| are sorted, as a Util.SORT_* value.
+    private int mSortType = Util.SORT_ARTIST;
+
     private ArrayList<String> mSections = new ArrayList<String>();
 
-    // Position of the first item in each section.
+    // Position of the first row in each section.
     private ArrayList<Integer> mSectionStartingPositions = new ArrayList<Integer>();
 
-    SortedStringArrayAdapter(Context context,
-                             int textViewResourceId,
-                             List<StringIntPair> items,
-                             int sortType) {
-        super(context, textViewResourceId, items);
-        mItems = items;
+    SortedStatsRowArrayAdapter(Context context,
+                               int textViewResourceId,
+                               List<StatsRow> rows,
+                               int sortType) {
+        super(context, textViewResourceId, rows);
+        mRows = rows;
         mSortType = sortType;
         initSections();
     }
 
-    // Should all of the items in the list be enabled, or all disabled?
+    // Should all of the rows in the list be enabled, or all disabled?
     public void setEnabled(boolean enabled) {
         mEnabled = enabled;
     }
@@ -55,8 +56,7 @@ class SortedStringArrayAdapter extends ArrayAdapter<StringIntPair>
     public int getSectionForPosition(int position) {
         // No upper_bound()/lower_bound()? :-(
         for (int i = 0; i < mSectionStartingPositions.size() - 1; ++i) {
-            if (position < mSectionStartingPositions.get(i + 1))
-                return i;
+            if (position < mSectionStartingPositions.get(i + 1)) return i;
         }
         return mSectionStartingPositions.size() - 1;
     }
@@ -92,27 +92,37 @@ class SortedStringArrayAdapter extends ArrayAdapter<StringIntPair>
             view = inflater.inflate(R.layout.browse_row, null);
         }
 
-        StringIntPair item = mItems.get(position);
-        ((TextView) view.findViewById(R.id.main)).setText(item.getString());
-        ((TextView) view.findViewById(R.id.extra)).setText(item.getInt() >= 0 ? "" + item.getInt() : "");
+        StatsRow row = mRows.get(position);
+        ((TextView) view.findViewById(R.id.main)).setText(getString(row.key));
+        ((TextView) view.findViewById(R.id.extra)).setText(row.count >= 0 ? "" + row.count : "");
         return view;
     }
 
+    // Returns the string to display for the supplied key.
+    private String getString(StatsKey key) {
+        if (mSortType == Util.SORT_ARTIST) {
+            return key.artist;
+        } else if (mSortType == Util.SORT_ALBUM) {
+            // TODO: Add a way to configure whether artist is also displayed.
+            return key.album;
+        }
+        throw new IllegalArgumentException("invalid sort type");
+    }
+
+    // Updates |mSections| and |mSectionStartingPositions| for |mRows|.
     private void initSections() {
         // Create a list of all possible sections in the order in which they'd appear.
         ArrayList<String> sections = new ArrayList<String>();
         sections.add(NUMBER_SECTION);
-        for (char ch = 'A'; ch <= 'Z'; ++ch)
-            sections.add(Character.toString(ch));
+        for (char ch = 'A'; ch <= 'Z'; ++ch) sections.add(Character.toString(ch));
         sections.add(OTHER_SECTION);
 
         mSections.clear();
         mSectionStartingPositions.clear();
 
         int sectionIndex = -1;
-        for (int itemIndex = 0; itemIndex < mItems.size(); ++itemIndex) {
-            StringIntPair item = mItems.get(itemIndex);
-            String sectionName = getSectionNameForString(item.getString());
+        for (int rowIndex = 0; rowIndex < mRows.size(); ++rowIndex) {
+            String sectionName = getSectionNameForString(getString(mRows.get(rowIndex).key));
 
             int prevSectionIndex = sectionIndex;
             while (sectionIndex == -1 || !sectionName.equals(sections.get(sectionIndex)))
@@ -121,21 +131,18 @@ class SortedStringArrayAdapter extends ArrayAdapter<StringIntPair>
             // If we advanced to a new section, register it.
             if (sectionIndex != prevSectionIndex) {
                 mSections.add(sections.get(sectionIndex));
-                mSectionStartingPositions.add(itemIndex);
+                mSectionStartingPositions.add(rowIndex);
             }
         }
     }
 
     private String getSectionNameForString(String str) {
-        if (str.isEmpty())
-            return NUMBER_SECTION;
+        if (str.isEmpty()) return NUMBER_SECTION;
 
         String sortStr = Util.getSortingKey(str, mSortType);
         char ch = sortStr.charAt(0);
-        if (ch < 'a')
-            return NUMBER_SECTION;
-        if (ch >= 'a' && ch <= 'z')
-            return Character.toString(Character.toUpperCase(ch));
+        if (ch < 'a') return NUMBER_SECTION;
+        if (ch >= 'a' && ch <= 'z') return Character.toString(Character.toUpperCase(ch));
         return OTHER_SECTION;
     }
 }
