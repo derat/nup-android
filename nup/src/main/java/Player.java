@@ -225,7 +225,7 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
         pct *= LOW_VOLUME_FRACTION;
       }
       if (mPeakAmp > 0) {
-        pct = Math.min(pct, mPeakAmp);
+        pct = Math.min(pct, 1 / mPeakAmp);
       }
 
       Log.d(TAG, "setting " + mPath + " volume to " + pct);
