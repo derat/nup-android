@@ -10,13 +10,13 @@ import android.os.AsyncTask;
  * (where AsyncTask is unimplemented).
  */
 public class TaskRunner {
-  public void runInBackground(final Runnable runnable) {
-    new AsyncTask<Void, Void, Void>() {
-      @Override
-      protected Void doInBackground(Void... args) {
-        runnable.run();
-        return null;
-      }
-    }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
-  }
+    public void runInBackground(final Runnable runnable) {
+        new AsyncTask<Void, Void, Void>() {
+            @Override
+            protected Void doInBackground(Void... args) {
+                runnable.run();
+                return null;
+            }
+        }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
+    }
 }

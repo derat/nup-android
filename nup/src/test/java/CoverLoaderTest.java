@@ -1,5 +1,8 @@
 package org.erat.nup.test;
 
+import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
+
 import android.graphics.Bitmap;
 import android.test.mock.MockContext;
 
@@ -10,12 +13,9 @@ import org.erat.nup.CoverLoader;
 import org.erat.nup.Downloader;
 import org.erat.nup.NetworkHelper;
 import org.erat.nup.Util;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
-
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
@@ -30,9 +30,6 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.util.HashMap;
 
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
-
 public class CoverLoaderTest {
     private FakeTaskRunner mTaskRunner;
     private File mTempDir;
@@ -45,99 +42,123 @@ public class CoverLoaderTest {
 
     HashMap<String, Bitmap> mBitmapDataMap;
 
-    @Before public void setUp() throws Exception {
+    @Before
+    public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
 
         mTaskRunner = new FakeTaskRunner();
         mTempDir = Files.createTempDir();
-        mContext = new MockContext() {
-            @Override public File getExternalCacheDir() {
-                return mTempDir;
-            }
-        };
+        mContext =
+                new MockContext() {
+                    @Override
+                    public File getExternalCacheDir() {
+                        return mTempDir;
+                    }
+                };
 
         mBitmapDataMap = new HashMap<String, Bitmap>();
-        when(mBitmapDecoder.decodeFile(any(File.class))).thenAnswer(new Answer() {
-            @Override public Object answer(InvocationOnMock invocation) {
-                FileInputStream inputStream = null;
-                try {
-                    inputStream = new FileInputStream((File) invocation.getArguments()[0]);
-                    String fileData = Util.getStringFromInputStream(inputStream);
-                    return mBitmapDataMap.get(fileData);
-                } catch (IOException e) {
-                    return null;
-                } finally {
-                    if (inputStream != null) {
-                        try { inputStream.close(); } catch (IOException e) {}
-                    }
-                }
-            }
-        });
+        when(mBitmapDecoder.decodeFile(any(File.class)))
+                .thenAnswer(
+                        new Answer() {
+                            @Override
+                            public Object answer(InvocationOnMock invocation) {
+                                FileInputStream inputStream = null;
+                                try {
+                                    inputStream =
+                                            new FileInputStream(
+                                                    (File) invocation.getArguments()[0]);
+                                    String fileData = Util.getStringFromInputStream(inputStream);
+                                    return mBitmapDataMap.get(fileData);
+                                } catch (IOException e) {
+                                    return null;
+                                } finally {
+                                    if (inputStream != null) {
+                                        try {
+                                            inputStream.close();
+                                        } catch (IOException e) {
+                                        }
+                                    }
+                                }
+                            }
+                        });
 
-        mCoverLoader = new CoverLoader(mContext, mDownloader, mTaskRunner, mBitmapDecoder, mNetworkHelper);
+        mCoverLoader =
+                new CoverLoader(mContext, mDownloader, mTaskRunner, mBitmapDecoder, mNetworkHelper);
     }
 
-    @After public void tearDown() throws Exception {
+    @After
+    public void tearDown() throws Exception {
         mTempDir.delete();
     }
 
-    @Test public void downloadAndCacheCovers() throws Exception {
+    @Test
+    public void downloadAndCacheCovers() throws Exception {
         when(mNetworkHelper.isNetworkAvailable()).thenReturn(true);
 
         final URL COVER_URL_1 = new URL("https://www.example.com/cover1.jpg");
         final String DATA_1 = "foo";
         final Bitmap BITMAP_1 = createAndRegisterBitmap(DATA_1);
         HttpURLConnection conn1 = createConnection(200, DATA_1);
-        when(mDownloader.download(COVER_URL_1, "GET", Downloader.AuthType.STORAGE, null)).thenReturn(conn1);
+        when(mDownloader.download(COVER_URL_1, "GET", Downloader.AuthType.STORAGE, null))
+                .thenReturn(conn1);
 
         final URL COVER_URL_2 = new URL("https://www.example.com/cover2.jpg");
         final String DATA_2 = "bar";
         final Bitmap BITMAP_2 = createAndRegisterBitmap(DATA_2);
         HttpURLConnection conn2 = createConnection(200, DATA_2);
-        when(mDownloader.download(COVER_URL_2, "GET", Downloader.AuthType.STORAGE, null)).thenReturn(conn2);
+        when(mDownloader.download(COVER_URL_2, "GET", Downloader.AuthType.STORAGE, null))
+                .thenReturn(conn2);
 
-        // The first load request for each cover should result in it being downloaded, but it should be cached after
-        // that.
+        // The first load request for each cover should result in it being downloaded, but it should
+        // be cached after that.
         assertEquals(BITMAP_1, mCoverLoader.loadCover(COVER_URL_1));
         assertEquals(BITMAP_2, mCoverLoader.loadCover(COVER_URL_2));
         assertEquals(BITMAP_1, mCoverLoader.loadCover(COVER_URL_1));
         assertEquals(BITMAP_1, mCoverLoader.loadCover(COVER_URL_1));
         assertEquals(BITMAP_2, mCoverLoader.loadCover(COVER_URL_2));
-        verify(mDownloader, times(1)).download(COVER_URL_1, "GET", Downloader.AuthType.STORAGE, null);
-        verify(mDownloader, times(1)).download(COVER_URL_2, "GET", Downloader.AuthType.STORAGE, null);
+        verify(mDownloader, times(1))
+                .download(COVER_URL_1, "GET", Downloader.AuthType.STORAGE, null);
+        verify(mDownloader, times(1))
+                .download(COVER_URL_2, "GET", Downloader.AuthType.STORAGE, null);
     }
 
-    @Test public void skipDownloadWhenNetworkUnavailable() throws Exception {
+    @Test
+    public void skipDownloadWhenNetworkUnavailable() throws Exception {
         final URL COVER_URL = new URL("https://www.example.com/cover.jpg");
         when(mNetworkHelper.isNetworkAvailable()).thenReturn(false);
         assertNull(mCoverLoader.loadCover(COVER_URL));
         verify(mDownloader, never()).download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null);
     }
 
-    @Test public void returnNullForMissingFile() throws Exception {
+    @Test
+    public void returnNullForMissingFile() throws Exception {
         when(mNetworkHelper.isNetworkAvailable()).thenReturn(true);
         final URL COVER_URL = new URL("https://www.example.com/cover.jpg");
         HttpURLConnection conn = createConnection(404, null);
-        when(mDownloader.download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null)).thenReturn(conn);
+        when(mDownloader.download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null))
+                .thenReturn(conn);
         assertNull(mCoverLoader.loadCover(COVER_URL));
     }
 
-    @Test public void returnNullForIOException() throws Exception {
+    @Test
+    public void returnNullForIOException() throws Exception {
         when(mNetworkHelper.isNetworkAvailable()).thenReturn(true);
         final URL COVER_URL = new URL("https://www.example.com/cover.jpg");
         when(mDownloader.download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null))
-            .thenThrow(new IOException());
+                .thenThrow(new IOException());
         assertNull(mCoverLoader.loadCover(COVER_URL));
     }
 
-    @Test public void cacheDecodedBitmap() throws Exception {
+    @Test
+    public void cacheDecodedBitmap() throws Exception {
         when(mNetworkHelper.isNetworkAvailable()).thenReturn(true);
 
         final URL COVER_URL = new URL("https://www.example.com/cover.jpg");
         final String DATA = "foo";
         final Bitmap BITMAP = createAndRegisterBitmap(DATA);
         HttpURLConnection conn = createConnection(200, DATA);
-        when(mDownloader.download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null)).thenReturn(conn);
+        when(mDownloader.download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null))
+                .thenReturn(conn);
 
         assertEquals(BITMAP, mCoverLoader.loadCover(COVER_URL));
         assertEquals(BITMAP, mCoverLoader.loadCover(COVER_URL));

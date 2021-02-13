@@ -1,16 +1,16 @@
 package org.erat.nup.test;
 
+import static org.junit.Assert.*;
+import static org.mockito.Mockito.*;
+
 import org.erat.nup.Downloader;
 import org.erat.nup.NetworkHelper;
 import org.erat.nup.PlaybackReporter;
 import org.erat.nup.SongDatabase;
-
 import org.junit.Before;
 import org.junit.Test;
-
 import org.mockito.InOrder;
 import org.mockito.Mock;
-import org.mockito.Mockito;
 import org.mockito.MockitoAnnotations;
 
 import java.net.HttpURLConnection;
@@ -18,9 +18,6 @@ import java.net.URL;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
-
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
 
 public class PlaybackReporterTest {
     private final long SONG_ID = 1234;
@@ -36,7 +33,8 @@ public class PlaybackReporterTest {
 
     private URL mReportUrl;
 
-    @Before public void setUp() throws Exception {
+    @Before
+    public void setUp() throws Exception {
         MockitoAnnotations.initMocks(this);
         mTaskRunner = new FakeTaskRunner();
 
@@ -47,31 +45,34 @@ public class PlaybackReporterTest {
         mReportUrl = getReportURL(reportPath);
         when(mDownloader.getServerUrl(reportPath)).thenReturn(mReportUrl);
 
-        when(mSongDb.getAllPendingPlaybackReports()).thenReturn(
-            new ArrayList<SongDatabase.PendingPlaybackReport>());
+        when(mSongDb.getAllPendingPlaybackReports())
+                .thenReturn(new ArrayList<SongDatabase.PendingPlaybackReport>());
     }
 
-    @Test public void immediateSuccessfulReport() throws Exception {
+    @Test
+    public void immediateSuccessfulReport() throws Exception {
         when(mNetworkHelper.isNetworkAvailable()).thenReturn(true);
         PlaybackReporter reporter = createReporter();
 
-        when(mSongDb.getAllPendingPlaybackReports()).thenReturn(
-            Arrays.asList(new SongDatabase.PendingPlaybackReport(SONG_ID, START_DATE)));
+        when(mSongDb.getAllPendingPlaybackReports())
+                .thenReturn(
+                        Arrays.asList(new SongDatabase.PendingPlaybackReport(SONG_ID, START_DATE)));
         when(mDownloader.download(mReportUrl, "POST", Downloader.AuthType.SERVER, null))
-            .thenReturn(mSuccessConn);
+                .thenReturn(mSuccessConn);
         reporter.report(SONG_ID, START_DATE);
 
         InOrder inOrder = inOrder(mSongDb, mDownloader);
         inOrder.verify(mSongDb).addPendingPlaybackReport(SONG_ID, START_DATE);
-        // For reasons that are unclear to me, Mockito permits this download call to happen multiple times. Maybe it's
-        // bad interaction with the earlier when() call. Using times(1) doesn't help and I'm also unable to reproduce
-        // this with a simpler example. It's a bummer to have a testing library that you can't trust to verify your
-        // code.
+        // For reasons that are unclear to me, Mockito permits this download call to happen multiple
+        // times. Maybe it's bad interaction with the earlier when() call. Using times(1) doesn't
+        // help and I'm also unable to reproduce this with a simpler example. It's a bummer to have
+        // a testing library that you can't trust to verify your code.
         inOrder.verify(mDownloader).download(mReportUrl, "POST", Downloader.AuthType.SERVER, null);
         inOrder.verify(mSongDb).removePendingPlaybackReport(SONG_ID, START_DATE);
     }
 
-    @Test public void deferReportWhenNetworkUnavailable() throws Exception {
+    @Test
+    public void deferReportWhenNetworkUnavailable() throws Exception {
         when(mNetworkHelper.isNetworkAvailable()).thenReturn(false);
         PlaybackReporter reporter = createReporter();
         verify(mSongDb, never()).getAllPendingPlaybackReports();
@@ -81,14 +82,16 @@ public class PlaybackReporterTest {
         verifyNoMoreInteractions(mDownloader);
     }
 
-    @Test public void deferReportOnServerError() throws Exception {
+    @Test
+    public void deferReportOnServerError() throws Exception {
         when(mNetworkHelper.isNetworkAvailable()).thenReturn(true);
         PlaybackReporter reporter = createReporter();
 
-        when(mSongDb.getAllPendingPlaybackReports()).thenReturn(
-            Arrays.asList(new SongDatabase.PendingPlaybackReport(SONG_ID, START_DATE)));
+        when(mSongDb.getAllPendingPlaybackReports())
+                .thenReturn(
+                        Arrays.asList(new SongDatabase.PendingPlaybackReport(SONG_ID, START_DATE)));
         when(mDownloader.download(mReportUrl, "POST", Downloader.AuthType.SERVER, null))
-            .thenReturn(mServerErrorConn);
+                .thenReturn(mServerErrorConn);
         reporter.report(SONG_ID, START_DATE);
 
         InOrder inOrder = inOrder(mSongDb, mDownloader);
@@ -97,12 +100,14 @@ public class PlaybackReporterTest {
         inOrder.verify(mSongDb, never()).removePendingPlaybackReport(SONG_ID, START_DATE);
     }
 
-    @Test public void reportPendingAtCreation() throws Exception {
+    @Test
+    public void reportPendingAtCreation() throws Exception {
         when(mNetworkHelper.isNetworkAvailable()).thenReturn(true);
-        when(mSongDb.getAllPendingPlaybackReports()).thenReturn(
-            Arrays.asList(new SongDatabase.PendingPlaybackReport(SONG_ID, START_DATE)));
+        when(mSongDb.getAllPendingPlaybackReports())
+                .thenReturn(
+                        Arrays.asList(new SongDatabase.PendingPlaybackReport(SONG_ID, START_DATE)));
         when(mDownloader.download(mReportUrl, "POST", Downloader.AuthType.SERVER, null))
-            .thenReturn(mSuccessConn);
+                .thenReturn(mSuccessConn);
 
         PlaybackReporter reporter = createReporter();
 
@@ -111,7 +116,8 @@ public class PlaybackReporterTest {
         inOrder.verify(mSongDb).removePendingPlaybackReport(SONG_ID, START_DATE);
     }
 
-    @Test public void reportPendingWhenReportRequested() throws Exception {
+    @Test
+    public void reportPendingWhenReportRequested() throws Exception {
         when(mNetworkHelper.isNetworkAvailable()).thenReturn(true);
         PlaybackReporter reporter = createReporter();
 
@@ -122,20 +128,22 @@ public class PlaybackReporterTest {
         when(mDownloader.getServerUrl(OLD_REPORT_PATH)).thenReturn(OLD_REPORT_URL);
 
         // Queue up an old report. Let it succeed, but the next report fail.
-        when(mSongDb.getAllPendingPlaybackReports()).thenReturn(
-            Arrays.asList(
-                new SongDatabase.PendingPlaybackReport(OLD_SONG_ID, OLD_START_DATE),
-                new SongDatabase.PendingPlaybackReport(SONG_ID, START_DATE)));
+        when(mSongDb.getAllPendingPlaybackReports())
+                .thenReturn(
+                        Arrays.asList(
+                                new SongDatabase.PendingPlaybackReport(OLD_SONG_ID, OLD_START_DATE),
+                                new SongDatabase.PendingPlaybackReport(SONG_ID, START_DATE)));
         when(mDownloader.download(OLD_REPORT_URL, "POST", Downloader.AuthType.SERVER, null))
-            .thenReturn(mSuccessConn);
+                .thenReturn(mSuccessConn);
         when(mDownloader.download(mReportUrl, "POST", Downloader.AuthType.SERVER, null))
-            .thenReturn(mServerErrorConn);
+                .thenReturn(mServerErrorConn);
 
         reporter.report(SONG_ID, START_DATE);
 
         InOrder inOrder = inOrder(mSongDb, mDownloader);
         inOrder.verify(mSongDb).addPendingPlaybackReport(SONG_ID, START_DATE);
-        inOrder.verify(mDownloader).download(OLD_REPORT_URL, "POST", Downloader.AuthType.SERVER, null);
+        inOrder.verify(mDownloader)
+                .download(OLD_REPORT_URL, "POST", Downloader.AuthType.SERVER, null);
         inOrder.verify(mSongDb).removePendingPlaybackReport(OLD_SONG_ID, OLD_START_DATE);
         inOrder.verify(mDownloader).download(mReportUrl, "POST", Downloader.AuthType.SERVER, null);
 
@@ -146,21 +154,24 @@ public class PlaybackReporterTest {
         final URL NEW_REPORT_URL = getReportURL(NEW_REPORT_PATH);
         when(mDownloader.getServerUrl(NEW_REPORT_PATH)).thenReturn(NEW_REPORT_URL);
 
-        when(mSongDb.getAllPendingPlaybackReports()).thenReturn(
-            Arrays.asList(
-                new SongDatabase.PendingPlaybackReport(SONG_ID, START_DATE),
-                new SongDatabase.PendingPlaybackReport(NEW_SONG_ID, NEW_START_DATE)));
+        when(mSongDb.getAllPendingPlaybackReports())
+                .thenReturn(
+                        Arrays.asList(
+                                new SongDatabase.PendingPlaybackReport(SONG_ID, START_DATE),
+                                new SongDatabase.PendingPlaybackReport(
+                                        NEW_SONG_ID, NEW_START_DATE)));
         when(mDownloader.download(mReportUrl, "POST", Downloader.AuthType.SERVER, null))
-            .thenReturn(mSuccessConn);
+                .thenReturn(mSuccessConn);
         when(mDownloader.download(NEW_REPORT_URL, "POST", Downloader.AuthType.SERVER, null))
-            .thenReturn(mSuccessConn);
+                .thenReturn(mSuccessConn);
 
         reporter.report(NEW_SONG_ID, NEW_START_DATE);
 
         inOrder.verify(mSongDb).addPendingPlaybackReport(NEW_SONG_ID, NEW_START_DATE);
         inOrder.verify(mDownloader).download(mReportUrl, "POST", Downloader.AuthType.SERVER, null);
         inOrder.verify(mSongDb).removePendingPlaybackReport(SONG_ID, START_DATE);
-        inOrder.verify(mDownloader).download(NEW_REPORT_URL, "POST", Downloader.AuthType.SERVER, null);
+        inOrder.verify(mDownloader)
+                .download(NEW_REPORT_URL, "POST", Downloader.AuthType.SERVER, null);
         inOrder.verify(mSongDb).removePendingPlaybackReport(NEW_SONG_ID, NEW_START_DATE);
     }
 
@@ -169,8 +180,8 @@ public class PlaybackReporterTest {
     }
 
     private String getReportPath(long songId, Date startDate) {
-        return String.format("/report_played?songId=%d&startTime=%f",
-                             songId, startDate.getTime() / 1000.0);
+        return String.format(
+                "/report_played?songId=%d&startTime=%f", songId, startDate.getTime() / 1000.0);
     }
 
     private URL getReportURL(String reportPath) throws Exception {

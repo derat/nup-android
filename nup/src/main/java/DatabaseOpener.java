@@ -17,59 +17,68 @@ import android.util.Log;
 // closing
 // its writable handle in the background at times (the docs don't mention this).
 class DatabaseOpener {
-  private static final String TAG = "DatabaseOpener";
+    private static final String TAG = "DatabaseOpener";
 
-  private final Context mContext;
-  private final String mDatabaseName;
-  private final SQLiteOpenHelper mOpenHelper;
+    private final Context mContext;
+    private final String mDatabaseName;
+    private final SQLiteOpenHelper mOpenHelper;
 
-  private SQLiteDatabase mDb = null;
+    private SQLiteDatabase mDb = null;
 
-  public DatabaseOpener(Context context, String databaseName, SQLiteOpenHelper helper) {
-    mContext = context;
-    mDatabaseName = databaseName;
-    mOpenHelper = helper;
-  }
-
-  // Opens and returns a database.  The caller shouldn't call close() on the object, since it's
-  // shared across multiple calls.
-  public synchronized SQLiteDatabase getDb() {
-    if (mDb == null) {
-      // Just use SQLiteOpenHelper to create and upgrade the database.
-      // Trying to use it with multithreaded code seems to be a disaster.
-      // We repeatedly try to open the database, since I see weird "database locked"
-      // errors when trying to open a database just after startup sometimes -- as
-      // far as I know, nobody should be using the database at that point.
-      while (true) {
-        try {
-          SQLiteDatabase db = mOpenHelper.getWritableDatabase();
-          db.close();
-          break;
-        } catch (SQLiteDatabaseLockedException e) {
-          Log.e(
-              TAG,
-              "database " + mDatabaseName + " was locked while trying to create/upgrade it: " + e);
-        }
-      }
-
-      while (true) {
-        try {
-          mDb = mContext.openOrCreateDatabase(mDatabaseName, 0, null);
-          break;
-        } catch (SQLiteDatabaseLockedException e) {
-          Log.e(TAG, "database " + mDatabaseName + " was locked while trying to open it: " + e);
-        }
-      }
+    public DatabaseOpener(Context context, String databaseName, SQLiteOpenHelper helper) {
+        mContext = context;
+        mDatabaseName = databaseName;
+        mOpenHelper = helper;
     }
 
-    return mDb;
-  }
+    // Opens and returns a database.  The caller shouldn't call close() on the object, since it's
+    // shared across multiple calls.
+    public synchronized SQLiteDatabase getDb() {
+        if (mDb == null) {
+            // Just use SQLiteOpenHelper to create and upgrade the database.
+            // Trying to use it with multithreaded code seems to be a disaster.
+            // We repeatedly try to open the database, since I see weird "database locked"
+            // errors when trying to open a database just after startup sometimes -- as
+            // far as I know, nobody should be using the database at that point.
+            while (true) {
+                try {
+                    SQLiteDatabase db = mOpenHelper.getWritableDatabase();
+                    db.close();
+                    break;
+                } catch (SQLiteDatabaseLockedException e) {
+                    Log.e(
+                            TAG,
+                            "database "
+                                    + mDatabaseName
+                                    + " was locked while trying to create/upgrade it: "
+                                    + e);
+                }
+            }
 
-  // Closes the internal database.  Any previously-returned copies of it cannot be used afterwards.
-  public synchronized void close() {
-    if (mDb != null) {
-      mDb.close();
-      mDb = null;
+            while (true) {
+                try {
+                    mDb = mContext.openOrCreateDatabase(mDatabaseName, 0, null);
+                    break;
+                } catch (SQLiteDatabaseLockedException e) {
+                    Log.e(
+                            TAG,
+                            "database "
+                                    + mDatabaseName
+                                    + " was locked while trying to open it: "
+                                    + e);
+                }
+            }
+        }
+
+        return mDb;
     }
-  }
+
+    // Closes the internal database.  Any previously-returned copies of it cannot be used
+    // afterwards.
+    public synchronized void close() {
+        if (mDb != null) {
+            mDb.close();
+            mDb = null;
+        }
+    }
 }
