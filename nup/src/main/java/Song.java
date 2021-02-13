@@ -10,12 +10,13 @@ import java.net.MalformedURLException;
 import java.net.URL;
 
 class Song implements Serializable {
-    private final long mSongId;
-    private final String mArtist, mTitle, mAlbum, mAlbumId;
-    private final int mLengthSec, mTrackNum, mDiscNum;
-    private final double mTrackGain, mAlbumGain, mPeakAmp;
-    private final double mRating;
-    private URL mUrl = null, mCoverUrl = null;
+    public final long id;
+    public final String artist, title, album, albumId;
+    public final int lengthSec, track, disc;
+    public final double trackGain, albumGain, peakAmp;
+    public final double rating;
+    public final URL url, coverUrl;
+
     private Bitmap mCoverBitmap = null;
 
     // Number of bytes available to us (i.e. what we have on disk).
@@ -26,7 +27,7 @@ class Song implements Serializable {
     private long mTotalBytes = 0;
 
     public Song(
-            long songId,
+            long id,
             String artist,
             String title,
             String album,
@@ -34,90 +35,33 @@ class Song implements Serializable {
             String url,
             String coverUrl,
             int lengthSec,
-            int trackNum,
-            int discNum,
+            int track,
+            int disc,
             double trackGain,
             double albumGain,
             double peakAmp,
             double rating)
             throws MalformedURLException {
-        mSongId = songId;
-        mArtist = artist;
-        mTitle = title;
-        mAlbum = album;
-        mAlbumId = albumId;
-        mUrl = url.isEmpty() ? null : new URL(url);
-        mCoverUrl = coverUrl.isEmpty() ? null : new URL(coverUrl);
-        mLengthSec = lengthSec;
-        mTrackNum = trackNum;
-        mDiscNum = discNum;
-        mTrackGain = trackGain;
-        mAlbumGain = albumGain;
-        mPeakAmp = peakAmp;
-        mRating = rating;
+        this.id = id;
+        this.artist = artist;
+        this.title = title;
+        this.album = album;
+        this.albumId = albumId;
+        this.url = url.isEmpty() ? null : new URL(url);
+        this.coverUrl = coverUrl.isEmpty() ? null : new URL(coverUrl);
+        this.lengthSec = lengthSec;
+        this.track = track;
+        this.disc = disc;
+        this.trackGain = trackGain;
+        this.albumGain = albumGain;
+        this.peakAmp = peakAmp;
+        this.rating = rating;
 
         // TODO: Tags.
     }
 
-    // Yay.
-    public long getSongId() {
-        return mSongId;
-    }
-
-    public String getArtist() {
-        return mArtist;
-    }
-
-    public String getTitle() {
-        return mTitle;
-    }
-
-    public String getAlbum() {
-        return mAlbum;
-    }
-
-    public String getAlbumId() {
-        return mAlbumId;
-    }
-
-    public URL getUrl() {
-        return mUrl;
-    }
-
-    public URL getCoverUrl() {
-        return mCoverUrl;
-    }
-
     public Bitmap getCoverBitmap() {
         return mCoverBitmap;
-    }
-
-    public int getLengthSec() {
-        return mLengthSec;
-    }
-
-    public int getTrackNum() {
-        return mTrackNum;
-    }
-
-    public int getDiscNum() {
-        return mDiscNum;
-    }
-
-    public double getTrackGain() {
-        return mTrackGain;
-    }
-
-    public double getAlbumGain() {
-        return mAlbumGain;
-    }
-
-    public double getPeakAmp() {
-        return mPeakAmp;
-    }
-
-    public double getRating() {
-        return mRating;
     }
 
     public long getAvailableBytes() {

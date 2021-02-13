@@ -90,8 +90,8 @@ class FileCacheDatabase {
                             Cursor cursor =
                                     db.rawQuery(
                                             "SELECT LocalPath, IFNULL(ContentLength, 0),"
-                                                + " IFNULL(LastAccessTime, 0) FROM"
-                                                + " CacheEntriesTmp",
+                                                    + " IFNULL(LastAccessTime, 0) FROM"
+                                                    + " CacheEntriesTmp",
                                             null);
                             cursor.moveToFirst();
                             while (!cursor.isAfterLast()) {
@@ -99,7 +99,7 @@ class FileCacheDatabase {
                                 long songId = Integer.valueOf(file.getName().split("\\.")[0]);
                                 db.execSQL(
                                         "REPLACE INTO CacheEntries (SongId, TotalBytes,"
-                                            + " LastAccessTime) VALUES(?, ?, ?)",
+                                                + " LastAccessTime) VALUES(?, ?, ?)",
                                         new Object[] {songId, cursor.getInt(1), cursor.getInt(2)});
                                 cursor.moveToNext();
                             }
@@ -135,7 +135,7 @@ class FileCacheDatabase {
                             mMusicDir, cursor.getLong(0), cursor.getLong(1), cursor.getInt(2));
             File file = entry.getLocalFile();
             entry.setCachedBytes(file.exists() ? file.length() : 0);
-            mEntries.put(entry.getSongId(), entry);
+            mEntries.put(entry.songId, entry);
             cursor.moveToNext();
         }
         Log.d(TAG, "finished loading " + mEntries.size() + " cache entries");

@@ -124,10 +124,9 @@ public class BrowseSongsActivity extends Activity implements AdapterView.OnItemC
                             new Comparator<Song>() {
                                 @Override
                                 public int compare(Song a, Song b) {
-                                    return Util.getSortingKey(a.getTitle(), Util.SORT_TITLE)
+                                    return Util.getSortingKey(a.title, Util.SORT_TITLE)
                                             .compareTo(
-                                                    Util.getSortingKey(
-                                                            b.getTitle(), Util.SORT_TITLE));
+                                                    Util.getSortingKey(b.title, Util.SORT_TITLE));
                                 }
                             });
                 }
@@ -137,7 +136,7 @@ public class BrowseSongsActivity extends Activity implements AdapterView.OnItemC
                 List<HashMap<String, String>> data = new ArrayList<HashMap<String, String>>();
                 for (Song song : mSongs) {
                     HashMap<String, String> map = new HashMap<String, String>();
-                    map.put(titleKey, song.getTitle());
+                    map.put(titleKey, song.title);
                     data.add(map);
                 }
 
@@ -184,7 +183,7 @@ public class BrowseSongsActivity extends Activity implements AdapterView.OnItemC
             AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) menuInfo;
             Song song = mSongs.get(info.position);
             if (song == null) return;
-            menu.setHeaderTitle(song.getTitle());
+            menu.setHeaderTitle(song.title);
             menu.add(0, MENU_ITEM_PLAY, 0, R.string.play);
             menu.add(0, MENU_ITEM_INSERT, 0, R.string.insert);
             menu.add(0, MENU_ITEM_APPEND, 0, R.string.append);
@@ -222,10 +221,7 @@ public class BrowseSongsActivity extends Activity implements AdapterView.OnItemC
         Song song = mSongs.get(position);
         if (song == null) return;
         NupActivity.getService().appendSongToPlaylist(song);
-        Toast.makeText(
-                        this,
-                        getString(R.string.appended_song_fmt, song.getTitle()),
-                        Toast.LENGTH_SHORT)
+        Toast.makeText(this, getString(R.string.appended_song_fmt, song.title), Toast.LENGTH_SHORT)
                 .show();
     }
 

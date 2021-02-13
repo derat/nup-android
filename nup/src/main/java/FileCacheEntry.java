@@ -6,21 +6,17 @@ package org.erat.nup;
 import java.io.File;
 
 class FileCacheEntry {
+    public final long songId;
     private final String mMusicDir;
-    private final long mSongId;
     private long mCachedBytes, mTotalBytes;
     private int mLastAccessTime;
 
     public FileCacheEntry(String musicDir, long songId, long totalBytes, int lastAccessTime) {
-        mMusicDir = musicDir;
-        mSongId = songId;
-        mCachedBytes = 0;
-        mTotalBytes = totalBytes;
-        mLastAccessTime = lastAccessTime;
-    }
-
-    public long getSongId() {
-        return mSongId;
+        this.mMusicDir = musicDir;
+        this.songId = songId;
+        this.mCachedBytes = 0;
+        this.mTotalBytes = totalBytes;
+        this.mLastAccessTime = lastAccessTime;
     }
 
     public long getCachedBytes() {
@@ -36,7 +32,7 @@ class FileCacheEntry {
     }
 
     public File getLocalFile() {
-        return new File(mMusicDir, mSongId + ".mp3");
+        return new File(mMusicDir, songId + ".mp3");
     }
 
     public void incrementCachedBytes(long bytes) {

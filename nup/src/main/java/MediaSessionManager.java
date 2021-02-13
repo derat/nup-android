@@ -41,23 +41,23 @@ public class MediaSessionManager {
     public void updateSong(Song song) {
         MediaMetadata.Builder builder = new MediaMetadata.Builder();
         if (song != null) {
-            setString(builder, MediaMetadata.METADATA_KEY_ARTIST, song.getArtist());
-            setString(builder, MediaMetadata.METADATA_KEY_TITLE, song.getTitle());
-            setString(builder, MediaMetadata.METADATA_KEY_ALBUM, song.getAlbum());
+            setString(builder, MediaMetadata.METADATA_KEY_ARTIST, song.artist);
+            setString(builder, MediaMetadata.METADATA_KEY_TITLE, song.title);
+            setString(builder, MediaMetadata.METADATA_KEY_ALBUM, song.album);
 
-            if (song.getRating() >= 0.0) {
+            if (song.rating >= 0.0) {
                 builder.putRating(
                         MediaMetadata.METADATA_KEY_RATING,
                         Rating.newStarRating(
-                                Rating.RATING_5_STARS, (float) (1.0 + song.getRating() * 4.0)));
+                                Rating.RATING_5_STARS, (float) (1.0 + song.rating * 4.0)));
             }
-            if (song.getTrackNum() > 0) {
-                builder.putLong(MediaMetadata.METADATA_KEY_TRACK_NUMBER, (long) song.getTrackNum());
+            if (song.track > 0) {
+                builder.putLong(MediaMetadata.METADATA_KEY_TRACK_NUMBER, (long) song.track);
             }
-            if (song.getDiscNum() > 0) {
-                builder.putLong(MediaMetadata.METADATA_KEY_DISC_NUMBER, (long) song.getDiscNum());
+            if (song.disc > 0) {
+                builder.putLong(MediaMetadata.METADATA_KEY_DISC_NUMBER, (long) song.disc);
             }
-            builder.putLong(MediaMetadata.METADATA_KEY_DURATION, song.getLengthSec() * 1000L);
+            builder.putLong(MediaMetadata.METADATA_KEY_DURATION, song.lengthSec * 1000L);
 
             Bitmap bitmap = song.getCoverBitmap();
             if (bitmap != null) {
@@ -83,7 +83,7 @@ public class MediaSessionManager {
             int numSongs) {
         PlaybackState.Builder builder = new PlaybackState.Builder();
 
-        if (song != null) builder.setActiveQueueItemId(song.getSongId());
+        if (song != null) builder.setActiveQueueItemId(song.id);
 
         int state = PlaybackState.STATE_NONE;
         if (numSongs > 0) {
@@ -117,12 +117,12 @@ public class MediaSessionManager {
         for (Song song : songs) {
             MediaDescription desc =
                     new MediaDescription.Builder()
-                            .setMediaId(Long.toString(song.getSongId()))
-                            .setTitle(song.getTitle())
-                            .setSubtitle(song.getArtist())
+                            .setMediaId(Long.toString(song.id))
+                            .setTitle(song.title)
+                            .setSubtitle(song.artist)
                             // TODO: Set icon too, maybe.
                             .build();
-            queue.add(new MediaSession.QueueItem(desc, song.getSongId()));
+            queue.add(new MediaSession.QueueItem(desc, song.id));
         }
         mSession.setQueue(queue);
     }

@@ -219,7 +219,7 @@ public class FileCache implements Runnable {
     // already being downloaded.
     public FileCacheEntry downloadSong(Song song) {
         waitUntilReady();
-        final long songId = song.getSongId();
+        final long songId = song.id;
 
         synchronized (mInProgressSongIds) {
             if (mInProgressSongIds.contains(songId)) return null;
@@ -238,10 +238,10 @@ public class FileCache implements Runnable {
                 "posting download of song "
                         + songId
                         + " from "
-                        + song.getUrl().toString()
+                        + song.url.toString()
                         + " to "
                         + entry.getLocalFile().getPath());
-        mHandler.post(new DownloadTask(entry, song.getUrl()));
+        mHandler.post(new DownloadTask(entry, song.url));
         return entry;
     }
 
@@ -307,7 +307,7 @@ public class FileCache implements Runnable {
                                 "sleeping for "
                                         + mBackoffTimeMs
                                         + " ms before retrying download "
-                                        + mEntry.getSongId());
+                                        + mEntry.songId);
                         SystemClock.sleep(mBackoffTimeMs);
                     }
 
@@ -390,7 +390,7 @@ public class FileCache implements Runnable {
                         mReason = "Got invalid content length " + mConn.getContentLength();
                         return DownloadStatus.FATAL_ERROR;
                     }
-                    mDb.setTotalBytes(mEntry.getSongId(), mConn.getContentLength());
+                    mDb.setTotalBytes(mEntry.songId, mConn.getContentLength());
                 }
             } catch (IOException e) {
                 mReason = "IO error while starting download";
@@ -447,7 +447,7 @@ public class FileCache implements Runnable {
 
             ProgressReporter reporter = new ProgressReporter(mEntry);
             Thread reporterThread =
-                    new Thread(reporter, "FileCache.ProgressReporter." + mEntry.getSongId());
+                    new Thread(reporter, "FileCache.ProgressReporter." + mEntry.songId);
             reporterThread.start();
 
             try {
@@ -478,7 +478,7 @@ public class FileCache implements Runnable {
                 Log.d(
                         TAG,
                         "finished download of song "
-                                + mEntry.getSongId()
+                                + mEntry.songId
                                 + " ("
                                 + bytesWritten
                                 + " bytes to "
@@ -512,7 +512,7 @@ public class FileCache implements Runnable {
 
         private void handleFailure() {
             synchronized (mInProgressSongIds) {
-                mInProgressSongIds.remove(mEntry.getSongId());
+                mInProgressSongIds.remove(mEntry.songId);
             }
             updateWifiLock();
             mListener.onCacheDownloadFail(mEntry, mReason);
@@ -520,7 +520,7 @@ public class FileCache implements Runnable {
 
         private void handleSuccess() {
             synchronized (mInProgressSongIds) {
-                mInProgressSongIds.remove(mEntry.getSongId());
+                mInProgressSongIds.remove(mEntry.songId);
             }
             updateWifiLock();
             mListener.onCacheDownloadComplete(mEntry);
@@ -538,7 +538,7 @@ public class FileCache implements Runnable {
 
         // Is this download currently active, or has it been cancelled?
         private boolean isActive() {
-            return isDownloadActive(mEntry.getSongId());
+            return isDownloadActive(mEntry.songId);
         }
 
         private class ProgressReporter implements Runnable {

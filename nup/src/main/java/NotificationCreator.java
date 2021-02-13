@@ -78,7 +78,7 @@ class NotificationCreator {
 
         if (onlyIfChanged
                 && song != null
-                && song.getSongId() == mSongId
+                && song.id == mSongId
                 && paused == mPaused
                 && (song.getCoverBitmap() != null) == mShowingCoverBitmap
                 && showPlayPause == mShowingPlayPause
@@ -87,7 +87,7 @@ class NotificationCreator {
             return null;
         }
 
-        mSongId = song != null ? song.getSongId() : 0;
+        mSongId = song != null ? song.id : 0;
         mPaused = paused;
         mShowingCoverBitmap = song != null ? song.getCoverBitmap() != null : false;
         mShowingPlayPause = showPlayPause;
@@ -98,11 +98,11 @@ class NotificationCreator {
                 new Notification.Builder(mContext)
                         .setContentTitle(
                                 song != null
-                                        ? song.getArtist()
+                                        ? song.artist
                                         : mContext.getString(R.string.startup_message_title))
                         .setContentText(
                                 song != null
-                                        ? song.getTitle()
+                                        ? song.title
                                         : mContext.getString(R.string.startup_message_text))
                         .setSmallIcon(R.drawable.status)
                         .setColor(mContext.getResources().getColor(R.color.primary))

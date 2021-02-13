@@ -142,8 +142,8 @@ public class SearchResultsActivity extends Activity {
                     List<HashMap<String, String>> data = new ArrayList<HashMap<String, String>>();
                     for (Song song : mSongs) {
                         HashMap<String, String> map = new HashMap<String, String>();
-                        map.put(artistKey, song.getArtist());
-                        map.put(titleKey, song.getTitle());
+                        map.put(artistKey, song.artist);
+                        map.put(titleKey, song.title);
                         data.add(map);
                     }
 
@@ -187,7 +187,7 @@ public class SearchResultsActivity extends Activity {
         if (view.getId() == R.id.results) {
             AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) menuInfo;
             Song song = mSongs.get(info.position);
-            menu.setHeaderTitle(song.getTitle());
+            menu.setHeaderTitle(song.title);
             menu.add(0, MENU_ITEM_PLAY, 0, R.string.play);
             menu.add(0, MENU_ITEM_INSERT, 0, R.string.insert);
             menu.add(0, MENU_ITEM_APPEND, 0, R.string.append);

@@ -821,7 +821,7 @@ public class SongDatabase {
             if (!entry.isFullyCached()) continue;
 
             ContentValues values = new ContentValues(1);
-            values.put("SongId", entry.getSongId());
+            values.put("SongId", entry.songId);
             db.replace("CachedSongs", null, values);
             numSongs++;
         }

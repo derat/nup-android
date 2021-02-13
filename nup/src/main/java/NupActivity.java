@@ -218,8 +218,7 @@ public class NupActivity extends Activity implements NupService.SongListener {
                         if (positionSec == mLastSongPositionSec) return;
                         // MediaPlayer appears to get confused sometimes and report things like
                         // 0:01.
-                        int durationSec =
-                                Math.max(durationMs / 1000, getCurrentSong().getLengthSec());
+                        int durationSec = Math.max(durationMs / 1000, getCurrentSong().lengthSec);
                         mTimeLabel.setText(
                                 Util.formatDurationProgressString(positionSec, durationSec));
                         mLastSongPositionSec = positionSec;
@@ -293,15 +292,15 @@ public class NupActivity extends Activity implements NupService.SongListener {
             mDownloadStatusLabel.setText("");
             mAlbumImageView.setVisibility(View.INVISIBLE);
         } else {
-            mArtistLabel.setText(song.getArtist());
-            mTitleLabel.setText(song.getTitle());
-            mAlbumLabel.setText(song.getAlbum());
+            mArtistLabel.setText(song.artist);
+            mTitleLabel.setText(song.title);
+            mAlbumLabel.setText(song.album);
             mTimeLabel.setText(
                     Util.formatDurationProgressString(
                             (song == mService.getCurrentSong())
                                     ? mService.getCurrentSongLastPositionMs() / 1000
                                     : 0,
-                            song.getLengthSec()));
+                            song.lengthSec));
             mDownloadStatusLabel.setText("");
             if (song.getCoverBitmap() != null) {
                 mAlbumImageView.setVisibility(View.VISIBLE);
@@ -409,8 +408,8 @@ public class NupActivity extends Activity implements NupService.SongListener {
 
             Song song = mSongs.get(position);
 
-            artistView.setText(song.getArtist());
-            titleView.setText(song.getTitle());
+            artistView.setText(song.artist);
+            titleView.setText(song.title);
 
             if (song.getTotalBytes() > 0) {
                 if (song.getAvailableBytes() == song.getTotalBytes())
@@ -455,7 +454,7 @@ public class NupActivity extends Activity implements NupService.SongListener {
         if (view.getId() == R.id.playlist) {
             AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) menuInfo;
             Song song = mSongs.get(info.position);
-            menu.setHeaderTitle(song.getTitle());
+            menu.setHeaderTitle(song.title);
             menu.add(0, MENU_ITEM_PLAY, 0, R.string.play);
             menu.add(0, MENU_ITEM_REMOVE_FROM_LIST, 0, R.string.remove_from_list);
             menu.add(0, MENU_ITEM_TRUNCATE_LIST, 0, R.string.truncate_list);

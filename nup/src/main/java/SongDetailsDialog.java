@@ -21,12 +21,12 @@ class SongDetailsDialog {
 
     public static Bundle createBundle(Song song) {
         Bundle bundle = new Bundle();
-        bundle.putString(BUNDLE_ARTIST, song.getArtist());
-        bundle.putString(BUNDLE_TITLE, song.getTitle());
-        bundle.putString(BUNDLE_ALBUM, song.getAlbum());
-        bundle.putInt(BUNDLE_TRACK_NUM, song.getTrackNum());
-        bundle.putInt(BUNDLE_LENGTH_SEC, song.getLengthSec());
-        bundle.putDouble(BUNDLE_RATING, song.getRating());
+        bundle.putString(BUNDLE_ARTIST, song.artist);
+        bundle.putString(BUNDLE_TITLE, song.title);
+        bundle.putString(BUNDLE_ALBUM, song.album);
+        bundle.putInt(BUNDLE_TRACK_NUM, song.track);
+        bundle.putInt(BUNDLE_LENGTH_SEC, song.lengthSec);
+        bundle.putDouble(BUNDLE_RATING, song.rating);
         return bundle;
     }
 
