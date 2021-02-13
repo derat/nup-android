@@ -4,7 +4,6 @@ import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 import android.graphics.Bitmap;
-import android.test.mock.MockContext;
 
 import com.google.common.io.Files;
 
@@ -33,7 +32,6 @@ import java.util.HashMap;
 public class CoverLoaderTest {
     private FakeTaskRunner mTaskRunner;
     private File mTempDir;
-    private MockContext mContext;
     private CoverLoader mCoverLoader;
 
     @Mock private Downloader mDownloader;
@@ -48,13 +46,6 @@ public class CoverLoaderTest {
 
         mTaskRunner = new FakeTaskRunner();
         mTempDir = Files.createTempDir();
-        mContext =
-                new MockContext() {
-                    @Override
-                    public File getExternalCacheDir() {
-                        return mTempDir;
-                    }
-                };
 
         mBitmapDataMap = new HashMap<String, Bitmap>();
         when(mBitmapDecoder.decodeFile(any(File.class)))
@@ -83,7 +74,7 @@ public class CoverLoaderTest {
                         });
 
         mCoverLoader =
-                new CoverLoader(mContext, mDownloader, mTaskRunner, mBitmapDecoder, mNetworkHelper);
+                new CoverLoader(mTempDir, mDownloader, mTaskRunner, mBitmapDecoder, mNetworkHelper);
     }
 
     @After

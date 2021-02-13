@@ -3,15 +3,24 @@
 
 buildscript {
   repositories {
+    google()
+    // Both (?) seem to be needed for org.jetbrains.trove4j:trove4j:20160824.
+    jcenter()
     mavenCentral()
   }
   dependencies {
-    classpath 'com.android.tools.build:gradle:2.3.0'
+    // 4.1.0+ requires Gradle 6.5:
+    // https://developer.android.com/studio/releases/gradle-plugin
+    // Gradle needs to be installed manually from https://gradle.org/releases/
+    classpath 'com.android.tools.build:gradle:4.1.0'
   }
 }
 
 allprojects {
+  // Apparently all the above repos need to be repeated here. :-/
   repositories {
+    google()
+    jcenter()
     mavenCentral()
   }
 }

@@ -12,12 +12,11 @@ android {
     targetSdkVersion 26
   }
 
-  compileSdkVersion 26
-  buildToolsVersion '26.0.2'
+  compileSdkVersion 30
+  buildToolsVersion '30.0.3'
 
   dexOptions {
     preDexLibraries true
-    incremental true
   }
 
   buildTypes {
@@ -33,12 +32,16 @@ android {
     // to call Log.d from code that's being tested?)
     unitTests.returnDefaultValues = true
   }
+
+  // Avoid "package android.test.mock does not exist" errors:
+  // https://developer.android.com/training/testing/set-up-project
+  useLibrary 'android.test.mock'
 }
 
 dependencies {
-  compile 'com.google.android.gms:play-services:9.2.1'
+  implementation 'com.google.android.gms:play-services:9.2.1'
 
-  testCompile 'com.google.guava:guava:15.0'
-  testCompile 'junit:junit:4.12'
-  testCompile 'org.mockito:mockito-core:1.10.19'
+  testImplementation 'com.google.guava:guava:15.0'
+  testImplementation 'junit:junit:4.12'
+  testImplementation 'org.mockito:mockito-core:1.10.19'
 }

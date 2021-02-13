@@ -359,7 +359,11 @@ public class NupService extends Service
         mSongDb = new SongDatabase(this, this, mCache, mDownloader, mNetworkHelper);
         mCoverLoader =
                 new CoverLoader(
-                        this, mDownloader, mTaskRunner, new BitmapDecoder(), mNetworkHelper);
+                        this.getExternalCacheDir(),
+                        mDownloader,
+                        mTaskRunner,
+                        new BitmapDecoder(),
+                        mNetworkHelper);
         mPlaybackReporter = new PlaybackReporter(mSongDb, mDownloader, mTaskRunner, mNetworkHelper);
 
         mMediaSessionManager =

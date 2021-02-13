@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
   <item android:id="@+id/browse_pause_menu_item"
-        android:icon="@+drawable/ic_menu_play_clip"
+        android:icon="@drawable/ic_menu_play_clip"
         android:title="@string/pause" />
   <item android:id="@+id/browse_return_menu_item"
         android:icon="@android:drawable/ic_menu_close_clear_cancel"

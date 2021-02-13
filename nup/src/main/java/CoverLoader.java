@@ -3,7 +3,6 @@
 
 package org.erat.nup;
 
-import android.content.Context;
 import android.graphics.Bitmap;
 import android.os.Environment;
 import android.util.Log;
@@ -28,7 +27,9 @@ public class CoverLoader {
     // Size of buffer used to write data to disk, in bytes.
     private static final int BUFFER_SIZE = 8 * 1024;
 
-    private final Context mContext;
+    // Application-specific cache dir (not including DIR_NAME).
+    private final File mCacheDir;
+
     private final Downloader mDownloader;
     private final BitmapDecoder mBitmapDecoder;
     private final NetworkHelper mNetworkHelper;
@@ -52,12 +53,12 @@ public class CoverLoader {
     private Bitmap mLastCoverBitmap = null;
 
     public CoverLoader(
-            Context context,
+            File cacheDir,
             Downloader downloader,
             TaskRunner taskRunner,
             BitmapDecoder bitmapDecoder,
             NetworkHelper networkHelper) {
-        mContext = context;
+        mCacheDir = cacheDir;
         mDownloader = downloader;
         mBitmapDecoder = bitmapDecoder;
         mNetworkHelper = networkHelper;
@@ -76,7 +77,7 @@ public class CoverLoader {
                                             + "; we need "
                                             + Environment.MEDIA_MOUNTED);
                         }
-                        mCoverDir = new File(mContext.getExternalCacheDir(), DIR_NAME);
+                        mCoverDir = new File(mCacheDir, DIR_NAME);
                     }
                 });
     }
