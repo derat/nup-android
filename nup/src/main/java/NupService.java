@@ -14,6 +14,8 @@ import android.content.IntentFilter;
 import android.content.SharedPreferences;
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener;
 import android.graphics.Bitmap;
+import android.media.AudioAttributes;
+import android.media.AudioFocusRequest;
 import android.media.AudioManager;
 import android.media.session.MediaSession;
 import android.net.Uri;
@@ -194,6 +196,7 @@ public class NupService extends Service
     private Handler mHandler = new Handler();
 
     private AudioManager mAudioManager;
+    private AudioAttributes mAudioAttrs;
     private TelephonyManager mTelephonyManager;
 
     private SharedPreferences mPrefs;
@@ -322,11 +325,17 @@ public class NupService extends Service
         }
 
         mAudioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
+        mAudioAttrs =
+                new AudioAttributes.Builder()
+                        .setUsage(AudioAttributes.USAGE_MEDIA)
+                        .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
+                        .build();
         int result =
                 mAudioManager.requestAudioFocus(
-                        mAudioFocusListener,
-                        AudioManager.STREAM_MUSIC,
-                        AudioManager.AUDIOFOCUS_GAIN);
+                        new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                                .setOnAudioFocusChangeListener(mAudioFocusListener)
+                                .setAudioAttributes(mAudioAttrs)
+                                .build());
         Log.d(TAG, "requested audio focus; got " + result);
 
         mTelephonyManager = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
@@ -347,7 +356,7 @@ public class NupService extends Service
                 Double.parseDouble(
                         mPrefs.getString(
                                 NupPreferences.PRE_AMP_GAIN, NupPreferences.PRE_AMP_GAIN_DEFAULT));
-        mPlayer = new Player(this, this, mHandler, gain);
+        mPlayer = new Player(this, this, mHandler, mAudioAttrs, gain);
         mPlayerThread = new Thread(mPlayer, "Player");
         mPlayerThread.setPriority(Thread.MAX_PRIORITY);
         mPlayerThread.start();

@@ -68,6 +68,9 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
     // Used to post tasks to mListener.
     private final Handler mListenerHandler;
 
+    // Attributes describing audio files to be played.
+    private final AudioAttributes mAttrs;
+
     // Used to load queued files in the background.
     private final ExecutorService mBackgroundLoader = Executors.newSingleThreadExecutor();
 
@@ -92,15 +95,22 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
         private FileInputStream mStream;
 
         private MediaPlayer mPlayer;
+        private AudioAttributes mAttrs;
         private LoudnessEnhancer mLoudnessEnhancer;
 
         private boolean mLowVolume = false; // True if the song's volume is temporarily lowered.
         private double mPreAmpGain = 0; // Pre-amp gain adjustment in decibels.
 
         public FilePlayer(
-                String path, long numBytes, double preAmpGain, double songGain, double peakAmp) {
+                String path,
+                long numBytes,
+                AudioAttributes attrs,
+                double preAmpGain,
+                double songGain,
+                double peakAmp) {
             mPath = path;
             mNumBytes = numBytes;
+            mAttrs = attrs;
             mSongGain = songGain;
             mPeakAmp = peakAmp;
             mPreAmpGain = preAmpGain;
@@ -145,11 +155,7 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
                                 + ")");
 
                 mPlayer.setWakeMode(mContext, PowerManager.PARTIAL_WAKE_LOCK);
-                mPlayer.setAudioAttributes(
-                        new AudioAttributes.Builder()
-                                .setUsage(AudioAttributes.USAGE_MEDIA)
-                                .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
-                                .build());
+                mPlayer.setAudioAttributes(mAttrs);
                 mPlayer.setOnCompletionListener(Player.this);
                 mPlayer.setOnErrorListener(Player.this);
 
@@ -272,10 +278,16 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
         }
     }
 
-    public Player(Context context, Listener listener, Handler listenerHandler, double preAmpGain) {
+    public Player(
+            Context context,
+            Listener listener,
+            Handler listenerHandler,
+            AudioAttributes attrs,
+            double preAmpGain) {
         mContext = context;
         mListener = listener;
         mListenerHandler = listenerHandler;
+        mAttrs = attrs;
         mPreAmpGain = preAmpGain;
     }
 
@@ -338,7 +350,8 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
                             mQueuedPlayer = null;
                         } else {
                             mCurrentPlayer =
-                                    new FilePlayer(path, numBytes, mPreAmpGain, gain, peakAmp);
+                                    new FilePlayer(
+                                            path, numBytes, mAttrs, mPreAmpGain, gain, peakAmp);
                             if (!mCurrentPlayer.prepare()) {
                                 mCurrentPlayer = null;
                                 return;
@@ -371,7 +384,12 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
                                     public void run() {
                                         final FilePlayer player =
                                                 new FilePlayer(
-                                                        path, numBytes, mPreAmpGain, gain, peakAmp);
+                                                        path,
+                                                        numBytes,
+                                                        mAttrs,
+                                                        mPreAmpGain,
+                                                        gain,
+                                                        peakAmp);
                                         if (!player.prepare()) {
                                             return;
                                         }
