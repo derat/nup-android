@@ -8,18 +8,18 @@ import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 
 public class NetworkHelper {
-    private final Context mContext;
-    private final ConnectivityManager mConnectivityManager;
+    private final Context context;
+    private final ConnectivityManager connectivityManager;
 
     public NetworkHelper(Context context) {
-        mContext = context;
-        mConnectivityManager =
-                (ConnectivityManager) mContext.getSystemService(Context.CONNECTIVITY_SERVICE);
+        this.context = context;
+        connectivityManager =
+                (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
     }
 
     // Is a network connection currently available?
     public boolean isNetworkAvailable() {
-        NetworkInfo info = mConnectivityManager.getActiveNetworkInfo();
+        NetworkInfo info = connectivityManager.getActiveNetworkInfo();
         return (info != null && info.isAvailable());
     }
 }

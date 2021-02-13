@@ -32,19 +32,19 @@ class FileCacheDatabase {
                     + "  ETag VARCHAR(40) NOT NULL DEFAULT '', "
                     + "  LastAccessTime INTEGER NOT NULL)";
 
-    private final DatabaseOpener mOpener;
+    private final DatabaseOpener opener;
 
     // Map from an entry's song ID to the entry itself.
-    private final HashMap<Long, FileCacheEntry> mEntries = new HashMap<Long, FileCacheEntry>();
+    private final HashMap<Long, FileCacheEntry> entries = new HashMap<Long, FileCacheEntry>();
 
     // Update the database in a background thread.
-    private final DatabaseUpdater mUpdater;
-    private final Thread mUpdaterThread;
+    private final DatabaseUpdater updater;
+    private final Thread updaterThread;
 
-    private final String mMusicDir;
+    private final String musicDir;
 
     public FileCacheDatabase(Context context, String musicDir) {
-        mMusicDir = musicDir;
+        this.musicDir = musicDir;
 
         SQLiteOpenHelper helper =
                 new SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
@@ -112,19 +112,19 @@ class FileCacheDatabase {
                         }
                     }
                 };
-        mOpener = new DatabaseOpener(context, DATABASE_NAME, helper);
+        opener = new DatabaseOpener(context, DATABASE_NAME, helper);
 
         // Block until we've loaded everything into memory.
         loadExistingEntries(context);
-        mUpdater = new DatabaseUpdater(mOpener);
-        mUpdaterThread = new Thread(mUpdater, "FileCacheDatabase.DatabaseUpdater");
-        mUpdaterThread.start();
+        updater = new DatabaseUpdater(opener);
+        updaterThread = new Thread(updater, "FileCacheDatabase.DatabaseUpdater");
+        updaterThread.start();
     }
 
     private synchronized void loadExistingEntries(Context context) {
         Log.d(TAG, "loading cache entries");
         Cursor cursor =
-                mOpener.getDb()
+                opener.getDb()
                         .rawQuery(
                                 "SELECT SongId, TotalBytes, LastAccessTime FROM CacheEntries",
                                 null);
@@ -132,71 +132,71 @@ class FileCacheDatabase {
         while (!cursor.isAfterLast()) {
             FileCacheEntry entry =
                     new FileCacheEntry(
-                            mMusicDir, cursor.getLong(0), cursor.getLong(1), cursor.getInt(2));
+                            musicDir, cursor.getLong(0), cursor.getLong(1), cursor.getInt(2));
             File file = entry.getLocalFile();
             entry.setCachedBytes(file.exists() ? file.length() : 0);
-            mEntries.put(entry.songId, entry);
+            entries.put(entry.songId, entry);
             cursor.moveToNext();
         }
-        Log.d(TAG, "finished loading " + mEntries.size() + " cache entries");
+        Log.d(TAG, "finished loading " + entries.size() + " cache entries");
         cursor.close();
     }
 
     public synchronized void quit() {
-        mUpdater.quit();
+        updater.quit();
         try {
-            mUpdaterThread.join();
+            updaterThread.join();
         } catch (InterruptedException e) {
         }
-        mOpener.close();
+        opener.close();
     }
 
     public synchronized FileCacheEntry getEntry(long songId) {
-        return mEntries.get(songId);
+        return entries.get(songId);
     }
 
     public synchronized FileCacheEntry addEntry(long songId) {
         final int accessTime = (int) (new Date().getTime() / 1000);
-        FileCacheEntry entry = new FileCacheEntry(mMusicDir, songId, 0, accessTime);
-        mEntries.put(songId, entry);
-        mUpdater.postUpdate(
+        FileCacheEntry entry = new FileCacheEntry(musicDir, songId, 0, accessTime);
+        entries.put(songId, entry);
+        updater.postUpdate(
                 "REPLACE INTO CacheEntries (SongId, TotalBytes, LastAccessTime) VALUES(?, 0, ?)",
                 new Object[] {songId, accessTime});
         return entry;
     }
 
     public synchronized void removeEntry(long songId) {
-        FileCacheEntry entry = mEntries.get(songId);
+        FileCacheEntry entry = entries.get(songId);
         if (entry == null) return;
 
-        mEntries.remove(songId);
-        mUpdater.postUpdate("DELETE FROM CacheEntries WHERE SongId = ?", new Object[] {songId});
+        entries.remove(songId);
+        updater.postUpdate("DELETE FROM CacheEntries WHERE SongId = ?", new Object[] {songId});
     }
 
     public synchronized void setTotalBytes(long songId, long totalBytes) {
-        FileCacheEntry entry = mEntries.get(songId);
+        FileCacheEntry entry = entries.get(songId);
         if (entry == null) return;
 
         entry.setTotalBytes(totalBytes);
-        mUpdater.postUpdate(
+        updater.postUpdate(
                 "UPDATE CacheEntries SET TotalBytes = ? WHERE SongId = ?",
                 new Object[] {totalBytes, songId});
     }
 
     public synchronized void updateLastAccessTime(long songId) {
-        FileCacheEntry entry = mEntries.get(songId);
+        FileCacheEntry entry = entries.get(songId);
         if (entry == null) return;
 
         int now = (int) (new Date().getTime() / 1000);
         entry.setLastAccessTime(now);
-        mUpdater.postUpdate(
+        updater.postUpdate(
                 "UPDATE CacheEntries SET LastAccessTime = ? WHERE SongId = ?",
                 new Object[] {now, songId});
     }
 
     public synchronized List<Long> getSongIdsByAge() {
         List<Long> ids = new ArrayList<Long>();
-        ids.addAll(mEntries.keySet());
+        ids.addAll(entries.keySet());
         Collections.sort(
                 ids,
                 new Comparator<Long>() {
@@ -212,13 +212,13 @@ class FileCacheDatabase {
 
     public synchronized long getTotalCachedBytes() {
         long bytes = 0;
-        for (FileCacheEntry entry : mEntries.values()) bytes += entry.getCachedBytes();
+        for (FileCacheEntry entry : entries.values()) bytes += entry.getCachedBytes();
         return bytes;
     }
 
     public synchronized List<FileCacheEntry> getAllFullyCachedEntries() {
         List<FileCacheEntry> fullyCachedEntries = new ArrayList<FileCacheEntry>();
-        for (FileCacheEntry entry : mEntries.values())
+        for (FileCacheEntry entry : entries.values())
             if (entry.isFullyCached()) fullyCachedEntries.add(entry);
         return fullyCachedEntries;
     }

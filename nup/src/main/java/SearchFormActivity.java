@@ -24,10 +24,10 @@ public class SearchFormActivity extends Activity implements NupService.SongDatab
     private static final int RESULTS_REQUEST_CODE = 1;
 
     // Various parts of our UI.
-    private AutoCompleteTextView mArtistEdit, mAlbumEdit;
-    private EditText mTitleEdit;
-    private CheckBox mShuffleCheckbox, mSubstringCheckbox, mCachedCheckbox;
-    private Spinner mMinRatingSpinner;
+    private AutoCompleteTextView artistEdit, albumEdit;
+    private EditText titleEdit;
+    private CheckBox shuffleCheckbox, substringCheckbox, cachedCheckbox;
+    private Spinner minRatingSpinner;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -36,18 +36,18 @@ public class SearchFormActivity extends Activity implements NupService.SongDatab
         setTitle(R.string.search);
         setContentView(R.layout.search);
 
-        mArtistEdit = (AutoCompleteTextView) findViewById(R.id.artist_edit_text);
-        mTitleEdit = (EditText) findViewById(R.id.title_edit_text);
+        artistEdit = (AutoCompleteTextView) findViewById(R.id.artist_edit_text);
+        titleEdit = (EditText) findViewById(R.id.title_edit_text);
 
         // When the album field gets the focus, set its suggestions based on the currently-entered
         // artist.
-        mAlbumEdit = (AutoCompleteTextView) findViewById(R.id.album_edit_text);
-        mAlbumEdit.setOnFocusChangeListener(
+        albumEdit = (AutoCompleteTextView) findViewById(R.id.album_edit_text);
+        albumEdit.setOnFocusChangeListener(
                 new View.OnFocusChangeListener() {
                     @Override
                     public void onFocusChange(View v, boolean hasFocus) {
                         if (hasFocus) {
-                            String artist = mArtistEdit.getText().toString();
+                            String artist = artistEdit.getText().toString();
                             List<String> albums = new ArrayList<String>();
                             List<StatsRow> albumsWithCounts =
                                     artist.trim().isEmpty()
@@ -62,7 +62,7 @@ public class SearchFormActivity extends Activity implements NupService.SongDatab
                                     albums.add(stats.key.album);
                                 }
                             }
-                            mAlbumEdit.setAdapter(
+                            albumEdit.setAdapter(
                                     new ArrayAdapter<String>(
                                             SearchFormActivity.this,
                                             android.R.layout.simple_dropdown_item_1line,
@@ -71,16 +71,16 @@ public class SearchFormActivity extends Activity implements NupService.SongDatab
                     }
                 });
 
-        mMinRatingSpinner = (Spinner) findViewById(R.id.min_rating_spinner);
+        minRatingSpinner = (Spinner) findViewById(R.id.min_rating_spinner);
         ArrayAdapter<CharSequence> adapter =
                 ArrayAdapter.createFromResource(
                         this, R.array.min_rating_array, android.R.layout.simple_spinner_item);
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
-        mMinRatingSpinner.setAdapter(adapter);
+        minRatingSpinner.setAdapter(adapter);
 
-        mShuffleCheckbox = (CheckBox) findViewById(R.id.shuffle_checkbox);
-        mSubstringCheckbox = (CheckBox) findViewById(R.id.substring_checkbox);
-        mCachedCheckbox = (CheckBox) findViewById(R.id.cached_checkbox);
+        shuffleCheckbox = (CheckBox) findViewById(R.id.shuffle_checkbox);
+        substringCheckbox = (CheckBox) findViewById(R.id.substring_checkbox);
+        cachedCheckbox = (CheckBox) findViewById(R.id.cached_checkbox);
 
         NupActivity.getService().addSongDatabaseUpdateListener(this);
         onSongDatabaseUpdate();
@@ -94,13 +94,13 @@ public class SearchFormActivity extends Activity implements NupService.SongDatab
     }
 
     private void resetForm() {
-        mArtistEdit.setText("");
-        mAlbumEdit.setText("");
-        mTitleEdit.setText("");
-        mShuffleCheckbox.setChecked(false);
-        mSubstringCheckbox.setChecked(true);
-        mCachedCheckbox.setChecked(false);
-        mMinRatingSpinner.setSelection(0, true);
+        artistEdit.setText("");
+        albumEdit.setText("");
+        titleEdit.setText("");
+        shuffleCheckbox.setChecked(false);
+        substringCheckbox.setChecked(true);
+        cachedCheckbox.setChecked(false);
+        minRatingSpinner.setSelection(0, true);
     }
 
     @Override
@@ -113,15 +113,15 @@ public class SearchFormActivity extends Activity implements NupService.SongDatab
     public void onSearchButtonClicked(View view) {
         Intent intent = new Intent(this, SearchResultsActivity.class);
         intent.putExtra(
-                SearchResultsActivity.BUNDLE_ARTIST, mArtistEdit.getText().toString().trim());
-        intent.putExtra(SearchResultsActivity.BUNDLE_TITLE, mTitleEdit.getText().toString().trim());
-        intent.putExtra(SearchResultsActivity.BUNDLE_ALBUM, mAlbumEdit.getText().toString().trim());
+                SearchResultsActivity.BUNDLE_ARTIST, artistEdit.getText().toString().trim());
+        intent.putExtra(SearchResultsActivity.BUNDLE_TITLE, titleEdit.getText().toString().trim());
+        intent.putExtra(SearchResultsActivity.BUNDLE_ALBUM, albumEdit.getText().toString().trim());
         intent.putExtra(
                 SearchResultsActivity.BUNDLE_MIN_RATING,
-                mMinRatingSpinner.getSelectedItemPosition() / 4.0);
-        intent.putExtra(SearchResultsActivity.BUNDLE_SHUFFLE, mShuffleCheckbox.isChecked());
-        intent.putExtra(SearchResultsActivity.BUNDLE_SUBSTRING, mSubstringCheckbox.isChecked());
-        intent.putExtra(SearchResultsActivity.BUNDLE_CACHED, mCachedCheckbox.isChecked());
+                minRatingSpinner.getSelectedItemPosition() / 4.0);
+        intent.putExtra(SearchResultsActivity.BUNDLE_SHUFFLE, shuffleCheckbox.isChecked());
+        intent.putExtra(SearchResultsActivity.BUNDLE_SUBSTRING, substringCheckbox.isChecked());
+        intent.putExtra(SearchResultsActivity.BUNDLE_CACHED, cachedCheckbox.isChecked());
         startActivityForResult(intent, RESULTS_REQUEST_CODE);
     }
 
@@ -138,7 +138,7 @@ public class SearchFormActivity extends Activity implements NupService.SongDatab
         if (artistsWithCounts != null) {
             for (StatsRow stats : artistsWithCounts) artists.add(stats.key.artist);
         }
-        mArtistEdit.setAdapter(
+        artistEdit.setAdapter(
                 new ArrayAdapter<String>(
                         SearchFormActivity.this,
                         android.R.layout.simple_dropdown_item_1line,

@@ -22,7 +22,7 @@ import java.util.concurrent.TimeUnit;
 class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListener {
     private static final String TAG = "Player";
 
-    // Interval between reports to mListener.
+    // Interval between reports to |listener|.
     private static final int POSITION_CHANGE_REPORT_MS = 100;
 
     private static final int SHUTDOWN_TIMEOUT_MS = 1000;
@@ -44,37 +44,37 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
         void onPlaybackError(String description);
     }
 
-    private Context mContext;
+    private Context context;
 
     // Currently-playing and queued songs.
-    private FilePlayer mCurrentPlayer;
-    private FilePlayer mQueuedPlayer;
+    private FilePlayer currentPlayer;
+    private FilePlayer queuedPlayer;
 
     // Is playback paused?
-    private boolean mPaused = false;
+    private boolean paused = false;
 
     // Is the volume currently lowered?
-    private boolean mLowVolume = false;
+    private boolean lowVolume = false;
 
     // Pre-amp gain adjustment in decibels.
-    private double mPreAmpGain = 0;
+    private double preAmpGain = 0;
 
     // Used to run tasks on our own thread.
-    private Handler mHandler;
+    private Handler handler;
 
     // Notified when things change.
-    private final Listener mListener;
+    private final Listener listener;
 
-    // Used to post tasks to mListener.
-    private final Handler mListenerHandler;
+    // Used to post tasks to |listener|.
+    private final Handler listenerHandler;
 
     // Attributes describing audio files to be played.
-    private final AudioAttributes mAttrs;
+    private final AudioAttributes attrs;
 
     // Used to load queued files in the background.
-    private final ExecutorService mBackgroundLoader = Executors.newSingleThreadExecutor();
+    private final ExecutorService backgroundLoader = Executors.newSingleThreadExecutor();
 
-    private boolean mShouldQuit = false;
+    private boolean shouldQuit = false;
 
     private enum PauseUpdateType {
         PAUSE,
@@ -84,22 +84,21 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
 
     /** Wraps an individual file. */
     private class FilePlayer {
-        private final String mPath; // File containing song.
-        private final long mNumBytes; // Total expected size of song (mPath may be incomplete).
-        private final double mSongGain; // Song-specific gain adjustment in decibels.
-        private final double
-                mPeakAmp; // Song's peak amplitude, with 1.0 being max without clipping.
+        private final String path; // File containing song.
+        private final long numBytes; // Total expected size of song (path may be incomplete).
+        private final double songGain; // Song-specific gain adjustment in decibels.
+        private final double peakAmp; // Song's peak amplitude (1.0 max without clipping).
 
         // Ideally only used if we haven't downloaded the complete file, since MediaPlayer
         // skips all the time when playing from a stream.
-        private FileInputStream mStream;
+        private FileInputStream stream;
 
-        private MediaPlayer mPlayer;
-        private AudioAttributes mAttrs;
-        private LoudnessEnhancer mLoudnessEnhancer;
+        private MediaPlayer player;
+        private AudioAttributes attrs;
+        private LoudnessEnhancer loudnessEnhancer;
 
-        private boolean mLowVolume = false; // True if the song's volume is temporarily lowered.
-        private double mPreAmpGain = 0; // Pre-amp gain adjustment in decibels.
+        private boolean lowVolume = false; // True if the song's volume is temporarily lowered.
+        private double preAmpGain = 0; // Pre-amp gain adjustment in decibels.
 
         public FilePlayer(
                 String path,
@@ -108,83 +107,83 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
                 double preAmpGain,
                 double songGain,
                 double peakAmp) {
-            mPath = path;
-            mNumBytes = numBytes;
-            mAttrs = attrs;
-            mSongGain = songGain;
-            mPeakAmp = peakAmp;
-            mPreAmpGain = preAmpGain;
+            this.path = path;
+            this.numBytes = numBytes;
+            this.attrs = attrs;
+            this.songGain = songGain;
+            this.peakAmp = peakAmp;
+            this.preAmpGain = preAmpGain;
         }
 
         public String getPath() {
-            return mPath;
+            return path;
         }
 
-        // Returns the current size of mPath.
+        // Returns the current size of |path|.
         public long getFileBytes() {
-            return (new File(mPath)).length();
+            return (new File(path)).length();
         }
 
         // Returns the total expected size of the song.
         public long getNumBytes() {
-            return mNumBytes;
+            return numBytes;
         }
 
         public FileInputStream getStream() {
-            return mStream;
+            return stream;
         }
 
         public MediaPlayer getMediaPlayer() {
-            return mPlayer;
+            return player;
         }
 
         public boolean prepare() {
             try {
-                final long currentBytes = (new File(mPath)).length();
-                mPlayer = new MediaPlayer();
+                final long currentBytes = (new File(path)).length();
+                player = new MediaPlayer();
                 Log.d(
                         TAG,
                         "created "
-                                + mPlayer
+                                + player
                                 + " for "
-                                + mPath
+                                + path
                                 + " (have "
                                 + currentBytes
                                 + " of "
-                                + mNumBytes
+                                + numBytes
                                 + ")");
 
-                mPlayer.setWakeMode(mContext, PowerManager.PARTIAL_WAKE_LOCK);
-                mPlayer.setAudioAttributes(mAttrs);
-                mPlayer.setOnCompletionListener(Player.this);
-                mPlayer.setOnErrorListener(Player.this);
+                player.setWakeMode(context, PowerManager.PARTIAL_WAKE_LOCK);
+                player.setAudioAttributes(attrs);
+                player.setOnCompletionListener(Player.this);
+                player.setOnErrorListener(Player.this);
 
                 // TODO: I am totally jinxing this, but passing MediaPlayer a path rather than an FD
                 // seems to maybe make it finally stop skipping. If this is really the case,
                 // investigate whether it's possible to also pass a path even when the file isn't
                 // fully downloaded yet. I think I tried this before and it made it stop when it got
                 // to the initial end of the file, even if more had been downloaded by then, though.
-                if (currentBytes == mNumBytes) {
-                    mPlayer.setDataSource(mPath);
+                if (currentBytes == numBytes) {
+                    player.setDataSource(path);
                 } else {
-                    mStream = new FileInputStream(mPath);
-                    mPlayer.setDataSource(mStream.getFD());
+                    stream = new FileInputStream(path);
+                    player.setDataSource(stream.getFD());
                 }
-                mPlayer.prepare();
+                player.prepare();
 
                 // This should happen after preparing the MediaPlayer,
                 // per https://stackoverflow.com/q/23342655/6882947.
-                mLoudnessEnhancer = new LoudnessEnhancer(mPlayer.getAudioSessionId());
+                loudnessEnhancer = new LoudnessEnhancer(player.getAudioSessionId());
                 adjustVolume();
 
                 return true;
             } catch (final IOException e) {
                 close();
-                mListenerHandler.post(
+                listenerHandler.post(
                         new Runnable() {
                             @Override
                             public void run() {
-                                mListener.onPlaybackError("Unable to prepare " + mPath + ": " + e);
+                                listener.onPlaybackError("Unable to prepare " + path + ": " + e);
                             }
                         });
                 return false;
@@ -193,87 +192,87 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
 
         public void close() {
             try {
-                if (mPlayer != null) {
-                    mPlayer.release();
-                    mLoudnessEnhancer.release();
+                if (player != null) {
+                    player.release();
+                    loudnessEnhancer.release();
                 }
-                if (mStream != null) {
-                    mStream.close();
+                if (stream != null) {
+                    stream.close();
                 }
             } catch (final IOException e) {
-                mListenerHandler.post(
+                listenerHandler.post(
                         new Runnable() {
                             @Override
                             public void run() {
-                                mListener.onPlaybackError("Unable to close " + mPath + ": " + e);
+                                listener.onPlaybackError("Unable to close " + path + ": " + e);
                             }
                         });
             }
         }
 
         public void setLowVolume(boolean lowVolume) {
-            mLowVolume = lowVolume;
+            this.lowVolume = lowVolume;
             adjustVolume();
         }
 
         public void setPreAmpGain(double preAmpGain) {
-            mPreAmpGain = preAmpGain;
+            this.preAmpGain = preAmpGain;
             adjustVolume();
         }
 
         // Adjusts |mPlayer|'s volume appropriately.
         private void adjustVolume() {
-            if (mPlayer == null || mLoudnessEnhancer == null) {
+            if (player == null || loudnessEnhancer == null) {
                 return;
             }
 
             // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_specification
-            double pct = Math.pow(10, (mPreAmpGain + mSongGain) / 20);
-            if (mLowVolume) {
+            double pct = Math.pow(10, (preAmpGain + songGain) / 20);
+            if (lowVolume) {
                 pct *= LOW_VOLUME_FRACTION;
             }
-            if (mPeakAmp > 0) {
-                pct = Math.min(pct, 1 / mPeakAmp);
+            if (peakAmp > 0) {
+                pct = Math.min(pct, 1 / peakAmp);
             }
 
-            Log.d(TAG, "setting " + mPath + " volume to " + pct);
+            Log.d(TAG, "setting " + path + " volume to " + pct);
 
             // Hooray: MediaPlayer only accepts volumes in the range [0.0, 1.0],
             // while LoudnessEnhancer seems to only accept positive gains (in mB).
             if (pct <= 1) {
-                mPlayer.setVolume((float) pct, (float) pct);
-                mLoudnessEnhancer.setTargetGain(0);
+                player.setVolume((float) pct, (float) pct);
+                loudnessEnhancer.setTargetGain(0);
             } else {
-                mPlayer.setVolume(1, 1);
+                player.setVolume(1, 1);
                 int gainmB = (int) Math.round(Math.log10(pct) * 2000);
-                mLoudnessEnhancer.setTargetGain(gainmB);
+                loudnessEnhancer.setTargetGain(gainmB);
             }
         }
 
         // Restarts playback after a buffer underrun.
         // Returns true if we switched to the complete file.
         public boolean restartPlayback() throws IOException {
-            final int currentPositionMs = mPlayer.getCurrentPosition();
+            final int currentPositionMs = player.getCurrentPosition();
             final long currentBytes = getFileBytes();
-            Log.w(TAG, "restarting " + mPlayer + " at " + currentPositionMs + " ms");
+            Log.w(TAG, "restarting " + player + " at " + currentPositionMs + " ms");
 
             boolean switchedToFile = false;
-            mPlayer.reset();
+            player.reset();
 
-            if (currentBytes == mNumBytes) {
-                Log.w(TAG, "switching " + mPlayer + " from stream to complete file " + mPath);
-                mStream.close();
-                mStream = null;
-                mPlayer.setDataSource(mPath);
+            if (currentBytes == numBytes) {
+                Log.w(TAG, "switching " + player + " from stream to complete file " + path);
+                stream.close();
+                stream = null;
+                player.setDataSource(path);
                 switchedToFile = true;
             } else {
-                Log.w(TAG, "setting " + mPlayer + " to reuse current stream");
-                mPlayer.setDataSource(getStream().getFD());
+                Log.w(TAG, "setting " + player + " to reuse current stream");
+                player.setDataSource(getStream().getFD());
             }
 
-            mPlayer.prepare();
-            mPlayer.seekTo(currentPositionMs);
-            mPlayer.start();
+            player.prepare();
+            player.seekTo(currentPositionMs);
+            player.start();
             return switchedToFile;
         }
     }
@@ -284,19 +283,19 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
             Handler listenerHandler,
             AudioAttributes attrs,
             double preAmpGain) {
-        mContext = context;
-        mListener = listener;
-        mListenerHandler = listenerHandler;
-        mAttrs = attrs;
-        mPreAmpGain = preAmpGain;
+        this.context = context;
+        this.listener = listener;
+        this.listenerHandler = listenerHandler;
+        this.attrs = attrs;
+        this.preAmpGain = preAmpGain;
     }
 
     @Override
     public void run() {
         Looper.prepare();
         synchronized (this) {
-            if (mShouldQuit) return;
-            mHandler = new Handler();
+            if (shouldQuit) return;
+            handler = new Handler();
         }
         Looper.loop();
     }
@@ -304,18 +303,18 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
     public void quit() {
         synchronized (this) {
             // The thread hasn't started looping yet; tell it to exit before starting.
-            if (mHandler == null) {
-                mShouldQuit = true;
+            if (handler == null) {
+                shouldQuit = true;
                 return;
             }
         }
-        mHandler.post(
+        handler.post(
                 new Runnable() {
                     @Override
                     public void run() {
-                        mBackgroundLoader.shutdownNow();
+                        backgroundLoader.shutdownNow();
                         try {
-                            mBackgroundLoader.awaitTermination(
+                            backgroundLoader.awaitTermination(
                                     SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS);
                         } catch (InterruptedException e) {
                         }
@@ -327,7 +326,7 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
     }
 
     public void abortPlayback() {
-        mHandler.post(
+        handler.post(
                 new Runnable() {
                     @Override
                     public void run() {
@@ -338,29 +337,29 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
 
     public void playFile(
             final String path, final long numBytes, final double gain, final double peakAmp) {
-        mHandler.post(
+        handler.post(
                 new Runnable() {
                     @Override
                     public void run() {
                         Log.d(TAG, "got request to play " + path);
                         resetCurrent();
-                        if (mQueuedPlayer != null && mQueuedPlayer.getPath().equals(path)) {
-                            Log.d(TAG, "using queued " + mQueuedPlayer.getMediaPlayer());
-                            mCurrentPlayer = mQueuedPlayer;
-                            mQueuedPlayer = null;
+                        if (queuedPlayer != null && queuedPlayer.getPath().equals(path)) {
+                            Log.d(TAG, "using queued " + queuedPlayer.getMediaPlayer());
+                            currentPlayer = queuedPlayer;
+                            queuedPlayer = null;
                         } else {
-                            mCurrentPlayer =
+                            currentPlayer =
                                     new FilePlayer(
-                                            path, numBytes, mAttrs, mPreAmpGain, gain, peakAmp);
-                            if (!mCurrentPlayer.prepare()) {
-                                mCurrentPlayer = null;
+                                            path, numBytes, attrs, preAmpGain, gain, peakAmp);
+                            if (!currentPlayer.prepare()) {
+                                currentPlayer = null;
                                 return;
                             }
-                            mCurrentPlayer.setLowVolume(mLowVolume);
+                            currentPlayer.setLowVolume(lowVolume);
                         }
 
-                        if (!mPaused) {
-                            mCurrentPlayer.getMediaPlayer().start();
+                        if (!paused) {
+                            currentPlayer.getMediaPlayer().start();
                             startPositionTimer();
                         }
                     }
@@ -369,16 +368,16 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
 
     public void queueFile(
             final String path, final long numBytes, final double gain, final double peakAmp) {
-        mHandler.post(
+        handler.post(
                 new Runnable() {
                     @Override
                     public void run() {
                         Log.d(TAG, "got request to queue " + path);
-                        if (mQueuedPlayer != null && mQueuedPlayer.getPath().equals(path)) {
+                        if (queuedPlayer != null && queuedPlayer.getPath().equals(path)) {
                             return;
                         }
 
-                        mBackgroundLoader.submit(
+                        backgroundLoader.submit(
                                 new Runnable() {
                                     @Override
                                     public void run() {
@@ -386,14 +385,14 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
                                                 new FilePlayer(
                                                         path,
                                                         numBytes,
-                                                        mAttrs,
-                                                        mPreAmpGain,
+                                                        attrs,
+                                                        preAmpGain,
                                                         gain,
                                                         peakAmp);
                                         if (!player.prepare()) {
                                             return;
                                         }
-                                        mHandler.post(
+                                        handler.post(
                                                 new Runnable() {
                                                     @Override
                                                     public void run() {
@@ -402,8 +401,8 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
                                                                 "finished preparing queued file "
                                                                         + path);
                                                         resetQueued();
-                                                        mQueuedPlayer = player;
-                                                        mQueuedPlayer.setLowVolume(mLowVolume);
+                                                        queuedPlayer = player;
+                                                        queuedPlayer.setLowVolume(lowVolume);
                                                     }
                                                 });
                                     }
@@ -425,41 +424,37 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
     }
 
     private void updatePauseState(final PauseUpdateType type) {
-        mHandler.post(
+        handler.post(
                 new Runnable() {
                     @Override
                     public void run() {
                         switch (type) {
                             case PAUSE:
-                                if (mPaused) {
-                                    return;
-                                }
-                                mPaused = true;
+                                if (paused) return;
+                                paused = true;
                                 break;
                             case UNPAUSE:
-                                if (!mPaused) {
-                                    return;
-                                }
-                                mPaused = false;
+                                if (!paused) return;
+                                paused = false;
                                 break;
                             case TOGGLE_PAUSE:
-                                mPaused = !mPaused;
+                                paused = !paused;
                                 break;
                         }
 
-                        if (mCurrentPlayer != null) {
-                            if (mPaused) {
-                                mCurrentPlayer.getMediaPlayer().pause();
+                        if (currentPlayer != null) {
+                            if (paused) {
+                                currentPlayer.getMediaPlayer().pause();
                                 stopPositionTimer();
                             } else {
                                 // If the file is already fully loaded, play from it instead of a
                                 // stream.
                                 boolean switchedToFile = false;
-                                if (mCurrentPlayer.getStream() != null
-                                        && mCurrentPlayer.getFileBytes()
-                                                == mCurrentPlayer.getNumBytes()) {
+                                if (currentPlayer.getStream() != null
+                                        && currentPlayer.getFileBytes()
+                                                == currentPlayer.getNumBytes()) {
                                     try {
-                                        mCurrentPlayer.restartPlayback();
+                                        currentPlayer.restartPlayback();
                                         switchedToFile = true;
                                     } catch (IOException e) {
                                         Log.e(
@@ -470,16 +465,16 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
                                     }
                                 }
                                 if (!switchedToFile) {
-                                    mCurrentPlayer.getMediaPlayer().start();
+                                    currentPlayer.getMediaPlayer().start();
                                 }
                                 startPositionTimer();
                             }
                         }
-                        mListenerHandler.post(
+                        listenerHandler.post(
                                 new Runnable() {
                                     @Override
                                     public void run() {
-                                        mListener.onPauseStateChange(mPaused);
+                                        listener.onPauseStateChange(paused);
                                     }
                                 });
                     }
@@ -487,89 +482,76 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
     }
 
     public void setLowVolume(final boolean lowVolume) {
-        mHandler.post(
+        handler.post(
                 new Runnable() {
                     @Override
                     public void run() {
-                        if (mLowVolume == lowVolume) {
-                            return;
-                        }
+                        if (lowVolume == Player.this.lowVolume) return;
 
-                        mLowVolume = lowVolume;
-                        if (mCurrentPlayer != null) {
-                            mCurrentPlayer.setLowVolume(lowVolume);
-                        }
-                        if (mQueuedPlayer != null) {
-                            mQueuedPlayer.setLowVolume(lowVolume);
-                        }
+                        Player.this.lowVolume = lowVolume;
+                        if (currentPlayer != null) currentPlayer.setLowVolume(lowVolume);
+                        if (queuedPlayer != null) queuedPlayer.setLowVolume(lowVolume);
                     }
                 });
     }
 
     public void setPreAmpGain(final double preAmpGain) {
-        mHandler.post(
+        handler.post(
                 new Runnable() {
                     @Override
                     public void run() {
-                        if (mPreAmpGain == preAmpGain) {
-                            return;
-                        }
+                        if (preAmpGain == Player.this.preAmpGain) return;
 
-                        mPreAmpGain = preAmpGain;
-                        if (mCurrentPlayer != null) {
-                            mCurrentPlayer.setPreAmpGain(preAmpGain);
-                        }
-                        if (mQueuedPlayer != null) {
-                            mQueuedPlayer.setPreAmpGain(preAmpGain);
-                        }
+                        Player.this.preAmpGain = preAmpGain;
+                        if (currentPlayer != null) currentPlayer.setPreAmpGain(preAmpGain);
+                        if (queuedPlayer != null) queuedPlayer.setPreAmpGain(preAmpGain);
                     }
                 });
     }
 
     // Periodically invoked to notify the observer about the playback position of the current song.
-    private Runnable mPositionTask =
+    private Runnable positionTask =
             new Runnable() {
                 public void run() {
-                    if (mCurrentPlayer == null) {
+                    if (currentPlayer == null) {
                         Log.w(TAG, "aborting position task; player is null");
                         return;
                     }
-                    final String path = mCurrentPlayer.getPath();
-                    final int positionMs = mCurrentPlayer.getMediaPlayer().getCurrentPosition();
-                    final int durationMs = mCurrentPlayer.getMediaPlayer().getDuration();
-                    mListenerHandler.post(
+                    final String path = currentPlayer.getPath();
+                    final int positionMs = currentPlayer.getMediaPlayer().getCurrentPosition();
+                    final int durationMs = currentPlayer.getMediaPlayer().getDuration();
+                    listenerHandler.post(
                             new Runnable() {
                                 @Override
                                 public void run() {
-                                    mListener.onPlaybackPositionChange(
-                                            path, positionMs, durationMs);
+                                    listener.onPlaybackPositionChange(path, positionMs, durationMs);
                                 }
                             });
-                    mHandler.postDelayed(this, POSITION_CHANGE_REPORT_MS);
+                    handler.postDelayed(this, POSITION_CHANGE_REPORT_MS);
                 }
             };
 
     // Start running |mSongPositionTask|.
     private void startPositionTimer() {
-        Util.assertOnLooper(mHandler.getLooper());
+        Util.assertOnLooper(handler.getLooper());
         stopPositionTimer();
-        mHandler.post(mPositionTask);
+        handler.post(positionTask);
     }
 
     // Stop running |mSongPositionTask|.
     private void stopPositionTimer() {
-        Util.assertOnLooper(mHandler.getLooper());
-        mHandler.removeCallbacks(mPositionTask);
+        Util.assertOnLooper(handler.getLooper());
+        handler.removeCallbacks(positionTask);
     }
 
     // Implements MediaPlayer.OnCompletionListener.
     @Override
     public void onCompletion(final MediaPlayer player) {
-        mHandler.post(
+        handler.post(
                 new Runnable() {
                     @Override
                     public void run() {
-                        if (mCurrentPlayer == null || mCurrentPlayer.getMediaPlayer() != player) {
+                        if (currentPlayer == null || currentPlayer.getMediaPlayer() != player) {
                             return;
                         }
                         try {
@@ -578,10 +560,10 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
                             // doesn't have buffer underruns that result in premature end of
                             // playback being reported.
                             final long streamPosition =
-                                    mCurrentPlayer.getStream() != null
-                                            ? mCurrentPlayer.getStream().getChannel().position()
-                                            : mCurrentPlayer.getNumBytes();
-                            final long numBytes = mCurrentPlayer.getNumBytes();
+                                    currentPlayer.getStream() != null
+                                            ? currentPlayer.getStream().getChannel().position()
+                                            : currentPlayer.getNumBytes();
+                            final long numBytes = currentPlayer.getNumBytes();
                             Log.d(
                                     TAG,
                                     player
@@ -590,13 +572,13 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
                                             + " of "
                                             + numBytes);
 
-                            if (streamPosition < numBytes && mCurrentPlayer.getStream() != null) {
-                                final boolean switchedToFile = mCurrentPlayer.restartPlayback();
-                                mListenerHandler.post(
+                            if (streamPosition < numBytes && currentPlayer.getStream() != null) {
+                                final boolean switchedToFile = currentPlayer.restartPlayback();
+                                listenerHandler.post(
                                         new Runnable() {
                                             @Override
                                             public void run() {
-                                                mListener.onPlaybackError(
+                                                listener.onPlaybackError(
                                                         switchedToFile
                                                                 ? "Switched to file after buffer"
                                                                         + " underrun"
@@ -606,11 +588,11 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
                                         });
                             } else {
                                 resetCurrent();
-                                mListenerHandler.post(
+                                listenerHandler.post(
                                         new Runnable() {
                                             @Override
                                             public void run() {
-                                                mListener.onPlaybackComplete();
+                                                listener.onPlaybackComplete();
                                             }
                                         });
                             }
@@ -626,11 +608,11 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
     // Implements MediaPlayer.OnErrorListener.
     @Override
     public boolean onError(MediaPlayer player, final int what, final int extra) {
-        mListenerHandler.post(
+        listenerHandler.post(
                 new Runnable() {
                     @Override
                     public void run() {
-                        mListener.onPlaybackError(
+                        listener.onPlaybackError(
                                 "MediaPlayer reported a vague, not-very-useful error: what="
                                         + what
                                         + " extra="
@@ -641,22 +623,22 @@ class Player implements Runnable, MediaPlayer.OnCompletionListener, MediaPlayer.
         return false;
     }
 
-    /** Resets mCurrentPlayer. */
+    /** Resets |currentPlayer|. */
     private void resetCurrent() {
-        Util.assertOnLooper(mHandler.getLooper());
+        Util.assertOnLooper(handler.getLooper());
         stopPositionTimer();
-        if (mCurrentPlayer != null) {
-            mCurrentPlayer.close();
-            mCurrentPlayer = null;
+        if (currentPlayer != null) {
+            currentPlayer.close();
+            currentPlayer = null;
         }
     }
 
-    /** Resets mQueuedPlayer. */
+    /** Resets |queuedPlayer|. */
     private void resetQueued() {
-        Util.assertOnLooper(mHandler.getLooper());
-        if (mQueuedPlayer != null) {
-            mQueuedPlayer.close();
-            mQueuedPlayer = null;
+        Util.assertOnLooper(handler.getLooper());
+        if (queuedPlayer != null) {
+            queuedPlayer.close();
+            queuedPlayer = null;
         }
     }
 }

@@ -13,22 +13,22 @@ import java.util.Date;
 public class CrashLogger implements Thread.UncaughtExceptionHandler {
     private static final String TAG = "CrashLogger";
 
-    private static CrashLogger mSingleton;
+    private static CrashLogger singleton;
 
-    private final File mDirectory;
-    private final Thread.UncaughtExceptionHandler mDefaultHandler;
+    private final File dir;
+    private final Thread.UncaughtExceptionHandler defaultHandler;
 
-    private CrashLogger(File directory) {
-        mDirectory = directory;
-        mDefaultHandler = Thread.getDefaultUncaughtExceptionHandler();
+    private CrashLogger(File dir) {
+        this.dir = dir;
+        this.defaultHandler = Thread.getDefaultUncaughtExceptionHandler();
     }
 
     @Override
     public void uncaughtException(Thread thread, Throwable error) {
         try {
-            mDirectory.mkdirs();
+            dir.mkdirs();
             SimpleDateFormat format = new SimpleDateFormat("yyyyMMdd-HHmmss");
-            File file = new File(mDirectory, format.format(new Date()) + ".txt");
+            File file = new File(dir, format.format(new Date()) + ".txt");
             Log.d(TAG, "creating crash file " + file.getAbsolutePath());
             file.createNewFile();
 
@@ -47,20 +47,20 @@ public class CrashLogger implements Thread.UncaughtExceptionHandler {
             Log.e(TAG, "IO error: " + e);
         }
 
-        mDefaultHandler.uncaughtException(thread, error);
+        defaultHandler.uncaughtException(thread, error);
     }
 
-    public static void register(File directory) {
-        if (mSingleton != null) return;
+    public static void register(File dir) {
+        if (singleton != null) return;
 
-        mSingleton = new CrashLogger(directory);
-        Thread.setDefaultUncaughtExceptionHandler(mSingleton);
+        singleton = new CrashLogger(dir);
+        Thread.setDefaultUncaughtExceptionHandler(singleton);
     }
 
     public static void unregister() {
-        if (mSingleton == null) return;
+        if (singleton == null) return;
 
         Thread.setDefaultUncaughtExceptionHandler(null);
-        mSingleton = null;
+        singleton = null;
     }
 }

@@ -27,45 +27,45 @@ public class BrowseAlbumsActivity extends BrowseActivityBase
     private static final int MENU_ITEM_BROWSE_SONGS = 3;
 
     // Are we displaying only cached songs?
-    private boolean mOnlyCached = false;
+    private boolean onlyCached = false;
 
     // Artist that was passed to us, or null if we were started directly from BrowseTopActivity.
-    private String mArtist = null;
+    private String artist = null;
 
     // Albums that we're displaying along with number of tracks.
     // Just the albums featuring |mArtist| if it's non-null, or all albums on the server otherwise.
-    private List<StatsRow> mRows = new ArrayList<StatsRow>();
+    private List<StatsRow> rows = new ArrayList<StatsRow>();
 
-    private StatsRowArrayAdapter mAdapter;
+    private StatsRowArrayAdapter adapter;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        mOnlyCached = getIntent().getBooleanExtra(BUNDLE_CACHED, false);
-        mArtist = getIntent().getStringExtra(BUNDLE_ARTIST);
+        onlyCached = getIntent().getBooleanExtra(BUNDLE_CACHED, false);
+        artist = getIntent().getStringExtra(BUNDLE_ARTIST);
         setTitle(
-                (mArtist != null)
+                (artist != null)
                         ? getString(
-                                mOnlyCached
+                                onlyCached
                                         ? R.string.browse_cached_albums_fmt
                                         : R.string.browse_albums_fmt,
-                                mArtist)
+                                artist)
                         : getString(
-                                mOnlyCached
+                                onlyCached
                                         ? R.string.browse_cached_albums
                                         : R.string.browse_albums));
 
-        mAdapter =
+        adapter =
                 new StatsRowArrayAdapter(
                         this,
                         R.layout.browse_row,
-                        mRows,
-                        mArtist == null
+                        rows,
+                        artist == null
                                 ? StatsRowArrayAdapter.DISPLAY_ALBUM_ARTIST
                                 : StatsRowArrayAdapter.DISPLAY_ALBUM,
                         Util.SORT_ALBUM);
-        setListAdapter(mAdapter);
+        setListAdapter(adapter);
         registerForContextMenu(getListView());
 
         NupActivity.getService().addSongDatabaseUpdateListener(this);
@@ -80,7 +80,7 @@ public class BrowseAlbumsActivity extends BrowseActivityBase
 
     @Override
     protected void onListItemClick(ListView listView, View view, int position, long id) {
-        StatsRow row = mRows.get(position);
+        StatsRow row = rows.get(position);
         if (row == null) return;
 
         // TODO: Right now, we show the full album by default instead of limiting it to songs by
@@ -92,11 +92,11 @@ public class BrowseAlbumsActivity extends BrowseActivityBase
     public void onCreateContextMenu(
             ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
         int pos = ((AdapterView.AdapterContextMenuInfo) menuInfo).position;
-        StatsRow row = mRows.get(pos);
+        StatsRow row = rows.get(pos);
         if (row != null) menu.setHeaderTitle(row.key.album);
 
-        if (mArtist != null) {
-            String msg = getString(R.string.browse_songs_by_artist_fmt, mArtist);
+        if (artist != null) {
+            String msg = getString(R.string.browse_songs_by_artist_fmt, artist);
             menu.add(0, MENU_ITEM_BROWSE_SONGS_BY_ARTIST, 0, msg);
         }
         menu.add(0, MENU_ITEM_BROWSE_SONGS_WITH_RATING, 0, R.string.browse_songs_four_stars);
@@ -107,12 +107,12 @@ public class BrowseAlbumsActivity extends BrowseActivityBase
     public boolean onContextItemSelected(MenuItem item) {
         AdapterView.AdapterContextMenuInfo info =
                 (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
-        StatsRow row = mRows.get(info.position);
+        StatsRow row = rows.get(info.position);
         if (row == null) return false;
 
         switch (item.getItemId()) {
             case MENU_ITEM_BROWSE_SONGS_BY_ARTIST:
-                startBrowseSongsActivity(mArtist, row.key.album, row.key.albumId, -1.0);
+                startBrowseSongsActivity(artist, row.key.album, row.key.albumId, -1.0);
                 return true;
             case MENU_ITEM_BROWSE_SONGS_WITH_RATING:
                 startBrowseSongsActivity("", row.key.album, row.key.albumId, 0.75);
@@ -129,23 +129,23 @@ public class BrowseAlbumsActivity extends BrowseActivityBase
     @Override
     public void onSongDatabaseUpdate() {
         if (!NupActivity.getService().getSongDb().getAggregateDataLoaded()) {
-            mRows.add(new StatsRow("", getString(R.string.loading), "", -1));
-            mAdapter.setEnabled(false);
-            mAdapter.notifyDataSetChanged();
+            rows.add(new StatsRow("", getString(R.string.loading), "", -1));
+            adapter.setEnabled(false);
+            adapter.notifyDataSetChanged();
             return;
         }
 
-        if (!mOnlyCached) {
+        if (!onlyCached) {
             updateRows(
-                    (mArtist != null)
-                            ? NupActivity.getService().getSongDb().getAlbumsByArtist(mArtist)
+                    (artist != null)
+                            ? NupActivity.getService().getSongDb().getAlbumsByArtist(artist)
                             : NupActivity.getService().getSongDb().getAlbumsSortedAlphabetically());
         } else {
             new AsyncTask<Void, Void, List<StatsRow>>() {
                 @Override
                 protected List<StatsRow> doInBackground(Void... args) {
-                    return mArtist != null
-                            ? NupActivity.getService().getSongDb().getCachedAlbumsByArtist(mArtist)
+                    return artist != null
+                            ? NupActivity.getService().getSongDb().getCachedAlbumsByArtist(artist)
                             : NupActivity.getService()
                                     .getSongDb()
                                     .getCachedAlbumsSortedAlphabetically();
@@ -160,13 +160,13 @@ public class BrowseAlbumsActivity extends BrowseActivityBase
     }
 
     // Show a new list of albums.
-    private void updateRows(List<StatsRow> rows) {
-        mRows.clear();
-        mRows.addAll(rows);
+    private void updateRows(List<StatsRow> newRows) {
+        rows.clear();
+        rows.addAll(newRows);
         final ListView listView = getListView();
         listView.setFastScrollEnabled(false);
-        mAdapter.setEnabled(true);
-        mAdapter.notifyDataSetChanged();
+        adapter.setEnabled(true);
+        adapter.notifyDataSetChanged();
         listView.setFastScrollEnabled(true);
         Util.resizeListViewToFixFastScroll(listView);
     }
@@ -178,7 +178,7 @@ public class BrowseAlbumsActivity extends BrowseActivityBase
         if (artist != null) intent.putExtra(BUNDLE_ARTIST, artist);
         intent.putExtra(BUNDLE_ALBUM, album);
         intent.putExtra(BUNDLE_ALBUM_ID, albumId);
-        intent.putExtra(BUNDLE_CACHED, mOnlyCached);
+        intent.putExtra(BUNDLE_CACHED, onlyCached);
         if (minRating >= 0.0) intent.putExtra(BUNDLE_MIN_RATING, minRating);
         startActivityForResult(intent, BROWSE_SONGS_REQUEST_CODE);
     }

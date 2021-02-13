@@ -28,29 +28,29 @@ public class CoverLoader {
     private static final int BUFFER_SIZE = 8 * 1024;
 
     // Application-specific cache dir (not including DIR_NAME).
-    private final File mCacheDir;
+    private final File cacheDir;
 
-    private final Downloader mDownloader;
-    private final BitmapDecoder mBitmapDecoder;
-    private final NetworkHelper mNetworkHelper;
+    private final Downloader downloader;
+    private final BitmapDecoder bitmapDecoder;
+    private final NetworkHelper networkHelper;
 
     // Directory where we write cover images.
-    private File mCoverDir;
+    private File coverDir;
 
     // Guards |mFilesBeingLoaded|.
-    private final Lock mLock = new ReentrantLock();
+    private final Lock lock = new ReentrantLock();
 
     // Signalled when a change has been made to |mFilesBeingLoaded|.
-    private final Condition mLoadFinishedCond = mLock.newCondition();
+    private final Condition loadFinishedCond = lock.newCondition();
 
     // Names of cover files that we're currently fetching.
-    private HashSet mFilesBeingLoaded = new HashSet();
+    private HashSet filesBeingLoaded = new HashSet();
 
     // The last cover that we've loaded.  We store it here so that we can reuse the already-loaded
     // bitmap in the common case where we're playing an album and need the same cover over and over.
-    private Object mLastCoverLock = new Object();
-    private File mLastCoverPath;
-    private Bitmap mLastCoverBitmap = null;
+    private Object lastCoverLock = new Object();
+    private File lastCoverPath;
+    private Bitmap lastCoverBitmap = null;
 
     public CoverLoader(
             File cacheDir,
@@ -58,10 +58,10 @@ public class CoverLoader {
             TaskRunner taskRunner,
             BitmapDecoder bitmapDecoder,
             NetworkHelper networkHelper) {
-        mCacheDir = cacheDir;
-        mDownloader = downloader;
-        mBitmapDecoder = bitmapDecoder;
-        mNetworkHelper = networkHelper;
+        this.cacheDir = cacheDir;
+        this.downloader = downloader;
+        this.bitmapDecoder = bitmapDecoder;
+        this.networkHelper = networkHelper;
 
         taskRunner.runInBackground(
                 new Runnable() {
@@ -77,7 +77,7 @@ public class CoverLoader {
                                             + "; we need "
                                             + Environment.MEDIA_MOUNTED);
                         }
-                        mCoverDir = new File(mCacheDir, DIR_NAME);
+                        coverDir = new File(CoverLoader.this.cacheDir, DIR_NAME);
                     }
                 });
     }
@@ -88,13 +88,13 @@ public class CoverLoader {
         // TODO: Util.assertNotOnMainThread() ought to be called here, but this gets called on the
         // main thread in unit tests.
 
-        if (mCoverDir == null) {
+        if (coverDir == null) {
             Log.e(TAG, "got request for " + url.toString() + " before initialized");
             return null;
         }
 
         // Ensure that the cover dir exists.
-        mCoverDir.mkdirs();
+        coverDir.mkdirs();
 
         File file = lookForLocalCover(url);
         if (file != null) {
@@ -110,13 +110,13 @@ public class CoverLoader {
             return null;
         }
 
-        synchronized (mLastCoverLock) {
-            if (mLastCoverPath != null && mLastCoverPath.equals(file)) {
-                return mLastCoverBitmap;
+        synchronized (lastCoverLock) {
+            if (lastCoverPath != null && lastCoverPath.equals(file)) {
+                return lastCoverBitmap;
             }
-            mLastCoverPath = file;
-            mLastCoverBitmap = mBitmapDecoder.decodeFile(file);
-            return mLastCoverBitmap;
+            lastCoverPath = file;
+            lastCoverBitmap = bitmapDecoder.decodeFile(file);
+            return lastCoverBitmap;
         }
     }
 
@@ -124,7 +124,7 @@ public class CoverLoader {
         String filename = getFilenameForUrl(url);
         startLoad(filename);
         try {
-            File file = new File(mCoverDir, filename);
+            File file = new File(coverDir, filename);
             if (file.exists()) return file;
         } finally {
             finishLoad(filename);
@@ -133,13 +133,13 @@ public class CoverLoader {
     }
 
     private File downloadCover(final URL url) {
-        if (!mNetworkHelper.isNetworkAvailable()) return null;
+        if (!networkHelper.isNetworkAvailable()) return null;
 
         String localFilename = getFilenameForUrl(url);
         startLoad(localFilename);
 
         boolean success = false;
-        File file = new File(mCoverDir, localFilename);
+        File file = new File(coverDir, localFilename);
         FileOutputStream outputStream = null;
         HttpURLConnection conn = null;
 
@@ -153,7 +153,7 @@ public class CoverLoader {
             file.createNewFile();
             outputStream = new FileOutputStream(file);
 
-            conn = mDownloader.download(url, "GET", Downloader.AuthType.STORAGE, null);
+            conn = downloader.download(url, "GET", Downloader.AuthType.STORAGE, null);
             if (conn.getResponseCode() != 200) {
                 throw new IOException("got status code " + conn.getResponseCode());
             }
@@ -196,14 +196,14 @@ public class CoverLoader {
     // |mFilesBeingLoaded| and then adds it.  Must be matched by a call to
     // finishLoad().
     private void startLoad(String filename) {
-        mLock.lock();
+        lock.lock();
         try {
-            while (mFilesBeingLoaded.contains(filename)) mLoadFinishedCond.await();
-            mFilesBeingLoaded.add(filename);
+            while (filesBeingLoaded.contains(filename)) loadFinishedCond.await();
+            filesBeingLoaded.add(filename);
         } catch (InterruptedException e) {
             // !#!@$#!$#!@
         } finally {
-            mLock.unlock();
+            lock.unlock();
         }
     }
 
@@ -211,15 +211,15 @@ public class CoverLoader {
     // a download (either successfully or unsuccessfully -- if unsuccessful, be
     // sure to remove the file first so that other threads don't try to use it).
     private void finishLoad(String filename) {
-        mLock.lock();
+        lock.lock();
         try {
-            if (!mFilesBeingLoaded.contains(filename))
+            if (!filesBeingLoaded.contains(filename))
                 throw new RuntimeException(
                         "got report of finished load of unknown file " + filename);
-            mFilesBeingLoaded.remove(filename);
-            mLoadFinishedCond.signal();
+            filesBeingLoaded.remove(filename);
+            loadFinishedCond.signal();
         } finally {
-            mLock.unlock();
+            lock.unlock();
         }
     }
 }

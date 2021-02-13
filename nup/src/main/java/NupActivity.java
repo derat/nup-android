@@ -48,36 +48,36 @@ public class NupActivity extends Activity implements NupService.SongListener {
     private static final int DIALOG_SONG_DETAILS = 1;
 
     // Persistent service to which we connect.
-    private static NupService mService;
+    private static NupService service;
 
     // UI components that we update dynamically.
-    private Button mPauseButton, mPrevButton, mNextButton;
-    private ImageView mAlbumImageView;
-    private TextView mArtistLabel, mTitleLabel, mAlbumLabel, mTimeLabel, mDownloadStatusLabel;
-    private ListView mPlaylistView;
+    private Button pauseButton, prevButton, nextButton;
+    private ImageView albumImageView;
+    private TextView artistLabel, titleLabel, albumLabel, timeLabel, downloadStatusLabel;
+    private ListView playlistView;
 
     // Last song-position time passed to onSongPositionChange(), in seconds.
     // Used to rate-limit how often we update the display so we only do it on integral changes.
-    private int mLastSongPositionSec = -1;
+    private int lastSongPositionSec = -1;
 
     // Songs in the current playlist.
-    private List<Song> mSongs = new ArrayList<Song>();
+    private List<Song> songs = new ArrayList<Song>();
 
-    // Position in mSongs of the song that we're currently displaying.
-    private int mCurrentSongIndex = -1;
+    // Position in |songs| of the song that we're currently displaying.
+    private int currentSongIndex = -1;
 
-    // Adapts the song listing to mPlaylistView.
-    private SongListAdapter mSongListAdapter = new SongListAdapter();
+    // Adapts the song listing to |playlistView|.
+    private SongListAdapter songListAdapter = new SongListAdapter();
 
     // Used to run tasks on our thread.
-    private Handler mHandler = new Handler();
+    private Handler handler = new Handler();
 
     // Task that tells the service to play our currently-selected song.
-    private Runnable mPlaySongTask =
+    private Runnable playSongTask =
             new Runnable() {
                 @Override
                 public void run() {
-                    mService.playSongAtIndex(mCurrentSongIndex);
+                    service.playSongAtIndex(currentSongIndex);
                 }
             };
 
@@ -109,23 +109,23 @@ public class NupActivity extends Activity implements NupService.SongListener {
         Log.d(TAG, "activity created");
         setContentView(R.layout.main);
 
-        mPauseButton = (Button) findViewById(R.id.pause_button);
-        mPrevButton = (Button) findViewById(R.id.prev_button);
-        mNextButton = (Button) findViewById(R.id.next_button);
-        mAlbumImageView = (ImageView) findViewById(R.id.album_image);
-        mArtistLabel = (TextView) findViewById(R.id.artist_label);
-        mTitleLabel = (TextView) findViewById(R.id.title_label);
-        mAlbumLabel = (TextView) findViewById(R.id.album_label);
-        mTimeLabel = (TextView) findViewById(R.id.time_label);
-        mDownloadStatusLabel = (TextView) findViewById(R.id.download_status_label);
+        pauseButton = (Button) findViewById(R.id.pause_button);
+        prevButton = (Button) findViewById(R.id.prev_button);
+        nextButton = (Button) findViewById(R.id.next_button);
+        albumImageView = (ImageView) findViewById(R.id.album_image);
+        artistLabel = (TextView) findViewById(R.id.artist_label);
+        titleLabel = (TextView) findViewById(R.id.title_label);
+        albumLabel = (TextView) findViewById(R.id.album_label);
+        timeLabel = (TextView) findViewById(R.id.time_label);
+        downloadStatusLabel = (TextView) findViewById(R.id.download_status_label);
 
-        mPlaylistView = (ListView) findViewById(R.id.playlist);
-        registerForContextMenu(mPlaylistView);
-        mPlaylistView.setAdapter(mSongListAdapter);
+        playlistView = (ListView) findViewById(R.id.playlist);
+        registerForContextMenu(playlistView);
+        playlistView.setAdapter(songListAdapter);
 
         Intent serviceIntent = new Intent(this, NupService.class);
         startService(serviceIntent);
-        bindService(new Intent(this, NupService.class), mConnection, 0);
+        bindService(new Intent(this, NupService.class), connection, 0);
 
         setVolumeControlStream(AudioManager.STREAM_MUSIC);
     }
@@ -136,66 +136,66 @@ public class NupActivity extends Activity implements NupService.SongListener {
         super.onDestroy();
 
         boolean stopService = false;
-        if (mService != null) {
-            mService.unregisterListener(this);
+        if (service != null) {
+            service.unregisterListener(this);
             // Shut down the service as well if the playlist is empty.
-            if (mService.getSongs().size() == 0) stopService = true;
+            if (service.getSongs().size() == 0) stopService = true;
         }
-        unbindService(mConnection);
+        unbindService(connection);
         if (stopService) stopService(new Intent(this, NupService.class));
     }
 
-    private ServiceConnection mConnection =
+    private ServiceConnection connection =
             new ServiceConnection() {
-                public void onServiceConnected(ComponentName className, IBinder service) {
+                public void onServiceConnected(ComponentName className, IBinder binder) {
                     Log.d(TAG, "connected to service");
-                    mService = ((NupService.LocalBinder) service).getService();
-                    mService.setSongListener(NupActivity.this);
+                    service = ((NupService.LocalBinder) binder).getService();
+                    service.setSongListener(NupActivity.this);
 
                     // Get current state from service.
-                    onPlaylistChange(mService.getSongs());
-                    onPauseStateChange(mService.getPaused());
+                    onPlaylistChange(service.getSongs());
+                    onPauseStateChange(service.getPaused());
                     if (getCurrentSong() != null) {
                         onSongPositionChange(
-                                mService.getCurrentSong(),
-                                mService.getCurrentSongLastPositionMs(),
+                                service.getCurrentSong(),
+                                service.getCurrentSongLastPositionMs(),
                                 0);
-                        mPlaylistView.smoothScrollToPosition(mCurrentSongIndex);
+                        playlistView.smoothScrollToPosition(currentSongIndex);
                     }
 
                     // TODO: Go to prefs page if server and account are unset.
-                    if (mSongs.isEmpty()) {
+                    if (songs.isEmpty()) {
                         startActivity(new Intent(NupActivity.this, BrowseTopActivity.class));
                     }
                 }
 
                 public void onServiceDisconnected(ComponentName className) {
                     Log.d(TAG, "disconnected from service");
-                    mService = null;
+                    service = null;
                 }
             };
 
     public static NupService getService() {
-        return NupActivity.mService;
+        return NupActivity.service;
     }
 
     public void onPauseButtonClicked(View view) {
-        mService.togglePause();
+        service.togglePause();
     }
 
     public void onPrevButtonClicked(View view) {
-        if (mCurrentSongIndex <= 0) return;
+        if (currentSongIndex <= 0) return;
 
-        mService.stopPlaying();
-        updateCurrentSongIndex(mCurrentSongIndex - 1);
+        service.stopPlaying();
+        updateCurrentSongIndex(currentSongIndex - 1);
         schedulePlaySongTask(SONG_CHANGE_DELAY_MS);
     }
 
     public void onNextButtonClicked(View view) {
-        if (mCurrentSongIndex >= mSongs.size() - 1) return;
+        if (currentSongIndex >= songs.size() - 1) return;
 
-        mService.stopPlaying();
-        updateCurrentSongIndex(mCurrentSongIndex + 1);
+        service.stopPlaying();
+        updateCurrentSongIndex(currentSongIndex + 1);
         schedulePlaySongTask(SONG_CHANGE_DELAY_MS);
     }
 
@@ -215,13 +215,13 @@ public class NupActivity extends Activity implements NupService.SongListener {
                         if (song != getCurrentSong()) return;
 
                         int positionSec = positionMs / 1000;
-                        if (positionSec == mLastSongPositionSec) return;
+                        if (positionSec == lastSongPositionSec) return;
                         // MediaPlayer appears to get confused sometimes and report things like
                         // 0:01.
                         int durationSec = Math.max(durationMs / 1000, getCurrentSong().lengthSec);
-                        mTimeLabel.setText(
+                        timeLabel.setText(
                                 Util.formatDurationProgressString(positionSec, durationSec));
-                        mLastSongPositionSec = positionSec;
+                        lastSongPositionSec = positionSec;
                     }
                 });
     }
@@ -232,7 +232,7 @@ public class NupActivity extends Activity implements NupService.SongListener {
         runOnUiThread(
                 new Runnable() {
                     public void run() {
-                        mPauseButton.setText(getString(isPaused ? R.string.play : R.string.pause));
+                        pauseButton.setText(getString(isPaused ? R.string.play : R.string.pause));
                     }
                 });
     }
@@ -241,22 +241,22 @@ public class NupActivity extends Activity implements NupService.SongListener {
     @Override
     public void onSongCoverLoad(Song song) {
         if (song == getCurrentSong()) {
-            mAlbumImageView.setVisibility(View.VISIBLE);
-            mAlbumImageView.setImageBitmap(song.getCoverBitmap());
+            albumImageView.setVisibility(View.VISIBLE);
+            albumImageView.setImageBitmap(song.getCoverBitmap());
         }
     }
 
     // Implements NupService.SongListener.
     @Override
-    public void onPlaylistChange(final List<Song> songs) {
+    public void onPlaylistChange(final List<Song> newSongs) {
         runOnUiThread(
                 new Runnable() {
                     @Override
                     public void run() {
-                        mSongs = songs;
+                        songs = newSongs;
                         findViewById(R.id.playlist_heading)
-                                .setVisibility(mSongs.isEmpty() ? View.INVISIBLE : View.VISIBLE);
-                        updateCurrentSongIndex(mService.getCurrentSongIndex());
+                                .setVisibility(songs.isEmpty() ? View.INVISIBLE : View.VISIBLE);
+                        updateCurrentSongIndex(service.getCurrentSongIndex());
                     }
                 });
     }
@@ -269,9 +269,9 @@ public class NupActivity extends Activity implements NupService.SongListener {
 
         if (song == getCurrentSong()) {
             if (availableBytes == totalBytes) {
-                mDownloadStatusLabel.setText("");
+                downloadStatusLabel.setText("");
             } else {
-                mDownloadStatusLabel.setText(
+                downloadStatusLabel.setText(
                         String.format(
                                 "%,d of %,d KB",
                                 Math.round(availableBytes / 1024.0),
@@ -279,40 +279,40 @@ public class NupActivity extends Activity implements NupService.SongListener {
             }
         }
 
-        mSongListAdapter.notifyDataSetChanged();
+        songListAdapter.notifyDataSetChanged();
     }
 
     // Update the onscreen information about the current song.
     private void updateSongDisplay(Song song) {
         if (song == null) {
-            mArtistLabel.setText("");
-            mTitleLabel.setText("");
-            mAlbumLabel.setText("");
-            mTimeLabel.setText("");
-            mDownloadStatusLabel.setText("");
-            mAlbumImageView.setVisibility(View.INVISIBLE);
+            artistLabel.setText("");
+            titleLabel.setText("");
+            albumLabel.setText("");
+            timeLabel.setText("");
+            downloadStatusLabel.setText("");
+            albumImageView.setVisibility(View.INVISIBLE);
         } else {
-            mArtistLabel.setText(song.artist);
-            mTitleLabel.setText(song.title);
-            mAlbumLabel.setText(song.album);
-            mTimeLabel.setText(
+            artistLabel.setText(song.artist);
+            titleLabel.setText(song.title);
+            albumLabel.setText(song.album);
+            timeLabel.setText(
                     Util.formatDurationProgressString(
-                            (song == mService.getCurrentSong())
-                                    ? mService.getCurrentSongLastPositionMs() / 1000
+                            (song == service.getCurrentSong())
+                                    ? service.getCurrentSongLastPositionMs() / 1000
                                     : 0,
                             song.lengthSec));
-            mDownloadStatusLabel.setText("");
+            downloadStatusLabel.setText("");
             if (song.getCoverBitmap() != null) {
-                mAlbumImageView.setVisibility(View.VISIBLE);
-                mAlbumImageView.setImageBitmap(song.getCoverBitmap());
+                albumImageView.setVisibility(View.VISIBLE);
+                albumImageView.setImageBitmap(song.getCoverBitmap());
             } else {
-                mAlbumImageView.setVisibility(View.INVISIBLE);
-                mService.fetchCoverForSongIfMissing(song);
+                albumImageView.setVisibility(View.INVISIBLE);
+                service.fetchCoverForSongIfMissing(song);
             }
         }
 
         // Update the displayed time in response to the next position change we get.
-        mLastSongPositionSec = -1;
+        lastSongPositionSec = -1;
     }
 
     @Override
@@ -326,7 +326,7 @@ public class NupActivity extends Activity implements NupService.SongListener {
         MenuItem item = menu.findItem(R.id.download_all_menu_item);
         // TODO: This sometimes runs before the service is bound, resulting in a crash.
         // Find a better way to handle it.
-        final boolean downloadAll = mService != null ? mService.getShouldDownloadAll() : false;
+        final boolean downloadAll = service != null ? service.getShouldDownloadAll() : false;
         item.setTitle(downloadAll ? R.string.dont_download_all : R.string.download_all);
         item.setIcon(
                 downloadAll
@@ -339,34 +339,22 @@ public class NupActivity extends Activity implements NupService.SongListener {
     public boolean onOptionsItemSelected(MenuItem item) {
         switch (item.getItemId()) {
             case R.id.browse_menu_item:
-                if (mService != null) {
-                    startActivity(new Intent(this, BrowseTopActivity.class));
-                }
+                if (service != null) startActivity(new Intent(this, BrowseTopActivity.class));
                 return true;
             case R.id.search_menu_item:
-                if (mService != null) {
-                    startActivity(new Intent(this, SearchFormActivity.class));
-                }
+                if (service != null) startActivity(new Intent(this, SearchFormActivity.class));
                 return true;
             case R.id.pause_menu_item:
-                if (mService != null) {
-                    mService.pause();
-                }
+                if (service != null) service.pause();
                 return true;
             case R.id.download_all_menu_item:
-                if (mService != null) {
-                    mService.setShouldDownloadAll(!mService.getShouldDownloadAll());
-                }
+                if (service != null) service.setShouldDownloadAll(!service.getShouldDownloadAll());
                 return true;
             case R.id.settings_menu_item:
-                if (mService != null) {
-                    startActivity(new Intent(this, SettingsActivity.class));
-                }
+                if (service != null) startActivity(new Intent(this, SettingsActivity.class));
                 return true;
             case R.id.exit_menu_item:
-                if (mService != null) {
-                    stopService(new Intent(this, NupService.class));
-                }
+                if (service != null) stopService(new Intent(this, NupService.class));
                 finish();
                 return true;
             default:
@@ -378,7 +366,7 @@ public class NupActivity extends Activity implements NupService.SongListener {
     private class SongListAdapter extends BaseAdapter {
         @Override
         public int getCount() {
-            return mSongs.size();
+            return songs.size();
         }
 
         @Override
@@ -406,7 +394,7 @@ public class NupActivity extends Activity implements NupService.SongListener {
             TextView titleView = (TextView) view.findViewById(R.id.title);
             TextView percentView = (TextView) view.findViewById(R.id.percent);
 
-            Song song = mSongs.get(position);
+            Song song = songs.get(position);
 
             artistView.setText(song.artist);
             titleView.setText(song.title);
@@ -427,7 +415,7 @@ public class NupActivity extends Activity implements NupService.SongListener {
                 percentView.setVisibility(View.GONE);
             }
 
-            boolean currentlyPlaying = (position == mCurrentSongIndex);
+            boolean currentlyPlaying = (position == currentSongIndex);
             view.setBackgroundColor(
                     getResources()
                             .getColor(
@@ -453,7 +441,7 @@ public class NupActivity extends Activity implements NupService.SongListener {
             ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
         if (view.getId() == R.id.playlist) {
             AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) menuInfo;
-            Song song = mSongs.get(info.position);
+            Song song = songs.get(info.position);
             menu.setHeaderTitle(song.title);
             menu.add(0, MENU_ITEM_PLAY, 0, R.string.play);
             menu.add(0, MENU_ITEM_REMOVE_FROM_LIST, 0, R.string.remove_from_list);
@@ -466,17 +454,17 @@ public class NupActivity extends Activity implements NupService.SongListener {
     public boolean onContextItemSelected(MenuItem item) {
         AdapterView.AdapterContextMenuInfo info =
                 (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
-        Song song = mSongs.get(info.position);
+        Song song = songs.get(info.position);
         switch (item.getItemId()) {
             case MENU_ITEM_PLAY:
                 updateCurrentSongIndex(info.position);
                 schedulePlaySongTask(0);
                 return true;
             case MENU_ITEM_REMOVE_FROM_LIST:
-                mService.removeFromPlaylist(info.position);
+                service.removeFromPlaylist(info.position);
                 return true;
             case MENU_ITEM_TRUNCATE_LIST:
-                mService.removeRangeFromPlaylist(info.position, mSongs.size() - 1);
+                service.removeRangeFromPlaylist(info.position, songs.size() - 1);
                 return true;
             case MENU_ITEM_SONG_DETAILS:
                 if (song != null)
@@ -500,23 +488,24 @@ public class NupActivity extends Activity implements NupService.SongListener {
     }
 
     private Song getCurrentSong() {
-        if (mCurrentSongIndex >= 0 && mCurrentSongIndex < mSongs.size())
-            return mSongs.get(mCurrentSongIndex);
-        else return null;
+        if (currentSongIndex >= 0 && currentSongIndex < songs.size()) {
+            return songs.get(currentSongIndex);
+        }
+        return null;
     }
 
     private void updateCurrentSongIndex(int index) {
-        mCurrentSongIndex = index;
+        currentSongIndex = index;
         updateSongDisplay(getCurrentSong());
-        mSongListAdapter.notifyDataSetChanged();
+        songListAdapter.notifyDataSetChanged();
 
-        mPrevButton.setEnabled(mCurrentSongIndex > 0);
-        mNextButton.setEnabled(!mSongs.isEmpty() && mCurrentSongIndex < mSongs.size() - 1);
-        mPauseButton.setEnabled(!mSongs.isEmpty());
+        prevButton.setEnabled(currentSongIndex > 0);
+        nextButton.setEnabled(!songs.isEmpty() && currentSongIndex < songs.size() - 1);
+        pauseButton.setEnabled(!songs.isEmpty());
     }
 
     private void schedulePlaySongTask(int delayMs) {
-        mHandler.removeCallbacks(mPlaySongTask);
-        mHandler.postDelayed(mPlaySongTask, delayMs);
+        handler.removeCallbacks(playSongTask);
+        handler.postDelayed(playSongTask, delayMs);
     }
 }

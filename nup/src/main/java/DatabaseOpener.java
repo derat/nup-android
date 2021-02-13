@@ -19,22 +19,22 @@ import android.util.Log;
 class DatabaseOpener {
     private static final String TAG = "DatabaseOpener";
 
-    private final Context mContext;
-    private final String mDatabaseName;
-    private final SQLiteOpenHelper mOpenHelper;
+    private final Context context;
+    private final String databaseName;
+    private final SQLiteOpenHelper openHelper;
 
-    private SQLiteDatabase mDb = null;
+    private SQLiteDatabase db = null;
 
     public DatabaseOpener(Context context, String databaseName, SQLiteOpenHelper helper) {
-        mContext = context;
-        mDatabaseName = databaseName;
-        mOpenHelper = helper;
+        this.context = context;
+        this.databaseName = databaseName;
+        this.openHelper = helper;
     }
 
     // Opens and returns a database.  The caller shouldn't call close() on the object, since it's
     // shared across multiple calls.
     public synchronized SQLiteDatabase getDb() {
-        if (mDb == null) {
+        if (db == null) {
             // Just use SQLiteOpenHelper to create and upgrade the database.
             // Trying to use it with multithreaded code seems to be a disaster.
             // We repeatedly try to open the database, since I see weird "database locked"
@@ -42,14 +42,14 @@ class DatabaseOpener {
             // far as I know, nobody should be using the database at that point.
             while (true) {
                 try {
-                    SQLiteDatabase db = mOpenHelper.getWritableDatabase();
-                    db.close();
+                    SQLiteDatabase tmpDb = openHelper.getWritableDatabase();
+                    tmpDb.close();
                     break;
                 } catch (SQLiteDatabaseLockedException e) {
                     Log.e(
                             TAG,
                             "database "
-                                    + mDatabaseName
+                                    + databaseName
                                     + " was locked while trying to create/upgrade it: "
                                     + e);
                 }
@@ -57,28 +57,28 @@ class DatabaseOpener {
 
             while (true) {
                 try {
-                    mDb = mContext.openOrCreateDatabase(mDatabaseName, 0, null);
+                    db = context.openOrCreateDatabase(databaseName, 0, null);
                     break;
                 } catch (SQLiteDatabaseLockedException e) {
                     Log.e(
                             TAG,
                             "database "
-                                    + mDatabaseName
+                                    + databaseName
                                     + " was locked while trying to open it: "
                                     + e);
                 }
             }
         }
 
-        return mDb;
+        return db;
     }
 
     // Closes the internal database.  Any previously-returned copies of it cannot be used
     // afterwards.
     public synchronized void close() {
-        if (mDb != null) {
-            mDb.close();
-            mDb = null;
+        if (db != null) {
+            db.close();
+            db = null;
         }
     }
 }

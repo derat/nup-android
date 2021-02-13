@@ -7,51 +7,51 @@ import java.io.File;
 
 class FileCacheEntry {
     public final long songId;
-    private final String mMusicDir;
-    private long mCachedBytes, mTotalBytes;
-    private int mLastAccessTime;
+    private final String musicDir;
+    private long cachedBytes, totalBytes;
+    private int lastAccessTime;
 
     public FileCacheEntry(String musicDir, long songId, long totalBytes, int lastAccessTime) {
-        this.mMusicDir = musicDir;
+        this.musicDir = musicDir;
         this.songId = songId;
-        this.mCachedBytes = 0;
-        this.mTotalBytes = totalBytes;
-        this.mLastAccessTime = lastAccessTime;
+        this.cachedBytes = 0;
+        this.totalBytes = totalBytes;
+        this.lastAccessTime = lastAccessTime;
     }
 
     public long getCachedBytes() {
-        return mCachedBytes;
+        return cachedBytes;
     }
 
     public long getTotalBytes() {
-        return mTotalBytes;
+        return totalBytes;
     }
 
     public int getLastAccessTime() {
-        return mLastAccessTime;
+        return lastAccessTime;
     }
 
     public File getLocalFile() {
-        return new File(mMusicDir, songId + ".mp3");
+        return new File(musicDir, songId + ".mp3");
     }
 
     public void incrementCachedBytes(long bytes) {
-        mCachedBytes += bytes;
+        cachedBytes += bytes;
     }
 
     public void setCachedBytes(long bytes) {
-        mCachedBytes = bytes;
+        cachedBytes = bytes;
     }
 
     public void setTotalBytes(long bytes) {
-        mTotalBytes = bytes;
+        totalBytes = bytes;
     }
 
     public void setLastAccessTime(int time) {
-        mLastAccessTime = time;
+        lastAccessTime = time;
     }
 
     public boolean isFullyCached() {
-        return mTotalBytes > 0 && mCachedBytes == mTotalBytes;
+        return totalBytes > 0 && cachedBytes == totalBytes;
     }
 }

@@ -16,16 +16,16 @@ import java.util.Calendar;
 import java.util.Date;
 
 class YesNoPreference extends DialogPreference implements NupService.SongDatabaseUpdateListener {
-    Context mContext;
+    Context context;
 
     public YesNoPreference(Context context, AttributeSet attrs) {
         super(context, attrs);
-        mContext = context;
+        this.context = context;
     }
 
     public YesNoPreference(Context context, AttributeSet attrs, int defStyle) {
         super(context, attrs, defStyle);
-        mContext = context;
+        this.context = context;
     }
 
     @Override
@@ -36,7 +36,7 @@ class YesNoPreference extends DialogPreference implements NupService.SongDatabas
                 new SyncSongListTask().executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
             } else if (NupPreferences.CLEAR_CACHE.equals(getKey())) {
                 NupActivity.getService().clearCache();
-                setSummary(mContext.getString(R.string.cache_is_empty));
+                setSummary(context.getString(R.string.cache_is_empty));
             }
         }
     }
@@ -50,9 +50,9 @@ class YesNoPreference extends DialogPreference implements NupService.SongDatabas
     public void updateSyncMessage() {
         SongDatabase db = NupActivity.getService().getSongDb();
         if (!db.getAggregateDataLoaded()) {
-            setSummary(mContext.getString(R.string.loading_stats));
+            setSummary(context.getString(R.string.loading_stats));
         } else if (db.getLastSyncDate() == null) {
-            setSummary(mContext.getString(R.string.never_synced));
+            setSummary(context.getString(R.string.never_synced));
         } else {
             Calendar lastSyncCal = Calendar.getInstance(), todayCal = Calendar.getInstance();
             lastSyncCal.setTime(db.getLastSyncDate());
@@ -63,7 +63,7 @@ class YesNoPreference extends DialogPreference implements NupService.SongDatabas
                             && lastSyncCal.get(Calendar.DAY_OF_MONTH)
                                     == todayCal.get(Calendar.DAY_OF_MONTH);
             setSummary(
-                    mContext.getResources()
+                    context.getResources()
                             .getQuantityString(
                                     R.plurals.sync_status_fmt,
                                     db.getNumSongs(),
@@ -78,15 +78,15 @@ class YesNoPreference extends DialogPreference implements NupService.SongDatabas
 
     private class SyncSongListTask extends AsyncTask<Void, Integer, String>
             implements DialogInterface.OnCancelListener, SongDatabase.SyncProgressListener {
-        private ProgressDialog mDialog;
+        private ProgressDialog dialog;
 
         @Override
         protected void onPreExecute() {
-            mDialog =
+            dialog =
                     ProgressDialog.show(
-                            mContext,
-                            mContext.getString(R.string.syncing_song_list),
-                            mContext.getResources()
+                            context,
+                            context.getString(R.string.syncing_song_list),
+                            context.getResources()
                                     .getQuantityString(R.plurals.sync_update_fmt, 0, 0),
                             true, // indeterminate
                             true); // cancelable
@@ -106,31 +106,31 @@ class YesNoPreference extends DialogPreference implements NupService.SongDatabas
             int numSongs = progress[1];
             switch (state) {
                 case UPDATING_SONGS:
-                    mDialog.setProgress(numSongs);
-                    mDialog.setMessage(
-                            mContext.getResources()
+                    dialog.setProgress(numSongs);
+                    dialog.setMessage(
+                            context.getResources()
                                     .getQuantityString(
                                             R.plurals.sync_update_fmt, numSongs, numSongs));
                     break;
                 case DELETING_SONGS:
-                    mDialog.setProgress(numSongs);
-                    mDialog.setMessage(
-                            mContext.getResources()
+                    dialog.setProgress(numSongs);
+                    dialog.setMessage(
+                            context.getResources()
                                     .getQuantityString(
                                             R.plurals.sync_delete_fmt, numSongs, numSongs));
                     break;
                 case UPDATING_STATS:
-                    mDialog.setMessage(
-                            mContext.getString(R.string.sync_progress_rebuilding_stats_tables));
+                    dialog.setMessage(
+                            context.getString(R.string.sync_progress_rebuilding_stats_tables));
                     break;
             }
         }
 
         @Override
         protected void onPostExecute(String message) {
-            mDialog.dismiss();
+            dialog.dismiss();
             updateSyncMessage();
-            Toast.makeText(mContext, message, Toast.LENGTH_SHORT).show();
+            Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
         }
 
         // Implements DialogInterface.OnCancelListener.

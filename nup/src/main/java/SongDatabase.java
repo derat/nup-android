@@ -93,27 +93,27 @@ public class SongDatabase {
                     + "  StartTime INTEGER NOT NULL, "
                     + "  PRIMARY KEY (SongId, StartTime))";
 
-    private final Context mContext;
-    private final Listener mListener;
-    private final FileCache mCache;
-    private final Downloader mDownloader;
-    private final NetworkHelper mNetworkHelper;
+    private final Context context;
+    private final Listener listener;
+    private final FileCache cache;
+    private final Downloader downloader;
+    private final NetworkHelper networkHelper;
 
-    private final DatabaseOpener mOpener;
+    private final DatabaseOpener opener;
 
     // Update the database in a background thread.
-    private final DatabaseUpdater mUpdater;
-    private final Thread mUpdaterThread;
+    private final DatabaseUpdater updater;
+    private final Thread updaterThread;
 
-    private boolean mAggregateDataLoaded = false;
-    private int mNumSongs = 0;
-    private Date mLastSyncDate = null;
+    private boolean aggregateDataLoaded = false;
+    private int numSongs = 0;
+    private Date lastSyncDate = null;
 
     // Int values in these maps are numbers of songs.
-    private List<StatsRow> mArtistsSortedAlphabetically = new ArrayList<StatsRow>();
-    private List<StatsRow> mArtistsSortedByNumSongs = new ArrayList<StatsRow>();
-    private List<StatsRow> mAlbumsSortedAlphabetically = new ArrayList<StatsRow>();
-    private HashMap<String, List<StatsRow>> mArtistAlbums = new HashMap<String, List<StatsRow>>();
+    private List<StatsRow> artistsSortedAlphabetically = new ArrayList<StatsRow>();
+    private List<StatsRow> artistsSortedByNumSongs = new ArrayList<StatsRow>();
+    private List<StatsRow> albumsSortedAlphabetically = new ArrayList<StatsRow>();
+    private HashMap<String, List<StatsRow>> artistAlbums = new HashMap<String, List<StatsRow>>();
 
     public interface Listener {
         void onAggregateDataUpdate();
@@ -135,11 +135,11 @@ public class SongDatabase {
             FileCache cache,
             Downloader downloader,
             NetworkHelper networkHelper) {
-        mContext = context;
-        mListener = listener;
-        mCache = cache;
-        mDownloader = downloader;
-        mNetworkHelper = networkHelper;
+        this.context = context;
+        this.listener = listener;
+        this.cache = cache;
+        this.downloader = downloader;
+        this.networkHelper = networkHelper;
 
         SQLiteOpenHelper helper =
                 new SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
@@ -348,7 +348,7 @@ public class SongDatabase {
                         }
                     }
                 };
-        mOpener = new DatabaseOpener(mContext, DATABASE_NAME, helper);
+        this.opener = new DatabaseOpener(context, DATABASE_NAME, helper);
 
         // Get some info from the database in a background thread.
         new AsyncTask<Void, Void, Void>() {
@@ -356,7 +356,7 @@ public class SongDatabase {
             protected Void doInBackground(Void... args) {
                 loadAggregateData(false);
 
-                SQLiteDatabase db = mOpener.getDb();
+                SQLiteDatabase db = opener.getDb();
                 db.beginTransaction();
                 try {
                     updateCachedSongs(db);
@@ -368,39 +368,39 @@ public class SongDatabase {
             }
         }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
 
-        mUpdater = new DatabaseUpdater(mOpener);
-        mUpdaterThread = new Thread(mUpdater, "SongDatabase.DatabaseUpdater");
-        mUpdaterThread.start();
+        updater = new DatabaseUpdater(opener);
+        updaterThread = new Thread(updater, "SongDatabase.DatabaseUpdater");
+        updaterThread.start();
     }
 
     public boolean getAggregateDataLoaded() {
-        return mAggregateDataLoaded;
+        return aggregateDataLoaded;
     }
 
     public int getNumSongs() {
-        return mNumSongs;
+        return numSongs;
     }
 
     public Date getLastSyncDate() {
-        return mLastSyncDate;
+        return lastSyncDate;
     }
 
     public List<StatsRow> getAlbumsSortedAlphabetically() {
-        return mAlbumsSortedAlphabetically;
+        return albumsSortedAlphabetically;
     }
 
     public List<StatsRow> getArtistsSortedAlphabetically() {
-        return mArtistsSortedAlphabetically;
+        return artistsSortedAlphabetically;
     }
 
     public List<StatsRow> getArtistsSortedByNumSongs() {
-        return mArtistsSortedByNumSongs;
+        return artistsSortedByNumSongs;
     }
 
     public List<StatsRow> getAlbumsByArtist(String artist) {
         String lowerArtist = artist.toLowerCase();
-        return mArtistAlbums.containsKey(lowerArtist)
-                ? mArtistAlbums.get(lowerArtist)
+        return artistAlbums.containsKey(lowerArtist)
+                ? artistAlbums.get(lowerArtist)
                 : new ArrayList<StatsRow>();
     }
 
@@ -440,12 +440,12 @@ public class SongDatabase {
     }
 
     public synchronized void quit() {
-        mUpdater.quit();
+        updater.quit();
         try {
-            mUpdaterThread.join();
+            updaterThread.join();
         } catch (InterruptedException e) {
         }
-        mOpener.close();
+        opener.close();
     }
 
     public List<Song> query(
@@ -502,7 +502,7 @@ public class SongDatabase {
                         + query
                         + "\" with args "
                         + TextUtils.join(", ", builder.selectionArgs));
-        SQLiteDatabase db = mOpener.getDb();
+        SQLiteDatabase db = opener.getDb();
         Cursor cursor = db.rawQuery(query, builder.selectionArgs.toArray(new String[] {}));
 
         List<Song> songs = new ArrayList<Song>();
@@ -518,9 +518,9 @@ public class SongDatabase {
                                 cursor.getString(4), // albumId
                                 cursor.getString(5), // url
                                 cursor.getString(6), // coverUrl
-                                cursor.getInt(7), // length
-                                cursor.getInt(8), // trackNumber
-                                cursor.getInt(9), // discNumber
+                                cursor.getInt(7), // lengthSec
+                                cursor.getInt(8), // track
+                                cursor.getInt(9), // disc
                                 cursor.getFloat(10), // trackGain
                                 cursor.getFloat(11), // albumGain
                                 cursor.getFloat(12), // peakAmp
@@ -532,9 +532,9 @@ public class SongDatabase {
                         "skipping song "
                                 + cursor.getLong(0)
                                 + " with malformed URL(s) \""
-                                + cursor.getString(4)
-                                + "\" and \""
                                 + cursor.getString(5)
+                                + "\" and \""
+                                + cursor.getString(6)
                                 + "\"");
             }
             cursor.moveToNext();
@@ -545,24 +545,24 @@ public class SongDatabase {
 
     // Record the fact that a song has been successfully cached.
     public void handleSongCached(long songId) {
-        mUpdater.postUpdate("REPLACE INTO CachedSongs (SongId) VALUES(?)", new Object[] {songId});
+        updater.postUpdate("REPLACE INTO CachedSongs (SongId) VALUES(?)", new Object[] {songId});
     }
 
     // Record the fact that a song has been evicted from the cache.
     public void handleSongEvicted(long songId) {
-        mUpdater.postUpdate("DELETE FROM CachedSongs WHERE SongId = ?", new Object[] {songId});
+        updater.postUpdate("DELETE FROM CachedSongs WHERE SongId = ?", new Object[] {songId});
     }
 
     // Add an entry to the PendingPlaybackReports table.
     public void addPendingPlaybackReport(long songId, Date startDate) {
-        mUpdater.postUpdate(
+        updater.postUpdate(
                 "REPLACE INTO PendingPlaybackReports (SongId, StartTime) VALUES(?, ?)",
                 new Object[] {songId, startDate.getTime() / 1000});
     }
 
     // Remove an entry from the PendingPlaybackReports table.
     public void removePendingPlaybackReport(long songId, Date startDate) {
-        mUpdater.postUpdate(
+        updater.postUpdate(
                 "DELETE FROM PendingPlaybackReports WHERE SongId = ? AND StartTime = ?",
                 new Object[] {songId, startDate.getTime() / 1000});
     }
@@ -581,7 +581,7 @@ public class SongDatabase {
     // Get all pending playback reports from the PendingPlaybackReports table.
     public List<PendingPlaybackReport> getAllPendingPlaybackReports() {
         String query = "SELECT SongId, StartTime FROM PendingPlaybackReports";
-        SQLiteDatabase db = mOpener.getDb();
+        SQLiteDatabase db = opener.getDb();
         Cursor cursor = db.rawQuery(query, null);
         cursor.moveToFirst();
         List<PendingPlaybackReport> reports = new ArrayList<PendingPlaybackReport>();
@@ -596,19 +596,19 @@ public class SongDatabase {
     }
 
     public boolean syncWithServer(SyncProgressListener listener, String message[]) {
-        if (!mNetworkHelper.isNetworkAvailable()) {
-            message[0] = mContext.getString(R.string.network_is_unavailable);
+        if (!networkHelper.isNetworkAvailable()) {
+            message[0] = context.getString(R.string.network_is_unavailable);
             return false;
         }
 
         int numSongsUpdated = 0;
-        SQLiteDatabase db = mOpener.getDb();
+        SQLiteDatabase db = opener.getDb();
         db.beginTransaction();
         try {
             // Ask the server for the current time before we fetch anything.  We'll use this as the
             // starting point for the next sync, to handle the case where some songs in the server
             // are updated while we're doing this sync.
-            String startTimeStr = mDownloader.downloadString("/now_nsec", message);
+            String startTimeStr = downloader.downloadString("/now_nsec", message);
             if (startTimeStr == null) return false;
             long startTimeNsec = 0;
             try {
@@ -681,7 +681,7 @@ public class SongDatabase {
                             deleted ? 1 : 0,
                             SERVER_SONG_BATCH_SIZE,
                             serverCursor);
-            String response = mDownloader.downloadString(path, message);
+            String response = downloader.downloadString(path, message);
             if (response == null) {
                 throw new ServerException("download failed");
             }
@@ -817,7 +817,7 @@ public class SongDatabase {
         db.delete("CachedSongs", null, null);
 
         int numSongs = 0;
-        for (FileCacheEntry entry : mCache.getAllFullyCachedEntries()) {
+        for (FileCacheEntry entry : cache.getAllFullyCachedEntries()) {
             if (!entry.isFullyCached()) continue;
 
             ContentValues values = new ContentValues(1);
@@ -829,25 +829,29 @@ public class SongDatabase {
     }
 
     private void loadAggregateData(boolean songsUpdated) {
-        SQLiteDatabase db = mOpener.getDb();
+        SQLiteDatabase db = opener.getDb();
         Cursor cursor = db.rawQuery("SELECT LocalTimeNsec FROM LastUpdateTime", null);
         cursor.moveToFirst();
-        mLastSyncDate =
-                (cursor.getLong(0) > 0) ? new Date(cursor.getLong(0) / (1000 * 1000)) : null;
+        lastSyncDate = (cursor.getLong(0) > 0) ? new Date(cursor.getLong(0) / (1000 * 1000)) : null;
         cursor.close();
 
         // If the song data didn't change and we've already loaded it, bail out early.
-        if (!songsUpdated && mAggregateDataLoaded) {
-            mListener.onAggregateDataUpdate();
+        if (!songsUpdated && aggregateDataLoaded) {
+            listener.onAggregateDataUpdate();
             return;
         }
 
+        numSongs = 0;
+        artistsSortedAlphabetically.clear();
+        albumsSortedAlphabetically.clear();
+        artistsSortedByNumSongs.clear();
+        artistAlbums.clear();
+
         cursor = db.rawQuery("SELECT COUNT(*) FROM Songs", null);
         cursor.moveToFirst();
-        int numSongs = cursor.getInt(0);
+        numSongs = cursor.getInt(0);
         cursor.close();
 
-        List<StatsRow> artistsSortedAlphabetically = new ArrayList<StatsRow>();
         cursor =
                 db.rawQuery(
                         "SELECT Artist, SUM(NumSongs) "
@@ -864,8 +868,6 @@ public class SongDatabase {
         cursor.close();
 
         // Aggregate by (album, albumId) while storing the most-frequent artist for each album.
-        List<StatsRow> albumsSortedAlphabetically = new ArrayList<StatsRow>();
-        HashMap<String, List<StatsRow>> artistAlbums = new HashMap<String, List<StatsRow>>();
         StatsRow lastRow = null; // last row added to |albumsSortedAlphabetically|
         cursor =
                 db.rawQuery(
@@ -906,7 +908,6 @@ public class SongDatabase {
         }
         cursor.close();
 
-        List<StatsRow> artistsSortedByNumSongs = new ArrayList<StatsRow>();
         artistsSortedByNumSongs.addAll(artistsSortedAlphabetically);
         Collections.sort(
                 artistsSortedByNumSongs,
@@ -917,20 +918,14 @@ public class SongDatabase {
                     }
                 });
 
-        mNumSongs = numSongs;
-        mArtistsSortedAlphabetically = artistsSortedAlphabetically;
-        mAlbumsSortedAlphabetically = albumsSortedAlphabetically;
-        mArtistsSortedByNumSongs = artistsSortedByNumSongs;
-        mArtistAlbums = artistAlbums;
-        mAggregateDataLoaded = true;
-
-        mListener.onAggregateDataUpdate();
+        aggregateDataLoaded = true;
+        listener.onAggregateDataUpdate();
     }
 
     // Given a query that returns artist, album, album ID, and num songs,
     // returns its results in sorted order.
     private List<StatsRow> getSortedRows(String query, String[] selectionArgs, int sortType) {
-        SQLiteDatabase db = mOpener.getDb();
+        SQLiteDatabase db = opener.getDb();
         Cursor cursor = db.rawQuery(query, selectionArgs);
 
         List<StatsRow> rows = new ArrayList<StatsRow>();

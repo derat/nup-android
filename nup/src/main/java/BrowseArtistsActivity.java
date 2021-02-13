@@ -28,27 +28,27 @@ public class BrowseArtistsActivity extends BrowseActivityBase
     private static final int MENU_ITEM_BROWSE_ALBUMS = 3;
 
     // Are we displaying only cached songs?
-    private boolean mOnlyCached = false;
+    private boolean onlyCached = false;
 
     // Artists that we're displaying.
-    private List<StatsRow> mRows = new ArrayList<StatsRow>();
+    private List<StatsRow> rows = new ArrayList<StatsRow>();
 
-    private StatsRowArrayAdapter mAdapter;
+    private StatsRowArrayAdapter adapter;
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        mOnlyCached = getIntent().getBooleanExtra(BUNDLE_CACHED, false);
-        setTitle(mOnlyCached ? R.string.browse_cached_artists : R.string.browse_artists);
+        onlyCached = getIntent().getBooleanExtra(BUNDLE_CACHED, false);
+        setTitle(onlyCached ? R.string.browse_cached_artists : R.string.browse_artists);
 
-        mAdapter =
+        adapter =
                 new StatsRowArrayAdapter(
                         this,
                         R.layout.browse_row,
-                        mRows,
+                        rows,
                         StatsRowArrayAdapter.DISPLAY_ARTIST,
                         Util.SORT_ARTIST);
-        setListAdapter(mAdapter);
+        setListAdapter(adapter);
         registerForContextMenu(getListView());
 
         NupActivity.getService().addSongDatabaseUpdateListener(this);
@@ -63,7 +63,7 @@ public class BrowseArtistsActivity extends BrowseActivityBase
 
     @Override
     protected void onListItemClick(ListView listView, View view, int position, long id) {
-        StatsRow row = mRows.get(position);
+        StatsRow row = rows.get(position);
         if (row == null) return;
         startBrowseAlbumsActivity(row.key.artist);
     }
@@ -72,7 +72,7 @@ public class BrowseArtistsActivity extends BrowseActivityBase
     public void onCreateContextMenu(
             ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
         int pos = ((AdapterView.AdapterContextMenuInfo) menuInfo).position;
-        StatsRow row = mRows.get(pos);
+        StatsRow row = rows.get(pos);
         if (row != null) menu.setHeaderTitle(row.key.artist);
 
         menu.add(0, MENU_ITEM_BROWSE_SONGS_WITH_RATING, 0, R.string.browse_songs_four_stars);
@@ -84,7 +84,7 @@ public class BrowseArtistsActivity extends BrowseActivityBase
     public boolean onContextItemSelected(MenuItem item) {
         AdapterView.AdapterContextMenuInfo info =
                 (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
-        StatsRow row = mRows.get(info.position);
+        StatsRow row = rows.get(info.position);
         if (row == null) return false;
 
         switch (item.getItemId()) {
@@ -106,13 +106,13 @@ public class BrowseArtistsActivity extends BrowseActivityBase
     @Override
     public void onSongDatabaseUpdate() {
         if (!NupActivity.getService().getSongDb().getAggregateDataLoaded()) {
-            mRows.add(new StatsRow(getString(R.string.loading), "", "", -1));
-            mAdapter.setEnabled(false);
-            mAdapter.notifyDataSetChanged();
+            rows.add(new StatsRow(getString(R.string.loading), "", "", -1));
+            adapter.setEnabled(false);
+            adapter.notifyDataSetChanged();
             return;
         }
 
-        if (!mOnlyCached) {
+        if (!onlyCached) {
             updateRows(NupActivity.getService().getSongDb().getArtistsSortedAlphabetically());
         } else {
             new AsyncTask<Void, Void, List<StatsRow>>() {
@@ -132,13 +132,13 @@ public class BrowseArtistsActivity extends BrowseActivityBase
     }
 
     // Show a new list of artists.
-    private void updateRows(List<StatsRow> rows) {
+    private void updateRows(List<StatsRow> newRows) {
         final ListView listView = getListView();
-        mRows.clear();
-        mRows.addAll(rows);
+        rows.clear();
+        rows.addAll(newRows);
         listView.setFastScrollEnabled(false);
-        mAdapter.setEnabled(true);
-        mAdapter.notifyDataSetChanged();
+        adapter.setEnabled(true);
+        adapter.notifyDataSetChanged();
         listView.setFastScrollEnabled(true);
         Util.resizeListViewToFixFastScroll(listView);
     }
@@ -147,7 +147,7 @@ public class BrowseArtistsActivity extends BrowseActivityBase
     private void startBrowseAlbumsActivity(String artist) {
         Intent intent = new Intent(this, BrowseAlbumsActivity.class);
         intent.putExtra(BUNDLE_ARTIST, artist);
-        intent.putExtra(BUNDLE_CACHED, mOnlyCached);
+        intent.putExtra(BUNDLE_CACHED, onlyCached);
         startActivityForResult(intent, BROWSE_ALBUMS_REQUEST_CODE);
     }
 
@@ -155,7 +155,7 @@ public class BrowseArtistsActivity extends BrowseActivityBase
     private void startBrowseSongsActivity(String artist, double minRating) {
         Intent intent = new Intent(this, BrowseSongsActivity.class);
         intent.putExtra(BUNDLE_ARTIST, artist);
-        intent.putExtra(BUNDLE_CACHED, mOnlyCached);
+        intent.putExtra(BUNDLE_CACHED, onlyCached);
         if (minRating >= 0) intent.putExtra(BUNDLE_MIN_RATING, minRating);
         startActivityForResult(intent, BROWSE_SONGS_REQUEST_CODE);
     }

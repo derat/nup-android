@@ -17,25 +17,25 @@ import java.util.List;
 public class MediaSessionManager {
     private static final String TAG = "MediaSessionManager";
 
-    private MediaSession mSession;
+    private MediaSession session;
 
     MediaSessionManager(Context context, MediaSession.Callback callback) {
-        mSession = new MediaSession(context, "nup");
-        mSession.setFlags(
+        session = new MediaSession(context, "nup");
+        session.setFlags(
                 MediaSession.FLAG_HANDLES_MEDIA_BUTTONS
                         | MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS);
-        mSession.setRatingType(Rating.RATING_5_STARS);
-        mSession.setCallback(callback);
-        mSession.setActive(true);
+        session.setRatingType(Rating.RATING_5_STARS);
+        session.setCallback(callback);
+        session.setActive(true);
         updateSong(null);
     }
 
     void cleanUp() {
-        mSession.release();
+        session.release();
     }
 
     public MediaSession.Token getToken() {
-        return mSession.getSessionToken();
+        return session.getSessionToken();
     }
 
     public void updateSong(Song song) {
@@ -70,7 +70,7 @@ public class MediaSessionManager {
             }
         }
 
-        mSession.setMetadata(builder.build());
+        session.setMetadata(builder.build());
     }
 
     public void updatePlaybackState(
@@ -109,7 +109,7 @@ public class MediaSessionManager {
         if (songIndex < numSongs - 1) actions |= PlaybackState.ACTION_SKIP_TO_NEXT;
         builder.setActions(actions);
 
-        mSession.setPlaybackState(builder.build());
+        session.setPlaybackState(builder.build());
     }
 
     public void updatePlaylist(List<Song> songs) {
@@ -124,7 +124,7 @@ public class MediaSessionManager {
                             .build();
             queue.add(new MediaSession.QueueItem(desc, song.id));
         }
-        mSession.setQueue(queue);
+        session.setQueue(queue);
     }
 
     private void setString(MediaMetadata.Builder builder, String key, String value) {

@@ -7,20 +7,20 @@ import android.os.Handler;
 import android.os.Looper;
 
 class DatabaseUpdater implements Runnable {
-    private final DatabaseOpener mOpener;
-    private Handler mHandler = null;
-    private boolean mShouldQuit = false;
+    private final DatabaseOpener opener;
+    private Handler handler = null;
+    private boolean shouldQuit = false;
 
     DatabaseUpdater(DatabaseOpener opener) {
-        mOpener = opener;
+        this.opener = opener;
     }
 
     @Override
     public void run() {
         Looper.prepare();
         synchronized (this) {
-            if (mShouldQuit) return;
-            mHandler = new Handler();
+            if (shouldQuit) return;
+            handler = new Handler();
         }
         Looper.loop();
     }
@@ -28,12 +28,12 @@ class DatabaseUpdater implements Runnable {
     public void quit() {
         synchronized (this) {
             // The thread hasn't started looping yet; tell it to exit before starting.
-            if (mHandler == null) {
-                mShouldQuit = true;
+            if (handler == null) {
+                shouldQuit = true;
                 return;
             }
         }
-        mHandler.post(
+        handler.post(
                 new Runnable() {
                     @Override
                     public void run() {
@@ -43,11 +43,11 @@ class DatabaseUpdater implements Runnable {
     }
 
     public void postUpdate(final String sql, final Object[] values) {
-        mHandler.post(
+        handler.post(
                 new Runnable() {
                     @Override
                     public void run() {
-                        mOpener.getDb().execSQL(sql, values);
+                        opener.getDb().execSQL(sql, values);
                     }
                 });
     }

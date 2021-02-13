@@ -13,21 +13,21 @@ import android.media.session.MediaSession;
 class NotificationCreator {
     private static final String CHANNEL_ID = "NupService";
 
-    private final Context mContext;
+    private final Context context;
 
-    private final MediaSession.Token mMediaSessionToken;
+    private final MediaSession.Token mediaSessionToken;
 
-    private final PendingIntent mLaunchActivityIntent;
-    private final PendingIntent mTogglePauseIntent;
-    private final PendingIntent mPrevTrackIntent;
-    private final PendingIntent mNextTrackIntent;
+    private final PendingIntent launchActivityIntent;
+    private final PendingIntent togglePauseIntent;
+    private final PendingIntent prevTrackIntent;
+    private final PendingIntent nextTrackIntent;
 
-    private long mSongId;
-    private boolean mPaused;
-    private boolean mShowingCoverBitmap;
-    private boolean mShowingPlayPause;
-    private boolean mShowingPrev;
-    private boolean mShowingNext;
+    private long songId;
+    private boolean paused;
+    private boolean showingCoverBitmap;
+    private boolean showingPlayPause;
+    private boolean showingPrev;
+    private boolean showingNext;
 
     public NotificationCreator(
             Context context,
@@ -37,20 +37,20 @@ class NotificationCreator {
             PendingIntent togglePauseIntent,
             PendingIntent prevTrackIntent,
             PendingIntent nextTrackIntent) {
-        mContext = context;
-        mMediaSessionToken = mediaSessionToken;
-        mLaunchActivityIntent = launchActivityIntent;
-        mTogglePauseIntent = togglePauseIntent;
-        mPrevTrackIntent = prevTrackIntent;
-        mNextTrackIntent = nextTrackIntent;
+        this.context = context;
+        this.mediaSessionToken = mediaSessionToken;
+        this.launchActivityIntent = launchActivityIntent;
+        this.togglePauseIntent = togglePauseIntent;
+        this.prevTrackIntent = prevTrackIntent;
+        this.nextTrackIntent = nextTrackIntent;
 
         if (android.os.Build.VERSION.SDK_INT >= 26) {
             NotificationChannel channel =
                     new NotificationChannel(
                             CHANNEL_ID,
-                            mContext.getString(R.string.channel_name),
+                            this.context.getString(R.string.channel_name),
                             NotificationManager.IMPORTANCE_DEFAULT);
-            channel.setDescription(mContext.getString(R.string.channel_description));
+            channel.setDescription(context.getString(R.string.channel_description));
             manager.createNotificationChannel(channel);
         }
     }
@@ -78,36 +78,36 @@ class NotificationCreator {
 
         if (onlyIfChanged
                 && song != null
-                && song.id == mSongId
-                && paused == mPaused
-                && (song.getCoverBitmap() != null) == mShowingCoverBitmap
-                && showPlayPause == mShowingPlayPause
-                && showPrev == mShowingPrev
-                && showNext == mShowingNext) {
+                && song.id == this.songId
+                && paused == this.paused
+                && (song.getCoverBitmap() != null) == this.showingCoverBitmap
+                && showPlayPause == this.showingPlayPause
+                && showPrev == this.showingPrev
+                && showNext == this.showingNext) {
             return null;
         }
 
-        mSongId = song != null ? song.id : 0;
-        mPaused = paused;
-        mShowingCoverBitmap = song != null ? song.getCoverBitmap() != null : false;
-        mShowingPlayPause = showPlayPause;
-        mShowingPrev = showPrev;
-        mShowingNext = showNext;
+        this.songId = song != null ? song.id : 0;
+        this.paused = paused;
+        this.showingCoverBitmap = song != null ? song.getCoverBitmap() != null : false;
+        this.showingPlayPause = showPlayPause;
+        this.showingPrev = showPrev;
+        this.showingNext = showNext;
 
         Notification.Builder builder =
-                new Notification.Builder(mContext)
+                new Notification.Builder(context)
                         .setContentTitle(
                                 song != null
                                         ? song.artist
-                                        : mContext.getString(R.string.startup_message_title))
+                                        : context.getString(R.string.startup_message_title))
                         .setContentText(
                                 song != null
                                         ? song.title
-                                        : mContext.getString(R.string.startup_message_text))
+                                        : context.getString(R.string.startup_message_text))
                         .setSmallIcon(R.drawable.status)
-                        .setColor(mContext.getResources().getColor(R.color.primary))
+                        .setColor(context.getResources().getColor(R.color.primary))
                         .setVisibility(Notification.VISIBILITY_PUBLIC)
-                        .setContentIntent(mLaunchActivityIntent)
+                        .setContentIntent(launchActivityIntent)
                         .setOngoing(true)
                         .setWhen(System.currentTimeMillis())
                         .setShowWhen(false);
@@ -120,7 +120,7 @@ class NotificationCreator {
             builder.setLargeIcon(song.getCoverBitmap());
 
             Notification.MediaStyle style = new Notification.MediaStyle();
-            style.setMediaSession(mMediaSessionToken);
+            style.setMediaSession(mediaSessionToken);
             builder.setStyle(style);
 
             int numActions = (showPlayPause ? 1 : 0) + (showPrev ? 1 : 0) + (showNext ? 1 : 0);
@@ -132,21 +132,21 @@ class NotificationCreator {
                                 ? R.drawable.ic_play_arrow_black_36dp
                                 : R.drawable.ic_pause_black_36dp,
                         showLabels
-                                ? mContext.getString(mPaused ? R.string.play : R.string.pause)
+                                ? context.getString(paused ? R.string.play : R.string.pause)
                                 : "",
-                        mTogglePauseIntent);
+                        togglePauseIntent);
             }
             if (showPrev) {
                 builder.addAction(
                         R.drawable.ic_skip_previous_black_36dp,
-                        showLabels ? mContext.getString(R.string.prev) : "",
-                        mPrevTrackIntent);
+                        showLabels ? context.getString(R.string.prev) : "",
+                        prevTrackIntent);
             }
             if (showNext) {
                 builder.addAction(
                         R.drawable.ic_skip_next_black_36dp,
-                        showLabels ? mContext.getString(R.string.next) : "",
-                        mNextTrackIntent);
+                        showLabels ? context.getString(R.string.next) : "",
+                        nextTrackIntent);
             }
 
             if (numActions > 0) {

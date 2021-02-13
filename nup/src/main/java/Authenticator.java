@@ -31,14 +31,14 @@ class Authenticator {
         }
     }
 
-    private final Context mContext;
+    private final Context context;
 
     public Authenticator(Context context) {
-        mContext = context;
+        this.context = context;
     }
 
     public String getAuthToken() throws AuthException {
-        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(mContext);
+        SharedPreferences prefs = PreferenceManager.getDefaultSharedPreferences(context);
         String accountName = prefs.getString(NupPreferences.ACCOUNT, "");
         if (accountName.isEmpty()) throw new AuthException("Account isn't set");
 
@@ -46,7 +46,7 @@ class Authenticator {
         try {
             Log.d(TAG, "attempting to get token for " + accountName);
             Bundle bundle = new Bundle();
-            token = GoogleAuthUtil.getTokenWithNotification(mContext, accountName, SCOPE, bundle);
+            token = GoogleAuthUtil.getTokenWithNotification(context, accountName, SCOPE, bundle);
         } catch (UserRecoverableNotifiedException e) {
             throw new AuthException("User action required");
         } catch (GoogleAuthException e) {
@@ -75,7 +75,7 @@ class Authenticator {
 
             @Override
             protected void onPostExecute(String message) {
-                Toast.makeText(mContext, message, Toast.LENGTH_SHORT).show();
+                Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
             }
         }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }

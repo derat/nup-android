@@ -17,14 +17,14 @@ class Song implements Serializable {
     public final double rating;
     public final URL url, coverUrl;
 
-    private Bitmap mCoverBitmap = null;
+    private Bitmap coverBitmap = null;
 
     // Number of bytes available to us (i.e. what we have on disk).
-    private long mAvailableBytes = 0;
+    private long availableBytes = 0;
 
     // Total size of the song, as supplied by the server.
     // 0 if the song doesn't have a cache entry.
-    private long mTotalBytes = 0;
+    private long totalBytes = 0;
 
     public Song(
             long id,
@@ -61,32 +61,32 @@ class Song implements Serializable {
     }
 
     public Bitmap getCoverBitmap() {
-        return mCoverBitmap;
+        return coverBitmap;
     }
 
     public long getAvailableBytes() {
-        return mAvailableBytes;
+        return availableBytes;
     }
 
     public long getTotalBytes() {
-        return mTotalBytes;
+        return totalBytes;
     }
 
     public void setCoverBitmap(Bitmap bitmap) {
-        mCoverBitmap = bitmap;
+        coverBitmap = bitmap;
     }
 
     public void setAvailableBytes(long bytes) {
-        mAvailableBytes = bytes;
+        availableBytes = bytes;
     }
 
     public void setTotalBytes(long bytes) {
-        mTotalBytes = bytes;
+        totalBytes = bytes;
     }
 
     // Update our available and total bytes from a cache entry.
     public void updateBytes(FileCacheEntry entry) {
-        mAvailableBytes = entry.getCachedBytes();
-        mTotalBytes = entry.getTotalBytes();
+        availableBytes = entry.getCachedBytes();
+        totalBytes = entry.getTotalBytes();
     }
 }

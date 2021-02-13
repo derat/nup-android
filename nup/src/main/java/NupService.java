@@ -31,6 +31,7 @@ import android.widget.Toast;
 
 import java.io.File;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -101,115 +102,115 @@ public class NupService extends Service
     }
 
     // Abstracts running background tasks.
-    private TaskRunner mTaskRunner;
+    private TaskRunner taskRunner;
 
     // Authenticates with Google Cloud Storage.
-    private Authenticator mAuthenticator;
+    private Authenticator authenticator;
 
     // Downloads files.
-    private Downloader mDownloader;
+    private Downloader downloader;
 
     // Plays songs.
-    private Player mPlayer;
-    private Thread mPlayerThread;
+    private Player player;
+    private Thread playerThread;
 
     // Caches songs.
-    private FileCache mCache;
-    private Thread mCacheThread;
+    private FileCache cache;
+    private Thread cacheThread;
 
     // Stores a local listing of all of the songs on the server.
-    private SongDatabase mSongDb;
+    private SongDatabase songDb;
 
     // Loads songs' cover art from local disk or the network.
-    private CoverLoader mCoverLoader;
+    private CoverLoader coverLoader;
 
     // Reports song playback to the music server.
-    private PlaybackReporter mPlaybackReporter;
+    private PlaybackReporter playbackReporter;
 
     // Publishes song metadata and handles remote commands.
-    private MediaSessionManager mMediaSessionManager;
+    private MediaSessionManager mediaSessionManager;
 
     // Token identifying the session managed by |mMediaSessionManager|.
-    private MediaSession.Token mMediaSessionToken;
+    private MediaSession.Token mediaSessionToken;
 
     // Updates the notification.
-    private NotificationManager mNotificationManager;
-    private NotificationCreator mNotificationCreator;
+    private NotificationManager notificationManager;
+    private NotificationCreator notificationCreator;
 
-    private NetworkHelper mNetworkHelper;
+    private NetworkHelper networkHelper;
 
     // Points from song ID to Song.
     // This is the canonical set of songs that we've seen.
-    private HashMap<Long, Song> mSongIdToSong = new HashMap<Long, Song>();
+    private HashMap<Long, Song> songIdToSong = new HashMap<Long, Song>();
 
     // ID of the song that's currently being downloaded.
-    private long mDownloadSongId = -1;
+    private long downloadSongId = -1;
 
     // Index into |mSongs| of the song that's currently being downloaded.
-    private int mDownloadIndex = -1;
+    private int downloadIndex = -1;
 
     // Are we currently waiting for a file to be downloaded before we can play it?
-    private boolean mWaitingForDownload = false;
+    private boolean waitingForDownload = false;
 
     // Have we temporarily been told to download all queued songs?
-    private boolean mShouldDownloadAll = false;
+    private boolean shouldDownloadAll = false;
 
     // Current playlist.
-    private List<Song> mSongs = new ArrayList<Song>();
+    private List<Song> songs = new ArrayList<Song>();
 
     // Index of the song in |mSongs| that's being played.
-    private int mCurrentSongIndex = -1;
+    private int currentSongIndex = -1;
 
     // Time at which we started playing the current song.
-    private Date mCurrentSongStartDate;
+    private Date currentSongStartDate;
 
     // Last playback position we were notified about for the current song.
-    private int mCurrentSongLastPositionMs = 0;
+    private int currentSongLastPositionMs = 0;
 
     // Total time during which we've played the current song, in milliseconds.
-    private long mCurrentSongPlayedMs = 0;
+    private long currentSongPlayedMs = 0;
 
     // Local path of the song that's being played.
-    private String mCurrentSongPath;
+    private String currentSongPath;
 
     // Is playback currently paused?
-    private boolean mPaused = false;
+    private boolean paused = false;
 
     // Are we done playing the current song?
-    private boolean mPlaybackComplete = false;
+    private boolean playbackComplete = false;
 
     // Have we reported the fact that we've played the current song?
-    private boolean mReportedCurrentSong = false;
+    private boolean reportedCurrentSong = false;
 
-    private final IBinder mBinder = new LocalBinder();
+    private final IBinder binder = new LocalBinder();
 
     // Songs whose covers are currently being fetched.
-    private HashSet<Song> mSongCoverFetches = new HashSet<Song>();
+    private HashSet<Song> songCoverFetches = new HashSet<Song>();
 
     // Songs whose covers we're currently keeping in memory.
-    private List<Song> mSongsWithCovers = new ArrayList<Song>();
+    private List<Song> songsWithCovers = new ArrayList<Song>();
 
     // Last time at which the user was foregrounded or backgrounded.
-    private Date mLastUserSwitchTime;
+    private Date lastUserSwitchTime;
 
     // Used to run tasks on our thread.
-    private Handler mHandler = new Handler();
+    private Handler handler = new Handler();
 
-    private AudioManager mAudioManager;
-    private AudioAttributes mAudioAttrs;
-    private TelephonyManager mTelephonyManager;
+    private AudioManager audioManager;
+    private AudioAttributes audioAttrs;
+    private TelephonyManager telephonyManager;
 
-    private SharedPreferences mPrefs;
+    private SharedPreferences prefs;
 
     // Pause when phone calls arrive.
-    private PhoneStateListener mPhoneStateListener =
+    private PhoneStateListener phoneStateListener =
             new PhoneStateListener() {
                 @Override
                 public void onCallStateChanged(int state, String incomingNumber) {
                     // I don't want to know who's calling.  Why isn't there a more-limited
                     // permission?
                     if (state == TelephonyManager.CALL_STATE_RINGING) {
-                        mPlayer.pause();
+                        player.pause();
                         Toast.makeText(
                                         NupService.this,
                                         "Paused for incoming call.",
@@ -219,7 +220,7 @@ public class NupService extends Service
                 }
             };
 
-    private BroadcastReceiver mBroadcastReceiver =
+    private BroadcastReceiver broadcastReceiver =
             new BroadcastReceiver() {
                 @Override
                 public void onReceive(Context context, Intent intent) {
@@ -233,13 +234,13 @@ public class NupService extends Service
                         // help for ignoring this. Instead, ignore these intents for a brief period
                         // after user-switch broadcast intents.
                         final boolean userSwitchedRecently =
-                                (mLastUserSwitchTime == null)
+                                (lastUserSwitchTime == null)
                                         ? true
-                                        : (new Date()).getTime() - mLastUserSwitchTime.getTime()
+                                        : (new Date()).getTime() - lastUserSwitchTime.getTime()
                                                 <= IGNORE_NOISY_AUDIO_AFTER_USER_SWITCH_MS;
 
-                        if (mCurrentSongIndex >= 0 && !mPaused && !userSwitchedRecently) {
-                            mPlayer.pause();
+                        if (currentSongIndex >= 0 && !paused && !userSwitchedRecently) {
+                            player.pause();
                             Toast.makeText(
                                             NupService.this,
                                             "Paused since unplugged.",
@@ -248,22 +249,22 @@ public class NupService extends Service
                         }
                     } else if (Intent.ACTION_USER_BACKGROUND.equals(intent.getAction())) {
                         Log.d(TAG, "User is backgrounded");
-                        mLastUserSwitchTime = new Date();
+                        lastUserSwitchTime = new Date();
                     } else if (Intent.ACTION_USER_FOREGROUND.equals(intent.getAction())) {
                         Log.d(TAG, "User is foregrounded");
-                        mLastUserSwitchTime = new Date();
+                        lastUserSwitchTime = new Date();
                     }
                 }
             };
 
-    private AudioManager.OnAudioFocusChangeListener mAudioFocusListener =
+    private AudioManager.OnAudioFocusChangeListener audioFocusListener =
             new AudioManager.OnAudioFocusChangeListener() {
                 @Override
                 public void onAudioFocusChange(int focusChange) {
                     switch (focusChange) {
                         case AudioManager.AUDIOFOCUS_GAIN:
                             Log.d(TAG, "Gained audio focus");
-                            mPlayer.setLowVolume(false);
+                            player.setLowVolume(false);
                             break;
                         case AudioManager.AUDIOFOCUS_LOSS:
                             Log.d(TAG, "Lost audio focus");
@@ -273,7 +274,7 @@ public class NupService extends Service
                             break;
                         case AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK:
                             Log.d(TAG, "Transiently lost audio focus (but can duck)");
-                            mPlayer.setLowVolume(true);
+                            player.setLowVolume(true);
                             break;
                         default:
                             Log.d(TAG, "Unhandled audio focus change " + focusChange);
@@ -282,7 +283,7 @@ public class NupService extends Service
                 }
             };
 
-    private OnSharedPreferenceChangeListener mPrefsListener =
+    private OnSharedPreferenceChangeListener prefsListener =
             new OnSharedPreferenceChangeListener() {
                 @Override
                 public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
@@ -290,13 +291,13 @@ public class NupService extends Service
                         double gain =
                                 Double.parseDouble(
                                         prefs.getString(key, NupPreferences.PRE_AMP_GAIN_DEFAULT));
-                        mPlayer.setPreAmpGain(gain);
+                        player.setPreAmpGain(gain);
                     }
                 }
             };
 
-    private SongListener mSongListener = null;
-    private HashSet<SongDatabaseUpdateListener> mSongDatabaseUpdateListeners =
+    private SongListener songListener = null;
+    private HashSet<SongDatabaseUpdateListener> songDatabaseUpdateListeners =
             new HashSet<SongDatabaseUpdateListener>();
 
     @Override
@@ -317,101 +318,101 @@ public class NupService extends Service
             }
         }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
 
-        mTaskRunner = new TaskRunner();
-        mNetworkHelper = new NetworkHelper(this);
-        mAuthenticator = new Authenticator(this);
-        if (mNetworkHelper.isNetworkAvailable()) {
+        taskRunner = new TaskRunner();
+        networkHelper = new NetworkHelper(this);
+        authenticator = new Authenticator(this);
+        if (networkHelper.isNetworkAvailable()) {
             authenticateInBackground();
         }
 
-        mAudioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
-        mAudioAttrs =
+        audioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
+        audioAttrs =
                 new AudioAttributes.Builder()
                         .setUsage(AudioAttributes.USAGE_MEDIA)
                         .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
                         .build();
         int result =
-                mAudioManager.requestAudioFocus(
+                audioManager.requestAudioFocus(
                         new AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                                .setOnAudioFocusChangeListener(mAudioFocusListener)
-                                .setAudioAttributes(mAudioAttrs)
+                                .setOnAudioFocusChangeListener(audioFocusListener)
+                                .setAudioAttributes(audioAttrs)
                                 .build());
         Log.d(TAG, "requested audio focus; got " + result);
 
-        mTelephonyManager = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
-        mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
+        telephonyManager = (TelephonyManager) getSystemService(TELEPHONY_SERVICE);
+        telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_CALL_STATE);
 
         final IntentFilter filter = new IntentFilter();
         filter.addAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
         filter.addAction(Intent.ACTION_USER_BACKGROUND);
         filter.addAction(Intent.ACTION_USER_FOREGROUND);
-        registerReceiver(mBroadcastReceiver, filter);
+        registerReceiver(broadcastReceiver, filter);
 
-        mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
-        mPrefs.registerOnSharedPreferenceChangeListener(mPrefsListener);
+        prefs = PreferenceManager.getDefaultSharedPreferences(this);
+        prefs.registerOnSharedPreferenceChangeListener(prefsListener);
 
-        mDownloader = new Downloader(mAuthenticator, mPrefs);
+        downloader = new Downloader(authenticator, prefs);
 
         double gain =
                 Double.parseDouble(
-                        mPrefs.getString(
+                        prefs.getString(
                                 NupPreferences.PRE_AMP_GAIN, NupPreferences.PRE_AMP_GAIN_DEFAULT));
-        mPlayer = new Player(this, this, mHandler, mAudioAttrs, gain);
-        mPlayerThread = new Thread(mPlayer, "Player");
-        mPlayerThread.setPriority(Thread.MAX_PRIORITY);
-        mPlayerThread.start();
+        player = new Player(this, this, handler, audioAttrs, gain);
+        playerThread = new Thread(player, "Player");
+        playerThread.setPriority(Thread.MAX_PRIORITY);
+        playerThread.start();
 
-        mCache = new FileCache(this, this, mDownloader, mNetworkHelper);
-        mCacheThread = new Thread(mCache, "FileCache");
-        mCacheThread.start();
+        cache = new FileCache(this, this, downloader, networkHelper);
+        cacheThread = new Thread(cache, "FileCache");
+        cacheThread.start();
 
-        mSongDb = new SongDatabase(this, this, mCache, mDownloader, mNetworkHelper);
-        mCoverLoader =
+        songDb = new SongDatabase(this, this, cache, downloader, networkHelper);
+        coverLoader =
                 new CoverLoader(
                         this.getExternalCacheDir(),
-                        mDownloader,
-                        mTaskRunner,
+                        downloader,
+                        taskRunner,
                         new BitmapDecoder(),
-                        mNetworkHelper);
-        mPlaybackReporter = new PlaybackReporter(mSongDb, mDownloader, mTaskRunner, mNetworkHelper);
+                        networkHelper);
+        playbackReporter = new PlaybackReporter(songDb, downloader, taskRunner, networkHelper);
 
-        mMediaSessionManager =
+        mediaSessionManager =
                 new MediaSessionManager(
                         this,
                         new MediaSession.Callback() {
                             @Override
                             public void onPause() {
-                                mPlayer.pause();
+                                player.pause();
                             }
 
                             @Override
                             public void onPlay() {
-                                mPlayer.unpause();
+                                player.unpause();
                             }
 
                             @Override
                             public void onSkipToNext() {
-                                playSongAtIndex(mCurrentSongIndex + 1);
+                                playSongAtIndex(currentSongIndex + 1);
                             }
 
                             @Override
                             public void onSkipToPrevious() {
-                                playSongAtIndex(mCurrentSongIndex - 1);
+                                playSongAtIndex(currentSongIndex - 1);
                             }
 
                             @Override
                             public void onStop() {
-                                mPlayer.pause();
+                                player.pause();
                             }
                         });
-        mMediaSessionToken = mMediaSessionManager.getToken();
+        mediaSessionToken = mediaSessionManager.getToken();
 
-        mNotificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
-        mNotificationCreator =
+        notificationManager = (NotificationManager) getSystemService(Context.NOTIFICATION_SERVICE);
+        notificationCreator =
                 new NotificationCreator(
                         this,
-                        mNotificationManager,
-                        mMediaSessionToken,
+                        notificationManager,
+                        mediaSessionToken,
                         PendingIntent.getActivity(this, 0, new Intent(this, NupActivity.class), 0),
                         PendingIntent.getService(
                                 this,
@@ -429,34 +430,34 @@ public class NupService extends Service
                                 new Intent(ACTION_NEXT_TRACK, Uri.EMPTY, this, NupService.class),
                                 0));
         Notification notification =
-                mNotificationCreator.createNotification(
+                notificationCreator.createNotification(
                         false,
                         getCurrentSong(),
-                        mPaused,
-                        mPlaybackComplete,
-                        mCurrentSongIndex,
-                        mSongs.size());
+                        paused,
+                        playbackComplete,
+                        currentSongIndex,
+                        songs.size());
         startForeground(NOTIFICATION_ID, notification);
     }
 
     @Override
     public void onDestroy() {
         Log.d(TAG, "service destroyed");
-        mAudioManager.abandonAudioFocus(mAudioFocusListener);
-        mPrefs.unregisterOnSharedPreferenceChangeListener(mPrefsListener);
-        mTelephonyManager.listen(mPhoneStateListener, PhoneStateListener.LISTEN_NONE);
-        unregisterReceiver(mBroadcastReceiver);
+        audioManager.abandonAudioFocus(audioFocusListener);
+        prefs.unregisterOnSharedPreferenceChangeListener(prefsListener);
+        telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE);
+        unregisterReceiver(broadcastReceiver);
 
-        mMediaSessionManager.cleanUp();
-        mSongDb.quit();
-        mPlayer.quit();
-        mCache.quit();
+        mediaSessionManager.cleanUp();
+        songDb.quit();
+        player.quit();
+        cache.quit();
         try {
-            mPlayerThread.join();
+            playerThread.join();
         } catch (InterruptedException e) {
         }
         try {
-            mCacheThread.join();
+            cacheThread.join();
         } catch (InterruptedException e) {
         }
 
@@ -470,9 +471,9 @@ public class NupService extends Service
             if (ACTION_TOGGLE_PAUSE.equals(intent.getAction())) {
                 togglePause();
             } else if (ACTION_NEXT_TRACK.equals(intent.getAction())) {
-                playSongAtIndex(mCurrentSongIndex + 1);
+                playSongAtIndex(currentSongIndex + 1);
             } else if (ACTION_PREV_TRACK.equals(intent.getAction())) {
-                playSongAtIndex(mCurrentSongIndex - 1);
+                playSongAtIndex(currentSongIndex - 1);
             }
         }
         return START_STICKY;
@@ -480,69 +481,69 @@ public class NupService extends Service
 
     @Override
     public IBinder onBind(Intent intent) {
-        return mBinder;
+        return binder;
     }
 
     public boolean getPaused() {
-        return mPaused;
+        return paused;
     }
 
     public List<Song> getSongs() {
-        return mSongs;
+        return songs;
     }
 
     public int getCurrentSongIndex() {
-        return mCurrentSongIndex;
+        return currentSongIndex;
     }
 
     public Song getCurrentSong() {
-        return (mCurrentSongIndex >= 0 && mCurrentSongIndex < mSongs.size())
-                ? mSongs.get(mCurrentSongIndex)
+        return (currentSongIndex >= 0 && currentSongIndex < songs.size())
+                ? songs.get(currentSongIndex)
                 : null;
     }
 
     public Song getNextSong() {
-        return (mCurrentSongIndex >= 0 && mCurrentSongIndex + 1 < mSongs.size())
-                ? mSongs.get(mCurrentSongIndex + 1)
+        return (currentSongIndex >= 0 && currentSongIndex + 1 < songs.size())
+                ? songs.get(currentSongIndex + 1)
                 : null;
     }
 
     public int getCurrentSongLastPositionMs() {
-        return mCurrentSongLastPositionMs;
+        return currentSongLastPositionMs;
     }
 
     public SongDatabase getSongDb() {
-        return mSongDb;
+        return songDb;
     }
 
     public void setSongListener(SongListener listener) {
-        mSongListener = listener;
+        songListener = listener;
     }
 
     public void addSongDatabaseUpdateListener(SongDatabaseUpdateListener listener) {
-        mSongDatabaseUpdateListeners.add(listener);
+        songDatabaseUpdateListeners.add(listener);
     }
 
     public void removeSongDatabaseUpdateListener(SongDatabaseUpdateListener listener) {
-        mSongDatabaseUpdateListeners.remove(listener);
+        songDatabaseUpdateListeners.remove(listener);
     }
 
     public boolean getShouldDownloadAll() {
-        return mShouldDownloadAll;
+        return shouldDownloadAll;
     }
 
     public void setShouldDownloadAll(boolean downloadAll) {
-        if (downloadAll == mShouldDownloadAll) return;
-        mShouldDownloadAll = downloadAll;
-        if (!mSongs.isEmpty() && downloadAll && mDownloadSongId == -1)
-            maybeDownloadAnotherSong(mCurrentSongIndex >= 0 ? mCurrentSongIndex : 0);
+        if (downloadAll == shouldDownloadAll) return;
+        shouldDownloadAll = downloadAll;
+        if (!songs.isEmpty() && downloadAll && downloadSongId == -1)
+            maybeDownloadAnotherSong(currentSongIndex >= 0 ? currentSongIndex : 0);
     }
 
     // Unregister an object that might be registered as one or more of our listeners.
     // Typically called when the object is an activity that's getting destroyed so
     // we'll drop our references to it.
     void unregisterListener(Object object) {
-        if (mSongListener == object) mSongListener = null;
+        if (songListener == object) songListener = null;
     }
 
     public class LocalBinder extends Binder {
@@ -554,50 +555,44 @@ public class NupService extends Service
     /** Updates the currently-displayed notification if needed. */
     private void updateNotification() {
         Notification notification =
-                mNotificationCreator.createNotification(
+                notificationCreator.createNotification(
                         true,
                         getCurrentSong(),
-                        mPaused,
-                        mPlaybackComplete,
-                        mCurrentSongIndex,
-                        mSongs.size());
-        if (notification != null) {
-            mNotificationManager.notify(NOTIFICATION_ID, notification);
-        }
+                        paused,
+                        playbackComplete,
+                        currentSongIndex,
+                        songs.size());
+        if (notification != null) notificationManager.notify(NOTIFICATION_ID, notification);
     }
 
     /** Toggle whether we're playing the current song or not. */
     public void togglePause() {
-        mPlayer.togglePause();
+        player.togglePause();
     }
 
     public void pause() {
-        mPlayer.pause();
+        player.pause();
     }
 
     public void clearPlaylist() {
-        removeRangeFromPlaylist(0, mSongs.size() - 1);
+        removeRangeFromPlaylist(0, songs.size() - 1);
     }
 
     public void appendSongToPlaylist(Song song) {
-        List<Song> songs = new ArrayList<Song>();
-        songs.add(song);
-        appendSongsToPlaylist(songs);
+        appendSongsToPlaylist(new ArrayList<Song>(Arrays.asList(song)));
     }
 
-    public void appendSongsToPlaylist(List<Song> songs) {
-        insertSongs(songs, mSongs.size());
+    public void appendSongsToPlaylist(List<Song> newSongs) {
+        insertSongs(newSongs, songs.size());
     }
 
     public void addSongToPlaylist(Song song, boolean play) {
-        List<Song> songs = new ArrayList<Song>();
-        songs.add(song);
-        addSongsToPlaylist(songs, play);
+        addSongsToPlaylist(new ArrayList<Song>(Arrays.asList(song)), play);
     }
 
-    public void addSongsToPlaylist(List<Song> songs, boolean forcePlay) {
-        int index = mCurrentSongIndex;
-        boolean alreadyPlayed = insertSongs(songs, index < 0 ? 0 : index + 1);
+    public void addSongsToPlaylist(List<Song> newSongs, boolean forcePlay) {
+        int index = currentSongIndex;
+        boolean alreadyPlayed = insertSongs(newSongs, index < 0 ? 0 : index + 1);
         if (forcePlay && !alreadyPlayed) {
             playSongAtIndex(index < 0 ? 0 : index + 1);
         }
@@ -610,66 +605,64 @@ public class NupService extends Service
     // Remove a range of songs from the playlist.
     public void removeRangeFromPlaylist(int firstIndex, int lastIndex) {
         if (firstIndex < 0) firstIndex = 0;
-        if (lastIndex >= mSongs.size()) lastIndex = mSongs.size() - 1;
+        if (lastIndex >= songs.size()) lastIndex = songs.size() - 1;
 
         boolean removedPlaying = false;
         for (int numToRemove = lastIndex - firstIndex + 1; numToRemove > 0; --numToRemove) {
-            mSongs.remove(firstIndex);
+            songs.remove(firstIndex);
 
-            if (mCurrentSongIndex == firstIndex) {
+            if (currentSongIndex == firstIndex) {
                 removedPlaying = true;
                 stopPlaying();
-            } else if (mCurrentSongIndex > firstIndex) {
-                mCurrentSongIndex--;
+            } else if (currentSongIndex > firstIndex) {
+                currentSongIndex--;
             }
 
-            if (mDownloadIndex == firstIndex) {
-                mCache.abortDownload(mDownloadSongId);
-                mDownloadSongId = -1;
-                mDownloadIndex = -1;
-            } else if (mDownloadIndex > firstIndex) {
-                mDownloadIndex--;
+            if (downloadIndex == firstIndex) {
+                cache.abortDownload(downloadSongId);
+                downloadSongId = -1;
+                downloadIndex = -1;
+            } else if (downloadIndex > firstIndex) {
+                downloadIndex--;
             }
         }
 
         if (removedPlaying) {
-            if (!mSongs.isEmpty() && mCurrentSongIndex < mSongs.size()) {
-                playSongAtIndex(mCurrentSongIndex);
+            if (!songs.isEmpty() && currentSongIndex < songs.size()) {
+                playSongAtIndex(currentSongIndex);
             } else {
-                mCurrentSongIndex = -1;
-                mMediaSessionManager.updateSong(null);
+                currentSongIndex = -1;
+                mediaSessionManager.updateSong(null);
                 updatePlaybackState();
             }
         }
 
         // Maybe the e.g. now-next-to-be-played song isn't downloaded yet.
-        if (mDownloadSongId == -1 && !mSongs.isEmpty() && mCurrentSongIndex < mSongs.size() - 1) {
-            maybeDownloadAnotherSong(mCurrentSongIndex + 1);
+        if (downloadSongId == -1 && !songs.isEmpty() && currentSongIndex < songs.size() - 1) {
+            maybeDownloadAnotherSong(currentSongIndex + 1);
         }
-        if (mSongListener != null) {
-            mSongListener.onPlaylistChange(mSongs);
-        }
+        if (songListener != null) songListener.onPlaylistChange(songs);
         updateNotification();
-        mMediaSessionManager.updatePlaylist(mSongs);
+        mediaSessionManager.updatePlaylist(songs);
     }
 
     // Play the song at a particular position in the playlist.
     public void playSongAtIndex(int index) {
-        if (index < 0 || index >= mSongs.size()) return;
+        if (index < 0 || index >= songs.size()) return;
 
-        mCurrentSongIndex = index;
+        currentSongIndex = index;
         Song song = getCurrentSong();
 
-        mCurrentSongStartDate = null;
-        mCurrentSongLastPositionMs = 0;
-        mCurrentSongPlayedMs = 0;
-        mReportedCurrentSong = false;
-        mPlaybackComplete = false;
+        currentSongStartDate = null;
+        currentSongLastPositionMs = 0;
+        currentSongPlayedMs = 0;
+        reportedCurrentSong = false;
+        playbackComplete = false;
 
-        mCache.clearPinnedSongIds();
+        cache.clearPinnedSongIds();
 
         // If we've already downloaded the whole file, start playing it.
-        FileCacheEntry cacheEntry = mCache.getEntry(getCurrentSong().id);
+        FileCacheEntry cacheEntry = cache.getEntry(getCurrentSong().id);
         if (cacheEntry != null && cacheEntry.isFullyCached()) {
             Log.d(TAG, "file " + getCurrentSong().url.toString() + " already downloaded; playing");
             playCacheEntry(cacheEntry);
@@ -678,33 +671,33 @@ public class NupService extends Service
             // previously-being-played song), abort it.
             // TODO: This could actually be a future song that we were already
             // downloading and will soon need to start downloading again.
-            if (mDownloadSongId != -1 && mDownloadSongId != cacheEntry.songId) {
-                mCache.abortDownload(mDownloadSongId);
-                mDownloadSongId = -1;
-                mDownloadIndex = -1;
+            if (downloadSongId != -1 && downloadSongId != cacheEntry.songId) {
+                cache.abortDownload(downloadSongId);
+                downloadSongId = -1;
+                downloadIndex = -1;
             }
 
-            maybeDownloadAnotherSong(mCurrentSongIndex + 1);
+            maybeDownloadAnotherSong(currentSongIndex + 1);
         } else {
             // Otherwise, start downloading it if we've never tried downloading it before,
             // or if we have but it's not currently being downloaded.
-            mPlayer.abortPlayback();
-            if (cacheEntry == null || mDownloadSongId != cacheEntry.songId) {
-                if (mDownloadSongId != -1) mCache.abortDownload(mDownloadSongId);
-                cacheEntry = mCache.downloadSong(song);
-                mDownloadSongId = song.id;
-                mDownloadIndex = mCurrentSongIndex;
+            player.abortPlayback();
+            if (cacheEntry == null || downloadSongId != cacheEntry.songId) {
+                if (downloadSongId != -1) cache.abortDownload(downloadSongId);
+                cacheEntry = cache.downloadSong(song);
+                downloadSongId = song.id;
+                downloadIndex = currentSongIndex;
             }
-            mWaitingForDownload = true;
+            waitingForDownload = true;
             updatePlaybackState();
         }
 
         // Enqueue the next song if we already have it.
         Song nextSong = getNextSong();
         if (nextSong != null) {
-            FileCacheEntry nextEntry = mCache.getEntry(nextSong.id);
+            FileCacheEntry nextEntry = cache.getEntry(nextSong.id);
             if (nextEntry != null && nextEntry.isFullyCached()) {
-                mPlayer.queueFile(
+                player.queueFile(
                         nextEntry.getLocalFile().getPath(),
                         nextEntry.getTotalBytes(),
                         nextSong.albumGain,
@@ -713,77 +706,77 @@ public class NupService extends Service
         }
 
         // Make sure that we won't drop the song that we're currently playing from the cache.
-        mCache.pinSongId(song.id);
+        cache.pinSongId(song.id);
 
         fetchCoverForSongIfMissing(song);
         updateNotification();
-        mMediaSessionManager.updateSong(song);
+        mediaSessionManager.updateSong(song);
         updatePlaybackState();
-        if (mSongListener != null) {
-            mSongListener.onSongChange(song, mCurrentSongIndex);
+        if (songListener != null) {
+            songListener.onSongChange(song, currentSongIndex);
         }
     }
 
     // Stop playing the current song, if any.
     public void stopPlaying() {
-        mCurrentSongPath = null;
-        mPlayer.abortPlayback();
+        currentSongPath = null;
+        player.abortPlayback();
     }
 
     // Start fetching the cover for a song if it's not loaded already.
     public void fetchCoverForSongIfMissing(Song song) {
         if (song.getCoverBitmap() != null || song.coverUrl == null) return;
 
-        if (!mSongCoverFetches.contains(song)) {
-            mSongCoverFetches.add(song);
+        if (!songCoverFetches.contains(song)) {
+            songCoverFetches.add(song);
             new CoverFetchTask(song).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
         }
     }
 
     // Fetches the cover bitmap for a particular song.
     class CoverFetchTask extends AsyncTask<Void, Void, Bitmap> {
-        private final Song mSong;
+        private final Song song;
 
         public CoverFetchTask(Song song) {
-            mSong = song;
+            this.song = song;
         }
 
         @Override
         protected Bitmap doInBackground(Void... args) {
-            return mCoverLoader.loadCover(mSong.coverUrl);
+            return coverLoader.loadCover(song.coverUrl);
         }
 
         @Override
         protected void onPostExecute(Bitmap bitmap) {
-            storeCoverForSong(mSong, bitmap);
-            mSongCoverFetches.remove(mSong);
-            if (mSong.getCoverBitmap() != null) {
-                if (mSongListener != null) mSongListener.onSongCoverLoad(mSong);
-                if (mSong == getCurrentSong()) {
+            storeCoverForSong(song, bitmap);
+            songCoverFetches.remove(song);
+            if (song.getCoverBitmap() != null) {
+                if (songListener != null) songListener.onSongCoverLoad(song);
+                if (song == getCurrentSong()) {
                     updateNotification();
-                    mMediaSessionManager.updateSong(mSong);
+                    mediaSessionManager.updateSong(song);
                 }
             }
         }
     }
 
     public long getTotalCachedBytes() {
-        return mCache.getTotalCachedBytes();
+        return cache.getTotalCachedBytes();
     }
 
     public void clearCache() {
-        mCache.clear();
+        cache.clear();
     }
 
     // Implements Player.Listener.
     @Override
     public void onPlaybackComplete() {
         Util.assertOnMainThread();
-        mPlaybackComplete = true;
+        playbackComplete = true;
         updateNotification();
         updatePlaybackState();
-        if (mCurrentSongIndex < mSongs.size() - 1) {
-            playSongAtIndex(mCurrentSongIndex + 1);
+        if (currentSongIndex < songs.size() - 1) {
+            playSongAtIndex(currentSongIndex + 1);
         }
     }
 
@@ -792,23 +785,23 @@ public class NupService extends Service
     public void onPlaybackPositionChange(
             final String path, final int positionMs, final int durationMs) {
         Util.assertOnMainThread();
-        if (!path.equals(mCurrentSongPath)) return;
+        if (!path.equals(currentSongPath)) return;
 
         Song song = getCurrentSong();
-        if (mSongListener != null) mSongListener.onSongPositionChange(song, positionMs, durationMs);
+        if (songListener != null) songListener.onSongPositionChange(song, positionMs, durationMs);
 
-        int elapsed = positionMs - mCurrentSongLastPositionMs;
+        int elapsed = positionMs - currentSongLastPositionMs;
         if (elapsed > 0 && elapsed <= MAX_POSITION_REPORT_MS) {
-            mCurrentSongPlayedMs += elapsed;
-            if (!mReportedCurrentSong
-                    && (mCurrentSongPlayedMs >= Math.max(durationMs, song.lengthSec * 1000) / 2
-                            || mCurrentSongPlayedMs >= REPORT_PLAYBACK_THRESHOLD_MS)) {
-                mPlaybackReporter.report(song.id, mCurrentSongStartDate);
-                mReportedCurrentSong = true;
+            currentSongPlayedMs += elapsed;
+            if (!reportedCurrentSong
+                    && (currentSongPlayedMs >= Math.max(durationMs, song.lengthSec * 1000) / 2
+                            || currentSongPlayedMs >= REPORT_PLAYBACK_THRESHOLD_MS)) {
+                playbackReporter.report(song.id, currentSongStartDate);
+                reportedCurrentSong = true;
             }
         }
 
-        mCurrentSongLastPositionMs = positionMs;
+        currentSongLastPositionMs = positionMs;
         updatePlaybackState();
     }
 
@@ -816,11 +809,9 @@ public class NupService extends Service
     @Override
     public void onPauseStateChange(final boolean paused) {
         Util.assertOnMainThread();
-        mPaused = paused;
+        this.paused = paused;
         updateNotification();
-        if (mSongListener != null) {
-            mSongListener.onPauseStateChange(paused);
-        }
+        if (songListener != null) songListener.onPauseStateChange(this.paused);
         updatePlaybackState();
     }
 
@@ -834,7 +825,7 @@ public class NupService extends Service
     // Implements FileCache.Listener.
     @Override
     public void onCacheDownloadError(final FileCacheEntry entry, final String reason) {
-        mHandler.post(
+        handler.post(
                 new Runnable() {
                     @Override
                     public void run() {
@@ -850,7 +841,7 @@ public class NupService extends Service
     // Implements FileCache.Listener.
     @Override
     public void onCacheDownloadFail(final FileCacheEntry entry, final String reason) {
-        mHandler.post(
+        handler.post(
                 new Runnable() {
                     @Override
                     public void run() {
@@ -863,15 +854,15 @@ public class NupService extends Service
                         Toast.makeText(
                                         NupService.this,
                                         "Download of "
-                                                + mSongIdToSong.get(entry.songId).url.toString()
+                                                + songIdToSong.get(entry.songId).url.toString()
                                                 + " failed: "
                                                 + reason,
                                         Toast.LENGTH_LONG)
                                 .show();
-                        if (entry.songId == mDownloadSongId) {
-                            mDownloadSongId = -1;
-                            mDownloadIndex = -1;
-                            mWaitingForDownload = false;
+                        if (entry.songId == downloadSongId) {
+                            downloadSongId = -1;
+                            downloadIndex = -1;
+                            waitingForDownload = false;
                         }
                     }
                 });
@@ -880,7 +871,7 @@ public class NupService extends Service
     // Implements FileCache.Listener.
     @Override
     public void onCacheDownloadComplete(final FileCacheEntry entry) {
-        mHandler.post(
+        handler.post(
                 new Runnable() {
                     @Override
                     public void run() {
@@ -890,29 +881,29 @@ public class NupService extends Service
                                         + entry.songId
                                         + " is done");
 
-                        Song song = mSongIdToSong.get(entry.songId);
+                        Song song = songIdToSong.get(entry.songId);
                         if (song == null) return;
 
                         song.updateBytes(entry);
-                        mSongDb.handleSongCached(song.id);
+                        songDb.handleSongCached(song.id);
 
-                        if (song == getCurrentSong() && mWaitingForDownload) {
-                            mWaitingForDownload = false;
+                        if (song == getCurrentSong() && waitingForDownload) {
+                            waitingForDownload = false;
                             playCacheEntry(entry);
                         } else if (song == getNextSong()) {
-                            mPlayer.queueFile(
+                            player.queueFile(
                                     entry.getLocalFile().getPath(),
                                     entry.getTotalBytes(),
                                     song.albumGain,
                                     song.peakAmp);
                         }
 
-                        if (mSongListener != null) mSongListener.onSongFileSizeChange(song);
+                        if (songListener != null) songListener.onSongFileSizeChange(song);
 
-                        if (entry.songId == mDownloadSongId) {
-                            int nextIndex = mDownloadIndex + 1;
-                            mDownloadSongId = -1;
-                            mDownloadIndex = -1;
+                        if (entry.songId == downloadSongId) {
+                            int nextIndex = downloadIndex + 1;
+                            downloadSongId = -1;
+                            downloadIndex = -1;
                             maybeDownloadAnotherSong(nextIndex);
                         }
                     }
@@ -923,25 +914,25 @@ public class NupService extends Service
     @Override
     public void onCacheDownloadProgress(
             final FileCacheEntry entry, final long downloadedBytes, final long elapsedMs) {
-        mHandler.post(
+        handler.post(
                 new Runnable() {
                     @Override
                     public void run() {
-                        Song song = mSongIdToSong.get(entry.songId);
+                        Song song = songIdToSong.get(entry.songId);
                         if (song == null) return;
 
                         song.updateBytes(entry);
 
                         if (song == getCurrentSong()) {
-                            if (mWaitingForDownload
+                            if (waitingForDownload
                                     && canPlaySong(
                                             entry, downloadedBytes, elapsedMs, song.lengthSec)) {
-                                mWaitingForDownload = false;
+                                waitingForDownload = false;
                                 playCacheEntry(entry);
                             }
                         }
 
-                        if (mSongListener != null) mSongListener.onSongFileSizeChange(song);
+                        if (songListener != null) songListener.onSongFileSizeChange(song);
                     }
                 });
     }
@@ -949,21 +940,21 @@ public class NupService extends Service
     // Implements FileCache.Listener.
     @Override
     public void onCacheEviction(final FileCacheEntry entry) {
-        mHandler.post(
+        handler.post(
                 new Runnable() {
                     @Override
                     public void run() {
                         Log.d(
                                 TAG,
                                 "got notification that song " + entry.songId + " has been evicted");
-                        mSongDb.handleSongEvicted(entry.songId);
+                        songDb.handleSongEvicted(entry.songId);
 
-                        Song song = mSongIdToSong.get(entry.songId);
+                        Song song = songIdToSong.get(entry.songId);
                         if (song == null) return;
 
                         song.setAvailableBytes(0);
                         song.setTotalBytes(0);
-                        if (mSongListener != null) mSongListener.onSongFileSizeChange(song);
+                        if (songListener != null) songListener.onSongFileSizeChange(song);
                     }
                 });
     }
@@ -971,12 +962,12 @@ public class NupService extends Service
     // Implements SongDatabase.Listener.
     @Override
     public void onAggregateDataUpdate() {
-        mHandler.post(
+        handler.post(
                 new Runnable() {
                     @Override
                     public void run() {
                         Log.d(TAG, "got notice that aggregate data has been updated");
-                        for (SongDatabaseUpdateListener listener : mSongDatabaseUpdateListeners)
+                        for (SongDatabaseUpdateListener listener : songDatabaseUpdateListeners)
                             listener.onSongDatabaseUpdate();
                     }
                 });
@@ -984,26 +975,28 @@ public class NupService extends Service
 
     /** Starts authenticating with Google Cloud Storage in the background. */
     public void authenticateInBackground() {
-        mAuthenticator.authenticateInBackground();
+        authenticator.authenticateInBackground();
     }
 
     // Insert a list of songs into the playlist at a particular position.
     // Plays the first one, if no song is already playing or if we were previously at the end of the
-    // playlist and we've appended to it.  Returns true if we started playing.
-    private boolean insertSongs(List<Song> songs, int index) {
-        if (index < 0 || index > mSongs.size()) {
-            Log.e(TAG, "ignoring request to insert " + songs.size() + " song(s) at index " + index);
+    // playlist and we've appended to it. Returns true if we started playing.
+    private boolean insertSongs(List<Song> insSongs, int index) {
+        if (index < 0 || index > songs.size()) {
+            Log.e(
+                    TAG,
+                    "ignoring request to insert " + insSongs.size() + " song(s) at index " + index);
             return false;
         }
 
-        // Songs that we didn't already have.  We track these so we can check
+        // Songs that we didn't already have. We track these so we can check
         // the cache for them later.
         ArrayList<Song> newSongs = new ArrayList<Song>();
 
         // Use our own version of each song if we have it already.
         ArrayList<Song> tmpSongs = new ArrayList<Song>();
-        for (Song song : songs) {
-            Song ourSong = mSongIdToSong.get(song.id);
+        for (Song song : insSongs) {
+            Song ourSong = songIdToSong.get(song.id);
             if (ourSong != null) {
                 tmpSongs.add(ourSong);
             } else {
@@ -1011,43 +1004,39 @@ public class NupService extends Service
                 newSongs.add(song);
             }
         }
-        songs = tmpSongs;
+        insSongs = tmpSongs;
 
-        mSongs.addAll(index, songs);
-        if (mCurrentSongIndex >= 0 && index <= mCurrentSongIndex) {
-            mCurrentSongIndex += songs.size();
+        songs.addAll(index, insSongs);
+        if (currentSongIndex >= 0 && index <= currentSongIndex) {
+            currentSongIndex += insSongs.size();
         }
-        if (mDownloadIndex >= 0 && index <= mDownloadIndex) {
-            mDownloadIndex += songs.size();
+        if (downloadIndex >= 0 && index <= downloadIndex) {
+            downloadIndex += insSongs.size();
         }
 
-        if (mSongListener != null) {
-            mSongListener.onPlaylistChange(mSongs);
-        }
-        mMediaSessionManager.updatePlaylist(mSongs);
+        if (songListener != null) songListener.onPlaylistChange(songs);
+        mediaSessionManager.updatePlaylist(songs);
 
         for (Song song : newSongs) {
-            mSongIdToSong.put(song.id, song);
-            FileCacheEntry entry = mCache.getEntry(song.id);
+            songIdToSong.put(song.id, song);
+            FileCacheEntry entry = cache.getEntry(song.id);
             if (entry != null) {
                 song.updateBytes(entry);
-                if (mSongListener != null) {
-                    mSongListener.onSongFileSizeChange(song);
-                }
+                if (songListener != null) songListener.onSongFileSizeChange(song);
             }
         }
 
         boolean played = false;
-        if (mCurrentSongIndex == -1) {
+        if (currentSongIndex == -1) {
             // If we didn't have any songs, then start playing the first one we added.
             playSongAtIndex(0);
             played = true;
-        } else if (mCurrentSongIndex < mSongs.size() - 1 && mPlaybackComplete) {
+        } else if (currentSongIndex < songs.size() - 1 && playbackComplete) {
             // If we were previously done playing (because we reached the end of the playlist),
             // then start playing the first song we added.
-            playSongAtIndex(mCurrentSongIndex + 1);
+            playSongAtIndex(currentSongIndex + 1);
             played = true;
-        } else if (mDownloadSongId == -1) {
+        } else if (downloadSongId == -1) {
             // Otherwise, consider downloading the new songs if we're not already downloading
             // something.
             maybeDownloadAnotherSong(index);
@@ -1079,48 +1068,48 @@ public class NupService extends Service
                             + song.id);
             return;
         }
-        mCurrentSongPath = entry.getLocalFile().getPath();
-        mPlayer.playFile(mCurrentSongPath, entry.getTotalBytes(), song.albumGain, song.peakAmp);
-        mCurrentSongStartDate = new Date();
-        mCache.updateLastAccessTime(entry.songId);
+        currentSongPath = entry.getLocalFile().getPath();
+        player.playFile(currentSongPath, entry.getTotalBytes(), song.albumGain, song.peakAmp);
+        currentSongStartDate = new Date();
+        cache.updateLastAccessTime(entry.songId);
         updateNotification();
         updatePlaybackState();
     }
 
     // Try to download the next not-yet-downloaded song in the playlist.
     private void maybeDownloadAnotherSong(int index) {
-        if (mDownloadSongId != -1) {
+        if (downloadSongId != -1) {
             Log.e(
                     TAG,
                     "aborting prefetch since download of song "
-                            + mDownloadSongId
+                            + downloadSongId
                             + " is still in progress");
             return;
         }
 
         final int songsToPreload =
                 Integer.valueOf(
-                        mPrefs.getString(
+                        prefs.getString(
                                 NupPreferences.SONGS_TO_PRELOAD,
                                 NupPreferences.SONGS_TO_PRELOAD_DEFAULT));
 
         for (;
-                index < mSongs.size()
-                        && (mShouldDownloadAll || index - mCurrentSongIndex <= songsToPreload);
+                index < songs.size()
+                        && (shouldDownloadAll || index - currentSongIndex <= songsToPreload);
                 index++) {
-            Song song = mSongs.get(index);
-            FileCacheEntry entry = mCache.getEntry(song.id);
+            Song song = songs.get(index);
+            FileCacheEntry entry = cache.getEntry(song.id);
             if (entry != null && entry.isFullyCached()) {
                 // We already have this one.  Pin it to make sure that it
                 // doesn't get evicted by a later song.
-                mCache.pinSongId(song.id);
+                cache.pinSongId(song.id);
                 continue;
             }
 
-            entry = mCache.downloadSong(song);
-            mDownloadSongId = song.id;
-            mDownloadIndex = index;
-            mCache.pinSongId(song.id);
+            entry = cache.downloadSong(song);
+            downloadSongId = song.id;
+            downloadIndex = index;
+            cache.pinSongId(song.id);
             fetchCoverForSongIfMissing(song);
             return;
         }
@@ -1130,28 +1119,28 @@ public class NupService extends Service
     // Also makes sure that we don't have more than |MAX_LOADED_COVERS| bitmaps in-memory.
     private void storeCoverForSong(Song song, Bitmap bitmap) {
         song.setCoverBitmap(bitmap);
-        final int existingIndex = mSongsWithCovers.indexOf(song);
+        final int existingIndex = songsWithCovers.indexOf(song);
 
         // If we didn't get a bitmap, bail out early.
         if (bitmap == null) {
-            if (existingIndex >= 0) mSongsWithCovers.remove(existingIndex);
+            if (existingIndex >= 0) songsWithCovers.remove(existingIndex);
             return;
         }
 
         // If the song is already in the list, remove it so we can add it to the end.
         if (existingIndex >= 0) {
             // It's already at the end of the list; we don't need to move it.
-            if (existingIndex == mSongsWithCovers.size() - 1) return;
-            mSongsWithCovers.remove(existingIndex);
+            if (existingIndex == songsWithCovers.size() - 1) return;
+            songsWithCovers.remove(existingIndex);
         }
 
         // If we're full, drop the cover from the first song on the list.
-        if (mSongsWithCovers.size() == MAX_LOADED_COVERS) {
-            mSongsWithCovers.get(0).setCoverBitmap(null);
-            mSongsWithCovers.remove(0);
+        if (songsWithCovers.size() == MAX_LOADED_COVERS) {
+            songsWithCovers.get(0).setCoverBitmap(null);
+            songsWithCovers.remove(0);
         }
 
-        mSongsWithCovers.add(song);
+        songsWithCovers.add(song);
     }
 
     // Choose a filename to use for storing a song locally (used to just use a slightly-mangled
@@ -1160,15 +1149,15 @@ public class NupService extends Service
         return String.format("%d.mp3", song.id);
     }
 
-    // Notifies mMediaSessionManager about the current playback state.
+    // Notifies |mediaSessionManager| about the current playback state.
     private void updatePlaybackState() {
-        mMediaSessionManager.updatePlaybackState(
+        mediaSessionManager.updatePlaybackState(
                 getCurrentSong(),
-                mPaused,
-                mPlaybackComplete,
-                mWaitingForDownload,
-                mCurrentSongLastPositionMs,
-                mCurrentSongIndex,
-                mSongs.size());
+                paused,
+                playbackComplete,
+                waitingForDownload,
+                currentSongLastPositionMs,
+                currentSongIndex,
+                songs.size());
     }
 }

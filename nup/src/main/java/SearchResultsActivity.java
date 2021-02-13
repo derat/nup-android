@@ -46,7 +46,7 @@ public class SearchResultsActivity extends Activity {
     private static final int DIALOG_SONG_DETAILS = 1;
 
     // Songs that we're displaying.
-    private List<Song> mSongs = new ArrayList<Song>();
+    private List<Song> songs = new ArrayList<Song>();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
@@ -100,11 +100,11 @@ public class SearchResultsActivity extends Activity {
         }
 
         new AsyncTask<Void, Void, List<Song>>() {
-            private ProgressDialog mDialog;
+            private ProgressDialog dialog;
 
             @Override
             protected void onPreExecute() {
-                mDialog =
+                dialog =
                         ProgressDialog.show(
                                 SearchResultsActivity.this,
                                 getString(R.string.searching),
@@ -116,9 +116,9 @@ public class SearchResultsActivity extends Activity {
 
             @Override
             protected List<Song> doInBackground(Void... args) {
-                List<Song> songs = new ArrayList<Song>();
+                List<Song> newSongs = new ArrayList<Song>();
                 for (Query query : queries) {
-                    songs.addAll(
+                    newSongs.addAll(
                             NupActivity.getService()
                                     .getSongDb()
                                     .query(
@@ -131,16 +131,16 @@ public class SearchResultsActivity extends Activity {
                                             query.substring,
                                             query.onlyCached));
                 }
-                return songs;
+                return newSongs;
             }
 
             @Override
-            protected void onPostExecute(List<Song> songs) {
-                mSongs = songs;
-                if (!mSongs.isEmpty()) {
+            protected void onPostExecute(List<Song> newSongs) {
+                songs = newSongs;
+                if (!songs.isEmpty()) {
                     final String artistKey = "artist", titleKey = "title";
                     List<HashMap<String, String>> data = new ArrayList<HashMap<String, String>>();
-                    for (Song song : mSongs) {
+                    for (Song song : songs) {
                         HashMap<String, String> map = new HashMap<String, String>();
                         map.put(artistKey, song.artist);
                         map.put(titleKey, song.title);
@@ -159,18 +159,18 @@ public class SearchResultsActivity extends Activity {
                     registerForContextMenu(view);
                 }
 
-                mDialog.dismiss();
+                dialog.dismiss();
                 String message =
-                        !mSongs.isEmpty()
+                        !songs.isEmpty()
                                 ? getResources()
                                         .getQuantityString(
                                                 R.plurals.search_found_songs_fmt,
-                                                mSongs.size(),
-                                                mSongs.size())
+                                                songs.size(),
+                                                songs.size())
                                 : getString(R.string.no_results);
                 Toast.makeText(SearchResultsActivity.this, message, Toast.LENGTH_SHORT).show();
 
-                if (mSongs.isEmpty()) finish();
+                if (songs.isEmpty()) finish();
             }
         }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR);
     }
@@ -186,7 +186,7 @@ public class SearchResultsActivity extends Activity {
             ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
         if (view.getId() == R.id.results) {
             AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) menuInfo;
-            Song song = mSongs.get(info.position);
+            Song song = songs.get(info.position);
             menu.setHeaderTitle(song.title);
             menu.add(0, MENU_ITEM_PLAY, 0, R.string.play);
             menu.add(0, MENU_ITEM_INSERT, 0, R.string.insert);
@@ -199,7 +199,7 @@ public class SearchResultsActivity extends Activity {
     public boolean onContextItemSelected(MenuItem item) {
         AdapterView.AdapterContextMenuInfo info =
                 (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
-        Song song = mSongs.get(info.position);
+        Song song = songs.get(info.position);
         switch (item.getItemId()) {
             case MENU_ITEM_PLAY:
                 NupActivity.getService().addSongToPlaylist(song, true);
@@ -231,20 +231,20 @@ public class SearchResultsActivity extends Activity {
     }
 
     public void onAppendButtonClicked(View view) {
-        NupActivity.getService().appendSongsToPlaylist(mSongs);
+        NupActivity.getService().appendSongsToPlaylist(songs);
         setResult(RESULT_OK);
         finish();
     }
 
     public void onInsertButtonClicked(View view) {
-        NupActivity.getService().addSongsToPlaylist(mSongs, false);
+        NupActivity.getService().addSongsToPlaylist(songs, false);
         setResult(RESULT_OK);
         finish();
     }
 
     public void onReplaceButtonClicked(View view) {
         NupActivity.getService().clearPlaylist();
-        NupActivity.getService().appendSongsToPlaylist(mSongs);
+        NupActivity.getService().appendSongsToPlaylist(songs);
         setResult(RESULT_OK);
         finish();
     }

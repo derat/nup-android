@@ -36,42 +36,42 @@ public class BrowseSongsActivity extends Activity implements AdapterView.OnItemC
     private static final int DIALOG_SONG_DETAILS = 1;
 
     // Passed-in criteria specifying which songs to display.
-    private String mArtist = null;
-    private String mAlbum = null;
-    private String mAlbumId = null;
-    private boolean mOnlyCached = false;
-    private double mMinRating = -1.0;
+    private String artist = null;
+    private String album = null;
+    private String albumId = null;
+    private boolean onlyCached = false;
+    private double minRating = -1.0;
 
     // Songs that we're displaying.
-    private List<Song> mSongs = new ArrayList<Song>();
+    private List<Song> songs = new ArrayList<Song>();
 
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.browse_songs);
 
-        mArtist = getIntent().getStringExtra(BrowseActivityBase.BUNDLE_ARTIST);
-        mAlbum = getIntent().getStringExtra(BrowseActivityBase.BUNDLE_ALBUM);
-        mAlbumId = getIntent().getStringExtra(BrowseActivityBase.BUNDLE_ALBUM_ID);
-        mOnlyCached = getIntent().getBooleanExtra(BrowseActivityBase.BUNDLE_CACHED, false);
-        mMinRating = getIntent().getDoubleExtra(BrowseActivityBase.BUNDLE_MIN_RATING, -1.0);
+        artist = getIntent().getStringExtra(BrowseActivityBase.BUNDLE_ARTIST);
+        album = getIntent().getStringExtra(BrowseActivityBase.BUNDLE_ALBUM);
+        albumId = getIntent().getStringExtra(BrowseActivityBase.BUNDLE_ALBUM_ID);
+        onlyCached = getIntent().getBooleanExtra(BrowseActivityBase.BUNDLE_CACHED, false);
+        minRating = getIntent().getDoubleExtra(BrowseActivityBase.BUNDLE_MIN_RATING, -1.0);
 
-        if (mAlbum != null) {
+        if (album != null) {
             setTitle(
                     getString(
-                            mOnlyCached
+                            onlyCached
                                     ? R.string.browse_cached_songs_from_album_fmt
                                     : R.string.browse_songs_from_album_fmt,
-                            mAlbum));
-        } else if (mArtist != null) {
+                            album));
+        } else if (artist != null) {
             setTitle(
                     getString(
-                            mOnlyCached
+                            onlyCached
                                     ? R.string.browse_cached_songs_by_artist_fmt
                                     : R.string.browse_songs_by_artist_fmt,
-                            mArtist));
+                            artist));
         } else {
-            setTitle(getString(mOnlyCached ? R.string.browse_cached_songs : R.string.browse_songs));
+            setTitle(getString(onlyCached ? R.string.browse_cached_songs : R.string.browse_songs));
         }
 
         // Do the query for the songs in the background.
@@ -102,25 +102,16 @@ public class BrowseSongsActivity extends Activity implements AdapterView.OnItemC
             protected List<Song> doInBackground(Void... args) {
                 return NupActivity.getService()
                         .getSongDb()
-                        .query(
-                                mArtist,
-                                null,
-                                mAlbum,
-                                mAlbumId,
-                                mMinRating,
-                                false,
-                                false,
-                                mOnlyCached);
+                        .query(artist, null, album, albumId, minRating, false, false, onlyCached);
             }
 
             @Override
-            protected void onPostExecute(List<Song> songs) {
-                // The results come back in album order.  If we're viewing all songs by
+            protected void onPostExecute(List<Song> newSongs) {
+                // The results come back in album order. If we're viewing all songs by
                 // an artist, sort them alphabetically instead.
-                if ((mAlbum == null || mAlbum.isEmpty())
-                        && (mAlbumId == null || mAlbumId.isEmpty())) {
+                if ((album == null || album.isEmpty()) && (albumId == null || albumId.isEmpty())) {
                     Collections.sort(
-                            songs,
+                            newSongs,
                             new Comparator<Song>() {
                                 @Override
                                 public int compare(Song a, Song b) {
@@ -130,11 +121,11 @@ public class BrowseSongsActivity extends Activity implements AdapterView.OnItemC
                                 }
                             });
                 }
-                mSongs = songs;
+                songs = newSongs;
 
                 final String titleKey = "title";
                 List<HashMap<String, String>> data = new ArrayList<HashMap<String, String>>();
-                for (Song song : mSongs) {
+                for (Song song : songs) {
                     HashMap<String, String> map = new HashMap<String, String>();
                     map.put(titleKey, song.title);
                     data.add(map);
@@ -181,7 +172,7 @@ public class BrowseSongsActivity extends Activity implements AdapterView.OnItemC
             ContextMenu menu, View view, ContextMenu.ContextMenuInfo menuInfo) {
         if (view.getId() == R.id.songs) {
             AdapterView.AdapterContextMenuInfo info = (AdapterView.AdapterContextMenuInfo) menuInfo;
-            Song song = mSongs.get(info.position);
+            Song song = songs.get(info.position);
             if (song == null) return;
             menu.setHeaderTitle(song.title);
             menu.add(0, MENU_ITEM_PLAY, 0, R.string.play);
@@ -195,7 +186,7 @@ public class BrowseSongsActivity extends Activity implements AdapterView.OnItemC
     public boolean onContextItemSelected(MenuItem item) {
         AdapterView.AdapterContextMenuInfo info =
                 (AdapterView.AdapterContextMenuInfo) item.getMenuInfo();
-        Song song = mSongs.get(info.position);
+        Song song = songs.get(info.position);
         if (song == null) return false;
         switch (item.getItemId()) {
             case MENU_ITEM_PLAY:
@@ -218,7 +209,7 @@ public class BrowseSongsActivity extends Activity implements AdapterView.OnItemC
     // Implements AdapterView.OnItemClickListener.
     @Override
     public void onItemClick(AdapterView parent, View view, int position, long id) {
-        Song song = mSongs.get(position);
+        Song song = songs.get(position);
         if (song == null) return;
         NupActivity.getService().appendSongToPlaylist(song);
         Toast.makeText(this, getString(R.string.appended_song_fmt, song.title), Toast.LENGTH_SHORT)
@@ -238,23 +229,23 @@ public class BrowseSongsActivity extends Activity implements AdapterView.OnItemC
     }
 
     public void onAppendButtonClicked(View view) {
-        if (mSongs.isEmpty()) return;
-        NupActivity.getService().appendSongsToPlaylist(mSongs);
+        if (songs.isEmpty()) return;
+        NupActivity.getService().appendSongsToPlaylist(songs);
         setResult(RESULT_OK);
         finish();
     }
 
     public void onInsertButtonClicked(View view) {
-        if (mSongs.isEmpty()) return;
-        NupActivity.getService().addSongsToPlaylist(mSongs, false);
+        if (songs.isEmpty()) return;
+        NupActivity.getService().addSongsToPlaylist(songs, false);
         setResult(RESULT_OK);
         finish();
     }
 
     public void onReplaceButtonClicked(View view) {
-        if (mSongs.isEmpty()) return;
+        if (songs.isEmpty()) return;
         NupActivity.getService().clearPlaylist();
-        NupActivity.getService().appendSongsToPlaylist(mSongs);
+        NupActivity.getService().appendSongsToPlaylist(songs);
         setResult(RESULT_OK);
         finish();
     }

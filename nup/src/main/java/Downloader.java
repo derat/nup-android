@@ -35,12 +35,12 @@ public class Downloader {
         STORAGE
     }
 
-    private final Authenticator mAuthenticator;
-    private final SharedPreferences mPrefs;
+    private final Authenticator authenticator;
+    private final SharedPreferences prefs;
 
     public Downloader(Authenticator authenticator, SharedPreferences prefs) {
-        mAuthenticator = authenticator;
-        mPrefs = prefs;
+        this.authenticator = authenticator;
+        this.prefs = prefs;
     }
 
     /**
@@ -69,8 +69,8 @@ public class Downloader {
 
         if (authType == AuthType.SERVER) {
             // Add Authorization header if username and password prefs are set.
-            String username = mPrefs.getString(NupPreferences.USERNAME, "");
-            String password = mPrefs.getString(NupPreferences.PASSWORD, "");
+            String username = prefs.getString(NupPreferences.USERNAME, "");
+            String password = prefs.getString(NupPreferences.PASSWORD, "");
             if (!username.isEmpty() && !password.isEmpty()) {
                 conn.setRequestProperty(
                         "Authorization",
@@ -80,7 +80,7 @@ public class Downloader {
             }
         } else if (authType == AuthType.STORAGE) {
             try {
-                String token = mAuthenticator.getAuthToken();
+                String token = authenticator.getAuthToken();
                 conn.setRequestProperty("Authorization", "Bearer " + token);
             } catch (Authenticator.AuthException e) {
                 Log.e(TAG, "failed to get auth token: " + e);
@@ -177,7 +177,7 @@ public class Downloader {
     }
 
     public URL getServerUrl(String path) throws PrefException {
-        String server = mPrefs.getString(NupPreferences.SERVER_URL, "");
+        String server = prefs.getString(NupPreferences.SERVER_URL, "");
         if (server.isEmpty()) {
             throw new PrefException("Server URL is not configured");
         }

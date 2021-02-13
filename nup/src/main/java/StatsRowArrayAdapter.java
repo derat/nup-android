@@ -24,21 +24,21 @@ class StatsRowArrayAdapter extends ArrayAdapter<StatsRow> implements SectionInde
             "\u2668"; // HOT SPRINGS (Android isn't snowman-compatible)
 
     // Rows to display.
-    private List<StatsRow> mRows;
+    private List<StatsRow> rows;
 
     // Are all rows in the list enabled?  If false, all are disabled.
-    private boolean mEnabled = true;
+    private boolean enabled = true;
 
     // Information to display from |mRows|.
-    private int mDisplayType = DISPLAY_ARTIST;
+    private int displayType = DISPLAY_ARTIST;
 
     // Manner in which |mRows| are sorted, as a Util.SORT_* value.
-    private int mSortType = Util.SORT_ARTIST;
+    private int sortType = Util.SORT_ARTIST;
 
-    private ArrayList<String> mSections = new ArrayList<String>();
+    private ArrayList<String> sections = new ArrayList<String>();
 
     // Position of the first row in each section.
-    private ArrayList<Integer> mSectionStartingPositions = new ArrayList<Integer>();
+    private ArrayList<Integer> sectionStartingPositions = new ArrayList<Integer>();
 
     StatsRowArrayAdapter(
             Context context,
@@ -47,34 +47,34 @@ class StatsRowArrayAdapter extends ArrayAdapter<StatsRow> implements SectionInde
             int displayType,
             int sortType) {
         super(context, textViewResourceId, rows);
-        mRows = rows;
-        mDisplayType = displayType;
-        mSortType = sortType;
+        this.rows = rows;
+        this.displayType = displayType;
+        this.sortType = sortType;
         initSections();
     }
 
     // Should all of the rows in the list be enabled, or all disabled?
     public void setEnabled(boolean enabled) {
-        mEnabled = enabled;
+        this.enabled = enabled;
     }
 
     @Override
     public int getPositionForSection(int section) {
-        return mSectionStartingPositions.get(section);
+        return sectionStartingPositions.get(section);
     }
 
     @Override
     public int getSectionForPosition(int position) {
         // No upper_bound()/lower_bound()? :-(
-        for (int i = 0; i < mSectionStartingPositions.size() - 1; ++i) {
-            if (position < mSectionStartingPositions.get(i + 1)) return i;
+        for (int i = 0; i < sectionStartingPositions.size() - 1; ++i) {
+            if (position < sectionStartingPositions.get(i + 1)) return i;
         }
-        return mSectionStartingPositions.size() - 1;
+        return sectionStartingPositions.size() - 1;
     }
 
     @Override
     public Object[] getSections() {
-        return mSections.toArray();
+        return sections.toArray();
     }
 
     @Override
@@ -85,12 +85,12 @@ class StatsRowArrayAdapter extends ArrayAdapter<StatsRow> implements SectionInde
 
     @Override
     public boolean areAllItemsEnabled() {
-        return mEnabled;
+        return enabled;
     }
 
     @Override
     public boolean isEnabled(int position) {
-        return mEnabled;
+        return enabled;
     }
 
     @Override
@@ -104,7 +104,7 @@ class StatsRowArrayAdapter extends ArrayAdapter<StatsRow> implements SectionInde
             view = inflater.inflate(R.layout.browse_row, null);
         }
 
-        StatsRow row = mRows.get(position);
+        StatsRow row = rows.get(position);
         ((TextView) view.findViewById(R.id.main)).setText(getDisplayString(row.key));
         ((TextView) view.findViewById(R.id.extra)).setText(row.count >= 0 ? "" + row.count : "");
         return view;
@@ -112,13 +112,9 @@ class StatsRowArrayAdapter extends ArrayAdapter<StatsRow> implements SectionInde
 
     // Returns the string to display for the supplied key.
     private String getDisplayString(StatsKey key) {
-        if (mDisplayType == DISPLAY_ARTIST) {
-            return key.artist;
-        } else if (mDisplayType == DISPLAY_ALBUM) {
-            return key.album;
-        } else if (mDisplayType == DISPLAY_ALBUM_ARTIST) {
-            return key.album + " (" + key.artist + ")";
-        }
+        if (displayType == DISPLAY_ARTIST) return key.artist;
+        else if (displayType == DISPLAY_ALBUM) return key.album;
+        else if (displayType == DISPLAY_ALBUM_ARTIST) return key.album + " (" + key.artist + ")";
         throw new IllegalArgumentException("invalid sort type");
     }
 
@@ -130,14 +126,14 @@ class StatsRowArrayAdapter extends ArrayAdapter<StatsRow> implements SectionInde
         for (char ch = 'A'; ch <= 'Z'; ++ch) sections.add(Character.toString(ch));
         sections.add(OTHER_SECTION);
 
-        mSections.clear();
-        mSectionStartingPositions.clear();
+        sections.clear();
+        sectionStartingPositions.clear();
 
         int sectionIndex = -1;
-        for (int rowIndex = 0; rowIndex < mRows.size(); ++rowIndex) {
-            StatsKey key = mRows.get(rowIndex).key;
+        for (int rowIndex = 0; rowIndex < rows.size(); ++rowIndex) {
+            StatsKey key = rows.get(rowIndex).key;
             String sectionName =
-                    getSectionNameForString(mSortType == Util.SORT_ARTIST ? key.artist : key.album);
+                    getSectionNameForString(sortType == Util.SORT_ARTIST ? key.artist : key.album);
 
             int prevSectionIndex = sectionIndex;
             while (sectionIndex == -1 || !sectionName.equals(sections.get(sectionIndex)))
@@ -145,8 +141,8 @@ class StatsRowArrayAdapter extends ArrayAdapter<StatsRow> implements SectionInde
 
             // If we advanced to a new section, register it.
             if (sectionIndex != prevSectionIndex) {
-                mSections.add(sections.get(sectionIndex));
-                mSectionStartingPositions.add(rowIndex);
+                sections.add(sections.get(sectionIndex));
+                sectionStartingPositions.add(rowIndex);
             }
         }
     }
@@ -154,7 +150,7 @@ class StatsRowArrayAdapter extends ArrayAdapter<StatsRow> implements SectionInde
     private String getSectionNameForString(String str) {
         if (str.isEmpty()) return NUMBER_SECTION;
 
-        String sortStr = Util.getSortingKey(str, mSortType);
+        String sortStr = Util.getSortingKey(str, sortType);
         char ch = sortStr.charAt(0);
         if (ch < 'a') return NUMBER_SECTION;
         if (ch >= 'a' && ch <= 'z') return Character.toString(Character.toUpperCase(ch));

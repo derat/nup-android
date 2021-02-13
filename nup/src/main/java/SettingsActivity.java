@@ -17,7 +17,7 @@ public class SettingsActivity extends PreferenceActivity
         implements Preference.OnPreferenceChangeListener {
     private static final String TAG = "SettingsActivity";
 
-    SharedPreferences mPrefs;
+    SharedPreferences prefs;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -25,19 +25,19 @@ public class SettingsActivity extends PreferenceActivity
         setTitle(R.string.settings);
         addPreferencesFromResource(R.xml.settings);
 
-        mPrefs = PreferenceManager.getDefaultSharedPreferences(this);
+        prefs = PreferenceManager.getDefaultSharedPreferences(this);
 
         Preference pref = findPreference(NupPreferences.SERVER_URL);
         pref.setOnPreferenceChangeListener(this);
-        pref.setSummary(mPrefs.getString(NupPreferences.SERVER_URL, ""));
+        pref.setSummary(prefs.getString(NupPreferences.SERVER_URL, ""));
 
         pref = findPreference(NupPreferences.USERNAME);
         pref.setOnPreferenceChangeListener(this);
-        pref.setSummary(mPrefs.getString(NupPreferences.USERNAME, ""));
+        pref.setSummary(prefs.getString(NupPreferences.USERNAME, ""));
 
         pref = findPreference(NupPreferences.ACCOUNT);
         pref.setOnPreferenceChangeListener(this);
-        pref.setSummary(mPrefs.getString(NupPreferences.ACCOUNT, ""));
+        pref.setSummary(prefs.getString(NupPreferences.ACCOUNT, ""));
 
         pref = findPreference(NupPreferences.SYNC_SONG_LIST);
         NupActivity.getService().addSongDatabaseUpdateListener((YesNoPreference) pref);
@@ -47,7 +47,7 @@ public class SettingsActivity extends PreferenceActivity
         pref.setOnPreferenceChangeListener(this);
         double gain =
                 Double.parseDouble(
-                        mPrefs.getString(
+                        prefs.getString(
                                 NupPreferences.PRE_AMP_GAIN, NupPreferences.PRE_AMP_GAIN_DEFAULT));
         pref.setSummary(getString(R.string.pre_amp_gain_value, gain));
 
@@ -55,7 +55,7 @@ public class SettingsActivity extends PreferenceActivity
         pref.setOnPreferenceChangeListener(this);
         int maxCacheMb =
                 Integer.parseInt(
-                        mPrefs.getString(
+                        prefs.getString(
                                 NupPreferences.CACHE_SIZE, NupPreferences.CACHE_SIZE_DEFAULT));
         pref.setSummary(getString(R.string.cache_size_value, maxCacheMb));
 
@@ -71,7 +71,7 @@ public class SettingsActivity extends PreferenceActivity
         pref.setOnPreferenceChangeListener(this);
         int songsToPreload =
                 Integer.parseInt(
-                        mPrefs.getString(
+                        prefs.getString(
                                 NupPreferences.SONGS_TO_PRELOAD,
                                 NupPreferences.SONGS_TO_PRELOAD_DEFAULT));
         pref.setSummary(
@@ -83,7 +83,7 @@ public class SettingsActivity extends PreferenceActivity
         pref.setOnPreferenceChangeListener(this);
         int downloadRate =
                 Integer.parseInt(
-                        mPrefs.getString(
+                        prefs.getString(
                                 NupPreferences.DOWNLOAD_RATE,
                                 NupPreferences.DOWNLOAD_RATE_DEFAULT));
         pref.setSummary(

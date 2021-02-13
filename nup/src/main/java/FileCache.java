@@ -67,53 +67,54 @@ public class FileCache implements Runnable {
         INACTIVE,
     }
 
-    private final Context mContext;
-    private final SharedPreferences mPrefs;
-    private final Listener mListener;
-    private final Downloader mDownloader;
-    private final NetworkHelper mNetworkHelper;
+    private final Context context;
+    private final SharedPreferences prefs;
+    private final Listener listener;
+    private final Downloader downloader;
+    private final NetworkHelper networkHelper;
 
     // Are we ready to service requests?  This is blocked on |mDb| being initialized.
-    private boolean mIsReady = false;
-    private final Lock mIsReadyLock = new ReentrantLock();
-    private final Condition mIsReadyCond = mIsReadyLock.newCondition();
+    private boolean isReady = false;
+    private final Lock isReadyLock = new ReentrantLock();
+    private final Condition isReadyCond = isReadyLock.newCondition();
 
     // Directory where we write music files.
-    private File mMusicDir;
+    private File musicDir;
 
     // Used to run tasks on our own thread.
-    private Handler mHandler;
+    private Handler handler;
 
     // Song IDs of entries that are currently being downloaded.
-    private HashSet mInProgressSongIds = new HashSet();
+    private HashSet inProgressSongIds = new HashSet();
 
     // Song IDs of entries that shouldn't be purged from the cache.
-    private HashSet mPinnedSongIds = new HashSet();
+    private HashSet pinnedSongIds = new HashSet();
 
     // Persistent information about cached items.
-    private FileCacheDatabase mDb = null;
+    private FileCacheDatabase db = null;
 
-    private WifiState mWifiState;
-    private final WifiLock mWifiLock;
-    private Runnable mUpdateWifiLockTask = null;
+    private WifiState wifiState;
+    private final WifiLock wifiLock;
+    private Runnable updateWifiLockTask = null;
 
     FileCache(
             Context context,
             Listener listener,
             Downloader downloader,
             NetworkHelper networkHelper) {
-        mContext = context;
-        mListener = listener;
-        mDownloader = downloader;
-        mNetworkHelper = networkHelper;
+        this.context = context;
+        this.listener = listener;
+        this.downloader = downloader;
+        this.networkHelper = networkHelper;
 
-        mPrefs = PreferenceManager.getDefaultSharedPreferences(mContext);
+        this.prefs = PreferenceManager.getDefaultSharedPreferences(context);
 
-        mWifiLock =
-                ((WifiManager) mContext.getSystemService(Context.WIFI_SERVICE))
+        this.wifiLock =
+                ((WifiManager) this.context.getSystemService(Context.WIFI_SERVICE))
                         .createWifiLock(
-                                WifiManager.WIFI_MODE_FULL, mContext.getString(R.string.app_name));
-        mWifiLock.setReferenceCounted(false);
+                                WifiManager.WIFI_MODE_FULL,
+                                this.context.getString(R.string.app_name));
+        this.wifiLock.setReferenceCounted(false);
     }
 
     @Override
@@ -123,59 +124,59 @@ public class FileCache implements Runnable {
             Log.e(TAG, "media has state " + state + "; we need " + Environment.MEDIA_MOUNTED);
         }
 
-        mMusicDir = mContext.getExternalFilesDir(Environment.DIRECTORY_MUSIC);
+        musicDir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC);
 
-        mDb = new FileCacheDatabase(mContext, mMusicDir.getPath());
+        db = new FileCacheDatabase(context, musicDir.getPath());
         Looper.prepare();
-        mHandler = new Handler();
+        handler = new Handler();
 
-        mIsReadyLock.lock();
-        mIsReady = true;
-        mIsReadyCond.signal();
-        mIsReadyLock.unlock();
+        isReadyLock.lock();
+        isReady = true;
+        isReadyCond.signal();
+        isReadyLock.unlock();
 
         Looper.loop();
     }
 
     public void quit() {
-        synchronized (mInProgressSongIds) {
-            mInProgressSongIds.clear();
+        synchronized (inProgressSongIds) {
+            inProgressSongIds.clear();
         }
         waitUntilReady();
-        mHandler.post(
+        handler.post(
                 new Runnable() {
                     @Override
                     public void run() {
                         Looper.myLooper().quit();
                     }
                 });
-        mDb.quit();
+        db.quit();
     }
 
     // Update the recorded last time that a particular song was accessed.
     public void updateLastAccessTime(long songId) {
         waitUntilReady();
-        mDb.updateLastAccessTime(songId);
+        db.updateLastAccessTime(songId);
     }
 
     // Get the entry corresponding to a particular song.
     // Returns null if the URL isn't cached.
     public FileCacheEntry getEntry(long songId) {
         waitUntilReady();
-        return mDb.getEntry(songId);
+        return db.getEntry(songId);
     }
 
     public List<FileCacheEntry> getAllFullyCachedEntries() {
         waitUntilReady();
-        return mDb.getAllFullyCachedEntries();
+        return db.getAllFullyCachedEntries();
     }
 
     // Abort a previously-started download.
     public void abortDownload(long songId) {
-        synchronized (mInProgressSongIds) {
-            if (!mInProgressSongIds.contains(songId))
+        synchronized (inProgressSongIds) {
+            if (!inProgressSongIds.contains(songId))
                 Log.e(TAG, "tried to abort nonexistent download of song " + songId);
-            mInProgressSongIds.remove(songId);
+            inProgressSongIds.remove(songId);
         }
         updateWifiLock();
         Log.d(TAG, "canceled download of song " + songId);
@@ -184,33 +185,33 @@ public class FileCache implements Runnable {
     // Get the total size of all cached data.
     public long getTotalCachedBytes() {
         waitUntilReady();
-        return mDb.getTotalCachedBytes();
+        return db.getTotalCachedBytes();
     }
 
     // Clear all cached data.
     public void clear() {
         waitUntilReady();
-        mHandler.post(
+        handler.post(
                 new Runnable() {
                     @Override
                     public void run() {
-                        synchronized (mInProgressSongIds) {
-                            mInProgressSongIds.clear();
+                        synchronized (inProgressSongIds) {
+                            inProgressSongIds.clear();
                         }
                         updateWifiLock();
                         clearPinnedSongIds();
 
-                        List<Long> songIds = mDb.getSongIdsByAge();
+                        List<Long> songIds = db.getSongIdsByAge();
                         for (long songId : songIds) {
-                            FileCacheEntry entry = mDb.getEntry(songId);
-                            mDb.removeEntry(songId);
+                            FileCacheEntry entry = db.getEntry(songId);
+                            db.removeEntry(songId);
                             File file = entry.getLocalFile();
                             file.delete();
-                            mListener.onCacheEviction(entry);
+                            listener.onCacheEviction(entry);
                         }
 
                         // Shouldn't be anything there, but whatever.
-                        for (File file : mMusicDir.listFiles()) file.delete();
+                        for (File file : musicDir.listFiles()) file.delete();
                     }
                 });
     }
@@ -221,16 +222,16 @@ public class FileCache implements Runnable {
         waitUntilReady();
         final long songId = song.id;
 
-        synchronized (mInProgressSongIds) {
-            if (mInProgressSongIds.contains(songId)) return null;
-            mInProgressSongIds.add(songId);
+        synchronized (inProgressSongIds) {
+            if (inProgressSongIds.contains(songId)) return null;
+            inProgressSongIds.add(songId);
         }
 
-        FileCacheEntry entry = mDb.getEntry(songId);
+        FileCacheEntry entry = db.getEntry(songId);
         if (entry == null) {
-            entry = mDb.addEntry(songId);
+            entry = db.addEntry(songId);
         } else {
-            mDb.updateLastAccessTime(songId);
+            db.updateLastAccessTime(songId);
         }
 
         Log.d(
@@ -241,19 +242,19 @@ public class FileCache implements Runnable {
                         + song.url.toString()
                         + " to "
                         + entry.getLocalFile().getPath());
-        mHandler.post(new DownloadTask(entry, song.url));
+        handler.post(new DownloadTask(entry, song.url));
         return entry;
     }
 
     public void pinSongId(long songId) {
-        synchronized (mPinnedSongIds) {
-            mPinnedSongIds.add(songId);
+        synchronized (pinnedSongIds) {
+            pinnedSongIds.add(songId);
         }
     }
 
     public void clearPinnedSongIds() {
-        synchronized (mPinnedSongIds) {
-            mPinnedSongIds.clear();
+        synchronized (pinnedSongIds) {
+            pinnedSongIds.clear();
         }
     }
 
@@ -267,32 +268,32 @@ public class FileCache implements Runnable {
         private static final int BUFFER_SIZE = 8 * 1024;
 
         // Cache entry that we're updating.
-        private final FileCacheEntry mEntry;
+        private final FileCacheEntry entry;
 
         // File that we're downloading.
-        private final URL mUrl;
+        private final URL url;
 
         // How long we should wait before retrying after an error, in milliseconds.
         // We start at 0 but back off exponentially after errors where we haven't made any progress.
-        private int mBackoffTimeMs = 0;
+        private int backoffTimeMs = 0;
 
         // Reason for the failure.
-        private String mReason;
+        private String reason;
 
-        private HttpURLConnection mConn;
-        private FileOutputStream mOutputStream = null;
+        private HttpURLConnection conn;
+        private FileOutputStream outputStream = null;
 
         public DownloadTask(FileCacheEntry entry, URL url) {
-            mEntry = entry;
-            mUrl = url;
+            this.entry = entry;
+            this.url = url;
         }
 
         @Override
         public void run() {
             if (!isActive()) return;
 
-            if (!mNetworkHelper.isNetworkAvailable()) {
-                mReason = mContext.getString(R.string.network_is_unavailable);
+            if (!networkHelper.isNetworkAvailable()) {
+                reason = context.getString(R.string.network_is_unavailable);
                 handleFailure();
                 return;
             }
@@ -301,18 +302,18 @@ public class FileCache implements Runnable {
 
             while (true) {
                 try {
-                    if (mBackoffTimeMs > 0) {
+                    if (backoffTimeMs > 0) {
                         Log.d(
                                 TAG,
                                 "sleeping for "
-                                        + mBackoffTimeMs
+                                        + backoffTimeMs
                                         + " ms before retrying download "
-                                        + mEntry.songId);
-                        SystemClock.sleep(mBackoffTimeMs);
+                                        + entry.songId);
+                        SystemClock.sleep(backoffTimeMs);
                     }
 
                     // If the file is fully downloaded already, report success.
-                    if (mEntry.isFullyCached()) {
+                    if (entry.isFullyCached()) {
                         handleSuccess();
                         return;
                     }
@@ -324,7 +325,7 @@ public class FileCache implements Runnable {
                         case ABORTED:
                             return;
                         case RETRYABLE_ERROR:
-                            mListener.onCacheDownloadError(mEntry, mReason);
+                            listener.onCacheDownloadError(entry, reason);
                             updateBackoffTime(false);
                             continue;
                         case FATAL_ERROR:
@@ -340,7 +341,7 @@ public class FileCache implements Runnable {
                         case ABORTED:
                             return;
                         case RETRYABLE_ERROR:
-                            mListener.onCacheDownloadError(mEntry, mReason);
+                            listener.onCacheDownloadError(entry, reason);
                             updateBackoffTime(true);
                             continue;
                         case FATAL_ERROR:
@@ -351,17 +352,17 @@ public class FileCache implements Runnable {
                     handleSuccess();
                     return;
                 } finally {
-                    if (mConn != null) {
-                        mConn.disconnect();
-                        mConn = null;
+                    if (conn != null) {
+                        conn.disconnect();
+                        conn = null;
                     }
-                    if (mOutputStream != null) {
+                    if (outputStream != null) {
                         try {
-                            mOutputStream.close();
+                            outputStream.close();
                         } catch (IOException e) {
                             Log.e(TAG, "got IO exception while closing output stream: " + e);
                         }
-                        mOutputStream = null;
+                        outputStream = null;
                     }
                 }
             }
@@ -370,30 +371,29 @@ public class FileCache implements Runnable {
         private DownloadStatus startDownload() {
             try {
                 Map<String, String> headers = new HashMap<String, String>();
-                if (mEntry.getCachedBytes() > 0
-                        && mEntry.getCachedBytes() < mEntry.getTotalBytes()) {
-                    Log.d(TAG, "attempting to resume download at byte " + mEntry.getCachedBytes());
-                    headers.put("Range", String.format("bytes=%d-", mEntry.getCachedBytes()));
+                if (entry.getCachedBytes() > 0 && entry.getCachedBytes() < entry.getTotalBytes()) {
+                    Log.d(TAG, "attempting to resume download at byte " + entry.getCachedBytes());
+                    headers.put("Range", String.format("bytes=%d-", entry.getCachedBytes()));
                 }
 
-                mConn = mDownloader.download(mUrl, "GET", Downloader.AuthType.STORAGE, headers);
-                final int status = mConn.getResponseCode();
+                conn = downloader.download(url, "GET", Downloader.AuthType.STORAGE, headers);
+                final int status = conn.getResponseCode();
                 Log.d(TAG, "got " + status + " from server");
                 if (status != 200 && status != 206) {
-                    mReason = "Got status code " + status;
+                    reason = "Got status code " + status;
                     return DownloadStatus.FATAL_ERROR;
                 }
 
                 // Update the cache entry with the total file size.
                 if (status == 200) {
-                    if (mConn.getContentLength() <= 1) {
-                        mReason = "Got invalid content length " + mConn.getContentLength();
+                    if (conn.getContentLength() <= 1) {
+                        reason = "Got invalid content length " + conn.getContentLength();
                         return DownloadStatus.FATAL_ERROR;
                     }
-                    mDb.setTotalBytes(mEntry.songId, mConn.getContentLength());
+                    db.setTotalBytes(entry.songId, conn.getContentLength());
                 }
             } catch (IOException e) {
-                mReason = "IO error while starting download";
+                reason = "IO error while starting download";
                 return DownloadStatus.RETRYABLE_ERROR;
             }
 
@@ -402,52 +402,50 @@ public class FileCache implements Runnable {
 
         private DownloadStatus writeFile() {
             // Make space for whatever we're planning to download.
-            if (!makeSpace(mConn.getContentLength())) {
-                mReason = "Unable to make space for " + mConn.getContentLength() + "-byte download";
+            if (!makeSpace(conn.getContentLength())) {
+                reason = "Unable to make space for " + conn.getContentLength() + "-byte download";
                 return DownloadStatus.FATAL_ERROR;
             }
 
-            File file = mEntry.getLocalFile();
+            File file = entry.getLocalFile();
             if (!file.exists()) {
                 file.getParentFile().mkdirs();
                 try {
                     file.createNewFile();
                 } catch (IOException e) {
-                    mReason = "Unable to create local file " + file.getPath();
+                    reason = "Unable to create local file " + file.getPath();
                     return DownloadStatus.FATAL_ERROR;
                 }
             }
 
             int statusCode;
             try {
-                statusCode = mConn.getResponseCode();
+                statusCode = conn.getResponseCode();
             } catch (IOException e) {
-                mReason = "Unable to get status code";
+                reason = "Unable to get status code";
                 return DownloadStatus.RETRYABLE_ERROR;
             }
 
             try {
                 // TODO: Also check the Content-Range header.
                 boolean append = (statusCode == 206);
-                mOutputStream = new FileOutputStream(file, append);
-                if (!append) {
-                    mEntry.setCachedBytes(0);
-                }
+                outputStream = new FileOutputStream(file, append);
+                if (!append) entry.setCachedBytes(0);
             } catch (FileNotFoundException e) {
-                mReason = "Unable to create output stream to local file";
+                reason = "Unable to create output stream to local file";
                 return DownloadStatus.FATAL_ERROR;
             }
 
             final long maxBytesPerSecond =
                     Long.valueOf(
-                                    mPrefs.getString(
+                                    prefs.getString(
                                             NupPreferences.DOWNLOAD_RATE,
                                             NupPreferences.DOWNLOAD_RATE_DEFAULT))
                             * 1024;
 
-            ProgressReporter reporter = new ProgressReporter(mEntry);
+            ProgressReporter reporter = new ProgressReporter(entry);
             Thread reporterThread =
-                    new Thread(reporter, "FileCache.ProgressReporter." + mEntry.songId);
+                    new Thread(reporter, "FileCache.ProgressReporter." + entry.songId);
             reporterThread.start();
 
             try {
@@ -455,18 +453,18 @@ public class FileCache implements Runnable {
 
                 int bytesRead = 0, bytesWritten = 0;
                 byte[] buffer = new byte[BUFFER_SIZE];
-                InputStream inputStream = mConn.getInputStream();
+                InputStream inputStream = conn.getInputStream();
                 while ((bytesRead = inputStream.read(buffer)) != -1) {
                     if (!isActive()) {
                         return DownloadStatus.ABORTED;
                     }
 
-                    mOutputStream.write(buffer, 0, bytesRead);
+                    outputStream.write(buffer, 0, bytesRead);
                     bytesWritten += bytesRead;
 
                     Date now = new Date();
                     long elapsedMs = now.getTime() - startDate.getTime();
-                    mEntry.incrementCachedBytes(bytesRead);
+                    entry.incrementCachedBytes(bytesRead);
                     reporter.update(bytesWritten, elapsedMs);
 
                     if (maxBytesPerSecond > 0) {
@@ -478,7 +476,7 @@ public class FileCache implements Runnable {
                 Log.d(
                         TAG,
                         "finished download of song "
-                                + mEntry.songId
+                                + entry.songId
                                 + " ("
                                 + bytesWritten
                                 + " bytes to "
@@ -488,16 +486,16 @@ public class FileCache implements Runnable {
                                 + " ms)");
 
                 // I see this happen when I kill the server midway through the download.
-                if (bytesWritten != mConn.getContentLength()) {
-                    mReason =
+                if (bytesWritten != conn.getContentLength()) {
+                    reason =
                             "Expected "
-                                    + mConn.getContentLength()
+                                    + conn.getContentLength()
                                     + " bytes but got "
                                     + bytesWritten;
                     return DownloadStatus.RETRYABLE_ERROR;
                 }
             } catch (IOException e) {
-                mReason = "IO error while reading body";
+                reason = "IO error while reading body";
                 return DownloadStatus.RETRYABLE_ERROR;
             } finally {
                 reporter.quit();
@@ -511,58 +509,54 @@ public class FileCache implements Runnable {
         }
 
         private void handleFailure() {
-            synchronized (mInProgressSongIds) {
-                mInProgressSongIds.remove(mEntry.songId);
+            synchronized (inProgressSongIds) {
+                inProgressSongIds.remove(entry.songId);
             }
             updateWifiLock();
-            mListener.onCacheDownloadFail(mEntry, mReason);
+            listener.onCacheDownloadFail(entry, reason);
         }
 
         private void handleSuccess() {
-            synchronized (mInProgressSongIds) {
-                mInProgressSongIds.remove(mEntry.songId);
+            synchronized (inProgressSongIds) {
+                inProgressSongIds.remove(entry.songId);
             }
             updateWifiLock();
-            mListener.onCacheDownloadComplete(mEntry);
+            listener.onCacheDownloadComplete(entry);
         }
 
         private void updateBackoffTime(boolean madeProgress) {
-            if (madeProgress) {
-                mBackoffTimeMs = 0;
-            } else if (mBackoffTimeMs == 0) {
-                mBackoffTimeMs = 1000;
-            } else {
-                mBackoffTimeMs = Math.min(mBackoffTimeMs * 2, MAX_BACKOFF_SEC * 1000);
-            }
+            if (madeProgress) backoffTimeMs = 0;
+            else if (backoffTimeMs == 0) backoffTimeMs = 1000;
+            else backoffTimeMs = Math.min(backoffTimeMs * 2, MAX_BACKOFF_SEC * 1000);
         }
 
         // Is this download currently active, or has it been cancelled?
         private boolean isActive() {
-            return isDownloadActive(mEntry.songId);
+            return isDownloadActive(entry.songId);
         }
 
         private class ProgressReporter implements Runnable {
             private static final String TAG = "FileCache.ProgressReporter";
             private static final long PROGRESS_REPORT_MS = 500;
 
-            private final FileCacheEntry mEntry;
-            private long mDownloadedBytes = 0;
-            private long mElapsedMs = 0;
-            private Handler mHandler;
-            private Runnable mTask;
-            private Date mLastReportDate;
-            private boolean mShouldQuit = false;
+            private final FileCacheEntry entry;
+            private long downloadedBytes = 0;
+            private long elapsedMs = 0;
+            private Handler handler;
+            private Runnable task;
+            private Date lastReportDate;
+            private boolean shouldQuit = false;
 
             ProgressReporter(final FileCacheEntry entry) {
-                mEntry = entry;
+                this.entry = entry;
             }
 
             @Override
             public void run() {
                 Looper.prepare();
                 synchronized (this) {
-                    if (mShouldQuit) return;
-                    mHandler = new Handler();
+                    if (shouldQuit) return;
+                    handler = new Handler();
                 }
                 Looper.loop();
             }
@@ -570,12 +564,12 @@ public class FileCache implements Runnable {
             public void quit() {
                 synchronized (this) {
                     // The thread hasn't started looping yet; tell it to exit before starting.
-                    if (mHandler == null) {
-                        mShouldQuit = true;
+                    if (handler == null) {
+                        shouldQuit = true;
                         return;
                     }
                 }
-                mHandler.post(
+                handler.post(
                         new Runnable() {
                             @Override
                             public void run() {
@@ -586,30 +580,30 @@ public class FileCache implements Runnable {
 
             public void update(final long downloadedBytes, final long elapsedMs) {
                 synchronized (this) {
-                    mDownloadedBytes = downloadedBytes;
-                    mElapsedMs = elapsedMs;
+                    this.downloadedBytes = downloadedBytes;
+                    this.elapsedMs = elapsedMs;
 
-                    if (mHandler != null && mTask == null) {
-                        mTask =
+                    if (handler != null && task == null) {
+                        task =
                                 new Runnable() {
                                     @Override
                                     public void run() {
                                         synchronized (ProgressReporter.this) {
-                                            mListener.onCacheDownloadProgress(
-                                                    mEntry, mDownloadedBytes, mElapsedMs);
-                                            mLastReportDate = new Date();
-                                            mTask = null;
+                                            listener.onCacheDownloadProgress(
+                                                    entry, downloadedBytes, elapsedMs);
+                                            lastReportDate = new Date();
+                                            task = null;
                                         }
                                     }
                                 };
 
                         long delayMs = 0;
-                        if (mLastReportDate != null) {
+                        if (lastReportDate != null) {
                             long timeSinceLastReportMs =
-                                    new Date().getTime() - mLastReportDate.getTime();
+                                    new Date().getTime() - lastReportDate.getTime();
                             delayMs = Math.max(PROGRESS_REPORT_MS - timeSinceLastReportMs, 0);
                         }
-                        mHandler.postDelayed(mTask, delayMs);
+                        handler.postDelayed(task, delayMs);
                     }
                 }
             }
@@ -618,18 +612,18 @@ public class FileCache implements Runnable {
 
     // Wait until |mIsReady| becomes true.
     private void waitUntilReady() {
-        mIsReadyLock.lock();
+        isReadyLock.lock();
         try {
-            while (!mIsReady) mIsReadyCond.await();
+            while (!isReady) isReadyCond.await();
         } catch (InterruptedException e) {
         } finally {
-            mIsReadyLock.unlock();
+            isReadyLock.unlock();
         }
     }
 
     private boolean isDownloadActive(long songId) {
-        synchronized (mInProgressSongIds) {
-            return mInProgressSongIds.contains(songId);
+        synchronized (inProgressSongIds) {
+            return inProgressSongIds.contains(songId);
         }
     }
 
@@ -639,7 +633,7 @@ public class FileCache implements Runnable {
     private synchronized boolean makeSpace(long neededBytes) {
         long maxBytes =
                 Long.valueOf(
-                                mPrefs.getString(
+                                prefs.getString(
                                         NupPreferences.CACHE_SIZE,
                                         NupPreferences.CACHE_SIZE_DEFAULT))
                         * 1024
@@ -655,17 +649,17 @@ public class FileCache implements Runnable {
                         + " bytes ("
                         + availableBytes
                         + " available)");
-        List<Long> songIds = mDb.getSongIdsByAge();
+        List<Long> songIds = db.getSongIdsByAge();
         for (long songId : songIds) {
             if (neededBytes <= availableBytes) break;
 
             if (isDownloadActive(songId)) continue;
 
-            synchronized (mPinnedSongIds) {
-                if (mPinnedSongIds.contains(songId)) continue;
+            synchronized (pinnedSongIds) {
+                if (pinnedSongIds.contains(songId)) continue;
             }
 
-            FileCacheEntry entry = mDb.getEntry(songId);
+            FileCacheEntry entry = db.getEntry(songId);
             File file = entry.getLocalFile();
             Log.d(
                     TAG,
@@ -678,8 +672,8 @@ public class FileCache implements Runnable {
                             + " bytes)");
             availableBytes += file.length();
             file.delete();
-            mDb.removeEntry(songId);
-            mListener.onCacheEviction(entry);
+            db.removeEntry(songId);
+            listener.onCacheEviction(entry);
         }
 
         return neededBytes <= availableBytes;
@@ -687,40 +681,40 @@ public class FileCache implements Runnable {
 
     // Acquire or release the wifi lock, depending on our current state.
     private void updateWifiLock() {
-        if (mUpdateWifiLockTask != null) {
-            mHandler.removeCallbacks(mUpdateWifiLockTask);
-            mUpdateWifiLockTask = null;
+        if (updateWifiLockTask != null) {
+            handler.removeCallbacks(updateWifiLockTask);
+            updateWifiLockTask = null;
         }
 
         boolean active = false;
-        synchronized (mInProgressSongIds) {
-            active = !mInProgressSongIds.isEmpty();
+        synchronized (inProgressSongIds) {
+            active = !inProgressSongIds.isEmpty();
         }
 
         if (active) {
             Log.d(TAG, "acquiring wifi lock");
-            mWifiState = WifiState.ACTIVE;
-            mWifiLock.acquire();
+            wifiState = WifiState.ACTIVE;
+            wifiLock.acquire();
         } else {
-            if (mWifiState == WifiState.ACTIVE) {
+            if (wifiState == WifiState.ACTIVE) {
                 Log.d(
                         TAG,
                         "waiting "
                                 + RELEASE_WIFI_LOCK_DELAY_SEC
                                 + " seconds before releasing wifi lock");
-                mWifiState = WifiState.WAITING;
-                mUpdateWifiLockTask =
+                wifiState = WifiState.WAITING;
+                updateWifiLockTask =
                         new Runnable() {
                             @Override
                             public void run() {
                                 updateWifiLock();
                             }
                         };
-                mHandler.postDelayed(mUpdateWifiLockTask, RELEASE_WIFI_LOCK_DELAY_SEC * 1000);
+                handler.postDelayed(updateWifiLockTask, RELEASE_WIFI_LOCK_DELAY_SEC * 1000);
             } else {
                 Log.d(TAG, "releasing wifi lock");
-                mWifiState = WifiState.INACTIVE;
-                mWifiLock.release();
+                wifiState = WifiState.INACTIVE;
+                wifiLock.release();
             }
         }
     }
