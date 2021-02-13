@@ -39,7 +39,7 @@ android {
 }
 
 dependencies {
-  implementation 'com.google.android.gms:play-services:9.2.1'
+  implementation 'com.google.android.gms:play-services-auth:19.0.0'
 
   testImplementation 'com.google.guava:guava:15.0'
   testImplementation 'junit:junit:4.12'
