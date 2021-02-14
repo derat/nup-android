@@ -121,11 +121,12 @@ class StatsRowArrayAdapter extends ArrayAdapter<StatsRow> implements SectionInde
     // Updates |mSections| and |mSectionStartingPositions| for |mRows|.
     private void initSections() {
         // Create a list of all possible sections in the order in which they'd appear.
-        ArrayList<String> sections = new ArrayList<String>();
-        sections.add(NUMBER_SECTION);
-        for (char ch = 'A'; ch <= 'Z'; ++ch) sections.add(Character.toString(ch));
-        sections.add(OTHER_SECTION);
+        ArrayList<String> allSections = new ArrayList<String>();
+        allSections.add(NUMBER_SECTION);
+        for (char ch = 'A'; ch <= 'Z'; ++ch) allSections.add(Character.toString(ch));
+        allSections.add(OTHER_SECTION);
 
+        // Update the main list to have the sections that are needed.
         sections.clear();
         sectionStartingPositions.clear();
 
@@ -136,12 +137,12 @@ class StatsRowArrayAdapter extends ArrayAdapter<StatsRow> implements SectionInde
                     getSectionNameForString(sortType == Util.SORT_ARTIST ? key.artist : key.album);
 
             int prevSectionIndex = sectionIndex;
-            while (sectionIndex == -1 || !sectionName.equals(sections.get(sectionIndex)))
+            while (sectionIndex == -1 || !sectionName.equals(allSections.get(sectionIndex)))
                 sectionIndex++;
 
             // If we advanced to a new section, register it.
             if (sectionIndex != prevSectionIndex) {
-                sections.add(sections.get(sectionIndex));
+                sections.add(allSections.get(sectionIndex));
                 sectionStartingPositions.add(rowIndex);
             }
         }
