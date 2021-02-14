@@ -24,7 +24,7 @@ internal class Authenticator(private val context: Context) {
             val prefs = PreferenceManager.getDefaultSharedPreferences(context)
             val accountName = prefs.getString(NupPreferences.ACCOUNT, "")
             if (accountName!!.isEmpty()) throw AuthException("Account isn't set")
-            var token: String? = null
+            var token: String?
             token = try {
                 Log.d(TAG, "attempting to get token for $accountName")
                 val bundle = Bundle()

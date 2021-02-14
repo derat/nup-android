@@ -151,7 +151,8 @@ class FileCache internal constructor(
             }
 
             // Shouldn't be anything there, but whatever.
-            for (file: File in musicDir!!.listFiles()) file.delete()
+            val files = musicDir!!.listFiles()
+            if (files != null) for (file: File in files) file.delete()
         }
     }
 
@@ -177,8 +178,8 @@ class FileCache internal constructor(
                         + " from "
                         + song.url.toString()
                         + " to "
-                        + entry!!.localFile.path))
-        handler!!.post(DownloadTask(entry!!, song.url!!))
+                        + entry.localFile.path))
+        handler!!.post(DownloadTask(entry, song.url!!))
         return entry
     }
 
@@ -223,12 +224,12 @@ class FileCache internal constructor(
                         Log.d(
                                 tag,
                                 ("sleeping for $backoffTimeMs ms before retrying download "
-                                        + entry!!.songId))
+                                        + entry.songId))
                         SystemClock.sleep(backoffTimeMs.toLong())
                     }
 
                     // If the file is fully downloaded already, report success.
-                    if (entry!!.isFullyCached) {
+                    if (entry.isFullyCached) {
                         handleSuccess()
                         return
                     }
@@ -283,11 +284,11 @@ class FileCache internal constructor(
         private fun startDownload(): DownloadStatus {
             try {
                 val headers: MutableMap<String, String> = HashMap()
-                if (entry!!.cachedBytes > 0 && entry.cachedBytes < entry.totalBytes) {
+                if (entry.cachedBytes > 0 && entry.cachedBytes < entry.totalBytes) {
                     Log.d(Companion.TAG, "attempting to resume download at byte " + entry.cachedBytes)
                     headers["Range"] = String.format("bytes=%d-", entry.cachedBytes)
                 }
-                conn = downloader.download(url!!, "GET", Downloader.AuthType.STORAGE, headers)
+                conn = downloader.download(url, "GET", Downloader.AuthType.STORAGE, headers)
                 val status = conn?.getResponseCode()
                 Log.d(Companion.TAG, "got $status from server")
                 if (status != 200 && status != 206) {
@@ -302,7 +303,7 @@ class FileCache internal constructor(
                         reason = "Got invalid content length $len"
                         return DownloadStatus.FATAL_ERROR
                     }
-                    db!!.setTotalBytes(entry.songId, len?.toLong())
+                    db!!.setTotalBytes(entry.songId, len.toLong())
                 }
             } catch (e: IOException) {
                 reason = "IO error while starting download"
@@ -317,9 +318,9 @@ class FileCache internal constructor(
                 reason = "Unable to make space for " + conn!!.contentLength + "-byte download"
                 return DownloadStatus.FATAL_ERROR
             }
-            val file = entry!!.localFile
+            val file = entry.localFile
             if (!file.exists()) {
-                file.parentFile.mkdirs()
+                file.parentFile?.mkdirs()
                 try {
                     file.createNewFile()
                 } catch (e: IOException) {
@@ -346,14 +347,14 @@ class FileCache internal constructor(
             val maxBytesPerSecond = (java.lang.Long.valueOf(
                     prefs.getString(
                             NupPreferences.DOWNLOAD_RATE,
-                            NupPreferences.DOWNLOAD_RATE_DEFAULT))
+                            NupPreferences.DOWNLOAD_RATE_DEFAULT)!!)
                     * 1024)
             val reporter = ProgressReporter(entry)
             val reporterThread = Thread(reporter, "FileCache.ProgressReporter." + entry.songId)
             reporterThread.start()
             try {
                 val startDate = Date()
-                var bytesRead = 0
+                var bytesRead: Int
                 var bytesWritten = 0
                 val buffer = ByteArray(bufferSize)
                 val inputStream = conn!!.inputStream
@@ -408,13 +409,13 @@ class FileCache internal constructor(
         }
 
         private fun handleFailure() {
-            synchronized(inProgressSongIds) { inProgressSongIds.remove(entry!!.songId) }
+            synchronized(inProgressSongIds) { inProgressSongIds.remove(entry.songId) }
             updateWifiLock()
             listener.onCacheDownloadFail(entry, reason)
         }
 
         private fun handleSuccess() {
-            synchronized(inProgressSongIds) { inProgressSongIds.remove(entry!!.songId) }
+            synchronized(inProgressSongIds) { inProgressSongIds.remove(entry.songId) }
             updateWifiLock()
             listener.onCacheDownloadComplete(entry)
         }
@@ -425,7 +426,7 @@ class FileCache internal constructor(
 
         // Is this download currently active, or has it been cancelled?
         private val isActive: Boolean
-            private get() = isDownloadActive(entry!!.songId)
+            get() = isDownloadActive(entry.songId)
 
         private inner class ProgressReporter internal constructor(private val entry: FileCacheEntry?) : Runnable {
             private var downloadedBytes: Long = 0
@@ -508,7 +509,7 @@ class FileCache internal constructor(
         val maxBytes = (java.lang.Long.valueOf(
                 prefs.getString(
                         NupPreferences.CACHE_SIZE,
-                        NupPreferences.CACHE_SIZE_DEFAULT))
+                        NupPreferences.CACHE_SIZE_DEFAULT)!!)
                 * 1024
                 * 1024)
         var availableBytes = maxBytes - totalCachedBytes
@@ -552,7 +553,7 @@ class FileCache internal constructor(
             handler!!.removeCallbacks(updateWifiLockTask!!)
             updateWifiLockTask = null
         }
-        var active = false
+        var active: Boolean
         synchronized(inProgressSongIds) { active = !inProgressSongIds.isEmpty() }
         if (active) {
             Log.d(TAG, "acquiring wifi lock")

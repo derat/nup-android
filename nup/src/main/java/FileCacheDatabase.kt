@@ -19,7 +19,7 @@ internal class FileCacheDatabase(context: Context, private val musicDir: String)
     private val updater: DatabaseUpdater
     private val updaterThread: Thread
     @Synchronized
-    private fun loadExistingEntries(context: Context) {
+    private fun loadExistingEntries() {
         Log.d(TAG, "loading cache entries")
         val cursor = opener.getDb()
                 .rawQuery(
@@ -65,7 +65,6 @@ internal class FileCacheDatabase(context: Context, private val musicDir: String)
 
     @Synchronized
     fun removeEntry(songId: Long) {
-        val entry = entries[songId] ?: return
         entries.remove(songId)
         updater.postUpdate("DELETE FROM CacheEntries WHERE SongId = ?", arrayOf<Any>(songId))
     }
@@ -191,7 +190,7 @@ internal class FileCacheDatabase(context: Context, private val musicDir: String)
         opener = DatabaseOpener(context, DATABASE_NAME, helper)
 
         // Block until we've loaded everything into memory.
-        loadExistingEntries(context)
+        loadExistingEntries()
         updater = DatabaseUpdater(opener)
         updaterThread = Thread(updater, "FileCacheDatabase.DatabaseUpdater")
         updaterThread.start()

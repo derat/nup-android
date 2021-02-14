@@ -80,10 +80,9 @@ internal object Util {
         // intact."
         // FAT: permits letters, numbers, spaces, and these characters: ! # $ % & ' ( ) - @ ^ _ ` {
         // } ~
-        var str = str
-        str = Uri.encode(str, " #$&@^`{}")
-        str = str.replace("*", "%2A")
-        return str
+        var esc = Uri.encode(str, " #$&@^`{}")
+        esc = esc.replace("*", "%2A")
+        return esc
     }
 
     // Find the position of a string in an array.  Returns -1 if it's not there.
@@ -101,31 +100,30 @@ internal object Util {
     // as sorting keys are cached in the database.
     @JvmStatic
     fun getSortingKey(str: String, sortType: Int): String {
-        var str = str
-        str = str.toLowerCase()
+        var key = str.toLowerCase()
         if (sortType == SORT_ARTIST) {
-            if (str == "[dialogue]" || str == "[no artist]" || str == "[unknown]") {
+            if (key == "[dialogue]" || key == "[no artist]" || key == "[unknown]") {
                 // Strings used by MusicBrainz and/or Picard.
-                return "!$str"
+                return "!$key"
             }
         } else if (sortType == SORT_ALBUM) {
-            if (str == "[non-album tracks]" || str == "[unset]") {
+            if (key == "[non-album tracks]" || key == "[unset]") {
                 // Strings used by MusicBrainz and/or Picard.
                 return "!$str"
-            } else if (str.startsWith("( )")) {
+            } else if (key.startsWith("( )")) {
                 // Weird album title.
-                return str
+                return key
             }
         }
 
         // Strip off leading punctuation, common articles, and other junk.
         val prefixes = arrayOf(" ", "\"", "'", "’", "(", "[", "<", "...", "a ", "an ", "the ")
         var start = 0
-        while (start < str.length) {
+        while (start < key.length) {
             var found = false
             for (i in prefixes.indices) {
                 val prefix = prefixes[i]
-                if (str.startsWith(prefix, start)) {
+                if (key.startsWith(prefix, start)) {
                     start += prefix.length
                     found = true
                     break
@@ -136,9 +134,9 @@ internal object Util {
             }
         }
         if (start > 0) {
-            str = str.substring(start)
+            key = key.substring(start)
         }
-        return str
+        return key
     }
 
     // Sort the supplied list by its keys.
