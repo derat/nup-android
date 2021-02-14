@@ -508,35 +508,23 @@ public class SongDatabase {
         List<Song> songs = new ArrayList<Song>();
         cursor.moveToFirst();
         while (!cursor.isAfterLast()) {
-            try {
-                Song song =
-                        new Song(
-                                cursor.getLong(0), // songId
-                                cursor.getString(1), // artist
-                                cursor.getString(2), // title
-                                cursor.getString(3), // album
-                                cursor.getString(4), // albumId
-                                cursor.getString(5), // url
-                                cursor.getString(6), // coverUrl
-                                cursor.getInt(7), // lengthSec
-                                cursor.getInt(8), // track
-                                cursor.getInt(9), // disc
-                                cursor.getFloat(10), // trackGain
-                                cursor.getFloat(11), // albumGain
-                                cursor.getFloat(12), // peakAmp
-                                cursor.getFloat(13)); // rating
-                songs.add(song);
-            } catch (MalformedURLException e) {
-                Log.d(
-                        TAG,
-                        "skipping song "
-                                + cursor.getLong(0)
-                                + " with malformed URL(s) \""
-                                + cursor.getString(5)
-                                + "\" and \""
-                                + cursor.getString(6)
-                                + "\"");
-            }
+            Song song =
+                    new Song(
+                            cursor.getLong(0), // songId
+                            cursor.getString(1), // artist
+                            cursor.getString(2), // title
+                            cursor.getString(3), // album
+                            cursor.getString(4), // albumId
+                            cursor.getString(5), // url
+                            cursor.getString(6), // coverUrl
+                            cursor.getInt(7), // lengthSec
+                            cursor.getInt(8), // track
+                            cursor.getInt(9), // disc
+                            cursor.getFloat(10), // trackGain
+                            cursor.getFloat(11), // albumGain
+                            cursor.getFloat(12), // peakAmp
+                            cursor.getFloat(13)); // rating
+            songs.add(song);
             cursor.moveToNext();
         }
         cursor.close();
