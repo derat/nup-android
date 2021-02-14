@@ -4,7 +4,7 @@ package org.erat.nup
 
 import java.io.File
 
-internal class FileCacheEntry(
+class FileCacheEntry(
         private val musicDir: String,
         @JvmField val songId: Long,
         var totalBytes: Long,

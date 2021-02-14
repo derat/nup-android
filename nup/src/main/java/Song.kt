@@ -6,7 +6,7 @@ import android.graphics.Bitmap
 import java.io.Serializable
 import java.net.URL
 
-internal class Song(
+class Song(
         @JvmField val id: Long,
         @JvmField val artist: String,
         @JvmField val title: String,
