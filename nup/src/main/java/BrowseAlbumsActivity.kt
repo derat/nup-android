@@ -53,8 +53,7 @@ class BrowseAlbumsActivity : BrowseActivityBase(), SongDatabaseUpdateListener {
     }
 
     override fun onListItemClick(listView: ListView, view: View, position: Int, id: Long) {
-        val row = rows[position] ?: return
-
+        val row = rows[position]
         // TODO: Right now, we show the full album by default instead of limiting it to songs by
         // |mArtist|. Decide if this makes sense.
         startBrowseSongsActivity(null, row.key.album, row.key.albumId, -1.0)
@@ -63,8 +62,7 @@ class BrowseAlbumsActivity : BrowseActivityBase(), SongDatabaseUpdateListener {
     override fun onCreateContextMenu(
             menu: ContextMenu, view: View, menuInfo: ContextMenuInfo) {
         val pos = (menuInfo as AdapterContextMenuInfo).position
-        val row = rows[pos]
-        if (row != null) menu.setHeaderTitle(row.key.album)
+        menu.setHeaderTitle(rows[pos].key.album)
         if (artist != null) {
             val msg = getString(R.string.browse_songs_by_artist_fmt, artist)
             menu.add(0, MENU_ITEM_BROWSE_SONGS_BY_ARTIST, 0, msg)
@@ -75,7 +73,7 @@ class BrowseAlbumsActivity : BrowseActivityBase(), SongDatabaseUpdateListener {
 
     override fun onContextItemSelected(item: MenuItem): Boolean {
         val info = item.menuInfo as AdapterContextMenuInfo
-        val row = rows[info.position] ?: return false
+        val row = rows[info.position]
         return when (item.itemId) {
             MENU_ITEM_BROWSE_SONGS_BY_ARTIST -> {
                 startBrowseSongsActivity(artist, row.key.album, row.key.albumId, -1.0)

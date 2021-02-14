@@ -35,7 +35,7 @@ class SearchFormActivity : Activity(), SongDatabaseUpdateListener {
         // When the album field gets the focus, set its suggestions based on the currently-entered
         // artist.
         albumEdit = findViewById<View>(R.id.album_edit_text) as AutoCompleteTextView
-        albumEdit!!.onFocusChangeListener = OnFocusChangeListener { v, hasFocus ->
+        albumEdit!!.onFocusChangeListener = OnFocusChangeListener { _, hasFocus ->
             if (hasFocus) {
                 val artist = artistEdit!!.text.toString()
                 val albums: MutableList<String> = ArrayList()
@@ -44,11 +44,7 @@ class SearchFormActivity : Activity(), SongDatabaseUpdateListener {
                         .getAlbumsSortedAlphabetically() else service!!
                         .songDb!!
                         .getAlbumsByArtist(artist)
-                if (albumsWithCounts != null) {
-                    for (stats in albumsWithCounts) {
-                        albums.add(stats.key.album)
-                    }
-                }
+                for (stats in albumsWithCounts) albums.add(stats.key.album)
                 albumEdit!!.setAdapter(
                         ArrayAdapter(
                                 this@SearchFormActivity,
@@ -84,13 +80,11 @@ class SearchFormActivity : Activity(), SongDatabaseUpdateListener {
         minRatingSpinner!!.setSelection(0, true)
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent) {
-        if (requestCode == RESULTS_REQUEST_CODE) {
-            if (resultCode == RESULT_OK) finish()
-        }
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        if (requestCode == RESULTS_REQUEST_CODE && resultCode == RESULT_OK) finish()
     }
 
-    fun onSearchButtonClicked(view: View?) {
+    fun onSearchButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
         val intent = Intent(this, SearchResultsActivity::class.java)
         intent.putExtra(
                 SearchResultsActivity.BUNDLE_ARTIST, artistEdit!!.text.toString().trim { it <= ' ' })
@@ -105,7 +99,7 @@ class SearchFormActivity : Activity(), SongDatabaseUpdateListener {
         startActivityForResult(intent, RESULTS_REQUEST_CODE)
     }
 
-    fun onResetButtonClicked(view: View?) {
+    fun onResetButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
         resetForm()
     }
 
@@ -113,9 +107,7 @@ class SearchFormActivity : Activity(), SongDatabaseUpdateListener {
     override fun onSongDatabaseUpdate() {
         val artists: MutableList<String> = ArrayList()
         val artistsWithCounts = service!!.songDb!!.getArtistsSortedByNumSongs()
-        if (artistsWithCounts != null) {
-            for (stats in artistsWithCounts) artists.add(stats.key.artist)
-        }
+        for (stats in artistsWithCounts) artists.add(stats.key.artist)
         artistEdit!!.setAdapter(
                 ArrayAdapter(
                         this@SearchFormActivity,

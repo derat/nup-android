@@ -16,10 +16,10 @@ import org.erat.nup.SongDatabase.SyncProgressListener
 import java.text.SimpleDateFormat
 import java.util.*
 
-internal class YesNoPreference : DialogPreference, SongDatabaseUpdateListener {
-    constructor(context: Context, attrs: AttributeSet?, defStyle: Int)
-            : super(context, attrs, defStyle)
-    
+internal class YesNoPreference(context: Context, attrs: AttributeSet?) :
+        DialogPreference(context, attrs),
+        SongDatabaseUpdateListener {
+
     override fun onDialogClosed(positiveResult: Boolean) {
         super.onDialogClosed(positiveResult)
         if (positiveResult) {
@@ -55,9 +55,7 @@ internal class YesNoPreference : DialogPreference, SongDatabaseUpdateListener {
                             R.plurals.sync_status_fmt,
                             db.numSongs,
                             db.numSongs,
-                            if (lastSyncWasToday) SimpleDateFormat.getTimeInstance()
-                                    .format(db.lastSyncDate) else SimpleDateFormat.getDateInstance()
-                                    .format(db.lastSyncDate))
+                            if (lastSyncWasToday) SimpleDateFormat.getTimeInstance().format(db.lastSyncDate!!) else SimpleDateFormat.getDateInstance().format(db.lastSyncDate!!))
         }
     }
 

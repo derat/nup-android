@@ -32,7 +32,7 @@ class CrashLogger private constructor(private val dir: File) : Thread.UncaughtEx
         } catch (e: IOException) {
             Log.e(TAG, "IO error: $e")
         }
-        defaultHandler.uncaughtException(thread, error)
+        defaultHandler?.uncaughtException(thread, error)
     }
 
     companion object {

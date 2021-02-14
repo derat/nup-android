@@ -7,11 +7,11 @@ internal class StatsKey(
         @JvmField val artist: String,
         @JvmField val album: String,
         @JvmField val albumId: String) {
-    override fun equals(o: Any?): Boolean {
-        if (this === o) return true
-        if (o == null) return false
-        if (javaClass != o.javaClass) return false
-        val ok = o as StatsKey
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other == null) return false
+        if (javaClass != other.javaClass) return false
+        val ok = other as StatsKey
         return ok.artist === artist && ok.album === album && ok.albumId === albumId
     }
 

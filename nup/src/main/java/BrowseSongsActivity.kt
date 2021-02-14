@@ -135,7 +135,7 @@ class BrowseSongsActivity : Activity(), OnItemClickListener {
             menu: ContextMenu, view: View, menuInfo: ContextMenuInfo) {
         if (view.id == R.id.songs) {
             val info = menuInfo as AdapterContextMenuInfo
-            val song = songs[info.position] ?: return
+            val song = songs[info.position]
             menu.setHeaderTitle(song.title)
             menu.add(0, MENU_ITEM_PLAY, 0, R.string.play)
             menu.add(0, MENU_ITEM_INSERT, 0, R.string.insert)
@@ -146,7 +146,7 @@ class BrowseSongsActivity : Activity(), OnItemClickListener {
 
     override fun onContextItemSelected(item: MenuItem): Boolean {
         val info = item.menuInfo as AdapterContextMenuInfo
-        val song = songs[info.position] ?: return false
+        val song = songs[info.position]
         return when (item.itemId) {
             MENU_ITEM_PLAY -> {
                 service!!.addSongToPlaylist(song, true)
@@ -170,7 +170,7 @@ class BrowseSongsActivity : Activity(), OnItemClickListener {
 
     // Implements AdapterView.OnItemClickListener.
     override fun onItemClick(parent: AdapterView<*>?, view: View, position: Int, id: Long) {
-        val song = songs[position] ?: return
+        val song = songs[position]
         service!!.appendSongToPlaylist(song)
         Toast.makeText(this, getString(R.string.appended_song_fmt, song.title), Toast.LENGTH_SHORT)
                 .show()
@@ -185,21 +185,21 @@ class BrowseSongsActivity : Activity(), OnItemClickListener {
         if (id == DIALOG_SONG_DETAILS) prepareDialog(dialog, args)
     }
 
-    fun onAppendButtonClicked(view: View?) {
+    fun onAppendButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
         if (songs.isEmpty()) return
         service!!.appendSongsToPlaylist(songs)
         setResult(RESULT_OK)
         finish()
     }
 
-    fun onInsertButtonClicked(view: View?) {
+    fun onInsertButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
         if (songs.isEmpty()) return
         service!!.addSongsToPlaylist(songs, false)
         setResult(RESULT_OK)
         finish()
     }
 
-    fun onReplaceButtonClicked(view: View?) {
+    fun onReplaceButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
         if (songs.isEmpty()) return
         service!!.clearPlaylist()
         service!!.appendSongsToPlaylist(songs)

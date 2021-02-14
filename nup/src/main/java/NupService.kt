@@ -49,7 +49,7 @@ internal class NupService : Service(), Player.Listener, FileCache.Listener, Song
         fun onSongCoverLoad(song: Song?)
 
         // Invoked when the current set of songs to be played changes.
-        fun onPlaylistChange(songs: List<Song>?)
+        fun onPlaylistChange(songs: List<Song>)
     }
 
     // Listener for the song database's aggregate data being updated.
@@ -112,7 +112,7 @@ internal class NupService : Service(), Player.Listener, FileCache.Listener, Song
     private var shouldDownloadAll = false
 
     // Current playlist.
-    private val songs: MutableList<Song> = ArrayList()
+    private val songs = ArrayList<Song>()
 
     // Index of the song in |mSongs| that's being played.
     var currentSongIndex = -1
@@ -786,11 +786,10 @@ internal class NupService : Service(), Player.Listener, FileCache.Listener, Song
     // Plays the first one, if no song is already playing or if we were previously at the end of the
     // playlist and we've appended to it. Returns true if we started playing.
     private fun insertSongs(insSongs: List<Song>, index: Int): Boolean {
-        var insSongs = insSongs
         if (index < 0 || index > songs.size) {
             Log.e(
                     TAG,
-                    "ignoring request to insert " + insSongs.size + " song(s) at index " + index)
+                    "ignoring request to insert ${insSongs.size} song(s) at index $index")
             return false
         }
 
@@ -799,32 +798,32 @@ internal class NupService : Service(), Player.Listener, FileCache.Listener, Song
         val newSongs = ArrayList<Song>()
 
         // Use our own version of each song if we have it already.
-        val tmpSongs = ArrayList<Song>()
+        val resSongs = ArrayList<Song>()
         for (song in insSongs) {
             val ourSong = songIdToSong[song.id]
             if (ourSong != null) {
-                tmpSongs.add(ourSong)
+                resSongs.add(ourSong)
             } else {
-                tmpSongs.add(song)
+                resSongs.add(song)
                 newSongs.add(song)
             }
         }
-        insSongs = tmpSongs
-        songs.addAll(index, insSongs)
+
+        songs.addAll(index, resSongs)
         if (currentSongIndex >= 0 && index <= currentSongIndex) {
-            currentSongIndex += insSongs.size
+            currentSongIndex += resSongs.size
         }
         if (downloadIndex >= 0 && index <= downloadIndex) {
-            downloadIndex += insSongs.size
+            downloadIndex += resSongs.size
         }
-        if (songListener != null) songListener!!.onPlaylistChange(songs)
+        songListener?.onPlaylistChange(songs)
         mediaSessionManager!!.updatePlaylist(songs)
         for (song in newSongs) {
             songIdToSong[song.id] = song
             val entry = cache!!.getEntry(song.id)
             if (entry != null) {
                 song.updateBytes(entry)
-                if (songListener != null) songListener!!.onSongFileSizeChange(song)
+                songListener?.onSongFileSizeChange(song)
             }
         }
         var played = false
@@ -878,20 +877,18 @@ internal class NupService : Service(), Player.Listener, FileCache.Listener, Song
     }
 
     // Try to download the next not-yet-downloaded song in the playlist.
-    private fun maybeDownloadAnotherSong(index: Int) {
-        var index = index
+    private fun maybeDownloadAnotherSong(startIndex: Int) {
         if (downloadSongId != -1L) {
             Log.e(
                     TAG,
-                    "aborting prefetch since download of song "
-                            + downloadSongId
-                            + " is still in progress")
+                    "aborting prefetch since download of song $downloadSongId is still in progress")
             return
         }
         val songsToPreload = Integer.valueOf(
                 prefs!!.getString(
                         NupPreferences.SONGS_TO_PRELOAD,
-                        NupPreferences.SONGS_TO_PRELOAD_DEFAULT))
+                        NupPreferences.SONGS_TO_PRELOAD_DEFAULT)!!)
+        var index = startIndex
         while (index < songs.size
                 && (shouldDownloadAll || index - currentSongIndex <= songsToPreload)) {
             val song = songs[index]
@@ -903,12 +900,10 @@ internal class NupService : Service(), Player.Listener, FileCache.Listener, Song
                 index++
                 continue
             }
-            entry = cache!!.downloadSong(song)
             downloadSongId = song.id
             downloadIndex = index
             cache!!.pinSongId(song.id)
             fetchCoverForSongIfMissing(song)
-            return
             index++
         }
     }

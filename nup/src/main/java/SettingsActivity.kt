@@ -96,7 +96,7 @@ class SettingsActivity : PreferenceActivity(), OnPreferenceChangeListener {
             return true
         } else if (pref.key == NupPreferences.PRE_AMP_GAIN) {
             return try {
-                val gain: Double = (value as String)?.toDouble()
+                val gain: Double = (value as String).toDouble()
                 findPreference(NupPreferences.PRE_AMP_GAIN).summary = getString(R.string.pre_amp_gain_value, gain)
                 true
             } catch (e: NumberFormatException) {

@@ -29,7 +29,7 @@ open class BrowseActivityBase : ListActivity() {
         }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent) {
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (resultCode == RESULT_OK) {
             setResult(RESULT_OK)
             finish()

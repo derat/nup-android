@@ -30,6 +30,6 @@ internal class DatabaseUpdater(private val opener: DatabaseOpener) : Runnable {
     }
 
     fun postUpdate(sql: String?, values: Array<Any>?) {
-        handler!!.post { opener.getDb()!!.execSQL(sql, values) }
+        handler!!.post { opener.getDb().execSQL(sql, values) }
     }
 }

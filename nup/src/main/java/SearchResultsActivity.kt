@@ -175,19 +175,19 @@ class SearchResultsActivity : Activity() {
         if (id == DIALOG_SONG_DETAILS) prepareDialog(dialog, args)
     }
 
-    fun onAppendButtonClicked(view: View?) {
+    fun onAppendButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
         service!!.appendSongsToPlaylist(songs)
         setResult(RESULT_OK)
         finish()
     }
 
-    fun onInsertButtonClicked(view: View?) {
+    fun onInsertButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
         service!!.addSongsToPlaylist(songs, false)
         setResult(RESULT_OK)
         finish()
     }
 
-    fun onReplaceButtonClicked(view: View?) {
+    fun onReplaceButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
         service!!.clearPlaylist()
         service!!.appendSongsToPlaylist(songs)
         setResult(RESULT_OK)

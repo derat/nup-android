@@ -46,7 +46,7 @@ internal class NupActivity : Activity(), SongListener {
     private var lastSongPositionSec = -1
 
     // Songs in the current playlist.
-    private var songs: List<Song>? = ArrayList()
+    private var songs: List<Song> = ArrayList<Song>()
 
     // Position in |songs| of the song that we're currently displaying.
     private var currentSongIndex = -1
@@ -130,7 +130,7 @@ internal class NupActivity : Activity(), SongListener {
             }
 
             // TODO: Go to prefs page if server and account are unset.
-            if (songs!!.isEmpty()) {
+            if (songs.isEmpty()) {
                 startActivity(Intent(this@NupActivity, BrowseTopActivity::class.java))
             }
         }
@@ -141,19 +141,19 @@ internal class NupActivity : Activity(), SongListener {
         }
     }
 
-    fun onPauseButtonClicked(view: View?) {
+    fun onPauseButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
         service!!.togglePause()
     }
 
-    fun onPrevButtonClicked(view: View?) {
+    fun onPrevButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
         if (currentSongIndex <= 0) return
         service!!.stopPlaying()
         updateCurrentSongIndex(currentSongIndex - 1)
         schedulePlaySongTask(SONG_CHANGE_DELAY_MS)
     }
 
-    fun onNextButtonClicked(view: View?) {
-        if (currentSongIndex >= songs!!.size - 1) return
+    fun onNextButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
+        if (currentSongIndex >= songs.size - 1) return
         service!!.stopPlaying()
         updateCurrentSongIndex(currentSongIndex + 1)
         schedulePlaySongTask(SONG_CHANGE_DELAY_MS)
@@ -180,8 +180,8 @@ internal class NupActivity : Activity(), SongListener {
     }
 
     // Implements NupService.SongListener.
-    override fun onPauseStateChange(isPaused: Boolean) {
-        runOnUiThread { pauseButton!!.text = getString(if (isPaused) R.string.play else R.string.pause) }
+    override fun onPauseStateChange(paused: Boolean) {
+        runOnUiThread { pauseButton!!.text = getString(if (paused) R.string.play else R.string.pause) }
     }
 
     // Implements NupService.SongListener.
@@ -193,10 +193,10 @@ internal class NupActivity : Activity(), SongListener {
     }
 
     // Implements NupService.SongListener.
-    override fun onPlaylistChange(newSongs: List<Song>?) {
+    override fun onPlaylistChange(songs: List<Song>) {
         runOnUiThread {
-            songs = newSongs
-            findViewById<View>(R.id.playlist_heading).visibility = if (songs!!.isEmpty()) View.INVISIBLE else View.VISIBLE
+            this.songs = songs
+            findViewById<View>(R.id.playlist_heading).visibility = if (this.songs.isEmpty()) View.INVISIBLE else View.VISIBLE
             updateCurrentSongIndex(service!!.currentSongIndex)
         }
     }
@@ -298,7 +298,7 @@ internal class NupActivity : Activity(), SongListener {
     // Adapts our information about the current playlist and song for the song list view.
     private inner class SongListAdapter : BaseAdapter() {
         override fun getCount(): Int {
-            return songs!!.size
+            return songs.size
         }
 
         override fun getItem(position: Int): Any {
@@ -309,9 +309,8 @@ internal class NupActivity : Activity(), SongListener {
             return position.toLong()
         }
 
-        override fun getView(position: Int, convertView: View, parent: ViewGroup): View {
-            val view: View
-            view = if (convertView != null) {
+        override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
+            val view = if (convertView != null) {
                 convertView
             } else {
                 val inflater = getSystemService(LAYOUT_INFLATER_SERVICE) as LayoutInflater
@@ -320,15 +319,14 @@ internal class NupActivity : Activity(), SongListener {
             val artistView = view.findViewById<View>(R.id.artist) as TextView
             val titleView = view.findViewById<View>(R.id.title) as TextView
             val percentView = view.findViewById<View>(R.id.percent) as TextView
-            val song = songs!![position]
+            val song = songs[position]
             artistView.text = song.artist
             titleView.text = song.title
             if (song.totalBytes > 0) {
                 if (song.availableBytes == song.totalBytes) percentView.text = "\u2713" // CHECK MARK from Dingbats
-                else percentView.setText((Math.round(100.0
+                else percentView.setText(Math.round(100.0
                         * song.availableBytes
-                        / song.totalBytes) as Int)
-                .toString() + "%")
+                        / song.totalBytes).toInt().toString() + "%")
                 percentView.visibility = View.VISIBLE
             } else {
                 percentView.visibility = View.GONE
@@ -355,7 +353,7 @@ internal class NupActivity : Activity(), SongListener {
             menu: ContextMenu, view: View, menuInfo: ContextMenuInfo) {
         if (view.id == R.id.playlist) {
             val info = menuInfo as AdapterContextMenuInfo
-            val song = songs!![info.position]
+            val song = songs[info.position]
             menu.setHeaderTitle(song.title)
             menu.add(0, MENU_ITEM_PLAY, 0, R.string.play)
             menu.add(0, MENU_ITEM_REMOVE_FROM_LIST, 0, R.string.remove_from_list)
@@ -366,7 +364,7 @@ internal class NupActivity : Activity(), SongListener {
 
     override fun onContextItemSelected(item: MenuItem): Boolean {
         val info = item.menuInfo as AdapterContextMenuInfo
-        val song = songs!![info.position]
+        val song = songs[info.position]
         return when (item.itemId) {
             MENU_ITEM_PLAY -> {
                 updateCurrentSongIndex(info.position)
@@ -378,11 +376,11 @@ internal class NupActivity : Activity(), SongListener {
                 true
             }
             MENU_ITEM_TRUNCATE_LIST -> {
-                service!!.removeRangeFromPlaylist(info.position, songs!!.size - 1)
+                service!!.removeRangeFromPlaylist(info.position, songs.size - 1)
                 true
             }
             MENU_ITEM_SONG_DETAILS -> {
-                if (song != null) showDialog(DIALOG_SONG_DETAILS, createBundle(song))
+                showDialog(DIALOG_SONG_DETAILS, createBundle(song))
                 true
             }
             else -> false
@@ -399,8 +397,8 @@ internal class NupActivity : Activity(), SongListener {
     }
 
     private val currentSong: Song?
-        private get() = if (currentSongIndex >= 0 && currentSongIndex < songs!!.size) {
-            songs!![currentSongIndex]
+        get() = if (currentSongIndex >= 0 && currentSongIndex < songs.size) {
+            songs[currentSongIndex]
         } else null
 
     private fun updateCurrentSongIndex(index: Int) {
@@ -408,8 +406,8 @@ internal class NupActivity : Activity(), SongListener {
         updateSongDisplay(currentSong)
         songListAdapter.notifyDataSetChanged()
         prevButton!!.isEnabled = currentSongIndex > 0
-        nextButton!!.isEnabled = !songs!!.isEmpty() && currentSongIndex < songs!!.size - 1
-        pauseButton!!.isEnabled = !songs!!.isEmpty()
+        nextButton!!.isEnabled = !songs.isEmpty() && currentSongIndex < songs.size - 1
+        pauseButton!!.isEnabled = !songs.isEmpty()
     }
 
     private fun schedulePlaySongTask(delayMs: Int) {

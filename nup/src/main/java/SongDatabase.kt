@@ -244,7 +244,7 @@ internal class SongDatabase(
             // starting point for the next sync, to handle the case where some songs in the server
             // are updated while we're doing this sync.
             val startTimeStr = downloader.downloadString("/now_nsec", message) ?: return false
-            var startTimeNsec: Long = 0
+            var startTimeNsec: Long
             try {
                 startTimeNsec = java.lang.Long.valueOf(startTimeStr)
             } catch (e: NumberFormatException) {
@@ -796,7 +796,7 @@ internal class SongDatabase(
                 } finally {
                     db.endTransaction()
                 }
-                return null as Void?
+                return null
             }
         }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR)
         updater = DatabaseUpdater(opener)

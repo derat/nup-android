@@ -46,15 +46,13 @@ class BrowseArtistsActivity : BrowseActivityBase(), SongDatabaseUpdateListener {
     }
 
     override fun onListItemClick(listView: ListView, view: View, position: Int, id: Long) {
-        val row = rows[position] ?: return
-        startBrowseAlbumsActivity(row.key.artist)
+        startBrowseAlbumsActivity(rows[position].key.artist)
     }
 
     override fun onCreateContextMenu(
             menu: ContextMenu, view: View, menuInfo: ContextMenuInfo) {
         val pos = (menuInfo as AdapterContextMenuInfo).position
-        val row = rows[pos]
-        if (row != null) menu.setHeaderTitle(row.key.artist)
+        menu.setHeaderTitle(rows[pos].key.artist)
         menu.add(0, MENU_ITEM_BROWSE_SONGS_WITH_RATING, 0, R.string.browse_songs_four_stars)
         menu.add(0, MENU_ITEM_BROWSE_SONGS, 0, R.string.browse_songs)
         menu.add(0, MENU_ITEM_BROWSE_ALBUMS, 0, R.string.browse_albums)
@@ -62,7 +60,7 @@ class BrowseArtistsActivity : BrowseActivityBase(), SongDatabaseUpdateListener {
 
     override fun onContextItemSelected(item: MenuItem): Boolean {
         val info = item.menuInfo as AdapterContextMenuInfo
-        val row = rows[info.position] ?: return false
+        val row = rows[info.position]
         return when (item.itemId) {
             MENU_ITEM_BROWSE_SONGS_WITH_RATING -> {
                 startBrowseSongsActivity(row.key.artist, 0.75)
