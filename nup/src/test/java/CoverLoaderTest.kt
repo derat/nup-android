@@ -11,7 +11,6 @@ import org.junit.After
 import org.junit.Assert
 import org.junit.Before
 import org.junit.Test
-import org.mockito.Matchers
 import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.MockitoAnnotations
@@ -29,15 +28,11 @@ class CoverLoaderTest {
     private var mTempDir: File? = null
     private var mCoverLoader: CoverLoader? = null
 
-    @Mock
-    private val mDownloader: Downloader? = null
-
-    @Mock
-    private val mBitmapDecoder: BitmapDecoder? = null
-
-    @Mock
-    private val mNetworkHelper: NetworkHelper? = null
+    @Mock private val mDownloader: Downloader? = null
+    @Mock private val mBitmapDecoder: BitmapDecoder? = null
+    @Mock private val mNetworkHelper: NetworkHelper? = null
     var mBitmapDataMap: HashMap<String, Bitmap>? = null
+
     @Before
     @Throws(Exception::class)
     fun setUp() {
@@ -45,13 +40,12 @@ class CoverLoaderTest {
         mTaskRunner = FakeTaskRunner()
         mTempDir = Files.createTempDir()
         mBitmapDataMap = HashMap()
-        Mockito.`when`(mBitmapDecoder!!.decodeFile(Matchers.any(File::class.java)))
+        Mockito.`when`(mBitmapDecoder!!.decodeFile(MockitoHelper.anyObject()))
                 .thenAnswer(
                         Answer<Any?> { invocation ->
                             var inputStream: FileInputStream? = null
                             try {
-                                inputStream = FileInputStream(
-                                        invocation.arguments[0] as File)
+                                inputStream = FileInputStream(invocation.arguments[0] as File)
                                 val fileData = getStringFromInputStream(inputStream)
                                 return@Answer mBitmapDataMap!![fileData]
                             } catch (e: IOException) {
@@ -65,7 +59,7 @@ class CoverLoaderTest {
                                 }
                             }
                         })
-        mCoverLoader = CoverLoader(mTempDir, mDownloader!!, mTaskRunner!!, mBitmapDecoder, mNetworkHelper!!)
+        mCoverLoader = CoverLoader(mTempDir!!, mDownloader!!, mTaskRunner!!, mBitmapDecoder, mNetworkHelper!!)
     }
 
     @After
@@ -110,7 +104,7 @@ class CoverLoaderTest {
         val COVER_URL = URL("https://www.example.com/cover.jpg")
         Mockito.`when`(mNetworkHelper!!.isNetworkAvailable).thenReturn(false)
         Assert.assertNull(mCoverLoader!!.loadCover(COVER_URL))
-        Mockito.verify(mDownloader, Mockito.never()).download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null)
+        Mockito.verify(mDownloader!!, Mockito.never()).download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null)
     }
 
     @Test
@@ -149,7 +143,7 @@ class CoverLoaderTest {
         Assert.assertEquals(BITMAP, mCoverLoader!!.loadCover(COVER_URL))
 
         // The file should've only been decoded once.
-        Mockito.verify(mBitmapDecoder, Mockito.times(1)).decodeFile(Matchers.any(File::class.java))
+        Mockito.verify(mBitmapDecoder!!, Mockito.times(1)).decodeFile(MockitoHelper.anyObject())
     }
 
     @Throws(Exception::class)

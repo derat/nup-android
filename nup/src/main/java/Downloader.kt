@@ -13,7 +13,8 @@ import java.net.SocketTimeoutException
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 
-internal class Downloader(
+// TODO: Make this non-open if possible after switching to Robolectric.
+internal open class Downloader(
         private val authenticator: Authenticator,
         private val prefs: SharedPreferences) {
     /* Thrown when the request couldn't be constructed because some preferences that we need are

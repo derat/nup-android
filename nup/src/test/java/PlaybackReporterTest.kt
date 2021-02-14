@@ -16,7 +16,7 @@ import java.util.*
 
 class PlaybackReporterTest {
     private val SONG_ID: Long = 1234
-    private val START_DATE = Date(1000 * 1469974953)
+    private val START_DATE = Date(1000 * 1469974953L)
 
     @Mock
     private val mSongDb: SongDatabase? = null
@@ -74,7 +74,7 @@ class PlaybackReporterTest {
     fun deferReportWhenNetworkUnavailable() {
         Mockito.`when`(mNetworkHelper!!.isNetworkAvailable).thenReturn(false)
         val reporter = createReporter()
-        Mockito.verify(mSongDb, Mockito.never()).allPendingPlaybackReports
+        Mockito.verify(mSongDb!!, Mockito.never()).allPendingPlaybackReports
         reporter.report(SONG_ID, START_DATE)
         Mockito.verify(mSongDb).addPendingPlaybackReport(SONG_ID, START_DATE)
         Mockito.verifyNoMoreInteractions(mDownloader)
@@ -106,7 +106,7 @@ class PlaybackReporterTest {
                         Arrays.asList(PendingPlaybackReport(SONG_ID, START_DATE)))
         Mockito.`when`(mDownloader!!.download(mReportUrl!!, "POST", Downloader.AuthType.SERVER, null))
                 .thenReturn(mSuccessConn)
-        val reporter = createReporter()
+        createReporter()
         val inOrder = Mockito.inOrder(mSongDb, mDownloader)
         inOrder.verify(mDownloader).download(mReportUrl!!, "POST", Downloader.AuthType.SERVER, null)
         inOrder.verify(mSongDb).removePendingPlaybackReport(SONG_ID, START_DATE)
@@ -118,7 +118,7 @@ class PlaybackReporterTest {
         Mockito.`when`(mNetworkHelper!!.isNetworkAvailable).thenReturn(true)
         val reporter = createReporter()
         val OLD_SONG_ID: Long = 456
-        val OLD_START_DATE = Date(1000 * 1470024671)
+        val OLD_START_DATE = Date(1000 * 1470024671L)
         val OLD_REPORT_PATH = getReportPath(OLD_SONG_ID, OLD_START_DATE)
         val OLD_REPORT_URL = getReportURL(OLD_REPORT_PATH)
         Mockito.`when`(mDownloader!!.getServerUrl(OLD_REPORT_PATH)).thenReturn(OLD_REPORT_URL)
@@ -143,7 +143,7 @@ class PlaybackReporterTest {
 
         // Now send a new report and let both it and the previous one succeed.
         val NEW_SONG_ID: Long = 789
-        val NEW_START_DATE = Date(1000 * 1470024251)
+        val NEW_START_DATE = Date(1000 * 1470024251L)
         val NEW_REPORT_PATH = getReportPath(NEW_SONG_ID, NEW_START_DATE)
         val NEW_REPORT_URL = getReportURL(NEW_REPORT_PATH)
         Mockito.`when`(mDownloader.getServerUrl(NEW_REPORT_PATH)).thenReturn(NEW_REPORT_URL)

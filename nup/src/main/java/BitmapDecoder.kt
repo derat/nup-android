@@ -7,7 +7,8 @@ import android.graphics.BitmapFactory
 import java.io.File
 
 /** Wrapper around BitmapFactory to permit use in unit tests.  */
-class BitmapDecoder {
+// TODO: Make this non-open if possible after switching to Robolectric.
+public open class BitmapDecoder {
     /**
      * Decodes a file to a bitmap.
      *

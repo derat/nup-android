@@ -5,7 +5,8 @@ package org.erat.nup
 import android.content.Context
 import android.net.ConnectivityManager
 
-class NetworkHelper(context: Context) {
+// TODO: Make this non-open if possible after switching to Robolectric.
+open class NetworkHelper(context: Context) {
     private val connectivityManager: ConnectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
     // Is a network connection currently available?
