@@ -13,21 +13,21 @@ $ gradle assembleDebug
 ## Installing
 
 ```
-$ adb -d install -r /path/to/nup-android/nup/build/outputs/apk/nup-debug.apk
+$ adb install -r /path/to/nup-android/nup/build/outputs/apk/debug/nup-debug.apk
 ```
 
 ## Debugging
 
-Watch spammy logs:
+Watch logs:
 
 ```
-$ adb -d logcat
+$ adb logcat --pid=$(adb shell pidof -s org.erat.nup)
 ```
 
 Copy database off device:
 
 ```
-$ adb -d shell "run-as org.erat.nup cat databases/NupSongs" >NupSongs
+$ adb shell "run-as org.erat.nup cat databases/NupSongs" >NupSongs
 ```
 
 (Sigh: `sqlite3` isn't installed on production devices, the normal `adb shell`
