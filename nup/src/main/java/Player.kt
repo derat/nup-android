@@ -18,7 +18,7 @@ import java.io.IOException
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
 
-internal class Player(
+class Player(
         private val context: Context,
         // Notified when things change.
         private val listener: Listener,
@@ -27,7 +27,7 @@ internal class Player(
         // Attributes describing audio files to be played.
         private val attrs: AudioAttributes,
         preAmpGain: Double) : Runnable, OnCompletionListener, MediaPlayer.OnErrorListener {
-    internal interface Listener {
+    interface Listener {
         // Invoked on completion of the currently-playing file.
         fun onPlaybackComplete()
 

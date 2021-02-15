@@ -15,7 +15,7 @@ import android.util.Log
 // mode violations about leaked database cursors that make me suspect that SQLiteOpenHelper is
 // closing
 // its writable handle in the background at times (the docs don't mention this).
-internal class DatabaseOpener(private val context: Context, private val databaseName: String, private val openHelper: SQLiteOpenHelper) {
+class DatabaseOpener(private val context: Context, private val databaseName: String, private val openHelper: SQLiteOpenHelper) {
     private var db: SQLiteDatabase? = null
 
     // Opens and returns a database.  The caller shouldn't call close() on the object, since it's

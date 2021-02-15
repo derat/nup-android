@@ -3,7 +3,7 @@
 package org.erat.nup
 
 // Holds song count for a specific key.
-internal class StatsRow(
+class StatsRow(
         @JvmField val key: StatsKey,
         @JvmField var count: Int) {
     constructor(artist: String?, album: String?, albumId: String?, count: Int)

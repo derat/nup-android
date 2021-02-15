@@ -15,7 +15,7 @@ import java.io.IOException
 
 // Utility class for doing Oauth2 authenticate to read from Google Cloud Storage on behalf of the
 // configure account.
-internal class Authenticator(private val context: Context) {
+class Authenticator(private val context: Context) {
     class AuthException(reason: String?) : Exception(reason)
 
     @get:Throws(AuthException::class)

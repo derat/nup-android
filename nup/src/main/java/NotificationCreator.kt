@@ -14,7 +14,7 @@ import android.app.NotificationChannel
 import android.content.Context
 import android.os.Build
 
-internal class NotificationCreator(
+class NotificationCreator(
         private val context: Context,
         manager: NotificationManager,
         private val mediaSessionToken: MediaSession.Token,

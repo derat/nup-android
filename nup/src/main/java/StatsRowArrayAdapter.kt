@@ -10,7 +10,7 @@ import android.widget.TextView
 import org.erat.nup.Util.getSortingKey
 import java.util.*
 
-internal class StatsRowArrayAdapter(
+class StatsRowArrayAdapter(
         context: Context?,
         textViewResourceId: Int,
         // Rows to display.

@@ -15,7 +15,7 @@ import java.util.*
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 
-internal class CoverLoader(
+class CoverLoader(
         // Application-specific cache dir (not including DIR_NAME).
         private val cacheDir: File,
         private val downloader: Downloader,

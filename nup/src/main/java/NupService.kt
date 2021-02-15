@@ -30,7 +30,7 @@ import org.erat.nup.Util.assertOnMainThread
 import java.io.File
 import java.util.*
 
-internal class NupService : Service(), Player.Listener, FileCache.Listener, SongDatabase.Listener {
+class NupService : Service(), Player.Listener, FileCache.Listener, SongDatabase.Listener {
     interface SongListener {
         // Invoked when we switch to a new track in the playlist.
         fun onSongChange(song: Song?, index: Int)

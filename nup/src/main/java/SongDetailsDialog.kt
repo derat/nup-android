@@ -12,7 +12,7 @@ import org.erat.nup.Util.formatDurationString
 
 // Static methods for activities that want to display dialogs showing
 // the details of Song objects.
-internal object SongDetailsDialog {
+object SongDetailsDialog {
     private const val BUNDLE_ARTIST = "artist"
     private const val BUNDLE_TITLE = "title"
     private const val BUNDLE_ALBUM = "album"

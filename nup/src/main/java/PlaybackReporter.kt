@@ -8,7 +8,7 @@ import java.net.HttpURLConnection
 import java.util.*
 import java.util.concurrent.locks.ReentrantLock
 
-internal class PlaybackReporter(
+class PlaybackReporter(
         private val songDb: SongDatabase,
         private val downloader: Downloader,
         private val taskRunner: TaskRunner,

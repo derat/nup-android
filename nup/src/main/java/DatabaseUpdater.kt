@@ -5,7 +5,7 @@ package org.erat.nup
 import android.os.Handler
 import android.os.Looper
 
-internal class DatabaseUpdater(private val opener: DatabaseOpener) : Runnable {
+class DatabaseUpdater(private val opener: DatabaseOpener) : Runnable {
     private var handler: Handler? = null
     private var shouldQuit = false
     override fun run() {

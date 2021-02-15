@@ -3,7 +3,7 @@
 package org.erat.nup
 
 // Key for song counts. Fields may be empty.
-internal class StatsKey(
+class StatsKey(
         @JvmField val artist: String,
         @JvmField val album: String,
         @JvmField val albumId: String) {

@@ -23,12 +23,12 @@ import java.util.*
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 
-class FileCache internal constructor(
+class FileCache constructor(
         private val context: Context,
         private val listener: Listener,
         private val downloader: Downloader,
         private val networkHelper: NetworkHelper) : Runnable {
-    internal interface Listener {
+    interface Listener {
         fun onCacheDownloadError(entry: FileCacheEntry?, reason: String?)
         fun onCacheDownloadFail(entry: FileCacheEntry?, reason: String?)
         fun onCacheDownloadProgress(entry: FileCacheEntry?, downloadedBytes: Long, elapsedMs: Long)

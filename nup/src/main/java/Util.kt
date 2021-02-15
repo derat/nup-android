@@ -12,7 +12,7 @@ import java.io.InputStream
 import java.io.InputStreamReader
 import java.util.*
 
-internal object Util {
+object Util {
     private const val TRUNCATION_STRING = "..."
 
     // Different sort types that can be passed to getSortingKey().

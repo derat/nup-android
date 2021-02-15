@@ -16,7 +16,7 @@ import org.json.JSONException
 import org.json.JSONTokener
 import java.util.*
 
-internal class SongDatabase(
+class SongDatabase(
         private val context: Context,
         private val listener: Listener,
         private val cache: FileCache,

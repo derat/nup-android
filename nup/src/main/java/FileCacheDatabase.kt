@@ -9,7 +9,7 @@ import android.util.Log
 import java.io.File
 import java.util.*
 
-internal class FileCacheDatabase(context: Context, private val musicDir: String) {
+class FileCacheDatabase(context: Context, private val musicDir: String) {
     private val opener: DatabaseOpener
 
     // Map from an entry's song ID to the entry itself.

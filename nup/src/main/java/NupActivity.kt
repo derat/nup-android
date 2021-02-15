@@ -28,7 +28,7 @@ import org.erat.nup.SongDetailsDialog.prepareDialog
 import org.erat.nup.Util.formatDurationProgressString
 import java.util.*
 
-internal class NupActivity : Activity(), SongListener {
+class NupActivity : Activity(), SongListener {
     // UI components that we update dynamically.
     private var pauseButton: Button? = null
     private var prevButton: Button? = null

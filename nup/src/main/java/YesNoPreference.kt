@@ -16,7 +16,7 @@ import org.erat.nup.SongDatabase.SyncProgressListener
 import java.text.SimpleDateFormat
 import java.util.*
 
-internal class YesNoPreference(context: Context, attrs: AttributeSet?) :
+class YesNoPreference(context: Context, attrs: AttributeSet?) :
         DialogPreference(context, attrs),
         SongDatabaseUpdateListener {
 

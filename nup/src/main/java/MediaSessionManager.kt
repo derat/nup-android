@@ -11,7 +11,7 @@ import android.media.session.MediaSession.QueueItem
 import android.media.session.PlaybackState
 import java.util.*
 
-class MediaSessionManager internal constructor(context: Context?, callback: MediaSession.Callback?) {
+class MediaSessionManager constructor(context: Context?, callback: MediaSession.Callback?) {
     private val session: MediaSession
     fun cleanUp() {
         session.release()
