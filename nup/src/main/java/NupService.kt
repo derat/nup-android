@@ -900,6 +900,7 @@ internal class NupService : Service(), Player.Listener, FileCache.Listener, Song
                 index++
                 continue
             }
+            entry = cache!!.downloadSong(song)
             downloadSongId = song.id
             downloadIndex = index
             cache!!.pinSongId(song.id)
