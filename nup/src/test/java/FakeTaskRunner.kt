@@ -1,5 +1,8 @@
-// Copyright 2016 Daniel Erat <dan@erat.org>
-// All rights reserved.
+/*
+ * Copyright 2016 Daniel Erat <dan@erat.org>
+ * All rights reserved.
+ */
+
 package org.erat.nup.test
 
 import org.erat.nup.TaskRunner

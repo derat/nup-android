@@ -1,3 +1,8 @@
+/*
+ * Copyright 2021 Daniel Erat <dan@erat.org>
+ * All rights reserved.
+ */
+
 package org.erat.nup
 
 import android.content.Context

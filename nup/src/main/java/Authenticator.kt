@@ -1,5 +1,8 @@
-// Copyright 2014 Daniel Erat <dan@erat.org>
-// All rights reserved.
+/*
+ * Copyright 2014 Daniel Erat <dan@erat.org>
+ * All rights reserved.
+ */
+
 package org.erat.nup
 
 import android.content.Context

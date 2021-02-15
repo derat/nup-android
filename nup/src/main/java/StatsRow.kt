@@ -1,5 +1,8 @@
-// Copyright 2021 Daniel Erat <dan@erat.org>
-// All rights reserved.
+/*
+ * Copyright 2021 Daniel Erat <dan@erat.org>
+ * All rights reserved.
+ */
+
 package org.erat.nup
 
 // Holds song count for a specific key.

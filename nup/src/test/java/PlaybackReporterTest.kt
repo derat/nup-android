@@ -1,3 +1,8 @@
+/*
+ * Copyright 2016 Daniel Erat <dan@erat.org>
+ * All rights reserved.
+ */
+
 package org.erat.nup.test
 
 import java.net.HttpURLConnection
