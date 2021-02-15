@@ -55,6 +55,7 @@ dependencies {
 
   // Needed for com.google.common.io.
   testImplementation 'com.google.guava:guava:15.0'
+  testImplementation "com.google.truth:truth:1.1.2"
   testImplementation 'junit:junit:4.12'
   testImplementation 'org.mockito:mockito-inline:2.23.4'
 }

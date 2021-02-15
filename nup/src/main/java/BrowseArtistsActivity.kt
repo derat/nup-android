@@ -33,8 +33,8 @@ class BrowseArtistsActivity : BrowseActivityBase(), SongDatabaseUpdateListener {
             this,
             R.layout.browse_row,
             rows,
-            StatsRowArrayAdapter.DISPLAY_ARTIST,
-            Util.SORT_ARTIST
+            StatsRowArrayAdapter.Display.ARTIST,
+            SongOrder.ARTIST,
         )
         listAdapter = adapter
         registerForContextMenu(listView)
@@ -87,7 +87,7 @@ class BrowseArtistsActivity : BrowseActivityBase(), SongDatabaseUpdateListener {
     override fun onSongDatabaseUpdate() {
         if (!service!!.songDb!!.aggregateDataLoaded) {
             rows.add(StatsRow(getString(R.string.loading), "", "", -1))
-            adapter!!.setEnabled(false)
+            adapter!!.enabled = false
             adapter!!.notifyDataSetChanged()
             return
         }
@@ -110,11 +110,11 @@ class BrowseArtistsActivity : BrowseActivityBase(), SongDatabaseUpdateListener {
 
     // Show a new list of artists.
     private fun updateRows(newRows: List<StatsRow>) {
-        val listView = listView
         rows.clear()
         rows.addAll(newRows)
+        val listView = listView
         listView.isFastScrollEnabled = false
-        adapter!!.setEnabled(true)
+        adapter!!.enabled = true
         adapter!!.notifyDataSetChanged()
         listView.isFastScrollEnabled = true
         resizeListViewToFixFastScroll(listView)

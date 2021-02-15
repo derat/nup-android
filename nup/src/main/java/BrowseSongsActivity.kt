@@ -26,7 +26,6 @@ import org.erat.nup.NupActivity.Companion.service
 import org.erat.nup.SongDetailsDialog.createBundle
 import org.erat.nup.SongDetailsDialog.createDialog
 import org.erat.nup.SongDetailsDialog.prepareDialog
-import org.erat.nup.Util.getSortingKey
 
 // This class doesn't extend BrowseActivityBase since it displays a different menu.
 class BrowseSongsActivity : Activity(), OnItemClickListener {
@@ -98,8 +97,8 @@ class BrowseSongsActivity : Activity(), OnItemClickListener {
                     (albumId == null || albumId!!.isEmpty())
                 ) {
                     Collections.sort(newSongs) { a, b ->
-                        getSortingKey(a.title, Util.SORT_TITLE)
-                            .compareTo(getSortingKey(b.title, Util.SORT_TITLE))
+                        getSongOrderKey(a.title, SongOrder.TITLE)
+                            .compareTo(getSongOrderKey(b.title, SongOrder.TITLE))
                     }
                 }
                 songs = newSongs

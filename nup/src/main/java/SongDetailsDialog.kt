@@ -11,7 +11,6 @@ import android.os.Bundle
 import android.view.View
 import android.view.Window
 import android.widget.TextView
-import org.erat.nup.Util.formatDurationString
 
 // Static methods for activities that want to display dialogs showing
 // the details of Song objects.
@@ -48,7 +47,7 @@ object SongDetailsDialog {
         (dialog.findViewById<View>(R.id.track) as TextView).text =
             bundle.getInt(BUNDLE_TRACK_NUM).toString()
         (dialog.findViewById<View>(R.id.length) as TextView).text =
-            formatDurationString(bundle.getInt(BUNDLE_LENGTH_SEC))
+            formatDuration(bundle.getInt(BUNDLE_LENGTH_SEC))
 
         var ratingStr = ""
         val rating = bundle.getDouble(BUNDLE_RATING)

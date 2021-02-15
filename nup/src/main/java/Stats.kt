@@ -12,38 +12,57 @@ import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.SectionIndexer
 import android.widget.TextView
-import org.erat.nup.Util.getSortingKey
+import java.util.Collections
 
+/** Key for song counts. Fields may be empty. */
+data class StatsKey(val artist: String, val album: String, val albumId: String)
+
+/** Song count for a specific [StatsKey]. */
+class StatsRow(val key: StatsKey, var count: Int) {
+    constructor(artist: String, album: String, albumId: String, count: Int) :
+        this(StatsKey(artist, album, albumId), count) {}
+}
+
+/** Sort [stats] according to [order]. */
+fun sortStatsRows(stats: List<StatsRow>, order: SongOrder) {
+    // Getting sorting keys is expensive, so just do it once.
+    val keys = HashMap<StatsKey, String>()
+    when (order) {
+        SongOrder.ALBUM -> for (s in stats) {
+            keys[s.key] = "${getSongOrderKey(s.key.album, order)} ${s.key.albumId}"
+        }
+        SongOrder.ARTIST -> for (s in stats) {
+            keys[s.key] = getSongOrderKey(s.key.artist, order)
+        }
+        else -> throw IllegalArgumentException("Invalid ordering $order")
+    }
+    Collections.sort(stats) { a, b -> keys[a.key]!!.compareTo(keys[b.key]!!) }
+}
+
+/** Adapts an array of [StatsRow]s for display. */
 class StatsRowArrayAdapter(
-    context: Context?,
+    context: Context,
     textViewResourceId: Int,
-    private val rows: List<StatsRow>, // Rows to display.
-    private val displayType: Int, // Information to display from |rows|.
-    private val sortType: Int // Manner in which |mRows| are sorted, as a Util.SORT_* value.
-) : ArrayAdapter<StatsRow?>(context!!, textViewResourceId, rows), SectionIndexer {
-    // Are all rows in the list enabled?  If false, all are disabled.
-    private var enabled = true
+    private val rows: List<StatsRow>,
+    private val display: Display,
+    private val order: SongOrder,
+) : ArrayAdapter<StatsRow>(context, textViewResourceId, rows), SectionIndexer {
+    /** Whether rows are enabled or not. */
+    var enabled = true
 
     private val sections = ArrayList<String>()
-
-    // Position of the first row in each section.
-    private val sectionStartingPositions = ArrayList<Int>()
-
-    // Should all of the rows in the list be enabled, or all disabled?
-    fun setEnabled(enabled: Boolean) {
-        this.enabled = enabled
-    }
+    private val sectionPositions = ArrayList<Int>()
 
     override fun getPositionForSection(section: Int): Int {
-        return sectionStartingPositions[section]
+        return sectionPositions[section]
     }
 
     override fun getSectionForPosition(position: Int): Int {
         // No upper_bound()/lower_bound()? :-(
-        for (i in 0 until sectionStartingPositions.size - 1) {
-            if (position < sectionStartingPositions[i + 1]) return i
+        for (i in 0 until sectionPositions.size - 1) {
+            if (position < sectionPositions[i + 1]) return i
         }
-        return sectionStartingPositions.size - 1
+        return sectionPositions.size - 1
     }
 
     override fun getSections(): Array<Any> {
@@ -55,13 +74,11 @@ class StatsRowArrayAdapter(
         initSections()
     }
 
-    // TODO: Turn these into getters?
     override fun areAllItemsEnabled(): Boolean { return enabled }
     override fun isEnabled(position: Int): Boolean { return enabled }
 
     override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
-        val view: View
-        view = if (convertView != null) {
+        val view = if (convertView != null) {
             convertView
         } else {
             val inflater =
@@ -71,41 +88,35 @@ class StatsRowArrayAdapter(
         val row = rows[position]
         (view.findViewById<View>(R.id.main) as TextView).text = getDisplayString(row.key)
         (view.findViewById<View>(R.id.extra) as TextView).text =
-            if (row.count >= 0) "" + row.count else ""
+            if (row.count >= 0) row.count.toString() else ""
         return view
     }
 
-    // Returns the string to display for the supplied key.
+    /** Get the string to display for [key]. */
     private fun getDisplayString(key: StatsKey): String {
-        return when (displayType) {
-            DISPLAY_ARTIST -> key.artist
-            DISPLAY_ALBUM -> key.album
-            DISPLAY_ALBUM_ARTIST -> key.album + " (" + key.artist + ")"
-            else -> throw IllegalArgumentException("invalid sort type")
+        return when (display) {
+            Display.ARTIST -> key.artist
+            Display.ALBUM -> key.album
+            Display.ALBUM_ARTIST -> "${key.album} (${key.artist})"
         }
     }
 
-    // Updates |mSections| and |mSectionStartingPositions| for |mRows|.
+    /** Update [sections] and [sectionPositions] for [rows]. */
     private fun initSections() {
         // Create a list of all possible sections in the order in which they'd appear.
         val allSections = ArrayList<String>()
         allSections.add(NUMBER_SECTION)
-        var ch = 'A'
-        while (ch <= 'Z') {
-            allSections.add(Character.toString(ch))
-            ++ch
-        }
+        for (ch in 'A'..'Z') allSections.add(Character.toString(ch))
         allSections.add(OTHER_SECTION)
 
-        // // Update the main list to have the sections that are needed.
+        // Update the main list to have the sections that are needed.
         sections.clear()
-        sectionStartingPositions.clear()
-
+        sectionPositions.clear()
         var sectionIndex = -1
         for (rowIndex in rows.indices) {
             val key = rows[rowIndex].key
             val sectionName = getSectionNameForString(
-                if (sortType == Util.SORT_ARTIST) key.artist else key.album
+                if (order == SongOrder.ARTIST) key.artist else key.album
             )
             val prevSectionIndex = sectionIndex
             while (sectionIndex == -1 || sectionName != allSections[sectionIndex]) sectionIndex++
@@ -113,14 +124,15 @@ class StatsRowArrayAdapter(
             // If we advanced to a new section, register it.
             if (sectionIndex != prevSectionIndex) {
                 sections.add(allSections[sectionIndex])
-                sectionStartingPositions.add(rowIndex)
+                sectionPositions.add(rowIndex)
             }
         }
     }
 
+    /** Get the section for [str]. */
     private fun getSectionNameForString(str: String): String {
         if (str.isEmpty()) return NUMBER_SECTION
-        val sortStr = getSortingKey(str, sortType)
+        val sortStr = getSongOrderKey(str, order)
         val ch = sortStr[0]
         return when {
             ch < 'a' -> NUMBER_SECTION
@@ -129,15 +141,10 @@ class StatsRowArrayAdapter(
         }
     }
 
+    /** Type of information to display. */
+    enum class Display { ARTIST, ALBUM, ALBUM_ARTIST }
+
     companion object {
-        private const val TAG = "StatsRowArrayAdapter"
-
-        // Different information to display.
-        // TODO: Switch this to an enum?
-        var DISPLAY_ARTIST = 1
-        var DISPLAY_ALBUM = 2
-        var DISPLAY_ALBUM_ARTIST = 3
-
         private const val NUMBER_SECTION = "#"
         private const val OTHER_SECTION = "\u2668" // HOT SPRINGS (Android isn't snowman-compatible)
     }

@@ -40,16 +40,16 @@ class BrowseAlbumsActivity : BrowseActivityBase(), SongDatabaseUpdateListener {
             if (onlyCached) R.string.browse_cached_albums else R.string.browse_albums
         )
         val display = if (artist == null) {
-            StatsRowArrayAdapter.DISPLAY_ALBUM_ARTIST
+            StatsRowArrayAdapter.Display.ALBUM_ARTIST
         } else {
-            StatsRowArrayAdapter.DISPLAY_ALBUM
+            StatsRowArrayAdapter.Display.ALBUM
         }
         adapter = StatsRowArrayAdapter(
             this,
             R.layout.browse_row,
             rows,
             display,
-            Util.SORT_ALBUM
+            SongOrder.ALBUM,
         )
         listAdapter = adapter
         registerForContextMenu(listView)
@@ -108,7 +108,7 @@ class BrowseAlbumsActivity : BrowseActivityBase(), SongDatabaseUpdateListener {
     override fun onSongDatabaseUpdate() {
         if (!service!!.songDb!!.aggregateDataLoaded) {
             rows.add(StatsRow("", getString(R.string.loading), "", -1))
-            adapter!!.setEnabled(false)
+            adapter!!.enabled = false
             adapter!!.notifyDataSetChanged()
             return
         }
@@ -140,7 +140,7 @@ class BrowseAlbumsActivity : BrowseActivityBase(), SongDatabaseUpdateListener {
         rows.addAll(newRows)
         val listView = listView
         listView.isFastScrollEnabled = false
-        adapter!!.setEnabled(true)
+        adapter!!.enabled = true
         adapter!!.notifyDataSetChanged()
         listView.isFastScrollEnabled = true
         resizeListViewToFixFastScroll(listView)

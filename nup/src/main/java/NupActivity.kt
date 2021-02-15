@@ -35,7 +35,6 @@ import org.erat.nup.NupService.SongListener
 import org.erat.nup.SongDetailsDialog.createBundle
 import org.erat.nup.SongDetailsDialog.createDialog
 import org.erat.nup.SongDetailsDialog.prepareDialog
-import org.erat.nup.Util.formatDurationProgressString
 
 class NupActivity : Activity(), SongListener {
     // UI components that we update dynamically.
@@ -184,7 +183,7 @@ class NupActivity : Activity(), SongListener {
                 if (positionSec == lastSongPositionSec) return@Runnable
                 // MediaPlayer appears to get confused sometimes and report things like 0:01.
                 val durationSec = Math.max(durationMs / 1000, currentSong!!.lengthSec)
-                timeLabel!!.text = formatDurationProgressString(positionSec, durationSec)
+                timeLabel!!.text = formatDurationProgress(positionSec, durationSec)
                 lastSongPositionSec = positionSec
             }
         )
@@ -246,7 +245,7 @@ class NupActivity : Activity(), SongListener {
             artistLabel!!.text = song.artist
             titleLabel!!.text = song.title
             albumLabel!!.text = song.album
-            timeLabel!!.text = formatDurationProgressString(
+            timeLabel!!.text = formatDurationProgress(
                 if (song == service!!.currentSong) {
                     service!!.currentSongLastPositionMs / 1000
                 } else {

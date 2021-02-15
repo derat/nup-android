@@ -14,8 +14,6 @@ import android.text.TextUtils
 import android.util.Log
 import java.util.Collections
 import java.util.Date
-import org.erat.nup.Util.getSortingKey
-import org.erat.nup.Util.sortStatsRowList
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONTokener
@@ -72,7 +70,7 @@ class SongDatabase(
                 "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
                 "GROUP BY LOWER(TRIM(s.Artist))",
             null,
-            Util.SORT_ARTIST
+            SongOrder.ARTIST,
         )
 
     // TODO: It'd be better to use most-frequent-artist logic here similar
@@ -90,7 +88,7 @@ class SongDatabase(
                     "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
                     "GROUP BY LOWER(TRIM(s.Album)), s.AlbumId",
                 null,
-                Util.SORT_ALBUM
+                SongOrder.ALBUM,
             )
 
     fun getCachedAlbumsByArtist(artist: String): List<StatsRow> {
@@ -101,7 +99,7 @@ class SongDatabase(
                 "WHERE LOWER(s.Artist) = LOWER(?) " +
                 "GROUP BY LOWER(TRIM(s.Album)), s.AlbumId",
             arrayOf(artist),
-            Util.SORT_ALBUM
+            SongOrder.ALBUM,
         )
     }
 
@@ -411,7 +409,7 @@ class SongDatabase(
         cursor.close()
         db.delete("ArtistAlbumStats", null, null)
         for (artist in artistAlbums.keys) {
-            val artistSortKey = getSortingKey(artist!!, Util.SORT_ARTIST)
+            val artistSortKey = getSongOrderKey(artist!!, SongOrder.ARTIST)
             val albumMap = artistAlbums[artist]!!
             for (key in albumMap.keys) {
                 val values = ContentValues(6)
@@ -420,7 +418,7 @@ class SongDatabase(
                 values.put("AlbumId", key.albumId)
                 values.put("NumSongs", albumMap[key])
                 values.put("ArtistSortKey", artistSortKey)
-                values.put("AlbumSortKey", getSortingKey(key.album, Util.SORT_ALBUM))
+                values.put("AlbumSortKey", getSongOrderKey(key.album, SongOrder.ALBUM))
                 db.insert("ArtistAlbumStats", "", values)
             }
         }
@@ -528,7 +526,7 @@ class SongDatabase(
     private fun getSortedRows(
         query: String,
         selectionArgs: Array<String>?,
-        sortType: Int
+        order: SongOrder,
     ): List<StatsRow> {
         val db = opener.getDb()
         val cursor = db.rawQuery(query, selectionArgs)
@@ -545,7 +543,7 @@ class SongDatabase(
             cursor.moveToNext()
         }
         cursor.close()
-        sortStatsRowList(rows, sortType)
+        sortStatsRows(rows, order)
         return rows
     }
 

@@ -8,6 +8,7 @@ package org.erat.nup
 import android.content.SharedPreferences
 import android.util.Base64
 import android.util.Log
+import java.io.BufferedReader
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.MalformedURLException
@@ -18,14 +19,13 @@ import javax.net.ssl.HttpsURLConnection
 // TODO: Make this non-open if possible after switching to Robolectric.
 open class Downloader(
     private val authenticator: Authenticator,
-    private val prefs: SharedPreferences
+    private val prefs: SharedPreferences,
 ) {
     /* Thrown when the request couldn't be constructed because some preferences that we need are
      * either unset or incorrect. */
     class PrefException(reason: String?) : Exception(reason)
-    enum class AuthType {
-        SERVER, STORAGE
-    }
+
+    enum class AuthType { SERVER, STORAGE }
 
     /**
      * Starts a download of a given URL.
@@ -41,7 +41,7 @@ open class Downloader(
         url: URL,
         method: String,
         authType: AuthType,
-        headers: Map<String, String>?
+        headers: Map<String, String>?,
     ): HttpURLConnection {
         Log.d(TAG, "starting $method to $url")
         val conn = url.openConnection() as HttpsURLConnection
@@ -60,10 +60,9 @@ open class Downloader(
             if (!username!!.isEmpty() && !password!!.isEmpty()) {
                 conn.setRequestProperty(
                     "Authorization",
-                    "Basic " +
-                        Base64.encodeToString(
-                            "$username:$password".toByteArray(), Base64.NO_WRAP
-                        )
+                    "Basic " + Base64.encodeToString(
+                        "$username:$password".toByteArray(), Base64.NO_WRAP
+                    )
                 )
             }
         } else if (authType == AuthType.STORAGE) {
@@ -98,50 +97,14 @@ open class Downloader(
                 error[0] = "Got $status from server (${conn.responseMessage})"
                 return null
             }
-            val stream = conn.inputStream
-            try {
-                Util.getStringFromInputStream(stream)
+            return try {
+                conn.inputStream.bufferedReader().use(BufferedReader::readText)
             } finally {
-                // This isn't documented as being necessary, but it seems to be needed to avoid a
-                // StrictMode crash caused by a resource leak when syncing songs:
-                //
-                // StrictMode policy violation: android.os.strictmode.LeakedClosableViolation: A
-                // resource was acquired at attached stack trace but never released. See
-                // java.io.Closeable for information on avoiding resource leaks.
-                //    at
-                // android.os.StrictMode$AndroidCloseGuardReporter.report(StrictMode.java:1786)
-                //    at dalvik.system.CloseGuard.warnIfOpen(CloseGuard.java:264)
-                //    at java.util.zip.Inflater.finalize(Inflater.java:398)
-                //    at java.lang.Daemons$FinalizerDaemon.doFinalize(Daemons.java:250)
-                //    at java.lang.Daemons$FinalizerDaemon.runInternal(Daemons.java:237)
-                //    at java.lang.Daemons$Daemon.run(Daemons.java:103)
-                //    at java.lang.Thread.run(Thread.java:764)
-                // Caused by: java.lang.Throwable: Explicit termination method 'end' not called
-                //    at dalvik.system.CloseGuard.open(CloseGuard.java:221)
-                //    at java.util.zip.Inflater.<init>(Inflater.java:114)
-                //    at com.android.okhttp.okio.GzipSource.<init>(GzipSource.java:62)
-                //    at com.android.okhttp.internal.http.HttpEngine.unzip(HttpEngine.java:473)
-                //    at
-                // com.android.okhttp.internal.http.HttpEngine.readResponse(HttpEngine.java:648)
-                //    at
-                // com.android.okhttp.internal.huc.HttpURLConnectionImpl.execute(HttpURLConnectionImpl.java:471)
-                //    at
-                // com.android.okhttp.internal.huc.HttpURLConnectionImpl.getResponse(HttpURLConnectionImpl.java:407)
-                //    at
-                // com.android.okhttp.internal.huc.HttpURLConnectionImpl.getResponseCode(HttpURLConnectionImpl.java:538)
-                //    at
-                // com.android.okhttp.internal.huc.DelegatingHttpsURLConnection.getResponseCode(DelegatingHttpsURLConnection.java:105)
-                //    at
-                // com.android.okhttp.internal.huc.HttpsURLConnectionImpl.getResponseCode(HttpsURLConnectionImpl.java:26)
-                //    at org.erat.nup.Downloader.download(Downloader.java:94)
-                //    at org.erat.nup.Downloader.downloadString(Downloader.java:111)
-                //    at org.erat.nup.SongDatabase.queryServer(SongDatabase.java:524)
-                //    at org.erat.nup.SongDatabase.syncWithServer(SongDatabase.java:479)
-                //    ...
-                //
-                // Oddly, this only started happening after I upgraded the AppEngine app to use the
-                // go111 runtime (?!).
-                stream.close()
+                // This isn't documented as being necessary, but it seems to be needed to avoid
+                // android.os.strictmode.LeakedClosableViolation when syncing songs. Oddly, this
+                // only started happening after I upgraded the AppEngine app to use the go111
+                // runtime (?!).
+                conn.inputStream.close()
             }
         } catch (e: PrefException) {
             error[0] = e.message ?: "Pref error ($e)"

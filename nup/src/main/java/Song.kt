@@ -43,3 +43,45 @@ class Song(
         totalBytes = entry.totalBytes
     }
 }
+
+/** Ways to order [Song]s. */
+enum class SongOrder { ARTIST, TITLE, ALBUM, }
+
+/**
+ * Get a key for ordering [str] according to [order].
+ *
+ * [str] is converted to lowercase and common leading articles are removed.
+ * If this method is changed, SongDatabase.updateStatsTables() must be called on the next run,
+ * as sorting keys are cached in the database.
+ */
+fun getSongOrderKey(str: String, order: SongOrder): String {
+    // TODO: Consider dropping the order parameter since it isn't actually used now.
+    // Note that the enum is still needed for sortStatsRows(), though.
+    var key = str.toLowerCase()
+
+    // Preserve bracketed strings used by MusicBrainz and/or Picard.
+    if (keyTags.contains(key)) return "!$key"
+
+    // Preserve some specific weird album names.
+    if (key.startsWith("( )")) return key
+
+    // Strip off leading punctuation, common articles, and other junk.
+    var start = 0
+    loop@ while (start < key.length) {
+        var found = false
+        for (pre in keyPrefixes) {
+            if (key.startsWith(pre, start)) {
+                start += pre.length
+                continue@loop
+            }
+        }
+        break
+    }
+    if (start > 0) key = key.substring(start)
+    return key
+}
+
+private val keyTags =
+    setOf("[dialogue]", "[no artist]", "[unknown]", "[non-album tracks]", "[unset]")
+private val keyPrefixes =
+    arrayOf(" ", "\"", "'", "’", "(", "[", "<", "...", "a ", "an ", "the ")

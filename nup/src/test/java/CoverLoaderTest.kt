@@ -7,6 +7,7 @@ package org.erat.nup.test
 
 import android.graphics.Bitmap
 import com.google.common.io.Files
+import java.io.BufferedReader
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
@@ -17,7 +18,6 @@ import org.erat.nup.BitmapDecoder
 import org.erat.nup.CoverLoader
 import org.erat.nup.Downloader
 import org.erat.nup.NetworkHelper
-import org.erat.nup.Util.getStringFromInputStream
 import org.junit.After
 import org.junit.Assert
 import org.junit.Before
@@ -50,17 +50,12 @@ class CoverLoaderTest {
                     var inputStream: FileInputStream? = null
                     try {
                         inputStream = FileInputStream(invocation.arguments[0] as File)
-                        val fileData = getStringFromInputStream(inputStream)
+                        val fileData = inputStream.bufferedReader().use(BufferedReader::readText)
                         return@Answer mBitmapDataMap!![fileData]
                     } catch (e: IOException) {
                         return@Answer null
                     } finally {
-                        if (inputStream != null) {
-                            try {
-                                inputStream.close()
-                            } catch (e: IOException) {
-                            }
-                        }
+                        inputStream?.close()
                     }
                 }
             )
