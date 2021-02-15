@@ -596,7 +596,7 @@ class NupService : Service(), Player.Listener, FileCache.Listener, SongDatabase.
 
     // Implements Player.Listener.
     override fun onPlaybackComplete() {
-        Util.assertOnMainThread()
+        assertOnMainThread()
         playbackComplete = true
         updateNotification()
         updatePlaybackState()
@@ -609,7 +609,7 @@ class NupService : Service(), Player.Listener, FileCache.Listener, SongDatabase.
         positionMs: Int,
         durationMs: Int
     ) {
-        Util.assertOnMainThread()
+        assertOnMainThread()
         if (path != currentSongPath) return
         val song = currentSong!!
         songListener?.onSongPositionChange(song, positionMs, durationMs)
@@ -630,7 +630,7 @@ class NupService : Service(), Player.Listener, FileCache.Listener, SongDatabase.
 
     // Implements Player.Listener.
     override fun onPauseStateChange(paused: Boolean) {
-        Util.assertOnMainThread()
+        assertOnMainThread()
         this.paused = paused
         updateNotification()
         songListener?.onPauseStateChange(this.paused)
@@ -639,7 +639,7 @@ class NupService : Service(), Player.Listener, FileCache.Listener, SongDatabase.
 
     // Implements Player.Listener.
     override fun onPlaybackError(description: String?) {
-        Util.assertOnMainThread()
+        assertOnMainThread()
         Toast.makeText(this@NupService, description, Toast.LENGTH_LONG).show()
     }
 

@@ -6,7 +6,6 @@
 package org.erat.nup
 
 import android.net.Uri
-import android.os.Looper
 import android.widget.FrameLayout
 import android.widget.ListView
 import java.io.BufferedReader
@@ -24,25 +23,6 @@ object Util {
     var SORT_ARTIST = 1
     var SORT_TITLE = 2
     var SORT_ALBUM = 3
-
-    /** Crash if not running on the given Looper.  */
-    fun assertOnLooper(looper: Looper) {
-        check(!(looper.thread !== Thread.currentThread())) {
-            "Running on ${Thread.currentThread()} instead of ${looper.thread}"
-        }
-    }
-
-    /** Crash if called from a thread besides the main/UI one.  */
-    fun assertOnMainThread() {
-        assertOnLooper(Looper.getMainLooper())
-    }
-
-    /** Crash if called from the main thread.  */
-    fun assertNotOnMainThread() {
-        check(Looper.myLooper() != Looper.getMainLooper()) {
-            "Running on main thread; shouldn't be"
-        }
-    }
 
     // Yay.
     @Throws(IOException::class)

@@ -44,7 +44,7 @@ class CoverLoader(
     // Load the cover for a song's artist and album.  Tries to find it locally
     // first; then goes to the server.  Returns null if unsuccessful.
     fun loadCover(url: URL): Bitmap? {
-        // TODO: Util.assertNotOnMainThread() ought to be called here, but this gets called on the
+        // TODO: assertNotOnMainThread() ought to be called here, but this gets called on the
         // main thread in unit tests.
         if (coverDir == null) {
             Log.e(TAG, "got request for $url before initialized")

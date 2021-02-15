@@ -387,14 +387,14 @@ class Player(
 
     // Start running |mSongPositionTask|.
     private fun startPositionTimer() {
-        Util.assertOnLooper(handler!!.looper)
+        assertOnLooper(handler!!.looper)
         stopPositionTimer()
         handler!!.post(positionTask)
     }
 
     // Stop running |mSongPositionTask|.
     private fun stopPositionTimer() {
-        Util.assertOnLooper(handler!!.looper)
+        assertOnLooper(handler!!.looper)
         handler!!.removeCallbacks(positionTask)
     }
 
@@ -447,7 +447,7 @@ class Player(
 
     /** Resets |currentPlayer|.  */
     private fun resetCurrent() {
-        Util.assertOnLooper(handler!!.looper)
+        assertOnLooper(handler!!.looper)
         stopPositionTimer()
         currentPlayer?.close()
         currentPlayer = null
@@ -455,7 +455,7 @@ class Player(
 
     /** Resets |queuedPlayer|.  */
     private fun resetQueued() {
-        Util.assertOnLooper(handler!!.looper)
+        assertOnLooper(handler!!.looper)
         queuedPlayer?.close()
         queuedPlayer = null
     }
