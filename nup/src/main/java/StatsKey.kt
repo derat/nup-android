@@ -4,9 +4,10 @@ package org.erat.nup
 
 // Key for song counts. Fields may be empty.
 class StatsKey(
-        @JvmField val artist: String,
-        @JvmField val album: String,
-        @JvmField val albumId: String) {
+    val artist: String,
+    val album: String,
+    val albumId: String
+) {
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
         if (other == null) return false

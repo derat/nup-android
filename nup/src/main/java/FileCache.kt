@@ -12,22 +12,22 @@ import android.os.Looper
 import android.os.SystemClock
 import android.preference.PreferenceManager
 import android.util.Log
-import org.erat.nup.FileCache.DownloadTask.ProgressReporter
 import java.io.File
 import java.io.FileNotFoundException
 import java.io.FileOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.*
+import java.util.Date
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 
 class FileCache constructor(
-        private val context: Context,
-        private val listener: Listener,
-        private val downloader: Downloader,
-        private val networkHelper: NetworkHelper) : Runnable {
+    private val context: Context,
+    private val listener: Listener,
+    private val downloader: Downloader,
+    private val networkHelper: NetworkHelper
+) : Runnable {
     interface Listener {
         fun onCacheDownloadError(entry: FileCacheEntry?, reason: String?)
         fun onCacheDownloadFail(entry: FileCacheEntry?, reason: String?)
@@ -44,10 +44,9 @@ class FileCache constructor(
 
     // Current state of our use of the wifi connection.
     private enum class WifiState {
-        // We have an active download.
-        ACTIVE,  // No active downloads, but waiting for another one to start before releasing the lock.
-        WAITING,  // No active downloads and the lock is released.
-        INACTIVE
+        ACTIVE, // We have an active download.
+        WAITING, // No active downloads; waiting for another one to start before releasing the lock.
+        INACTIVE, // No active downloads and the lock is released.
     }
 
     private val prefs: SharedPreferences
@@ -77,7 +76,7 @@ class FileCache constructor(
     override fun run() {
         val state = Environment.getExternalStorageState()
         if (state != Environment.MEDIA_MOUNTED) {
-            Log.e(TAG, "media has state $state; we need " + Environment.MEDIA_MOUNTED)
+            Log.e(TAG, "media has state $state; we need ${Environment.MEDIA_MOUNTED}")
         }
         musicDir = context.getExternalFilesDir(Environment.DIRECTORY_MUSIC)
         db = FileCacheDatabase(context, musicDir!!.path)
@@ -93,8 +92,7 @@ class FileCache constructor(
     fun quit() {
         synchronized(inProgressSongIds) { inProgressSongIds.clear() }
         waitUntilReady()
-        handler!!.post(
-                Runnable { Looper.myLooper()!!.quit() })
+        handler!!.post(Runnable { Looper.myLooper()!!.quit() })
         db!!.quit()
     }
 
@@ -120,7 +118,9 @@ class FileCache constructor(
     // Abort a previously-started download.
     fun abortDownload(songId: Long) {
         synchronized(inProgressSongIds) {
-            if (!inProgressSongIds.contains(songId)) Log.e(TAG, "tried to abort nonexistent download of song $songId")
+            if (!inProgressSongIds.contains(songId)) {
+                Log.e(TAG, "tried to abort nonexistent download of song $songId")
+            }
             inProgressSongIds.remove(songId)
         }
         updateWifiLock()
@@ -145,8 +145,7 @@ class FileCache constructor(
             for (songId: Long in songIds) {
                 val entry = db!!.getEntry(songId)!!
                 db!!.removeEntry(songId)
-                val file = entry.localFile
-                file.delete()
+                entry.localFile.delete()
                 listener.onCacheEviction(entry)
             }
 
@@ -165,20 +164,12 @@ class FileCache constructor(
             if (inProgressSongIds.contains(songId)) return null
             inProgressSongIds.add(songId)
         }
+
         var entry = db!!.getEntry(songId)
-        if (entry == null) {
-            entry = db!!.addEntry(songId)
-        } else {
-            db!!.updateLastAccessTime(songId)
-        }
-        Log.d(
-                TAG,
-                ("posting download of song "
-                        + songId
-                        + " from "
-                        + song.url.toString()
-                        + " to "
-                        + entry.localFile.path))
+        if (entry == null) entry = db!!.addEntry(songId)
+        else db!!.updateLastAccessTime(songId)
+
+        Log.d(TAG, "posting download of song $songId from ${song.url} to ${entry.localFile.path}")
         handler!!.post(DownloadTask(entry, song.url!!))
         return entry
     }
@@ -192,8 +183,9 @@ class FileCache constructor(
     }
 
     private inner class DownloadTask(
-            private val entry: FileCacheEntry,
-            private val url: URL) : Runnable {
+        private val entry: FileCacheEntry,
+        private val url: URL
+    ) : Runnable {
         private val tag = "FileCache.DownloadTask"
 
         // Maximum number of seconds we'll wait before retrying after failure.  Never give up!
@@ -222,9 +214,9 @@ class FileCache constructor(
                 try {
                     if (backoffTimeMs > 0) {
                         Log.d(
-                                tag,
-                                ("sleeping for $backoffTimeMs ms before retrying download "
-                                        + entry.songId))
+                            tag,
+                            "sleeping $backoffTimeMs ms before retrying download ${entry.songId}"
+                        )
                         SystemClock.sleep(backoffTimeMs.toLong())
                     }
 
@@ -234,8 +226,7 @@ class FileCache constructor(
                         return
                     }
                     when (startDownload()) {
-                        DownloadStatus.SUCCESS -> {
-                        }
+                        DownloadStatus.SUCCESS -> {}
                         DownloadStatus.ABORTED -> return
                         DownloadStatus.RETRYABLE_ERROR -> {
                             listener.onCacheDownloadError(entry, reason)
@@ -249,8 +240,7 @@ class FileCache constructor(
                     }
                     if (!isActive) return
                     when (writeFile()) {
-                        DownloadStatus.SUCCESS -> {
-                        }
+                        DownloadStatus.SUCCESS -> {}
                         DownloadStatus.ABORTED -> return
                         DownloadStatus.RETRYABLE_ERROR -> {
                             listener.onCacheDownloadError(entry, reason)
@@ -270,11 +260,7 @@ class FileCache constructor(
                         conn = null
                     }
                     if (outputStream != null) {
-                        try {
-                            outputStream!!.close()
-                        } catch (e: IOException) {
-                            Log.e(Companion.TAG, "got IO exception while closing output stream: $e")
-                        }
+                        outputStream!!.close()
                         outputStream = null
                     }
                 }
@@ -285,7 +271,7 @@ class FileCache constructor(
             try {
                 val headers: MutableMap<String, String> = HashMap()
                 if (entry.cachedBytes > 0 && entry.cachedBytes < entry.totalBytes) {
-                    Log.d(Companion.TAG, "attempting to resume download at byte " + entry.cachedBytes)
+                    Log.d(Companion.TAG, "resuming download at byte ${entry.cachedBytes}")
                     headers["Range"] = String.format("bytes=%d-", entry.cachedBytes)
                 }
                 conn = downloader.download(url, "GET", Downloader.AuthType.STORAGE, headers)
@@ -315,7 +301,7 @@ class FileCache constructor(
         private fun writeFile(): DownloadStatus {
             // Make space for whatever we're planning to download.
             if (!makeSpace(conn!!.contentLength.toLong())) {
-                reason = "Unable to make space for " + conn!!.contentLength + "-byte download"
+                reason = "Unable to make space for ${conn!!.contentLength}-byte download"
                 return DownloadStatus.FATAL_ERROR
             }
             val file = entry.localFile
@@ -324,7 +310,7 @@ class FileCache constructor(
                 try {
                     file.createNewFile()
                 } catch (e: IOException) {
-                    reason = "Unable to create local file " + file.path
+                    reason = "Unable to create local file ${file.path}"
                     return DownloadStatus.FATAL_ERROR
                 }
             }
@@ -344,13 +330,15 @@ class FileCache constructor(
                 reason = "Unable to create output stream to local file"
                 return DownloadStatus.FATAL_ERROR
             }
-            val maxBytesPerSecond = (java.lang.Long.valueOf(
+            val maxBytesPerSecond =
+                java.lang.Long.valueOf(
                     prefs.getString(
-                            NupPreferences.DOWNLOAD_RATE,
-                            NupPreferences.DOWNLOAD_RATE_DEFAULT)!!)
-                    * 1024)
+                        NupPreferences.DOWNLOAD_RATE,
+                        NupPreferences.DOWNLOAD_RATE_DEFAULT
+                    )!!
+                ) * 1024
             val reporter = ProgressReporter(entry)
-            val reporterThread = Thread(reporter, "FileCache.ProgressReporter." + entry.songId)
+            val reporterThread = Thread(reporter, "FileCache.ProgressReporter.${entry.songId}")
             reporterThread.start()
             try {
                 val startDate = Date()
@@ -359,9 +347,7 @@ class FileCache constructor(
                 val buffer = ByteArray(bufferSize)
                 val inputStream = conn!!.inputStream
                 while ((inputStream.read(buffer).also { bytesRead = it }) != -1) {
-                    if (!isActive) {
-                        return DownloadStatus.ABORTED
-                    }
+                    if (!isActive) return DownloadStatus.ABORTED
                     outputStream!!.write(buffer, 0, bytesRead)
                     bytesWritten += bytesRead
                     val now = Date()
@@ -369,29 +355,21 @@ class FileCache constructor(
                     entry.incrementCachedBytes(bytesRead.toLong())
                     reporter.update(bytesWritten.toLong(), elapsedMs)
                     if (maxBytesPerSecond > 0) {
-                        val expectedMs = (bytesWritten / maxBytesPerSecond.toFloat() * 1000).toLong()
+                        val expectedMs =
+                            (bytesWritten / maxBytesPerSecond.toFloat() * 1000).toLong()
                         if (elapsedMs < expectedMs) SystemClock.sleep(expectedMs - elapsedMs)
                     }
                 }
                 val endDate = Date()
                 Log.d(
-                        Companion.TAG,
-                        ("finished download of song "
-                                + entry.songId
-                                + " ("
-                                + bytesWritten
-                                + " bytes to "
-                                + file.absolutePath
-                                + " in "
-                                + (endDate.time - startDate.time)
-                                + " ms)"))
+                    Companion.TAG,
+                    "finished download of song ${entry.songId} ($bytesWritten bytes to " +
+                        "${file.absolutePath} in ${endDate.time - startDate.time} ms)"
+                )
 
                 // I see this happen when I kill the server midway through the download.
                 if (bytesWritten != conn!!.contentLength) {
-                    reason = ("Expected "
-                            + conn!!.contentLength
-                            + " bytes but got "
-                            + bytesWritten)
+                    reason = "Expected ${conn!!.contentLength} bytes but got $bytesWritten"
                     return DownloadStatus.RETRYABLE_ERROR
                 }
             } catch (e: IOException) {
@@ -399,11 +377,7 @@ class FileCache constructor(
                 return DownloadStatus.RETRYABLE_ERROR
             } finally {
                 reporter.quit()
-                try {
-                    reporterThread.join()
-                } catch (e: InterruptedException) {
-                    /* !~$#%$#!$#!~$#! */
-                }
+                reporterThread.join()
             }
             return DownloadStatus.SUCCESS
         }
@@ -421,14 +395,20 @@ class FileCache constructor(
         }
 
         private fun updateBackoffTime(madeProgress: Boolean) {
-            if (madeProgress) backoffTimeMs = 0 else if (backoffTimeMs == 0) backoffTimeMs = 1000 else backoffTimeMs = Math.min(backoffTimeMs * 2, maxBackoffSec * 1000)
+            backoffTimeMs = when {
+                madeProgress -> 0
+                backoffTimeMs == 0 -> 1000
+                else -> Math.min(backoffTimeMs * 2, maxBackoffSec * 1000)
+            }
         }
 
         // Is this download currently active, or has it been cancelled?
         private val isActive: Boolean
             get() = isDownloadActive(entry.songId)
 
-        private inner class ProgressReporter internal constructor(private val entry: FileCacheEntry?) : Runnable {
+        private inner class ProgressReporter internal constructor(
+            private val entry: FileCacheEntry?
+        ) : Runnable {
             private var downloadedBytes: Long = 0
             private var elapsedMs: Long = 0
             private var handler: Handler? = null
@@ -454,11 +434,9 @@ class FileCache constructor(
                     }
                 }
                 handler!!.post(
-                        object : Runnable {
-                            override fun run() {
-                                Looper.myLooper()!!.quit()
-                            }
-                        })
+                    object : Runnable {
+                        override fun run() { Looper.myLooper()!!.quit() }
+                    })
             }
 
             fun update(downloadedBytes: Long, elapsedMs: Long) {
@@ -468,15 +446,15 @@ class FileCache constructor(
                     if (handler != null && task == null) {
                         task = Runnable {
                             synchronized(this@ProgressReporter) {
-                                listener.onCacheDownloadProgress(
-                                        entry, downloadedBytes, elapsedMs)
+                                listener.onCacheDownloadProgress(entry, downloadedBytes, elapsedMs)
                                 lastReportDate = Date()
                                 task = null
                             }
                         }
                         var delayMs: Long = 0
                         if (lastReportDate != null) {
-                            val timeSinceLastReportMs: Long = Date().getTime() - lastReportDate!!.getTime()
+                            val timeSinceLastReportMs: Long =
+                                Date().getTime() - lastReportDate!!.getTime()
                             delayMs = Math.max(progressReportMs - timeSinceLastReportMs, 0)
                         }
                         handler!!.postDelayed(task!!, delayMs)
@@ -489,12 +467,8 @@ class FileCache constructor(
     // Wait until |mIsReady| becomes true.
     private fun waitUntilReady() {
         isReadyLock.lock()
-        try {
-            while (!isReady) isReadyCond.await()
-        } catch (e: InterruptedException) {
-        } finally {
-            isReadyLock.unlock()
-        }
+        while (!isReady) isReadyCond.await()
+        isReadyLock.unlock()
     }
 
     private fun isDownloadActive(songId: Long): Boolean {
@@ -506,21 +480,15 @@ class FileCache constructor(
     // that are currently being downloaded or are pinned.
     @Synchronized
     private fun makeSpace(neededBytes: Long): Boolean {
-        val maxBytes = (java.lang.Long.valueOf(
-                prefs.getString(
-                        NupPreferences.CACHE_SIZE,
-                        NupPreferences.CACHE_SIZE_DEFAULT)!!)
-                * 1024
-                * 1024)
+        val maxBytes = java.lang.Long.valueOf(
+            prefs.getString(
+                NupPreferences.CACHE_SIZE,
+                NupPreferences.CACHE_SIZE_DEFAULT
+            )!!
+        ) * 1024 * 1024
         var availableBytes = maxBytes - totalCachedBytes
         if (neededBytes <= availableBytes) return true
-        Log.d(
-                TAG,
-                ("need to make space for "
-                        + neededBytes
-                        + " bytes ("
-                        + availableBytes
-                        + " available)"))
+        Log.d(TAG, "need to make space for $neededBytes bytes ($availableBytes available)")
         val songIds = db!!.songIdsByAge
         for (songId: Long in songIds) {
             if (neededBytes <= availableBytes) break
@@ -530,15 +498,7 @@ class FileCache constructor(
             if (pinned) continue
             val entry = db!!.getEntry(songId)!!
             val file = entry.localFile
-            Log.d(
-                    TAG,
-                    ("deleting song "
-                            + songId
-                            + " ("
-                            + file.path
-                            + ", "
-                            + file.length()
-                            + " bytes)"))
+            Log.d(TAG, "deleting song $songId (${file.path}, ${file.length()} bytes)")
             availableBytes += file.length()
             file.delete()
             db!!.removeEntry(songId)
@@ -561,11 +521,7 @@ class FileCache constructor(
             wifiLock.acquire()
         } else {
             if (wifiState == WifiState.ACTIVE) {
-                Log.d(
-                        TAG,
-                        ("waiting "
-                                + RELEASE_WIFI_LOCK_DELAY_SEC
-                                + " seconds before releasing wifi lock"))
+                Log.d(TAG, "waiting $RELEASE_WIFI_LOCK_DELAY_SEC sec before releasing wifi lock")
                 wifiState = WifiState.WAITING
                 updateWifiLockTask = Runnable { updateWifiLock() }
                 handler!!.postDelayed(updateWifiLockTask!!, RELEASE_WIFI_LOCK_DELAY_SEC * 1000)
@@ -587,9 +543,7 @@ class FileCache constructor(
     init {
         prefs = PreferenceManager.getDefaultSharedPreferences(context)
         wifiLock = (context.getSystemService(Context.WIFI_SERVICE) as WifiManager)
-                .createWifiLock(
-                        WifiManager.WIFI_MODE_FULL,
-                        context.getString(R.string.app_name))
+            .createWifiLock(WifiManager.WIFI_MODE_FULL, context.getString(R.string.app_name))
         wifiLock.setReferenceCounted(false)
     }
 }

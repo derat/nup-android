@@ -1,18 +1,18 @@
 package org.erat.nup
 
 import android.util.Log
-import org.erat.nup.Downloader
-import org.erat.nup.Downloader.PrefException
 import java.io.IOException
 import java.net.HttpURLConnection
-import java.util.*
+import java.util.Date
 import java.util.concurrent.locks.ReentrantLock
+import org.erat.nup.Downloader.PrefException
 
 class PlaybackReporter(
-        private val songDb: SongDatabase,
-        private val downloader: Downloader,
-        private val taskRunner: TaskRunner,
-        private val networkHelper: NetworkHelper) {
+    private val songDb: SongDatabase,
+    private val downloader: Downloader,
+    private val taskRunner: TaskRunner,
+    private val networkHelper: NetworkHelper
+) {
     private val lock = ReentrantLock()
 
     /**
@@ -60,20 +60,15 @@ class PlaybackReporter(
         Log.d(TAG, "reporting song $songId started at $startDate")
         var conn: HttpURLConnection? = null
         try {
-            val path = String.format(
-                    "/report_played?songId=%d&startTime=%f",
-                    songId, startDate.time / 1000.0)
+            val path = "/report_played?songId=$songId&startTime=${startDate.time / 1000.0}"
             conn = downloader.download(
-                    downloader.getServerUrl(path),
-                    "POST",
-                    Downloader.AuthType.SERVER,
-                    null)
-            if (conn.responseCode == 200) {
-                return true
-            }
-            Log.e(
-                    TAG,
-                    "got " + conn.responseCode + " from server: " + conn.responseMessage)
+                downloader.getServerUrl(path),
+                "POST",
+                Downloader.AuthType.SERVER,
+                null
+            )
+            if (conn.responseCode == 200) return true
+            Log.e(TAG, "got ${conn.responseCode} from server: ${conn.responseMessage}")
         } catch (e: PrefException) {
             Log.e(TAG, "got preferences error: $e")
         } catch (e: IOException) {
@@ -89,7 +84,6 @@ class PlaybackReporter(
     }
 
     init {
-
         // TODO: Listen for the network coming up and send pending reports then?
 
         // Retry all of the pending reports in the background.

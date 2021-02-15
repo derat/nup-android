@@ -10,10 +10,6 @@ class FakeTaskRunner : TaskRunner() {
         // Use a new thread to avoid triggering running-on-non-UI-thread asserts.
         val thread = Thread(runnable)
         thread.start()
-        try {
-            thread.join()
-        } catch (e: InterruptedException) {
-            throw IllegalStateException(e)
-        }
+        thread.join()
     }
 }

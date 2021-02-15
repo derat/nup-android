@@ -14,7 +14,6 @@ import android.widget.ListView
 import org.erat.nup.NupActivity.Companion.service
 import org.erat.nup.NupService.SongDatabaseUpdateListener
 import org.erat.nup.Util.resizeListViewToFixFastScroll
-import java.util.*
 
 class BrowseAlbumsActivity : BrowseActivityBase(), SongDatabaseUpdateListener {
     // Are we displaying only cached songs?
@@ -32,15 +31,23 @@ class BrowseAlbumsActivity : BrowseActivityBase(), SongDatabaseUpdateListener {
         onlyCached = intent.getBooleanExtra(BUNDLE_CACHED, false)
         artist = intent.getStringExtra(BUNDLE_ARTIST)
         title = if (artist != null) getString(
-                if (onlyCached) R.string.browse_cached_albums_fmt else R.string.browse_albums_fmt,
-                artist) else getString(
-                if (onlyCached) R.string.browse_cached_albums else R.string.browse_albums)
+            if (onlyCached) R.string.browse_cached_albums_fmt else R.string.browse_albums_fmt,
+            artist
+        ) else getString(
+            if (onlyCached) R.string.browse_cached_albums else R.string.browse_albums
+        )
+        val display = if (artist == null) {
+            StatsRowArrayAdapter.DISPLAY_ALBUM_ARTIST
+        } else {
+            StatsRowArrayAdapter.DISPLAY_ALBUM
+        }
         adapter = StatsRowArrayAdapter(
-                this,
-                R.layout.browse_row,
-                rows,
-                if (artist == null) StatsRowArrayAdapter.DISPLAY_ALBUM_ARTIST else StatsRowArrayAdapter.DISPLAY_ALBUM,
-                Util.SORT_ALBUM)
+            this,
+            R.layout.browse_row,
+            rows,
+            display,
+            Util.SORT_ALBUM
+        )
         listAdapter = adapter
         registerForContextMenu(listView)
         service!!.addSongDatabaseUpdateListener(this)
@@ -60,7 +67,10 @@ class BrowseAlbumsActivity : BrowseActivityBase(), SongDatabaseUpdateListener {
     }
 
     override fun onCreateContextMenu(
-            menu: ContextMenu, view: View, menuInfo: ContextMenuInfo) {
+        menu: ContextMenu,
+        view: View,
+        menuInfo: ContextMenuInfo
+    ) {
         val pos = (menuInfo as AdapterContextMenuInfo).position
         menu.setHeaderTitle(rows[pos].key.album)
         if (artist != null) {
@@ -101,13 +111,17 @@ class BrowseAlbumsActivity : BrowseActivityBase(), SongDatabaseUpdateListener {
         }
         if (!onlyCached) {
             updateRows(
-                    if (artist != null) service!!.songDb!!.getAlbumsByArtist(artist!!) else service!!.songDb!!.getAlbumsSortedAlphabetically())
+                if (artist != null) service!!.songDb!!.getAlbumsByArtist(artist!!)
+                else service!!.songDb!!.getAlbumsSortedAlphabetically()
+            )
         } else {
             object : AsyncTask<Void?, Void?, List<StatsRow>>() {
                 protected override fun doInBackground(vararg args: Void?): List<StatsRow> {
-                    return if (artist != null) service!!.songDb!!.getCachedAlbumsByArtist(artist!!) else service!!
-                            .songDb!!
-                            .cachedAlbumsSortedAlphabetically
+                    return if (artist != null) {
+                        service!!.songDb!!.getCachedAlbumsByArtist(artist!!)
+                    } else {
+                        service!!.songDb!!.cachedAlbumsSortedAlphabetically
+                    }
                 }
 
                 override fun onPostExecute(rows: List<StatsRow>) {
@@ -131,7 +145,11 @@ class BrowseAlbumsActivity : BrowseActivityBase(), SongDatabaseUpdateListener {
 
     // Launch BrowseSongsActivity for a given album.
     private fun startBrowseSongsActivity(
-            artist: String?, album: String, albumId: String, minRating: Double) {
+        artist: String?,
+        album: String,
+        albumId: String,
+        minRating: Double
+    ) {
         val intent = Intent(this, BrowseSongsActivity::class.java)
         if (artist != null) intent.putExtra(BUNDLE_ARTIST, artist)
         intent.putExtra(BUNDLE_ALBUM, album)

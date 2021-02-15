@@ -5,23 +5,21 @@ package org.erat.nup
 import android.graphics.Bitmap
 import android.os.Environment
 import android.util.Log
-import org.erat.nup.Downloader
 import java.io.File
 import java.io.FileOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
-import java.util.*
-import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 
 class CoverLoader(
-        // Application-specific cache dir (not including DIR_NAME).
-        private val cacheDir: File,
-        private val downloader: Downloader,
-        taskRunner: TaskRunner,
-        private val bitmapDecoder: BitmapDecoder,
-        private val networkHelper: NetworkHelper) {
+    // Application-specific cache dir (not including DIR_NAME).
+    private val cacheDir: File,
+    private val downloader: Downloader,
+    taskRunner: TaskRunner,
+    private val bitmapDecoder: BitmapDecoder,
+    private val networkHelper: NetworkHelper
+) {
     // Directory where we write cover images.
     private var coverDir: File? = null
 
@@ -54,16 +52,13 @@ class CoverLoader(
         coverDir!!.mkdirs()
         var file = lookForLocalCover(url)
         if (file != null) {
-            Log.d(TAG, "found local file " + file.name)
+            Log.d(TAG, "found local file ${file.name}")
         } else {
             file = downloadCover(url)
-            if (file != null) {
-                Log.d(TAG, "fetched remote file " + file.name)
-            }
+            if (file != null) Log.d(TAG, "fetched remote file ${file.name}")
         }
-        if (file == null || !file.exists()) {
-            return null
-        }
+        if (file == null || !file.exists()) return null
+
         synchronized(lastCoverLock) {
             if (lastCoverPath != null && lastCoverPath == file) {
                 return lastCoverBitmap
@@ -116,16 +111,9 @@ class CoverLoader(
         } catch (e: IOException) {
             Log.e(TAG, "got IO error while fetching $url: $e")
         } finally {
-            if (outputStream != null) {
-                try {
-                    outputStream.close()
-                } catch (e: IOException) {
-                }
-            }
+            outputStream?.close()
             conn?.disconnect()
-            if (!success && file.exists()) {
-                file.delete()
-            }
+            if (!success && file.exists()) file.delete()
             finishLoad(localFilename)
         }
         return if (success) file else null
@@ -142,14 +130,9 @@ class CoverLoader(
     // finishLoad().
     private fun startLoad(filename: String) {
         lock.lock()
-        try {
-            while (filesBeingLoaded.contains(filename)) loadFinishedCond.await()
-            filesBeingLoaded.add(filename)
-        } catch (e: InterruptedException) {
-            // !#!@$#!$#!@
-        } finally {
-            lock.unlock()
-        }
+        while (filesBeingLoaded.contains(filename)) loadFinishedCond.await()
+        filesBeingLoaded.add(filename)
+        lock.unlock()
     }
 
     // Call after checking for the existence of a local file or after completing
@@ -159,7 +142,8 @@ class CoverLoader(
         lock.lock()
         try {
             if (!filesBeingLoaded.contains(filename)) throw RuntimeException(
-                    "got report of finished load of unknown file $filename")
+                "got report of finished load of unknown file $filename"
+            )
             filesBeingLoaded.remove(filename)
             loadFinishedCond.signal()
         } finally {
@@ -183,9 +167,9 @@ class CoverLoader(
             // Null in unit tests. :-/
             if (state != null && state != Environment.MEDIA_MOUNTED) {
                 Log.e(
-                        TAG,
-                        "media has state $state; we need "
-                                + Environment.MEDIA_MOUNTED)
+                    TAG,
+                    "media has state $state; we need ${Environment.MEDIA_MOUNTED}"
+                )
             }
             coverDir = File(cacheDir, DIR_NAME)
         }

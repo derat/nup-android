@@ -7,22 +7,23 @@ import java.io.Serializable
 import java.net.URL
 
 class Song(
-        @JvmField val id: Long,
-        @JvmField val artist: String,
-        @JvmField val title: String,
-        @JvmField val album: String,
-        @JvmField val albumId: String,
-        url: String,
-        coverUrl: String,
-        @JvmField val lengthSec: Int,
-        @JvmField val track: Int,
-        @JvmField val disc: Int,
-        @JvmField val trackGain: Double,
-        @JvmField val albumGain: Double,
-        @JvmField val peakAmp: Double,
-        @JvmField val rating: Double) : Serializable {
-    @JvmField val url: URL? = if (url.isEmpty()) null else URL(url)
-    @JvmField val coverUrl: URL? = if (coverUrl.isEmpty()) null else URL(coverUrl)
+    val id: Long,
+    val artist: String,
+    val title: String,
+    val album: String,
+    val albumId: String,
+    url: String,
+    coverUrl: String,
+    val lengthSec: Int,
+    val track: Int,
+    val disc: Int,
+    val trackGain: Double,
+    val albumGain: Double,
+    val peakAmp: Double,
+    val rating: Double
+) : Serializable {
+    val url: URL? = if (url.isEmpty()) null else URL(url)
+    val coverUrl: URL? = if (coverUrl.isEmpty()) null else URL(coverUrl)
 
     var coverBitmap: Bitmap? = null
 

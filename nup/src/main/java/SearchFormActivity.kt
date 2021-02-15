@@ -8,12 +8,13 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.view.View.OnFocusChangeListener
-import android.widget.*
+import android.widget.ArrayAdapter
+import android.widget.AutoCompleteTextView
+import android.widget.CheckBox
+import android.widget.EditText
+import android.widget.Spinner
 import org.erat.nup.NupActivity.Companion.service
 import org.erat.nup.NupService.SongDatabaseUpdateListener
-import org.erat.nup.SearchFormActivity
-import org.erat.nup.SearchResultsActivity
-import java.util.*
 
 class SearchFormActivity : Activity(), SongDatabaseUpdateListener {
     // Various parts of our UI.
@@ -40,21 +41,24 @@ class SearchFormActivity : Activity(), SongDatabaseUpdateListener {
                 val artist = artistEdit!!.text.toString()
                 val albums: MutableList<String> = ArrayList()
                 val albumsWithCounts = if (artist.trim { it <= ' ' }.isEmpty()) service!!
-                        .songDb!!
-                        .getAlbumsSortedAlphabetically() else service!!
-                        .songDb!!
-                        .getAlbumsByArtist(artist)
+                    .songDb!!
+                    .getAlbumsSortedAlphabetically() else service!!
+                    .songDb!!
+                    .getAlbumsByArtist(artist)
                 for (stats in albumsWithCounts) albums.add(stats.key.album)
                 albumEdit!!.setAdapter(
-                        ArrayAdapter(
-                                this@SearchFormActivity,
-                                android.R.layout.simple_dropdown_item_1line,
-                                albums))
+                    ArrayAdapter(
+                        this@SearchFormActivity,
+                        android.R.layout.simple_dropdown_item_1line,
+                        albums
+                    )
+                )
             }
         }
         minRatingSpinner = findViewById<View>(R.id.min_rating_spinner) as Spinner
         val adapter = ArrayAdapter.createFromResource(
-                this, R.array.min_rating_array, android.R.layout.simple_spinner_item)
+            this, R.array.min_rating_array, android.R.layout.simple_spinner_item
+        )
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
         minRatingSpinner!!.adapter = adapter
         shuffleCheckbox = findViewById<View>(R.id.shuffle_checkbox) as CheckBox
@@ -87,12 +91,20 @@ class SearchFormActivity : Activity(), SongDatabaseUpdateListener {
     fun onSearchButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
         val intent = Intent(this, SearchResultsActivity::class.java)
         intent.putExtra(
-                SearchResultsActivity.BUNDLE_ARTIST, artistEdit!!.text.toString().trim { it <= ' ' })
-        intent.putExtra(SearchResultsActivity.BUNDLE_TITLE, titleEdit!!.text.toString().trim { it <= ' ' })
-        intent.putExtra(SearchResultsActivity.BUNDLE_ALBUM, albumEdit!!.text.toString().trim { it <= ' ' })
+            SearchResultsActivity.BUNDLE_ARTIST, artistEdit!!.text.toString().trim { it <= ' ' }
+        )
         intent.putExtra(
-                SearchResultsActivity.BUNDLE_MIN_RATING,
-                minRatingSpinner!!.selectedItemPosition / 4.0)
+            SearchResultsActivity.BUNDLE_TITLE,
+            titleEdit!!.text.toString().trim { it <= ' ' }
+        )
+        intent.putExtra(
+            SearchResultsActivity.BUNDLE_ALBUM,
+            albumEdit!!.text.toString().trim { it <= ' ' }
+        )
+        intent.putExtra(
+            SearchResultsActivity.BUNDLE_MIN_RATING,
+            minRatingSpinner!!.selectedItemPosition / 4.0
+        )
         intent.putExtra(SearchResultsActivity.BUNDLE_SHUFFLE, shuffleCheckbox!!.isChecked)
         intent.putExtra(SearchResultsActivity.BUNDLE_SUBSTRING, substringCheckbox!!.isChecked)
         intent.putExtra(SearchResultsActivity.BUNDLE_CACHED, cachedCheckbox!!.isChecked)
@@ -109,10 +121,12 @@ class SearchFormActivity : Activity(), SongDatabaseUpdateListener {
         val artistsWithCounts = service!!.songDb!!.getArtistsSortedByNumSongs()
         for (stats in artistsWithCounts) artists.add(stats.key.artist)
         artistEdit!!.setAdapter(
-                ArrayAdapter(
-                        this@SearchFormActivity,
-                        android.R.layout.simple_dropdown_item_1line,
-                        artists))
+            ArrayAdapter(
+                this@SearchFormActivity,
+                android.R.layout.simple_dropdown_item_1line,
+                artists
+            )
+        )
     }
 
     companion object {

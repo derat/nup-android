@@ -7,7 +7,8 @@ import android.net.ConnectivityManager
 
 // TODO: Make this non-open if possible after switching to Robolectric.
 open class NetworkHelper(context: Context) {
-    private val connectivityManager: ConnectivityManager = context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+    private val connectivityManager =
+        context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
     // Is a network connection currently available?
     val isNetworkAvailable: Boolean
@@ -15,5 +16,4 @@ open class NetworkHelper(context: Context) {
             val info = connectivityManager.activeNetworkInfo
             return info != null && info.isAvailable
         }
-
 }

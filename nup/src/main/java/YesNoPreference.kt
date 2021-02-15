@@ -9,16 +9,16 @@ import android.os.AsyncTask
 import android.preference.DialogPreference
 import android.util.AttributeSet
 import android.widget.Toast
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Date
 import org.erat.nup.NupActivity.Companion.service
 import org.erat.nup.NupService.SongDatabaseUpdateListener
-import org.erat.nup.SongDatabase
 import org.erat.nup.SongDatabase.SyncProgressListener
-import java.text.SimpleDateFormat
-import java.util.*
 
 class YesNoPreference(context: Context, attrs: AttributeSet?) :
-        DialogPreference(context, attrs),
-        SongDatabaseUpdateListener {
+    DialogPreference(context, attrs),
+    SongDatabaseUpdateListener {
 
     override fun onDialogClosed(positiveResult: Boolean) {
         super.onDialogClosed(positiveResult)
@@ -48,32 +48,41 @@ class YesNoPreference(context: Context, attrs: AttributeSet?) :
             val todayCal = Calendar.getInstance()
             lastSyncCal.time = db.lastSyncDate
             todayCal.time = Date()
-            val lastSyncWasToday = lastSyncCal[Calendar.YEAR] == todayCal[Calendar.YEAR] && lastSyncCal[Calendar.MONTH] == todayCal[Calendar.MONTH] && (lastSyncCal[Calendar.DAY_OF_MONTH]
-                    == todayCal[Calendar.DAY_OF_MONTH])
+            val lastSyncWasToday = lastSyncCal[Calendar.YEAR] == todayCal[Calendar.YEAR] &&
+                lastSyncCal[Calendar.MONTH] == todayCal[Calendar.MONTH] &&
+                lastSyncCal[Calendar.DAY_OF_MONTH] == todayCal[Calendar.DAY_OF_MONTH]
             summary = context.resources
-                    .getQuantityString(
-                            R.plurals.sync_status_fmt,
-                            db.numSongs,
-                            db.numSongs,
-                            if (lastSyncWasToday) SimpleDateFormat.getTimeInstance().format(db.lastSyncDate!!) else SimpleDateFormat.getDateInstance().format(db.lastSyncDate!!))
+                .getQuantityString(
+                    R.plurals.sync_status_fmt,
+                    db.numSongs,
+                    db.numSongs,
+                    if (lastSyncWasToday) {
+                        SimpleDateFormat.getTimeInstance().format(db.lastSyncDate!!)
+                    } else {
+                        SimpleDateFormat.getDateInstance().format(db.lastSyncDate!!)
+                    }
+                )
         }
     }
 
-    private inner class SyncSongListTask : AsyncTask<Void?, Int?, String?>(), DialogInterface.OnCancelListener, SyncProgressListener {
+    private inner class SyncSongListTask :
+        AsyncTask<Void?, Int?, String?>(),
+        DialogInterface.OnCancelListener,
+        SyncProgressListener {
         private var dialog: ProgressDialog? = null
         override fun onPreExecute() {
             dialog = ProgressDialog.show(
-                    context,
-                    context.getString(R.string.syncing_song_list),
-                    context.resources
-                            .getQuantityString(R.plurals.sync_update_fmt, 0, 0),
-                    true,  // indeterminate
-                    true) // cancelable
+                context,
+                context.getString(R.string.syncing_song_list),
+                context.resources.getQuantityString(R.plurals.sync_update_fmt, 0, 0),
+                true, // indeterminate
+                true, // cancelable
+            )
             // FIXME: Support canceling.
         }
 
-        protected override fun doInBackground(vararg args: Void?): String? {
-            val message = arrayOfNulls<String>(1)
+        protected override fun doInBackground(vararg args: Void?): String {
+            val message = arrayOf("")
             service!!.songDb!!.syncWithServer(this, message)
             return message[0]
         }
@@ -85,19 +94,20 @@ class YesNoPreference(context: Context, attrs: AttributeSet?) :
                 SongDatabase.SyncState.UPDATING_SONGS -> {
                     dialog!!.progress = numSongs
                     dialog!!.setMessage(
-                            context.resources
-                                    .getQuantityString(
-                                            R.plurals.sync_update_fmt, numSongs, numSongs))
+                        context.resources
+                            .getQuantityString(R.plurals.sync_update_fmt, numSongs, numSongs)
+                    )
                 }
                 SongDatabase.SyncState.DELETING_SONGS -> {
                     dialog!!.progress = numSongs
                     dialog!!.setMessage(
-                            context.resources
-                                    .getQuantityString(
-                                            R.plurals.sync_delete_fmt, numSongs, numSongs))
+                        context.resources
+                            .getQuantityString(R.plurals.sync_delete_fmt, numSongs, numSongs)
+                    )
                 }
                 SongDatabase.SyncState.UPDATING_STATS -> dialog!!.setMessage(
-                        context.getString(R.string.sync_progress_rebuilding_stats_tables))
+                    context.getString(R.string.sync_progress_rebuilding_stats_tables)
+                )
             }
         }
 

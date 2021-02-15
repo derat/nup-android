@@ -14,19 +14,25 @@ import android.os.IBinder
 import android.os.StrictMode
 import android.os.StrictMode.VmPolicy
 import android.util.Log
-import android.view.*
+import android.view.ContextMenu
 import android.view.ContextMenu.ContextMenuInfo
-import android.widget.*
+import android.view.LayoutInflater
+import android.view.Menu
+import android.view.MenuItem
+import android.view.View
+import android.view.ViewGroup
 import android.widget.AdapterView.AdapterContextMenuInfo
-import org.erat.nup.NupActivity
-import org.erat.nup.NupService
+import android.widget.BaseAdapter
+import android.widget.Button
+import android.widget.ImageView
+import android.widget.ListView
+import android.widget.TextView
 import org.erat.nup.NupService.LocalBinder
 import org.erat.nup.NupService.SongListener
 import org.erat.nup.SongDetailsDialog.createBundle
 import org.erat.nup.SongDetailsDialog.createDialog
 import org.erat.nup.SongDetailsDialog.prepareDialog
 import org.erat.nup.Util.formatDurationProgressString
-import java.util.*
 
 class NupActivity : Activity(), SongListener {
     // UI components that we update dynamically.
@@ -61,23 +67,24 @@ class NupActivity : Activity(), SongListener {
     private val playSongTask = Runnable { service!!.playSongAtIndex(currentSongIndex) }
     public override fun onCreate(savedInstanceState: Bundle?) {
         StrictMode.setThreadPolicy(
-                StrictMode.ThreadPolicy.Builder()
-                        .detectDiskReads()
-                        .detectDiskWrites()
-                        .detectNetwork()
-                        .penaltyLog()
-                        .penaltyDeathOnNetwork()
-                        .build())
+            StrictMode.ThreadPolicy.Builder()
+                .detectDiskReads()
+                .detectDiskWrites()
+                .detectNetwork()
+                .penaltyLog()
+                .penaltyDeathOnNetwork()
+                .build()
+        )
+        // TODO: Not including detectActivityLeaks() since I'm getting leaks of Browse*Activity
+        // objects that I don't understand.
         StrictMode.setVmPolicy(
-                VmPolicy.Builder()
-                        .detectLeakedClosableObjects()
-                        .detectLeakedSqlLiteObjects() // TODO: Not including detectActivityLeaks() since I'm getting leaks of
-                        // Browse*Activity
-                        // objects that I
-                        // don't understand.
-                        .penaltyLog()
-                        .penaltyDeath()
-                        .build())
+            VmPolicy.Builder()
+                .detectLeakedClosableObjects()
+                .detectLeakedSqlLiteObjects()
+                .penaltyLog()
+                .penaltyDeath()
+                .build()
+        )
         super.onCreate(savedInstanceState)
         Log.d(TAG, "activity created")
         setContentView(R.layout.main)
@@ -123,9 +130,10 @@ class NupActivity : Activity(), SongListener {
             onPauseStateChange(service!!.paused)
             if (currentSong != null) {
                 onSongPositionChange(
-                        service!!.currentSong,
-                        service!!.currentSongLastPositionMs,
-                        0)
+                    service!!.currentSong,
+                    service!!.currentSongLastPositionMs,
+                    0
+                )
                 playlistView!!.smoothScrollToPosition(currentSongIndex)
             }
 
@@ -167,21 +175,23 @@ class NupActivity : Activity(), SongListener {
     // Implements NupService.SongListener.
     override fun onSongPositionChange(song: Song?, positionMs: Int, durationMs: Int) {
         runOnUiThread(
-                Runnable {
-                    if (song != currentSong) return@Runnable
-                    val positionSec = positionMs / 1000
-                    if (positionSec == lastSongPositionSec) return@Runnable
-                    // MediaPlayer appears to get confused sometimes and report things like
-                    // 0:01.
-                    val durationSec = Math.max(durationMs / 1000, currentSong!!.lengthSec)
-                    timeLabel!!.text = formatDurationProgressString(positionSec, durationSec)
-                    lastSongPositionSec = positionSec
-                })
+            Runnable {
+                if (song != currentSong) return@Runnable
+                val positionSec = positionMs / 1000
+                if (positionSec == lastSongPositionSec) return@Runnable
+                // MediaPlayer appears to get confused sometimes and report things like 0:01.
+                val durationSec = Math.max(durationMs / 1000, currentSong!!.lengthSec)
+                timeLabel!!.text = formatDurationProgressString(positionSec, durationSec)
+                lastSongPositionSec = positionSec
+            }
+        )
     }
 
     // Implements NupService.SongListener.
     override fun onPauseStateChange(paused: Boolean) {
-        runOnUiThread { pauseButton!!.text = getString(if (paused) R.string.play else R.string.pause) }
+        runOnUiThread {
+            pauseButton!!.text = getString(if (paused) R.string.play else R.string.pause)
+        }
     }
 
     // Implements NupService.SongListener.
@@ -196,7 +206,8 @@ class NupActivity : Activity(), SongListener {
     override fun onPlaylistChange(songs: List<Song>) {
         runOnUiThread {
             this.songs = songs
-            findViewById<View>(R.id.playlist_heading).visibility = if (this.songs.isEmpty()) View.INVISIBLE else View.VISIBLE
+            findViewById<View>(R.id.playlist_heading).visibility =
+                if (this.songs.isEmpty()) View.INVISIBLE else View.VISIBLE
             updateCurrentSongIndex(service!!.currentSongIndex)
         }
     }
@@ -210,9 +221,10 @@ class NupActivity : Activity(), SongListener {
                 downloadStatusLabel!!.text = ""
             } else {
                 downloadStatusLabel!!.text = String.format(
-                        "%,d of %,d KB",
-                        Math.round(availableBytes / 1024.0),
-                        Math.round(totalBytes / 1024.0))
+                    "%,d of %,d KB",
+                    Math.round(availableBytes / 1024.0),
+                    Math.round(totalBytes / 1024.0)
+                )
             }
         }
         songListAdapter.notifyDataSetChanged()
@@ -232,8 +244,13 @@ class NupActivity : Activity(), SongListener {
             titleLabel!!.text = song.title
             albumLabel!!.text = song.album
             timeLabel!!.text = formatDurationProgressString(
-                    if (song == service!!.currentSong) service!!.currentSongLastPositionMs / 1000 else 0,
-                    song.lengthSec)
+                if (song == service!!.currentSong) {
+                    service!!.currentSongLastPositionMs / 1000
+                } else {
+                    0
+                },
+                song.lengthSec
+            )
             downloadStatusLabel!!.text = ""
             if (song.coverBitmap != null) {
                 albumImageView!!.visibility = View.VISIBLE
@@ -260,7 +277,9 @@ class NupActivity : Activity(), SongListener {
         val downloadAll = if (service != null) service!!.getShouldDownloadAll() else false
         item.setTitle(if (downloadAll) R.string.dont_download_all else R.string.download_all)
         item.setIcon(
-                if (downloadAll) R.drawable.ic_cloud_off_white_24dp else R.drawable.ic_cloud_download_white_24dp)
+            if (downloadAll) R.drawable.ic_cloud_off_white_24dp
+            else R.drawable.ic_cloud_download_white_24dp
+        )
         return true
     }
 
@@ -275,11 +294,11 @@ class NupActivity : Activity(), SongListener {
                 true
             }
             R.id.pause_menu_item -> {
-                if (service != null) service!!.pause()
+                service?.pause()
                 true
             }
             R.id.download_all_menu_item -> {
-                if (service != null) service!!.setShouldDownloadAll(!service!!.getShouldDownloadAll())
+                service?.setShouldDownloadAll(!(service?.getShouldDownloadAll() ?: false))
                 true
             }
             R.id.settings_menu_item -> {
@@ -297,18 +316,9 @@ class NupActivity : Activity(), SongListener {
 
     // Adapts our information about the current playlist and song for the song list view.
     private inner class SongListAdapter : BaseAdapter() {
-        override fun getCount(): Int {
-            return songs.size
-        }
-
-        override fun getItem(position: Int): Any {
-            return position
-        }
-
-        override fun getItemId(position: Int): Long {
-            return position.toLong()
-        }
-
+        override fun getCount(): Int { return songs.size }
+        override fun getItem(position: Int): Any { return position }
+        override fun getItemId(position: Int): Long { return position.toLong() }
         override fun getView(position: Int, convertView: View?, parent: ViewGroup): View {
             val view = if (convertView != null) {
                 convertView
@@ -323,34 +333,47 @@ class NupActivity : Activity(), SongListener {
             artistView.text = song.artist
             titleView.text = song.title
             if (song.totalBytes > 0) {
-                if (song.availableBytes == song.totalBytes) percentView.text = "\u2713" // CHECK MARK from Dingbats
-                else percentView.setText(Math.round(100.0
-                        * song.availableBytes
-                        / song.totalBytes).toInt().toString() + "%")
+                // CHECK MARK from Dingbats.
+                if (song.availableBytes == song.totalBytes) percentView.text = "\u2713"
+                else percentView.setText(
+                    Math.round(
+                        100.0 *
+                            song.availableBytes /
+                            song.totalBytes
+                    ).toInt().toString() + "%"
+                )
                 percentView.visibility = View.VISIBLE
             } else {
                 percentView.visibility = View.GONE
             }
             val currentlyPlaying = position == currentSongIndex
             view.setBackgroundColor(
-                    resources
-                            .getColor(
-                                    if (currentlyPlaying) R.color.primary else android.R.color.transparent))
+                resources
+                    .getColor(
+                        if (currentlyPlaying) R.color.primary else android.R.color.transparent
+                    )
+            )
             artistView.setTextColor(
-                    resources
-                            .getColor(if (currentlyPlaying) R.color.icons else R.color.primary_text))
+                resources
+                    .getColor(if (currentlyPlaying) R.color.icons else R.color.primary_text)
+            )
             titleView.setTextColor(
-                    resources
-                            .getColor(if (currentlyPlaying) R.color.icons else R.color.primary_text))
+                resources
+                    .getColor(if (currentlyPlaying) R.color.icons else R.color.primary_text)
+            )
             percentView.setTextColor(
-                    resources
-                            .getColor(if (currentlyPlaying) R.color.icons else R.color.primary_text))
+                resources
+                    .getColor(if (currentlyPlaying) R.color.icons else R.color.primary_text)
+            )
             return view
         }
     }
 
     override fun onCreateContextMenu(
-            menu: ContextMenu, view: View, menuInfo: ContextMenuInfo) {
+        menu: ContextMenu,
+        view: View,
+        menuInfo: ContextMenuInfo
+    ) {
         if (view.id == R.id.playlist) {
             val info = menuInfo as AdapterContextMenuInfo
             val song = songs[info.position]
@@ -431,7 +454,6 @@ class NupActivity : Activity(), SongListener {
         private const val DIALOG_SONG_DETAILS = 1
 
         // Persistent service to which we connect.
-        @JvmStatic
         public var service: NupService? = null
             private set
     }

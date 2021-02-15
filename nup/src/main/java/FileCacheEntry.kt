@@ -5,10 +5,11 @@ package org.erat.nup
 import java.io.File
 
 class FileCacheEntry(
-        private val musicDir: String,
-        @JvmField val songId: Long,
-        var totalBytes: Long,
-        var lastAccessTime: Int) {
+    private val musicDir: String,
+    val songId: Long,
+    var totalBytes: Long,
+    var lastAccessTime: Int
+) {
     var cachedBytes: Long = 0
     val localFile: File
         get() = File(musicDir, "$songId.mp3")

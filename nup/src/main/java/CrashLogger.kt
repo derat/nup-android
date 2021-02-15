@@ -8,7 +8,7 @@ import java.io.FileNotFoundException
 import java.io.IOException
 import java.io.PrintWriter
 import java.text.SimpleDateFormat
-import java.util.*
+import java.util.Date
 
 class CrashLogger private constructor(private val dir: File) : Thread.UncaughtExceptionHandler {
     private val defaultHandler = Thread.getDefaultUncaughtExceptionHandler()
@@ -17,7 +17,7 @@ class CrashLogger private constructor(private val dir: File) : Thread.UncaughtEx
             dir.mkdirs()
             val format = SimpleDateFormat("yyyyMMdd-HHmmss")
             val file = File(dir, format.format(Date()) + ".txt")
-            Log.d(TAG, "creating crash file " + file.absolutePath)
+            Log.d(TAG, "creating crash file ${file.absolutePath}")
             file.createNewFile()
             val writer = PrintWriter(file)
             error.printStackTrace(writer)
@@ -38,19 +38,15 @@ class CrashLogger private constructor(private val dir: File) : Thread.UncaughtEx
     companion object {
         private const val TAG = "CrashLogger"
         private var singleton: CrashLogger? = null
-        @JvmStatic
         fun register(dir: File) {
             if (singleton != null) return
             singleton = CrashLogger(dir)
             Thread.setDefaultUncaughtExceptionHandler(singleton)
         }
-
-        @JvmStatic
         fun unregister() {
             if (singleton == null) return
             Thread.setDefaultUncaughtExceptionHandler(null)
             singleton = null
         }
     }
-
 }

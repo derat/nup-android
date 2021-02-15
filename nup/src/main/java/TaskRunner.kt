@@ -2,7 +2,6 @@
 // All rights reserved.
 package org.erat.nup
 
-import android.annotation.SuppressLint
 import android.os.AsyncTask
 
 /**

@@ -11,16 +11,19 @@ import android.view.ContextMenu.ContextMenuInfo
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
-import android.widget.*
+import android.widget.AdapterView
 import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.AdapterView.OnItemClickListener
-import org.erat.nup.BrowseSongsActivity
+import android.widget.ArrayAdapter
+import android.widget.ListView
+import android.widget.SimpleAdapter
+import android.widget.Toast
+import java.util.Collections
 import org.erat.nup.NupActivity.Companion.service
 import org.erat.nup.SongDetailsDialog.createBundle
 import org.erat.nup.SongDetailsDialog.createDialog
 import org.erat.nup.SongDetailsDialog.prepareDialog
 import org.erat.nup.Util.getSortingKey
-import java.util.*
 
 // This class doesn't extend BrowseActivityBase since it displays a different menu.
 class BrowseSongsActivity : Activity(), OnItemClickListener {
@@ -43,12 +46,22 @@ class BrowseSongsActivity : Activity(), OnItemClickListener {
         minRating = intent.getDoubleExtra(BrowseActivityBase.BUNDLE_MIN_RATING, -1.0)
         title = if (album != null) {
             getString(
-                    if (onlyCached) R.string.browse_cached_songs_from_album_fmt else R.string.browse_songs_from_album_fmt,
-                    album)
+                if (onlyCached) {
+                    R.string.browse_cached_songs_from_album_fmt
+                } else {
+                    R.string.browse_songs_from_album_fmt
+                },
+                album
+            )
         } else if (artist != null) {
             getString(
-                    if (onlyCached) R.string.browse_cached_songs_by_artist_fmt else R.string.browse_songs_by_artist_fmt,
-                    artist)
+                if (onlyCached) {
+                    R.string.browse_cached_songs_by_artist_fmt
+                } else {
+                    R.string.browse_songs_by_artist_fmt
+                },
+                artist
+            )
         } else {
             getString(if (onlyCached) R.string.browse_cached_songs else R.string.browse_songs)
         }
@@ -60,14 +73,10 @@ class BrowseSongsActivity : Activity(), OnItemClickListener {
                 val items: MutableList<String> = ArrayList()
                 items.add(getString(R.string.loading))
                 val adapter: ArrayAdapter<String> = object : ArrayAdapter<String>(
-                        this@BrowseSongsActivity, R.layout.browse_row, R.id.main, items) {
-                    override fun areAllItemsEnabled(): Boolean {
-                        return false
-                    }
-
-                    override fun isEnabled(position: Int): Boolean {
-                        return false
-                    }
+                    this@BrowseSongsActivity, R.layout.browse_row, R.id.main, items
+                ) {
+                    override fun areAllItemsEnabled(): Boolean { return false }
+                    override fun isEnabled(position: Int): Boolean { return false }
                 }
                 val view = findViewById<View>(R.id.songs) as ListView
                 view.adapter = adapter
@@ -75,20 +84,19 @@ class BrowseSongsActivity : Activity(), OnItemClickListener {
 
             protected override fun doInBackground(vararg args: Void?): List<Song> {
                 return service!!
-                        .songDb!!
-                        .query(artist, null, album, albumId, minRating, false, false, onlyCached)
+                    .songDb!!
+                    .query(artist, null, album, albumId, minRating, false, false, onlyCached)
             }
 
             override fun onPostExecute(newSongs: List<Song>) {
                 // The results come back in album order. If we're viewing all songs by
                 // an artist, sort them alphabetically instead.
-                if ((album == null || album!!.isEmpty()) && (albumId == null || albumId!!.isEmpty())) {
-                    Collections.sort(
-                            newSongs
-                    ) { a, b ->
+                if ((album == null || album!!.isEmpty()) &&
+                    (albumId == null || albumId!!.isEmpty())
+                ) {
+                    Collections.sort(newSongs) { a, b ->
                         getSortingKey(a.title, Util.SORT_TITLE)
-                                .compareTo(
-                                        getSortingKey(b.title, Util.SORT_TITLE))
+                            .compareTo(getSortingKey(b.title, Util.SORT_TITLE))
                     }
                 }
                 songs = newSongs
@@ -100,9 +108,10 @@ class BrowseSongsActivity : Activity(), OnItemClickListener {
                     data.add(map)
                 }
                 val adapter = SimpleAdapter(
-                        this@BrowseSongsActivity,
-                        data,
-                        R.layout.browse_row, arrayOf(titleKey), intArrayOf(R.id.main))
+                    this@BrowseSongsActivity,
+                    data,
+                    R.layout.browse_row, arrayOf(titleKey), intArrayOf(R.id.main)
+                )
                 val view = findViewById<View>(R.id.songs) as ListView
                 view.adapter = adapter
                 view.onItemClickListener = this@BrowseSongsActivity
@@ -132,7 +141,10 @@ class BrowseSongsActivity : Activity(), OnItemClickListener {
     }
 
     override fun onCreateContextMenu(
-            menu: ContextMenu, view: View, menuInfo: ContextMenuInfo) {
+        menu: ContextMenu,
+        view: View,
+        menuInfo: ContextMenuInfo
+    ) {
         if (view.id == R.id.songs) {
             val info = menuInfo as AdapterContextMenuInfo
             val song = songs[info.position]
@@ -173,7 +185,7 @@ class BrowseSongsActivity : Activity(), OnItemClickListener {
         val song = songs[position]
         service!!.appendSongToPlaylist(song)
         Toast.makeText(this, getString(R.string.appended_song_fmt, song.title), Toast.LENGTH_SHORT)
-                .show()
+            .show()
     }
 
     override fun onCreateDialog(id: Int, args: Bundle): Dialog? {

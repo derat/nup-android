@@ -4,8 +4,9 @@ package org.erat.nup
 
 // Holds song count for a specific key.
 class StatsRow(
-        @JvmField val key: StatsKey,
-        @JvmField var count: Int) {
-    constructor(artist: String?, album: String?, albumId: String?, count: Int)
-            : this(StatsKey(artist!!, album!!, albumId!!), count) {}
+    val key: StatsKey,
+    var count: Int
+) {
+    constructor(artist: String, album: String, albumId: String, count: Int) :
+        this(StatsKey(artist, album, albumId), count) {}
 }

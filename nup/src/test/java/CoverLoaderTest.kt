@@ -2,6 +2,12 @@ package org.erat.nup.test
 
 import android.graphics.Bitmap
 import com.google.common.io.Files
+import java.io.File
+import java.io.FileInputStream
+import java.io.IOException
+import java.io.StringBufferInputStream
+import java.net.HttpURLConnection
+import java.net.URL
 import org.erat.nup.BitmapDecoder
 import org.erat.nup.CoverLoader
 import org.erat.nup.Downloader
@@ -15,13 +21,6 @@ import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.MockitoAnnotations
 import org.mockito.stubbing.Answer
-import java.io.File
-import java.io.FileInputStream
-import java.io.IOException
-import java.io.StringBufferInputStream
-import java.net.HttpURLConnection
-import java.net.URL
-import java.util.*
 
 class CoverLoaderTest {
     private var mTaskRunner: FakeTaskRunner? = null
@@ -41,25 +40,27 @@ class CoverLoaderTest {
         mTempDir = Files.createTempDir()
         mBitmapDataMap = HashMap()
         Mockito.`when`(mBitmapDecoder!!.decodeFile(MockitoHelper.anyObject()))
-                .thenAnswer(
-                        Answer<Any?> { invocation ->
-                            var inputStream: FileInputStream? = null
+            .thenAnswer(
+                Answer<Any?> { invocation ->
+                    var inputStream: FileInputStream? = null
+                    try {
+                        inputStream = FileInputStream(invocation.arguments[0] as File)
+                        val fileData = getStringFromInputStream(inputStream)
+                        return@Answer mBitmapDataMap!![fileData]
+                    } catch (e: IOException) {
+                        return@Answer null
+                    } finally {
+                        if (inputStream != null) {
                             try {
-                                inputStream = FileInputStream(invocation.arguments[0] as File)
-                                val fileData = getStringFromInputStream(inputStream)
-                                return@Answer mBitmapDataMap!![fileData]
+                                inputStream.close()
                             } catch (e: IOException) {
-                                return@Answer null
-                            } finally {
-                                if (inputStream != null) {
-                                    try {
-                                        inputStream.close()
-                                    } catch (e: IOException) {
-                                    }
-                                }
                             }
-                        })
-        mCoverLoader = CoverLoader(mTempDir!!, mDownloader!!, mTaskRunner!!, mBitmapDecoder, mNetworkHelper!!)
+                        }
+                    }
+                }
+            )
+        mCoverLoader =
+            CoverLoader(mTempDir!!, mDownloader!!, mTaskRunner!!, mBitmapDecoder, mNetworkHelper!!)
     }
 
     @After
@@ -76,14 +77,16 @@ class CoverLoaderTest {
         val DATA_1 = "foo"
         val BITMAP_1 = createAndRegisterBitmap(DATA_1)
         val conn1 = createConnection(200, DATA_1)
-        Mockito.`when`(mDownloader!!.download(COVER_URL_1, "GET", Downloader.AuthType.STORAGE, null))
-                .thenReturn(conn1)
+        Mockito.`when`(
+            mDownloader!!.download(COVER_URL_1, "GET", Downloader.AuthType.STORAGE, null)
+        ).thenReturn(conn1)
         val COVER_URL_2 = URL("https://www.example.com/cover2.jpg")
         val DATA_2 = "bar"
         val BITMAP_2 = createAndRegisterBitmap(DATA_2)
         val conn2 = createConnection(200, DATA_2)
-        Mockito.`when`(mDownloader.download(COVER_URL_2, "GET", Downloader.AuthType.STORAGE, null))
-                .thenReturn(conn2)
+        Mockito.`when`(
+            mDownloader.download(COVER_URL_2, "GET", Downloader.AuthType.STORAGE, null)
+        ).thenReturn(conn2)
 
         // The first load request for each cover should result in it being downloaded, but it should
         // be cached after that.
@@ -93,9 +96,9 @@ class CoverLoaderTest {
         Assert.assertEquals(BITMAP_1, mCoverLoader!!.loadCover(COVER_URL_1))
         Assert.assertEquals(BITMAP_2, mCoverLoader!!.loadCover(COVER_URL_2))
         Mockito.verify(mDownloader, Mockito.times(1))
-                .download(COVER_URL_1, "GET", Downloader.AuthType.STORAGE, null)
+            .download(COVER_URL_1, "GET", Downloader.AuthType.STORAGE, null)
         Mockito.verify(mDownloader, Mockito.times(1))
-                .download(COVER_URL_2, "GET", Downloader.AuthType.STORAGE, null)
+            .download(COVER_URL_2, "GET", Downloader.AuthType.STORAGE, null)
     }
 
     @Test
@@ -104,7 +107,8 @@ class CoverLoaderTest {
         val COVER_URL = URL("https://www.example.com/cover.jpg")
         Mockito.`when`(mNetworkHelper!!.isNetworkAvailable).thenReturn(false)
         Assert.assertNull(mCoverLoader!!.loadCover(COVER_URL))
-        Mockito.verify(mDownloader!!, Mockito.never()).download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null)
+        Mockito.verify(mDownloader!!, Mockito.never())
+            .download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null)
     }
 
     @Test
@@ -114,7 +118,7 @@ class CoverLoaderTest {
         val COVER_URL = URL("https://www.example.com/cover.jpg")
         val conn = createConnection(404, null)
         Mockito.`when`(mDownloader!!.download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null))
-                .thenReturn(conn)
+            .thenReturn(conn)
         Assert.assertNull(mCoverLoader!!.loadCover(COVER_URL))
     }
 
@@ -124,7 +128,7 @@ class CoverLoaderTest {
         Mockito.`when`(mNetworkHelper!!.isNetworkAvailable).thenReturn(true)
         val COVER_URL = URL("https://www.example.com/cover.jpg")
         Mockito.`when`(mDownloader!!.download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null))
-                .thenThrow(IOException())
+            .thenThrow(IOException())
         Assert.assertNull(mCoverLoader!!.loadCover(COVER_URL))
     }
 
@@ -137,7 +141,7 @@ class CoverLoaderTest {
         val BITMAP = createAndRegisterBitmap(DATA)
         val conn = createConnection(200, DATA)
         Mockito.`when`(mDownloader!!.download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null))
-                .thenReturn(conn)
+            .thenReturn(conn)
         Assert.assertEquals(BITMAP, mCoverLoader!!.loadCover(COVER_URL))
         Assert.assertEquals(BITMAP, mCoverLoader!!.loadCover(COVER_URL))
         Assert.assertEquals(BITMAP, mCoverLoader!!.loadCover(COVER_URL))

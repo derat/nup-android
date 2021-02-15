@@ -19,7 +19,7 @@ object SongDetailsDialog {
     private const val BUNDLE_TRACK_NUM = "track_num"
     private const val BUNDLE_LENGTH_SEC = "length_sec"
     private const val BUNDLE_RATING = "rating"
-    @JvmStatic
+
     fun createBundle(song: Song): Bundle {
         val bundle = Bundle()
         bundle.putString(BUNDLE_ARTIST, song.artist)
@@ -31,7 +31,6 @@ object SongDetailsDialog {
         return bundle
     }
 
-    @JvmStatic
     fun createDialog(context: Context?): Dialog {
         val dialog = Dialog(context!!)
         dialog.requestWindowFeature(Window.FEATURE_NO_TITLE)
@@ -39,13 +38,15 @@ object SongDetailsDialog {
         return dialog
     }
 
-    @JvmStatic
     fun prepareDialog(dialog: Dialog, bundle: Bundle) {
         (dialog.findViewById<View>(R.id.artist) as TextView).text = bundle.getString(BUNDLE_ARTIST)
         (dialog.findViewById<View>(R.id.title) as TextView).text = bundle.getString(BUNDLE_TITLE)
         (dialog.findViewById<View>(R.id.album) as TextView).text = bundle.getString(BUNDLE_ALBUM)
-        (dialog.findViewById<View>(R.id.track) as TextView).text = bundle.getInt(BUNDLE_TRACK_NUM).toString()
-        (dialog.findViewById<View>(R.id.length) as TextView).text = formatDurationString(bundle.getInt(BUNDLE_LENGTH_SEC))
+        (dialog.findViewById<View>(R.id.track) as TextView).text =
+            bundle.getInt(BUNDLE_TRACK_NUM).toString()
+        (dialog.findViewById<View>(R.id.length) as TextView).text =
+            formatDurationString(bundle.getInt(BUNDLE_LENGTH_SEC))
+
         var ratingStr = ""
         val rating = bundle.getDouble(BUNDLE_RATING)
         if (rating >= 0.0) {

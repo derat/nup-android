@@ -19,11 +19,9 @@ import android.widget.ListView
 import android.widget.SimpleAdapter
 import android.widget.Toast
 import org.erat.nup.NupActivity.Companion.service
-import org.erat.nup.SearchResultsActivity
 import org.erat.nup.SongDetailsDialog.createBundle
 import org.erat.nup.SongDetailsDialog.createDialog
 import org.erat.nup.SongDetailsDialog.prepareDialog
-import java.util.*
 
 class SearchResultsActivity : Activity() {
     // Songs that we're displaying.
@@ -33,15 +31,16 @@ class SearchResultsActivity : Activity() {
         super.onCreate(savedInstanceState)
         setTitle(R.string.search_results)
         setContentView(R.layout.search_results)
-        class Query     // TODO: Include albumId somehow.
-        (
-                var artist: String?,
-                var title: String?,
-                var album: String?,
-                var minRating: Double,
-                var shuffle: Boolean,
-                var substring: Boolean,
-                var onlyCached: Boolean)
+        class Query(
+            var artist: String?,
+            var title: String?,
+            var album: String?,
+            // TODO: Include albumId somehow.
+            var minRating: Double,
+            var shuffle: Boolean,
+            var substring: Boolean,
+            var onlyCached: Boolean
+        )
 
         val queries: MutableList<Query> = ArrayList()
         val intent = intent
@@ -52,24 +51,27 @@ class SearchResultsActivity : Activity() {
             queries.add(Query(null, queryString, null, -1.0, false, true, false))
         } else {
             queries.add(
-                    Query(
-                            intent.getStringExtra(BUNDLE_ARTIST),
-                            intent.getStringExtra(BUNDLE_TITLE),
-                            intent.getStringExtra(BUNDLE_ALBUM),
-                            intent.getDoubleExtra(BUNDLE_MIN_RATING, -1.0),
-                            intent.getBooleanExtra(BUNDLE_SHUFFLE, false),
-                            intent.getBooleanExtra(BUNDLE_SUBSTRING, false),
-                            intent.getBooleanExtra(BUNDLE_CACHED, false)))
+                Query(
+                    intent.getStringExtra(BUNDLE_ARTIST),
+                    intent.getStringExtra(BUNDLE_TITLE),
+                    intent.getStringExtra(BUNDLE_ALBUM),
+                    intent.getDoubleExtra(BUNDLE_MIN_RATING, -1.0),
+                    intent.getBooleanExtra(BUNDLE_SHUFFLE, false),
+                    intent.getBooleanExtra(BUNDLE_SUBSTRING, false),
+                    intent.getBooleanExtra(BUNDLE_CACHED, false)
+                )
+            )
         }
         object : AsyncTask<Void?, Void?, List<Song>>() {
             private var dialog: ProgressDialog? = null
             override fun onPreExecute() {
                 dialog = ProgressDialog.show(
-                        this@SearchResultsActivity,
-                        getString(R.string.searching),
-                        getString(R.string.querying_database),
-                        true,  // indeterminate
-                        true) // cancelable
+                    this@SearchResultsActivity,
+                    getString(R.string.searching),
+                    getString(R.string.querying_database),
+                    true, // indeterminate
+                    true, // cancelable
+                )
                 // FIXME: Support canceling.
             }
 
@@ -77,17 +79,19 @@ class SearchResultsActivity : Activity() {
                 val newSongs = ArrayList<Song>()
                 for (query in queries) {
                     newSongs.addAll(
-                            service!!
-                                    .songDb!!
-                                    .query(
-                                            query.artist,
-                                            query.title,
-                                            query.album,
-                                            null,
-                                            query.minRating,
-                                            query.shuffle,
-                                            query.substring,
-                                            query.onlyCached))
+                        service!!
+                            .songDb!!
+                            .query(
+                                query.artist,
+                                query.title,
+                                query.album,
+                                null,
+                                query.minRating,
+                                query.shuffle,
+                                query.substring,
+                                query.onlyCached
+                            )
+                    )
                 }
                 return newSongs
             }
@@ -105,19 +109,23 @@ class SearchResultsActivity : Activity() {
                         data.add(map)
                     }
                     val adapter = SimpleAdapter(
-                            this@SearchResultsActivity,
-                            data,
-                            R.layout.search_results_row, arrayOf(artistKey, titleKey), intArrayOf(R.id.artist, R.id.title))
+                        this@SearchResultsActivity,
+                        data,
+                        R.layout.search_results_row,
+                        arrayOf(artistKey, titleKey),
+                        intArrayOf(R.id.artist, R.id.title)
+                    )
                     val view = findViewById<View>(R.id.results) as ListView
                     view.adapter = adapter
                     registerForContextMenu(view)
                 }
                 dialog!!.dismiss()
                 val message = if (!songs.isEmpty()) resources
-                        .getQuantityString(
-                                R.plurals.search_found_songs_fmt,
-                                songs.size,
-                                songs.size) else getString(R.string.no_results)
+                    .getQuantityString(
+                        R.plurals.search_found_songs_fmt,
+                        songs.size,
+                        songs.size
+                    ) else getString(R.string.no_results)
                 Toast.makeText(this@SearchResultsActivity, message, Toast.LENGTH_SHORT).show()
                 if (songs.isEmpty()) finish()
             }
@@ -130,7 +138,10 @@ class SearchResultsActivity : Activity() {
     }
 
     override fun onCreateContextMenu(
-            menu: ContextMenu, view: View, menuInfo: ContextMenuInfo) {
+        menu: ContextMenu,
+        view: View,
+        menuInfo: ContextMenuInfo
+    ) {
         if (view.id == R.id.results) {
             val info = menuInfo as AdapterContextMenuInfo
             val song = songs[info.position]

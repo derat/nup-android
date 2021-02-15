@@ -11,11 +11,9 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.ListView
-import org.erat.nup.BrowseAlbumsActivity
 import org.erat.nup.NupActivity.Companion.service
 import org.erat.nup.NupService.SongDatabaseUpdateListener
 import org.erat.nup.Util.resizeListViewToFixFastScroll
-import java.util.*
 
 class BrowseArtistsActivity : BrowseActivityBase(), SongDatabaseUpdateListener {
     // Are we displaying only cached songs?
@@ -29,11 +27,12 @@ class BrowseArtistsActivity : BrowseActivityBase(), SongDatabaseUpdateListener {
         onlyCached = intent.getBooleanExtra(BUNDLE_CACHED, false)
         setTitle(if (onlyCached) R.string.browse_cached_artists else R.string.browse_artists)
         adapter = StatsRowArrayAdapter(
-                this,
-                R.layout.browse_row,
-                rows,
-                StatsRowArrayAdapter.DISPLAY_ARTIST,
-                Util.SORT_ARTIST)
+            this,
+            R.layout.browse_row,
+            rows,
+            StatsRowArrayAdapter.DISPLAY_ARTIST,
+            Util.SORT_ARTIST
+        )
         listAdapter = adapter
         registerForContextMenu(listView)
         service!!.addSongDatabaseUpdateListener(this)
@@ -50,7 +49,10 @@ class BrowseArtistsActivity : BrowseActivityBase(), SongDatabaseUpdateListener {
     }
 
     override fun onCreateContextMenu(
-            menu: ContextMenu, view: View, menuInfo: ContextMenuInfo) {
+        menu: ContextMenu,
+        view: View,
+        menuInfo: ContextMenuInfo
+    ) {
         val pos = (menuInfo as AdapterContextMenuInfo).position
         menu.setHeaderTitle(rows[pos].key.artist)
         menu.add(0, MENU_ITEM_BROWSE_SONGS_WITH_RATING, 0, R.string.browse_songs_four_stars)
@@ -92,8 +94,8 @@ class BrowseArtistsActivity : BrowseActivityBase(), SongDatabaseUpdateListener {
             object : AsyncTask<Void?, Void?, List<StatsRow>>() {
                 protected override fun doInBackground(vararg args: Void?): List<StatsRow> {
                     return service!!
-                            .songDb!!
-                            .cachedArtistsSortedAlphabetically
+                        .songDb!!
+                        .cachedArtistsSortedAlphabetically
                 }
 
                 override fun onPostExecute(rows: List<StatsRow>) {

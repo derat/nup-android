@@ -10,62 +10,63 @@ import java.io.BufferedReader
 import java.io.IOException
 import java.io.InputStream
 import java.io.InputStreamReader
-import java.util.*
+import java.util.Collections
 
 object Util {
+    // TODO: Switch this to Unicode ellipsis.
     private const val TRUNCATION_STRING = "..."
 
     // Different sort types that can be passed to getSortingKey().
-    @JvmField var SORT_ARTIST = 1
-    @JvmField var SORT_TITLE = 2
-    @JvmField var SORT_ALBUM = 3
+    // TODO: Make this be an enum.
+    var SORT_ARTIST = 1
+    var SORT_TITLE = 2
+    var SORT_ALBUM = 3
 
     /** Crash if not running on the given Looper.  */
-    @JvmStatic fun assertOnLooper(looper: Looper) {
-        check(!(looper.thread !== Thread.currentThread())) { "Running on " + Thread.currentThread() + " instead of " + looper.thread }
+    fun assertOnLooper(looper: Looper) {
+        check(!(looper.thread !== Thread.currentThread())) {
+            "Running on ${Thread.currentThread()} instead of ${looper.thread}"
+        }
     }
 
     /** Crash if called from a thread besides the main/UI one.  */
-    @JvmStatic fun assertOnMainThread() {
+    fun assertOnMainThread() {
         assertOnLooper(Looper.getMainLooper())
     }
 
     /** Crash if called from the main thread.  */
-    @JvmStatic fun assertNotOnMainThread() {
-        check(Looper.myLooper() != Looper.getMainLooper()) { "Running on main thread; shouldn't be" }
+    fun assertNotOnMainThread() {
+        check(Looper.myLooper() != Looper.getMainLooper()) {
+            "Running on main thread; shouldn't be"
+        }
     }
 
     // Yay.
-    @JvmStatic
     @Throws(IOException::class)
     fun getStringFromInputStream(stream: InputStream?): String {
         val sb = StringBuilder()
         val reader = BufferedReader(InputStreamReader(stream))
         var line: String?
-        while (reader.readLine().also { line = it } != null) {
-            sb.append(line)
-        }
+        while (reader.readLine().also { line = it } != null) sb.append(line)
         return sb.toString()
     }
 
     // Formats a duration as "0:00".
-    @JvmStatic
     fun formatDurationString(sec: Int): String {
         return String.format("%d:%02d", sec / 60, sec % 60)
     }
 
     // Formats a current duration and total duration as "0:00 / 0:00".
-    @JvmStatic
     fun formatDurationProgressString(curSec: Int, totalSec: Int): String {
-        return formatDurationString(curSec) + " / " + formatDurationString(totalSec)
+        return "${formatDurationString(curSec)} / ${formatDurationString(totalSec)}"
     }
 
     // Truncate a string.
-    @JvmStatic
     fun truncateString(str: String, maxLength: Int): String {
         if (str.length <= maxLength) return str
         if (maxLength <= TRUNCATION_STRING.length) throw RuntimeException(
-                "unable to truncate string to just $maxLength char(s)")
+            "Unable to truncate string to just $maxLength char(s)"
+        )
         return str.substring(0, maxLength - TRUNCATION_STRING.length) + TRUNCATION_STRING
     }
 
@@ -74,19 +75,15 @@ object Util {
     // Unicode support in filenames is a mess on Android.  Filenames are silently converted to UTF-8
     // bytes before being written.  On FAT filesystems, hilarity ensues.  Just URL-escape everything
     // instead.
-    @JvmStatic
     fun escapeStringForFilename(str: String): String {
         // Uri: "Leaves letters (A-Z, a-z), numbers (0-9), and unreserved characters (_-!.~'()*)
         // intact."
         // FAT: permits letters, numbers, spaces, and these characters: ! # $ % & ' ( ) - @ ^ _ ` {
         // } ~
-        var esc = Uri.encode(str, " #$&@^`{}")
-        esc = esc.replace("*", "%2A")
-        return esc
+        return Uri.encode(str, " #$&@^`{}").replace("*", "%2A")
     }
 
     // Find the position of a string in an array.  Returns -1 if it's not there.
-    @JvmStatic
     fun getStringArrayIndex(array: Array<String>, str: String): Int {
         for (i in array.indices) if (array[i] == str) return i
         return -1
@@ -98,9 +95,9 @@ object Util {
     //
     // If this method is changed, SongDatabase.updateStatsTables() must be called on the next run,
     // as sorting keys are cached in the database.
-    @JvmStatic
     fun getSortingKey(str: String, sortType: Int): String {
         var key = str.toLowerCase()
+        // TODO: Put keys in an immutable set.
         if (sortType == SORT_ARTIST) {
             if (key == "[dialogue]" || key == "[no artist]" || key == "[unknown]") {
                 // Strings used by MusicBrainz and/or Picard.
@@ -117,6 +114,7 @@ object Util {
         }
 
         // Strip off leading punctuation, common articles, and other junk.
+        // TODO: Put prefixes in immutable set.
         val prefixes = arrayOf(" ", "\"", "'", "’", "(", "[", "<", "...", "a ", "an ", "the ")
         var start = 0
         while (start < key.length) {
@@ -129,37 +127,28 @@ object Util {
                     break
                 }
             }
-            if (!found) {
-                break
-            }
+            if (!found) break
         }
-        if (start > 0) {
-            key = key.substring(start)
-        }
+        if (start > 0) key = key.substring(start)
         return key
     }
 
     // Sort the supplied list by its keys.
-    @JvmStatic
     fun sortStatsRowList(stats: List<StatsRow>, sortType: Int) {
         // Getting sorting keys is expensive, so just do it once.
         val keys = HashMap<StatsKey, String>()
-        if (sortType == SORT_ALBUM) {
-            for (s in stats) {
-                var key = getSortingKey(s.key.album, sortType)
-                key += " " + s.key.albumId
-                keys[s.key] = key
+        when (sortType) {
+            SORT_ALBUM -> {
+                for (s in stats) {
+                    var key = getSortingKey(s.key.album, sortType)
+                    key += " " + s.key.albumId
+                    keys[s.key] = key
+                }
             }
-        } else if (sortType == SORT_ARTIST) {
-            for (s in stats) {
-                keys[s.key] = getSortingKey(s.key.artist, sortType)
-            }
-        } else {
-            throw IllegalArgumentException("invalid sort type")
+            SORT_ARTIST -> for (s in stats) keys[s.key] = getSortingKey(s.key.artist, sortType)
+            else -> throw IllegalArgumentException("invalid sort type")
         }
-        Collections.sort(
-                stats
-        ) { a, b -> keys[a.key]!!.compareTo(keys[b.key]!!) }
+        Collections.sort(stats) { a, b -> keys[a.key]!!.compareTo(keys[b.key]!!) }
     }
 
     // ListView is stupid and can't handle a SectionIndexer's sections getting updated:
@@ -173,10 +162,11 @@ object Util {
     //
     // TODO: Switch to something that doesn't shrink the size of the ListView every time it's
     // called.
-    @JvmStatic
+    // TODO: Is this still needed?
     fun resizeListViewToFixFastScroll(view: ListView) {
         val layoutParams = FrameLayout.LayoutParams(
-                view.width - 1, FrameLayout.LayoutParams.FILL_PARENT)
+            view.width - 1, FrameLayout.LayoutParams.FILL_PARENT
+        )
         view.layoutParams = layoutParams
     }
 }

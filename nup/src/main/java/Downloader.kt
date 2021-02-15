@@ -5,7 +5,6 @@ package org.erat.nup
 import android.content.SharedPreferences
 import android.util.Base64
 import android.util.Log
-import org.erat.nup.Util.getStringFromInputStream
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.MalformedURLException
@@ -15,8 +14,9 @@ import javax.net.ssl.HttpsURLConnection
 
 // TODO: Make this non-open if possible after switching to Robolectric.
 open class Downloader(
-        private val authenticator: Authenticator,
-        private val prefs: SharedPreferences) {
+    private val authenticator: Authenticator,
+    private val prefs: SharedPreferences
+) {
     /* Thrown when the request couldn't be constructed because some preferences that we need are
      * either unset or incorrect. */
     class PrefException(reason: String?) : Exception(reason)
@@ -35,7 +35,11 @@ open class Downloader(
      */
     @Throws(IOException::class)
     fun download(
-            url: URL, method: String, authType: AuthType, headers: Map<String, String>?): HttpURLConnection {
+        url: URL,
+        method: String,
+        authType: AuthType,
+        headers: Map<String, String>?
+    ): HttpURLConnection {
         Log.d(TAG, "starting $method to $url")
         val conn = url.openConnection() as HttpsURLConnection
         conn.connectTimeout = CONNECT_TIMEOUT_MS
@@ -52,9 +56,12 @@ open class Downloader(
             val password = prefs.getString(NupPreferences.PASSWORD, "")
             if (!username!!.isEmpty() && !password!!.isEmpty()) {
                 conn.setRequestProperty(
-                        "Authorization", "Basic "
-                        + Base64.encodeToString(
-                        "$username:$password".toByteArray(), Base64.NO_WRAP))
+                    "Authorization",
+                    "Basic " +
+                        Base64.encodeToString(
+                            "$username:$password".toByteArray(), Base64.NO_WRAP
+                        )
+                )
             }
         } else if (authType == AuthType.STORAGE) {
             try {
@@ -66,14 +73,7 @@ open class Downloader(
         }
         return try {
             conn.connect()
-            Log.d(
-                    TAG,
-                    "got "
-                            + conn.responseCode
-                            + " ("
-                            + conn.responseMessage
-                            + ") for "
-                            + url.toString())
+            Log.d(TAG, "got ${conn.responseCode} (${conn.responseMessage}) for $url")
             conn
         } catch (e: SocketTimeoutException) {
             Log.e(TAG, "got timeout for $url", e)
@@ -86,18 +86,18 @@ open class Downloader(
         }
     }
 
-    fun downloadString(path: String?, error: Array<String?>): String? {
+    fun downloadString(path: String, error: Array<String>): String? {
         var conn: HttpURLConnection? = null
         return try {
             conn = download(getServerUrl(path), "GET", AuthType.SERVER, null)
             val status = conn.responseCode
             if (status != 200) {
-                error[0] = "Got " + status + " from server (" + conn.responseMessage + ")"
+                error[0] = "Got $status from server (${conn.responseMessage})"
                 return null
             }
             val stream = conn.inputStream
             try {
-                getStringFromInputStream(stream)
+                Util.getStringFromInputStream(stream)
             } finally {
                 // This isn't documented as being necessary, but it seems to be needed to avoid a
                 // StrictMode crash caused by a resource leak when syncing songs:
@@ -141,7 +141,7 @@ open class Downloader(
                 stream.close()
             }
         } catch (e: PrefException) {
-            error[0] = e.message
+            error[0] = e.message ?: "Pref error ($e)"
             null
         } catch (e: IOException) {
             error[0] = "IO error ($e)"
@@ -152,7 +152,7 @@ open class Downloader(
     }
 
     @Throws(PrefException::class)
-    fun getServerUrl(path: String?): URL {
+    fun getServerUrl(path: String): URL {
         val server = prefs.getString(NupPreferences.SERVER_URL, "")
         if (server!!.isEmpty()) {
             throw PrefException("Server URL is not configured")
@@ -160,8 +160,7 @@ open class Downloader(
         val serverUrl: URL = try {
             URL(server)
         } catch (e: MalformedURLException) {
-            throw PrefException(
-                    "Unable to parse server URL \"" + server + "\" (" + e.message + ")")
+            throw PrefException("Unable to parse server URL $server (${e.message})")
         }
 
         // Check protocol and set port.
@@ -173,15 +172,15 @@ open class Downloader(
             if (serverUrl.port > 0) serverUrl.port else 443
         } else {
             throw PrefException(
-                    "Unknown server URL scheme \"$protocol\" "
-                            + "(should be \"http\" or \"https\")")
+                "Unknown server URL scheme \"$protocol\" (should be \"http\" or \"https\")"
+            )
         }
 
         // Now build the real URL.
         return try {
             URL(protocol, serverUrl.host, port, path)
         } catch (e: MalformedURLException) {
-            throw PrefException("Unable to parse URL: " + e.message)
+            throw PrefException("Unable to parse URL: ${e.message}")
         }
     }
 

@@ -25,8 +25,7 @@ class DatabaseUpdater(private val opener: DatabaseOpener) : Runnable {
                 return
             }
         }
-        handler!!.post(
-                Runnable { Looper.myLooper()!!.quit() })
+        handler!!.post(Runnable { Looper.myLooper()!!.quit() })
     }
 
     fun postUpdate(sql: String?, values: Array<Any>?) {

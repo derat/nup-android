@@ -23,10 +23,12 @@ class BrowseTopActivity : BrowseActivityBase() {
     override fun onListItemClick(listView: ListView?, view: View?, position: Int, id: Long) {
         if (position == 0) {
             startActivityForResult(
-                    Intent(this, BrowseArtistsActivity::class.java), BROWSE_ARTISTS_REQUEST_CODE)
+                Intent(this, BrowseArtistsActivity::class.java), BROWSE_ARTISTS_REQUEST_CODE
+            )
         } else if (position == 1) {
             startActivityForResult(
-                    Intent(this, BrowseAlbumsActivity::class.java), BROWSE_ALBUMS_REQUEST_CODE)
+                Intent(this, BrowseAlbumsActivity::class.java), BROWSE_ALBUMS_REQUEST_CODE
+            )
         } else if (position == 2) {
             val intent = Intent(this, BrowseArtistsActivity::class.java)
             intent.putExtra(BUNDLE_CACHED, true)
