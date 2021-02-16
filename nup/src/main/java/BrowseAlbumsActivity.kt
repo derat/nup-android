@@ -80,7 +80,7 @@ class BrowseAlbumsActivity : BrowseActivityBase() {
             else -> object : AsyncTask<Void?, Void?, List<StatsRow>>() {
                 protected override fun doInBackground(vararg args: Void?): List<StatsRow> {
                     return if (artist != null) {
-                        db.getCachedAlbumsByArtist(artist!!)
+                        db.cachedAlbumsByArtist(artist!!)
                     } else {
                         db.cachedAlbumsSortedAlphabetically
                     }

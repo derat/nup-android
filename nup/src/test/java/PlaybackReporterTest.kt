@@ -9,6 +9,8 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.util.Arrays
 import java.util.Date
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.test.TestCoroutineScope
 import org.erat.nup.Downloader
 import org.erat.nup.NetworkHelper
 import org.erat.nup.PlaybackReporter
@@ -21,141 +23,125 @@ import org.mockito.Mockito
 import org.mockito.MockitoAnnotations
 
 class PlaybackReporterTest {
-    private val SONG_ID: Long = 1234
-    private val START_DATE = Date(1000 * 1469974953L)
+    val SONG_ID: Long = 1234
+    val START_DATE = Date(1000 * 1469974953L)
+    val scope = TestCoroutineScope()
 
-    @Mock private val mSongDb: SongDatabase? = null
-    @Mock private val mDownloader: Downloader? = null
-    @Mock private val mNetworkHelper: NetworkHelper? = null
-    @Mock private val mSuccessConn: HttpURLConnection? = null
-    @Mock private val mServerErrorConn: HttpURLConnection? = null
+    @Mock lateinit var songDb: SongDatabase
+    @Mock lateinit var downloader: Downloader
+    @Mock lateinit var networkHelper: NetworkHelper
+    @Mock lateinit var successConn: HttpURLConnection
+    @Mock lateinit var serverErrorConn: HttpURLConnection
 
-    private var mTaskRunner: FakeTaskRunner? = null
-    private var mReportUrl: URL? = null
+    lateinit var reportUrl: URL
 
-    @Before
-    @Throws(Exception::class)
-    fun setUp() {
+    @Before fun setUp() {
         MockitoAnnotations.initMocks(this)
-        mTaskRunner = FakeTaskRunner()
-        Mockito.`when`(mSuccessConn!!.responseCode).thenReturn(200)
-        Mockito.`when`(mServerErrorConn!!.responseCode).thenReturn(500)
+        Mockito.`when`(successConn.responseCode).thenReturn(200)
+        Mockito.`when`(serverErrorConn.responseCode).thenReturn(500)
         val reportPath = getReportPath(SONG_ID, START_DATE)
-        mReportUrl = getReportURL(reportPath)
-        Mockito.`when`(mDownloader!!.getServerUrl(reportPath)).thenReturn(mReportUrl)
-        Mockito.`when`(mSongDb!!.allPendingPlaybackReports)
+        reportUrl = getReportUrl(reportPath)
+        Mockito.`when`(downloader.getServerUrl(reportPath)).thenReturn(reportUrl)
+        Mockito.`when`(songDb.allPendingPlaybackReports)
             .thenReturn(ArrayList())
     }
 
-    @Test
-    @Throws(Exception::class)
-    fun immediateSuccessfulReport() {
-        Mockito.`when`(mNetworkHelper!!.isNetworkAvailable).thenReturn(true)
+    @Test fun immediateSuccessfulReport() {
+        Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(true)
 
         val reporter = createReporter()
-        Mockito.`when`(mSongDb!!.allPendingPlaybackReports)
+        Mockito.`when`(songDb.allPendingPlaybackReports)
             .thenReturn(Arrays.asList(PendingPlaybackReport(SONG_ID, START_DATE)))
-        Mockito.`when`(
-            mDownloader!!.download(mReportUrl!!, "POST", Downloader.AuthType.SERVER, null)
-        ).thenReturn(mSuccessConn)
-        reporter.report(SONG_ID, START_DATE)
+        Mockito.`when`(downloader.download(reportUrl, "POST", Downloader.AuthType.SERVER, null))
+            .thenReturn(successConn)
+        scope.launch { reporter.report(SONG_ID, START_DATE) }
 
-        val inOrder = Mockito.inOrder(mSongDb, mDownloader)
-        inOrder.verify(mSongDb).addPendingPlaybackReport(SONG_ID, START_DATE)
+        val inOrder = Mockito.inOrder(songDb, downloader)
+        inOrder.verify(songDb).addPendingPlaybackReport(SONG_ID, START_DATE)
         // For reasons that are unclear to me, Mockito permits this download call to happen multiple
         // times. Maybe it's bad interaction with the earlier when() call. Using times(1) doesn't
         // help and I'm also unable to reproduce this with a simpler example. It's a bummer to have
         // a testing library that you can't trust to verify your code.
-        inOrder.verify(mDownloader).download(mReportUrl!!, "POST", Downloader.AuthType.SERVER, null)
-        inOrder.verify(mSongDb).removePendingPlaybackReport(SONG_ID, START_DATE)
+        inOrder.verify(downloader).download(reportUrl, "POST", Downloader.AuthType.SERVER, null)
+        inOrder.verify(songDb).removePendingPlaybackReport(SONG_ID, START_DATE)
     }
 
-    @Test
-    @Throws(Exception::class)
-    fun deferReportWhenNetworkUnavailable() {
-        Mockito.`when`(mNetworkHelper!!.isNetworkAvailable).thenReturn(false)
+    @Test fun deferReportWhenNetworkUnavailable() {
+        Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(false)
         val reporter = createReporter()
-        Mockito.verify(mSongDb!!, Mockito.never()).allPendingPlaybackReports
-        reporter.report(SONG_ID, START_DATE)
-        Mockito.verify(mSongDb).addPendingPlaybackReport(SONG_ID, START_DATE)
-        Mockito.verifyNoMoreInteractions(mDownloader)
+        scope.launch { reporter.report(SONG_ID, START_DATE) }
+        Mockito.verify(songDb).addPendingPlaybackReport(SONG_ID, START_DATE)
+        Mockito.verifyNoMoreInteractions(downloader)
     }
 
-    @Test
-    @Throws(Exception::class)
-    fun deferReportOnServerError() {
-        Mockito.`when`(mNetworkHelper!!.isNetworkAvailable).thenReturn(true)
-        Mockito.`when`(mSongDb!!.allPendingPlaybackReports)
+    @Test fun deferReportOnServerError() {
+        Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(true)
+        Mockito.`when`(songDb.allPendingPlaybackReports)
             .thenReturn(Arrays.asList(PendingPlaybackReport(SONG_ID, START_DATE)))
-        Mockito.`when`(
-            mDownloader!!.download(mReportUrl!!, "POST", Downloader.AuthType.SERVER, null)
-        ).thenReturn(mServerErrorConn)
+        Mockito.`when`(downloader.download(reportUrl, "POST", Downloader.AuthType.SERVER, null))
+            .thenReturn(serverErrorConn)
 
-        createReporter().report(SONG_ID, START_DATE)
+        scope.launch { createReporter().report(SONG_ID, START_DATE) }
 
-        val inOrder = Mockito.inOrder(mSongDb, mDownloader)
-        inOrder.verify(mSongDb).addPendingPlaybackReport(SONG_ID, START_DATE)
-        inOrder.verify(mDownloader).download(mReportUrl!!, "POST", Downloader.AuthType.SERVER, null)
-        inOrder.verify(mSongDb, Mockito.never()).removePendingPlaybackReport(SONG_ID, START_DATE)
+        val inOrder = Mockito.inOrder(songDb, downloader)
+        inOrder.verify(songDb).addPendingPlaybackReport(SONG_ID, START_DATE)
+        inOrder.verify(downloader).download(reportUrl, "POST", Downloader.AuthType.SERVER, null)
+        inOrder.verify(songDb, Mockito.never()).removePendingPlaybackReport(SONG_ID, START_DATE)
     }
 
-    @Test
-    @Throws(Exception::class)
-    fun reportPendingAtCreation() {
-        Mockito.`when`(mNetworkHelper!!.isNetworkAvailable).thenReturn(true)
-        Mockito.`when`(mSongDb!!.allPendingPlaybackReports)
+    @Test fun reportPendingAtCreation() {
+        Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(true)
+        Mockito.`when`(songDb.allPendingPlaybackReports)
             .thenReturn(Arrays.asList(PendingPlaybackReport(SONG_ID, START_DATE)))
-        Mockito.`when`(
-            mDownloader!!.download(mReportUrl!!, "POST", Downloader.AuthType.SERVER, null)
-        ).thenReturn(mSuccessConn)
+        Mockito.`when`(downloader.download(reportUrl, "POST", Downloader.AuthType.SERVER, null))
+            .thenReturn(successConn)
 
-        createReporter()
+        var reporter = createReporter()
+        scope.launch { reporter.reportPending() }
 
-        val inOrder = Mockito.inOrder(mSongDb, mDownloader)
-        inOrder.verify(mDownloader).download(mReportUrl!!, "POST", Downloader.AuthType.SERVER, null)
-        inOrder.verify(mSongDb).removePendingPlaybackReport(SONG_ID, START_DATE)
+        val inOrder = Mockito.inOrder(songDb, downloader)
+        inOrder.verify(downloader).download(reportUrl, "POST", Downloader.AuthType.SERVER, null)
+        inOrder.verify(songDb).removePendingPlaybackReport(SONG_ID, START_DATE)
     }
 
-    @Test
-    @Throws(Exception::class)
-    fun reportPendingWhenReportRequested() {
-        Mockito.`when`(mNetworkHelper!!.isNetworkAvailable).thenReturn(true)
+    @Test fun reportPendingWhenReportRequested() {
+        Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(true)
 
         // Queue up an old report. Let it succeed, but the next report fail.
         val OLD_SONG_ID: Long = 456
         val OLD_START_DATE = Date(1000 * 1470024671L)
         val OLD_REPORT_PATH = getReportPath(OLD_SONG_ID, OLD_START_DATE)
-        val OLD_REPORT_URL = getReportURL(OLD_REPORT_PATH)
-        Mockito.`when`(mDownloader!!.getServerUrl(OLD_REPORT_PATH)).thenReturn(OLD_REPORT_URL)
-        Mockito.`when`(mSongDb!!.allPendingPlaybackReports).thenReturn(
+        val OLD_REPORT_URL = getReportUrl(OLD_REPORT_PATH)
+        Mockito.`when`(downloader.getServerUrl(OLD_REPORT_PATH)).thenReturn(OLD_REPORT_URL)
+        Mockito.`when`(songDb.allPendingPlaybackReports).thenReturn(
             Arrays.asList(
                 PendingPlaybackReport(OLD_SONG_ID, OLD_START_DATE),
                 PendingPlaybackReport(SONG_ID, START_DATE)
             )
         )
         Mockito.`when`(
-            mDownloader.download(OLD_REPORT_URL, "POST", Downloader.AuthType.SERVER, null)
-        ).thenReturn(mSuccessConn)
-        Mockito.`when`(mDownloader.download(mReportUrl!!, "POST", Downloader.AuthType.SERVER, null))
-            .thenReturn(mServerErrorConn)
+            downloader.download(OLD_REPORT_URL, "POST", Downloader.AuthType.SERVER, null)
+        ).thenReturn(successConn)
+        Mockito.`when`(downloader.download(reportUrl, "POST", Downloader.AuthType.SERVER, null))
+            .thenReturn(serverErrorConn)
 
         val reporter = createReporter()
-        reporter.report(SONG_ID, START_DATE)
+        scope.launch { reporter.report(SONG_ID, START_DATE) }
 
-        val inOrder = Mockito.inOrder(mSongDb, mDownloader)
-        inOrder.verify(mSongDb).addPendingPlaybackReport(SONG_ID, START_DATE)
-        inOrder.verify(mDownloader)
+        val inOrder = Mockito.inOrder(songDb, downloader)
+        inOrder.verify(songDb).addPendingPlaybackReport(SONG_ID, START_DATE)
+        inOrder.verify(downloader)
             .download(OLD_REPORT_URL, "POST", Downloader.AuthType.SERVER, null)
-        inOrder.verify(mSongDb).removePendingPlaybackReport(OLD_SONG_ID, OLD_START_DATE)
-        inOrder.verify(mDownloader).download(mReportUrl!!, "POST", Downloader.AuthType.SERVER, null)
+        inOrder.verify(songDb).removePendingPlaybackReport(OLD_SONG_ID, OLD_START_DATE)
+        inOrder.verify(downloader).download(reportUrl, "POST", Downloader.AuthType.SERVER, null)
 
         // Now send a new report and let both it and the previous one succeed.
         val NEW_SONG_ID: Long = 789
         val NEW_START_DATE = Date(1000 * 1470024251L)
         val NEW_REPORT_PATH = getReportPath(NEW_SONG_ID, NEW_START_DATE)
-        val NEW_REPORT_URL = getReportURL(NEW_REPORT_PATH)
-        Mockito.`when`(mDownloader.getServerUrl(NEW_REPORT_PATH)).thenReturn(NEW_REPORT_URL)
-        Mockito.`when`(mSongDb.allPendingPlaybackReports)
+        val NEW_REPORT_URL = getReportUrl(NEW_REPORT_PATH)
+        Mockito.`when`(downloader.getServerUrl(NEW_REPORT_PATH)).thenReturn(NEW_REPORT_URL)
+        Mockito.`when`(songDb.allPendingPlaybackReports)
             .thenReturn(
                 Arrays.asList(
                     PendingPlaybackReport(SONG_ID, START_DATE),
@@ -164,32 +150,28 @@ class PlaybackReporterTest {
                     )
                 )
             )
-        Mockito.`when`(mDownloader.download(mReportUrl!!, "POST", Downloader.AuthType.SERVER, null))
-            .thenReturn(mSuccessConn)
+        Mockito.`when`(downloader.download(reportUrl, "POST", Downloader.AuthType.SERVER, null))
+            .thenReturn(successConn)
         Mockito.`when`(
-            mDownloader.download(NEW_REPORT_URL, "POST", Downloader.AuthType.SERVER, null)
-        ).thenReturn(mSuccessConn)
+            downloader.download(NEW_REPORT_URL, "POST", Downloader.AuthType.SERVER, null)
+        ).thenReturn(successConn)
 
-        reporter.report(NEW_SONG_ID, NEW_START_DATE)
+        scope.launch { reporter.report(NEW_SONG_ID, NEW_START_DATE) }
 
-        inOrder.verify(mSongDb).addPendingPlaybackReport(NEW_SONG_ID, NEW_START_DATE)
-        inOrder.verify(mDownloader).download(mReportUrl!!, "POST", Downloader.AuthType.SERVER, null)
-        inOrder.verify(mSongDb).removePendingPlaybackReport(SONG_ID, START_DATE)
-        inOrder.verify(mDownloader)
+        inOrder.verify(songDb).addPendingPlaybackReport(NEW_SONG_ID, NEW_START_DATE)
+        inOrder.verify(downloader).download(reportUrl, "POST", Downloader.AuthType.SERVER, null)
+        inOrder.verify(songDb).removePendingPlaybackReport(SONG_ID, START_DATE)
+        inOrder.verify(downloader)
             .download(NEW_REPORT_URL, "POST", Downloader.AuthType.SERVER, null)
-        inOrder.verify(mSongDb).removePendingPlaybackReport(NEW_SONG_ID, NEW_START_DATE)
+        inOrder.verify(songDb).removePendingPlaybackReport(NEW_SONG_ID, NEW_START_DATE)
     }
 
-    private fun createReporter(): PlaybackReporter {
-        return PlaybackReporter(mSongDb!!, mDownloader!!, mTaskRunner!!, mNetworkHelper!!)
+    fun createReporter() = PlaybackReporter(songDb, downloader, networkHelper)
+
+    fun getReportPath(songId: Long, startDate: Date): String {
+        val start = String.format("%.3f", startDate.time / 1000.0)
+        return "/report_played?songId=$songId&startTime=$start"
     }
 
-    private fun getReportPath(songId: Long, startDate: Date): String {
-        return "/report_played?songId=$songId&startTime=${startDate.time / 1000.0}"
-    }
-
-    @Throws(Exception::class)
-    private fun getReportURL(reportPath: String): URL {
-        return URL("https", "www.example.com", reportPath)
-    }
+    fun getReportUrl(reportPath: String) = URL("https", "www.example.com", reportPath)
 }

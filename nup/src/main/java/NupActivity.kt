@@ -130,12 +130,9 @@ class NupActivity : Activity(), SongListener {
             // Get current state from service.
             onPlaylistChange(service!!.getSongs())
             onPauseStateChange(service!!.paused)
-            if (currentSong != null) {
-                onSongPositionChange(
-                    service!!.currentSong,
-                    service!!.currentSongLastPositionMs,
-                    0
-                )
+            val song = currentSong
+            if (song != null && song == service!!.currentSong) {
+                onSongPositionChange(song, service!!.currentSongLastPositionMs, 0)
                 playlistView!!.smoothScrollToPosition(currentSongIndex)
             }
 
@@ -169,13 +166,11 @@ class NupActivity : Activity(), SongListener {
         schedulePlaySongTask(SONG_CHANGE_DELAY_MS)
     }
 
-    // Implements NupService.SongListener.
-    override fun onSongChange(song: Song?, index: Int) {
+    override fun onSongChange(song: Song, index: Int) {
         updateCurrentSongIndex(index)
     }
 
-    // Implements NupService.SongListener.
-    override fun onSongPositionChange(song: Song?, positionMs: Int, durationMs: Int) {
+    override fun onSongPositionChange(song: Song, positionMs: Int, durationMs: Int) {
         runOnUiThread(
             Runnable {
                 if (song != currentSong) return@Runnable
@@ -189,22 +184,19 @@ class NupActivity : Activity(), SongListener {
         )
     }
 
-    // Implements NupService.SongListener.
     override fun onPauseStateChange(paused: Boolean) {
         runOnUiThread {
             pauseButton!!.text = getString(if (paused) R.string.play else R.string.pause)
         }
     }
 
-    // Implements NupService.SongListener.
-    override fun onSongCoverLoad(song: Song?) {
+    override fun onSongCoverLoad(song: Song) {
         if (song == currentSong) {
             albumImageView!!.visibility = View.VISIBLE
             albumImageView!!.setImageBitmap(song!!.coverBitmap)
         }
     }
 
-    // Implements NupService.SongListener.
     override fun onPlaylistChange(songs: List<Song>) {
         runOnUiThread {
             this.songs = songs
@@ -214,9 +206,8 @@ class NupActivity : Activity(), SongListener {
         }
     }
 
-    // Implements NupService.SongListener.
-    override fun onSongFileSizeChange(song: Song?) {
-        val availableBytes = song!!.availableBytes
+    override fun onSongFileSizeChange(song: Song) {
+        val availableBytes = song.availableBytes
         val totalBytes = song.totalBytes
         if (song == currentSong) {
             if (availableBytes == totalBytes) {
@@ -422,9 +413,7 @@ class NupActivity : Activity(), SongListener {
     }
 
     private val currentSong: Song?
-        get() = if (currentSongIndex >= 0 && currentSongIndex < songs.size) {
-            songs[currentSongIndex]
-        } else null
+        get() = if (currentSongIndex in 0 until songs.size) songs[currentSongIndex] else null
 
     private fun updateCurrentSongIndex(index: Int) {
         currentSongIndex = index

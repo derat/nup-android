@@ -9,11 +9,12 @@ import android.content.ContentValues
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
-import android.os.AsyncTask
 import android.text.TextUtils
 import android.util.Log
 import java.util.Collections
 import java.util.Date
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONTokener
@@ -74,24 +75,20 @@ class SongDatabase(
         )
 
     // TODO: It'd be better to use most-frequent-artist logic here similar
-    // to what loadAggregateData() does for |mAlbumsSortedAlphabetically|.
+    // to what [loadAggregateData] does for [albumsSortedAlphabetically].
     // I haven't figured out how to do that solely with SQL, though, and
     // I'd rather not write one-off code here.
     val cachedAlbumsSortedAlphabetically: List<StatsRow>
-        get() = // TODO: It'd be better to use most-frequent-artist logic here similar
-            // to what loadAggregateData() does for |mAlbumsSortedAlphabetically|.
-            // I haven't figured out how to do that solely with SQL, though, and
-            // I'd rather not write one-off code here.
-            getSortedRows(
-                "SELECT MIN(s.Artist), s.Album, s.AlbumId, COUNT(*) " +
-                    "FROM Songs s " +
-                    "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
-                    "GROUP BY LOWER(TRIM(s.Album)), s.AlbumId",
-                null,
-                SongOrder.ALBUM,
-            )
+        get() = getSortedRows(
+            "SELECT MIN(s.Artist), s.Album, s.AlbumId, COUNT(*) " +
+                "FROM Songs s " +
+                "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
+                "GROUP BY LOWER(TRIM(s.Album)), s.AlbumId",
+            null,
+            SongOrder.ALBUM,
+        )
 
-    fun getCachedAlbumsByArtist(artist: String): List<StatsRow> {
+    fun cachedAlbumsByArtist(artist: String): List<StatsRow> {
         return getSortedRows(
             "SELECT '' AS Artist, s.Album, s.AlbumId, COUNT(*) " +
                 "FROM Songs s " +
@@ -838,19 +835,17 @@ class SongDatabase(
         opener = DatabaseOpener(context, DATABASE_NAME, helper)
 
         // Get some info from the database in a background thread.
-        object : AsyncTask<Void?, Void?, Void?>() {
-            protected override fun doInBackground(vararg args: Void?): Void? {
-                loadAggregateData(false)
-                val db = opener.getDb()
-                db.beginTransaction()
-                try {
-                    updateCachedSongs(db)
-                } finally {
-                    db.endTransaction()
-                }
-                return null
+        GlobalScope.launch {
+            loadAggregateData(false)
+            val db = opener.getDb()
+            db.beginTransaction()
+            try {
+                updateCachedSongs(db)
+            } finally {
+                db.endTransaction()
             }
-        }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR)
+        }
+
         updater = DatabaseUpdater(opener)
         updaterThread = Thread(updater, "SongDatabase.DatabaseUpdater")
         updaterThread.start()
