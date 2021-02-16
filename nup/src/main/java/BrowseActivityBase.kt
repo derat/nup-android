@@ -7,14 +7,72 @@ package org.erat.nup
 
 import android.app.ListActivity
 import android.content.Intent
+import android.os.Bundle
+import android.view.ContextMenu
+import android.view.ContextMenu.ContextMenuInfo
 import android.view.Menu
 import android.view.MenuItem
+import android.view.View
+import android.widget.AdapterView.AdapterContextMenuInfo
+import android.widget.ListView
 import org.erat.nup.NupActivity.Companion.service
 
-open class BrowseActivityBase : ListActivity() {
+abstract class BrowseActivityBase : ListActivity(), NupService.SongDatabaseUpdateListener {
+    private var display: StatsRowArrayAdapter.Display = StatsRowArrayAdapter.Display.ARTIST
+    private val rows: MutableList<StatsRow> = ArrayList()
+    private var adapter: StatsRowArrayAdapter? = null
+
+    protected var artist: String? = null // artist passed in intent (may be null)
+    protected var onlyCached = false // displaying only cached songs
+
+    abstract fun getBrowseTitle(): String
+    abstract fun getBrowseDisplay(): StatsRowArrayAdapter.Display
+    abstract fun onRowClick(row: StatsRow, pos: Int)
+    abstract fun fillMenu(menu: ContextMenu, row: StatsRow)
+    abstract fun onMenuClick(itemId: Int, row: StatsRow): Boolean
+    abstract fun getRows(db: SongDatabase, update: (rows: List<StatsRow>?) -> Unit)
+
+    public override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        artist = intent.getStringExtra(BUNDLE_ARTIST)
+        onlyCached = intent.getBooleanExtra(BUNDLE_CACHED, false)
+
+        title = getBrowseTitle()
+        display = getBrowseDisplay()
+
+        adapter = StatsRowArrayAdapter(
+            this,
+            R.layout.browse_row,
+            rows,
+            display,
+        )
+        listAdapter = adapter
+        registerForContextMenu(listView)
+        service!!.addSongDatabaseUpdateListener(this)
+        onSongDatabaseUpdate()
+    }
+
+    override fun onDestroy() {
+        service!!.removeSongDatabaseUpdateListener(this)
+        super.onDestroy()
+    }
+
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.browse_menu, menu)
         return true
+    }
+
+    override fun onListItemClick(listView: ListView, view: View, position: Int, id: Long) {
+        onRowClick(rows[position], position)
+    }
+
+    override fun onCreateContextMenu(menu: ContextMenu, view: View, menuInfo: ContextMenuInfo) {
+        fillMenu(menu, rows[(menuInfo as AdapterContextMenuInfo).position])
+    }
+
+    override fun onContextItemSelected(item: MenuItem): Boolean {
+        return onMenuClick(item.itemId, rows[(item.menuInfo as AdapterContextMenuInfo).position])
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
@@ -39,7 +97,51 @@ open class BrowseActivityBase : ListActivity() {
         }
     }
 
+    override fun onSongDatabaseUpdate() {
+        getRows(
+            service!!.songDb!!,
+            { newRows: List<StatsRow>? ->
+                rows.clear()
+                if (newRows == null) {
+                    val msg = getString(R.string.loading)
+                    rows.add(StatsRow(msg, msg, "", -1))
+                    listView.isFastScrollEnabled = false
+                    adapter!!.enabled = false
+                    adapter!!.notifyDataSetChanged()
+                } else {
+                    rows.addAll(newRows)
+                    listView.isFastScrollEnabled = false
+                    adapter!!.enabled = true
+                    adapter!!.notifyDataSetChanged()
+                    listView.isFastScrollEnabled = true
+                    // Util.resizeListViewToFixFastScroll(listView) // FIXME
+                }
+            }
+        )
+    }
+
+    /** Launch BrowseSongsActivity for the given criteria. */
+    protected fun startBrowseSongsActivity(
+        artist: String? = null,
+        album: String? = null,
+        albumId: String? = null,
+        minRating: Double = -1.0,
+    ) {
+        val intent = Intent(this, BrowseSongsActivity::class.java)
+        if (artist != null) intent.putExtra(BUNDLE_ARTIST, artist)
+        if (album != null) intent.putExtra(BUNDLE_ALBUM, album)
+        if (albumId != null) intent.putExtra(BUNDLE_ALBUM_ID, albumId)
+        if (minRating >= 0) intent.putExtra(BUNDLE_MIN_RATING, minRating)
+        intent.putExtra(BUNDLE_CACHED, onlyCached)
+        startActivityForResult(intent, BROWSE_SONGS_REQUEST_CODE)
+    }
+
     companion object {
+        // Identifiers for activities that we start.
+        const val BROWSE_ARTISTS_REQUEST_CODE = 1
+        const val BROWSE_ALBUMS_REQUEST_CODE = 2
+        const val BROWSE_SONGS_REQUEST_CODE = 3
+
         const val BUNDLE_ARTIST = "artist"
         const val BUNDLE_ALBUM = "album"
         const val BUNDLE_ALBUM_ID = "album_id"

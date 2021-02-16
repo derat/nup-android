@@ -25,6 +25,8 @@ class StatsRow(val key: StatsKey, var count: Int) {
 
 /** Sort [stats] according to [order]. */
 fun sortStatsRows(stats: List<StatsRow>, order: SongOrder) {
+    if (order == SongOrder.UNSORTED) return
+
     // Getting sorting keys is expensive, so just do it once.
     val keys = HashMap<StatsKey, String>()
     when (order) {
@@ -45,13 +47,14 @@ class StatsRowArrayAdapter(
     textViewResourceId: Int,
     private val rows: List<StatsRow>,
     private val display: Display,
-    private val order: SongOrder,
 ) : ArrayAdapter<StatsRow>(context, textViewResourceId, rows), SectionIndexer {
     /** Whether rows are enabled or not. */
     var enabled = true
 
     private val sections = ArrayList<String>()
     private val sectionPositions = ArrayList<Int>()
+
+    private val order = display.songOrder()
 
     override fun getPositionForSection(section: Int): Int {
         return sectionPositions[section]
@@ -96,6 +99,7 @@ class StatsRowArrayAdapter(
     private fun getDisplayString(key: StatsKey): String {
         return when (display) {
             Display.ARTIST -> key.artist
+            Display.ARTIST_UNSORTED -> key.artist
             Display.ALBUM -> key.album
             Display.ALBUM_ARTIST -> "${key.album} (${key.artist})"
         }
@@ -142,7 +146,14 @@ class StatsRowArrayAdapter(
     }
 
     /** Type of information to display. */
-    enum class Display { ARTIST, ALBUM, ALBUM_ARTIST }
+    enum class Display {
+        ARTIST { override fun songOrder() = SongOrder.ARTIST },
+        ARTIST_UNSORTED { override fun songOrder() = SongOrder.UNSORTED },
+        ALBUM { override fun songOrder() = SongOrder.ALBUM },
+        ALBUM_ARTIST { override fun songOrder() = SongOrder.ALBUM };
+
+        abstract fun songOrder(): SongOrder
+    }
 
     companion object {
         private const val NUMBER_SECTION = "#"

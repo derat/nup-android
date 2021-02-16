@@ -45,7 +45,7 @@ class Song(
 }
 
 /** Ways to order [Song]s. */
-enum class SongOrder { ARTIST, TITLE, ALBUM, }
+enum class SongOrder { ARTIST, TITLE, ALBUM, UNSORTED }
 
 /**
  * Get a key for ordering [str] according to [order].
