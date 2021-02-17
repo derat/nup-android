@@ -146,7 +146,7 @@ class FileCache constructor(
             for (songId: Long in db.songIdsByAge) {
                 val entry = db.getEntry(songId) ?: continue
                 db.removeEntry(songId)
-                entry.localFile.delete()
+                entry.file.delete()
                 listener.onCacheEviction(entry)
             }
 
@@ -177,7 +177,7 @@ class FileCache constructor(
         if (entry == null) entry = db.addEntry(song.id)
         else db.updateLastAccessTime(song.id)
 
-        Log.d(TAG, "Posting download of ${song.id} from ${song.url} to ${entry.localFile.path}")
+        Log.d(TAG, "Posting download of ${song.id} from ${song.url} to ${entry.file.path}")
         handler.post(DownloadTask(entry, song.url))
         return entry
     }
@@ -316,29 +316,21 @@ class FileCache constructor(
                 return DownloadStatus.FATAL_ERROR
             }
 
-            val file = entry.localFile
-            if (!file.exists()) {
-                file.parentFile?.mkdirs()
+            if (!entry.file.exists()) {
+                entry.file.parentFile?.mkdirs()
                 try {
-                    file.createNewFile()
+                    entry.file.createNewFile()
                 } catch (e: IOException) {
-                    reason = "Unable to create local file ${file.path}"
+                    reason = "Unable to create local file ${entry.file.path}"
                     return DownloadStatus.FATAL_ERROR
                 }
             }
 
-            val statusCode: Int
-            try {
-                statusCode = conn!!.responseCode
-            } catch (e: IOException) {
-                reason = "Unable to get status code"
-                return DownloadStatus.RETRYABLE_ERROR
-            }
-
+            val statusCode = conn!!.responseCode
             try {
                 // TODO: Also check the Content-Range header.
                 val append = (statusCode == 206)
-                outputStream = FileOutputStream(file, append)
+                outputStream = FileOutputStream(entry.file, append)
                 if (!append) entry.cachedBytes = 0
             } catch (e: FileNotFoundException) {
                 reason = "Unable to create output stream to local file"
@@ -384,7 +376,7 @@ class FileCache constructor(
                 Log.d(
                     Companion.TAG,
                     "Finished download of song ${entry.songId} ($bytesWritten bytes to " +
-                        "${file.absolutePath} in ${endDate.time - startDate.time} ms)"
+                        "${entry.file} in ${endDate.time - startDate.time} ms)"
                 )
 
                 // I see this happen when I kill the server midway through the download.
@@ -531,10 +523,9 @@ class FileCache constructor(
                 continue
             }
 
-            val file = entry.localFile
-            Log.d(TAG, "Deleting song $songId (${file.path}, ${file.length()} bytes)")
-            availableBytes += file.length()
-            file.delete()
+            Log.d(TAG, "Deleting song $songId (${entry.file.path}, ${entry.file.length()} bytes)")
+            availableBytes += entry.file.length()
+            entry.file.delete()
             db.removeEntry(songId)
             listener.onCacheEviction(entry)
         }
@@ -585,19 +576,22 @@ class FileCache constructor(
 
 /** Information about a song that has been cached by [FileCache]. */
 class FileCacheEntry(
-    private val musicDir: String,
+    musicDir: String,
     val songId: Long,
     var totalBytes: Long,
-    var lastAccessTime: Int
+    var lastAccessTime: Int,
+    /** If negative, file's actual size will be used. */
+    cachedBytes: Long = -1,
 ) {
-    var cachedBytes: Long = 0
-    val localFile: File
-        get() = File(musicDir, "$songId.mp3")
+    val file = File(musicDir, "$songId.mp3").absoluteFile
+    var cachedBytes =
+        if (cachedBytes >= 0) cachedBytes
+        else if (file.exists()) file.length() else 0
+
+    val isFullyCached: Boolean
+        get() = totalBytes > 0 && cachedBytes == totalBytes
 
     fun incrementCachedBytes(bytes: Long) {
         cachedBytes += bytes
     }
-
-    val isFullyCached: Boolean
-        get() = totalBytes > 0 && cachedBytes == totalBytes
 }

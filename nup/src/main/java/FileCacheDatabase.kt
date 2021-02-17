@@ -36,8 +36,6 @@ class FileCacheDatabase(context: Context, private val musicDir: String) {
                 totalBytes = cursor.getLong(1),
                 lastAccessTime = cursor.getInt(2),
             )
-            val file = entry.localFile
-            entry.cachedBytes = if (file.exists()) file.length() else 0
             entries[entry.songId] = entry
             cursor.moveToNext()
         }
@@ -57,7 +55,13 @@ class FileCacheDatabase(context: Context, private val musicDir: String) {
 
     @Synchronized fun addEntry(songId: Long): FileCacheEntry {
         val accessTime = (Date().time / 1000).toInt()
-        val entry = FileCacheEntry(musicDir, songId, 0, accessTime)
+        val entry = FileCacheEntry(
+            musicDir = musicDir,
+            songId = songId,
+            totalBytes = 0,
+            lastAccessTime = accessTime,
+            cachedBytes = 0, // avoid hitting disk
+        )
         entries[songId] = entry
         updater.postUpdate(
             "REPLACE INTO CacheEntries (SongId, TotalBytes, LastAccessTime) VALUES(?, 0, ?)",

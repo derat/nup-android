@@ -54,7 +54,7 @@ enum class SongOrder { ARTIST, TITLE, ALBUM, UNSORTED }
  * If this method is changed, SongDatabase.updateStatsTables() must be called on the next run,
  * as sorting keys are cached in the database.
  */
-fun getSongOrderKey(str: String, order: SongOrder): String {
+fun getSongOrderKey(str: String, @Suppress("UNUSED_PARAMETER") order: SongOrder): String {
     // TODO: Consider dropping the order parameter since it isn't actually used now.
     // Note that the enum is still needed for sortStatsRows(), though.
     var key = str.toLowerCase()
@@ -68,7 +68,6 @@ fun getSongOrderKey(str: String, order: SongOrder): String {
     // Strip off leading punctuation, common articles, and other junk.
     var start = 0
     loop@ while (start < key.length) {
-        var found = false
         for (pre in keyPrefixes) {
             if (key.startsWith(pre, start)) {
                 start += pre.length

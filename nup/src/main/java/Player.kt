@@ -8,415 +8,342 @@ package org.erat.nup
 import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
-import android.media.MediaPlayer.OnCompletionListener
 import android.media.audiofx.LoudnessEnhancer
 import android.os.Handler
-import android.os.Looper
 import android.os.PowerManager
 import android.util.Log
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
 import java.util.concurrent.Executors
+import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
 
+/** Plays music files. */
 class Player(
     private val context: Context,
-    // Notified when things change.
     private val listener: Listener,
-    // Used to post tasks to |listener|.
     private val listenerHandler: Handler,
-    // Attributes describing audio files to be played.
     private val attrs: AudioAttributes,
-    preAmpGain: Double
-) : Runnable, OnCompletionListener, MediaPlayer.OnErrorListener {
-    interface Listener {
-        // Invoked on completion of the currently-playing file.
-        fun onPlaybackComplete()
-
-        // Invoked when the playback position of the current file changes.
-        fun onPlaybackPositionChange(path: String?, positionMs: Int, durationMs: Int)
-
-        // Invoked when the pause state changes.
-        fun onPauseStateChange(paused: Boolean)
-
-        // Invoked when an error occurs.
-        fun onPlaybackError(description: String?)
-    }
-
-    // Currently-playing and queued songs.
+) : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListener {
     private var currentPlayer: FilePlayer? = null
     private var queuedPlayer: FilePlayer? = null
-
-    // Is playback paused?
     private var paused = false
+    private val executor = Executors.newScheduledThreadPool(1)
 
-    // Is the volume currently lowered?
-    private var lowVolume = false
-
-    // Pre-amp gain adjustment in decibels.
-    private var preAmpGain = 0.0
-
-    // Used to run tasks on our own thread.
-    private var handler: Handler? = null
-
-    // Used to load queued files in the background.
-    private val backgroundLoader = Executors.newSingleThreadExecutor()
-    private var shouldQuit = false
-
-    private enum class PauseUpdateType {
-        PAUSE, UNPAUSE, TOGGLE_PAUSE
+    interface Listener {
+        /* Called on completion of the currently-playing file. */
+        fun onPlaybackComplete()
+        /* Called when the playback position of the current file changes. */
+        fun onPlaybackPositionChange(file: File, positionMs: Int, durationMs: Int)
+        /* Called when the pause state changes. */
+        fun onPauseStateChange(paused: Boolean)
+        /* Called when an error occurs. */
+        fun onPlaybackError(description: String)
     }
 
-    /** Wraps an individual file.  */
+    /** Wraps an individual file. */
     private inner class FilePlayer(
-        val path: String, // File containing song.
-        val numBytes: Long, // Total expected size of song (path may be incomplete).
-        private val attrs: AudioAttributes,
-        preAmpGain: Double, // App-wide gain adjustment in decibels.
-        private val songGain: Double, // Song-specific gain adjustment in decibels.
-        private val peakAmp: Double, // Song's peak amplitude (1.0 max without clipping).
+        val file: File,
+        val totalBytes: Long,
+        val songGain: Double,
+        val peakAmp: Double,
     ) {
+        val mediaPlayer = MediaPlayer()
+        lateinit var loudnessEnhancer: LoudnessEnhancer
 
-        // Ideally only used if we haven't downloaded the complete file, since MediaPlayer
+        // Used only if we haven't downloaded the complete file, since MediaPlayer
         // skips all the time when playing from a stream.
         var stream: FileInputStream? = null
             private set
-        var mediaPlayer: MediaPlayer? = null
-            private set
-        private var loudnessEnhancer: LoudnessEnhancer? = null
-        private var lowVolume = false // True if the song's volume is temporarily lowered.
-        private var preAmpGain = 0.0 // Pre-amp gain adjustment in decibels.
 
-        // Returns the current size of |path|.
+        /** Current size of [file]. */
         val fileBytes: Long
-            get() = File(path).length()
+            get() = file.length()
 
+        /**
+         * Initialize the object.
+         *
+         * This must be called after constructing the [FilePlayer]. If it returns false,
+         * initialization was unsuccessful the player should be discarded.
+         */
         fun prepare(): Boolean {
             return try {
-                val currentBytes = File(path).length()
-                mediaPlayer = MediaPlayer()
-                Log.d(TAG, "created $mediaPlayer for $path (have $currentBytes of $numBytes")
-                mediaPlayer!!.setWakeMode(context, PowerManager.PARTIAL_WAKE_LOCK)
-                mediaPlayer!!.setAudioAttributes(attrs)
-                mediaPlayer!!.setOnCompletionListener(this@Player)
-                mediaPlayer!!.setOnErrorListener(this@Player)
+                val curBytes = fileBytes
+                Log.d(TAG, "Created $mediaPlayer for ${file.name} (have $curBytes of $totalBytes)")
+                mediaPlayer.setWakeMode(context, PowerManager.PARTIAL_WAKE_LOCK)
+                mediaPlayer.setAudioAttributes(attrs)
+                mediaPlayer.setOnCompletionListener(this@Player)
+                mediaPlayer.setOnErrorListener(this@Player)
 
-                // TODO: I am totally jinxing this, but passing MediaPlayer a path rather than an FD
-                // seems to maybe make it finally stop skipping. If this is really the case,
-                // investigate whether it's possible to also pass a path even when the file isn't
-                // fully downloaded yet. I think I tried this before and it made it stop when it got
-                // to the initial end of the file, even if more had been downloaded by then, though.
-                if (currentBytes == numBytes) {
-                    mediaPlayer!!.setDataSource(path)
+                // TODO: Passing MediaPlayer a path rather than an FD seems to maybe make it finally
+                // stop skipping. Investigate whether it's possible to also pass a path even when
+                // the file isn't fully downloaded yet. I think I tried this before and it made it
+                // stop when it got to the initial end of the file, even if more had been downloaded
+                // by then, though.
+                if (curBytes == totalBytes) {
+                    mediaPlayer.setDataSource(file.path)
                 } else {
-                    stream = FileInputStream(path)
-                    mediaPlayer!!.setDataSource(stream!!.fd)
+                    stream = FileInputStream(file)
+                    mediaPlayer.setDataSource(stream!!.fd)
                 }
-                mediaPlayer!!.prepare()
+                mediaPlayer.prepare()
 
                 // This should happen after preparing the MediaPlayer,
                 // per https://stackoverflow.com/q/23342655/6882947.
-                loudnessEnhancer = LoudnessEnhancer(mediaPlayer!!.audioSessionId)
+                loudnessEnhancer = LoudnessEnhancer(mediaPlayer.audioSessionId)
                 adjustVolume()
                 true
             } catch (e: IOException) {
                 close()
-                listenerHandler.post { listener.onPlaybackError("Unable to prepare $path: $e") }
+                listenerHandler.post { listener.onPlaybackError("Unable to prepare $file: $e") }
                 false
             }
         }
 
+        /** Release resources. */
         fun close() {
             try {
-                if (mediaPlayer != null) {
-                    mediaPlayer!!.release()
-                    loudnessEnhancer!!.release()
-                }
-                if (stream != null) {
-                    stream!!.close()
-                }
+                mediaPlayer.release()
+                loudnessEnhancer.release()
+                stream?.close()
             } catch (e: IOException) {
-                listenerHandler.post { listener.onPlaybackError("Unable to close $path: $e") }
+                listenerHandler.post { listener.onPlaybackError("Unable to close $file: $e") }
             }
         }
 
-        fun setLowVolume(lowVolume: Boolean) {
-            this.lowVolume = lowVolume
-            adjustVolume()
-        }
-
-        fun setPreAmpGain(preAmpGain: Double) {
-            this.preAmpGain = preAmpGain
-            adjustVolume()
-        }
-
-        // Adjusts |mPlayer|'s volume appropriately.
-        private fun adjustVolume() {
-            if (mediaPlayer == null || loudnessEnhancer == null) {
-                return
-            }
-
+        /** Adjust [mediaPlayer]'s volume appropriately. */
+        fun adjustVolume() {
             // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_specification
             var pct = Math.pow(10.0, (preAmpGain + songGain) / 20)
-            if (lowVolume) {
-                pct *= LOW_VOLUME_FRACTION.toDouble()
-            }
-            if (peakAmp > 0) {
-                pct = Math.min(pct, 1 / peakAmp)
-            }
-            Log.d(TAG, "setting $path volume to $pct")
+            if (lowVolume) pct *= LOW_VOLUME_FRACTION.toDouble()
+            if (peakAmp > 0) pct = Math.min(pct, 1 / peakAmp)
+            Log.d(TAG, "Setting $mediaPlayer volume to ${String.format("%.3f", pct)}")
 
             // Hooray: MediaPlayer only accepts volumes in the range [0.0, 1.0],
             // while LoudnessEnhancer seems to only accept positive gains (in mB).
             if (pct <= 1) {
-                mediaPlayer!!.setVolume(pct.toFloat(), pct.toFloat())
-                loudnessEnhancer!!.setTargetGain(0)
+                mediaPlayer.setVolume(pct.toFloat(), pct.toFloat())
+                loudnessEnhancer.setTargetGain(0)
             } else {
-                mediaPlayer!!.setVolume(1f, 1f)
+                mediaPlayer.setVolume(1f, 1f)
                 val gainmB = Math.round(Math.log10(pct) * 2000).toInt()
-                loudnessEnhancer!!.setTargetGain(gainmB)
+                loudnessEnhancer.setTargetGain(gainmB)
             }
         }
 
-        // Restarts playback after a buffer underrun.
-        // Returns true if we switched to the complete file.
+        /**
+         * Restart playback after a buffer underrun.
+         *
+         * @return true if we switched to the complete file
+         */
         @Throws(IOException::class)
         fun restartPlayback(): Boolean {
-            val currentPositionMs = mediaPlayer!!.currentPosition
-            val currentBytes = fileBytes
-            Log.w(TAG, "restarting $mediaPlayer at $currentPositionMs ms")
+            val curPositionMs = mediaPlayer.currentPosition
+            Log.w(TAG, "Restarting $mediaPlayer at $curPositionMs ms")
             var switchedToFile = false
-            mediaPlayer!!.reset()
-            if (currentBytes == numBytes) {
-                Log.w(TAG, "switching $mediaPlayer from stream to complete file $path")
-                stream!!.close()
+            mediaPlayer.reset()
+            if (fileBytes == totalBytes) {
+                Log.w(TAG, "Switching $mediaPlayer from stream to complete file")
+                stream?.close()
                 stream = null
-                mediaPlayer!!.setDataSource(path)
+                mediaPlayer.setDataSource(file.path)
                 switchedToFile = true
             } else {
-                Log.w(TAG, "setting $mediaPlayer to reuse current stream")
-                mediaPlayer!!.setDataSource(stream!!.fd)
+                Log.w(TAG, "Setting $mediaPlayer to reuse current stream")
+                mediaPlayer.setDataSource(stream!!.fd)
             }
-            mediaPlayer!!.prepare()
-            mediaPlayer!!.seekTo(currentPositionMs)
-            mediaPlayer!!.start()
+
+            mediaPlayer.prepare()
+            mediaPlayer.seekTo(curPositionMs)
+            mediaPlayer.start()
             return switchedToFile
         }
-
-        init {
-            this.preAmpGain = preAmpGain
-        }
     }
 
-    override fun run() {
-        Looper.prepare()
-        synchronized(this) {
-            if (shouldQuit) return
-            handler = Handler()
-        }
-        Looper.loop()
-    }
-
+    /** Stop the thread. */
     fun quit() {
-        synchronized(this) {
-            // The thread hasn't started looping yet; tell it to exit before starting.
-            if (handler == null) {
-                shouldQuit = true
-                return
-            }
-        }
-        handler!!.post {
-            backgroundLoader.shutdownNow()
-            backgroundLoader.awaitTermination(SHUTDOWN_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
-            resetCurrent()
-            resetQueued()
-            Looper.myLooper()!!.quit()
-        }
+        executor.shutdownNow()
+        executor.awaitTermination(SHUTDOWN_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
     }
 
+    /** Stop playing the current song (if any). */
     fun abortPlayback() {
-        handler!!.post { resetCurrent() }
+        executor.submit { resetCurrent() }
     }
 
-    fun playFile(
-        path: String,
-        numBytes: Long,
-        gain: Double,
-        peakAmp: Double
-    ) {
-        handler!!.post(
+    /** Start playback of [file]. */
+    fun playFile(file: File, totalBytes: Long, gain: Double, peakAmp: Double) {
+        executor.submit(
             Runnable {
-                Log.d(TAG, "got request to play $path")
+                Log.d(TAG, "Playing $file")
                 resetCurrent()
-                if (queuedPlayer != null && queuedPlayer!!.path == path) {
-                    Log.d(TAG, "using queued ${queuedPlayer!!.mediaPlayer}")
-                    currentPlayer = queuedPlayer!!
+                if (queuedPlayer?.file == file) {
+                    Log.d(TAG, "Using queued player")
+                    currentPlayer = queuedPlayer
                     queuedPlayer = null
                 } else {
-                    currentPlayer = FilePlayer(path, numBytes, attrs, preAmpGain, gain, peakAmp)
+                    currentPlayer = FilePlayer(file, totalBytes, gain, peakAmp)
                     if (!currentPlayer!!.prepare()) {
                         currentPlayer = null
                         return@Runnable
                     }
-                    currentPlayer!!.setLowVolume(lowVolume)
                 }
                 if (!paused) {
-                    currentPlayer!!.mediaPlayer!!.start()
+                    currentPlayer!!.mediaPlayer.start()
                     startPositionTimer()
                 }
             }
         )
     }
 
-    fun queueFile(
-        path: String,
-        numBytes: Long,
-        gain: Double,
-        peakAmp: Double
-    ) {
-        handler!!.post(
+    /** Queue [file] for future playback. */
+    fun queueFile(file: File, totalBytes: Long, gain: Double, peakAmp: Double) {
+        executor.submit(
             Runnable {
-                Log.d(TAG, "got request to queue $path")
-                if (queuedPlayer != null && queuedPlayer!!.path == path) return@Runnable
-                backgroundLoader.submit(
-                    Runnable {
-                        val player = FilePlayer(path, numBytes, attrs, preAmpGain, gain, peakAmp)
-                        if (!player.prepare()) return@Runnable
-                        handler!!.post {
-                            Log.d(TAG, "finished preparing queued file $path")
-                            resetQueued()
-                            queuedPlayer = player
-                            queuedPlayer!!.setLowVolume(lowVolume)
-                        }
-                    }
-                )
+                if (queuedPlayer?.file == file) return@Runnable
+
+                Log.d(TAG, "Queuing $file")
+                val player = FilePlayer(file, totalBytes, gain, peakAmp)
+                if (!player.prepare()) return@Runnable
+
+                Log.d(TAG, "Finished preparing $file")
+                resetQueued()
+                queuedPlayer = player
             }
         )
     }
 
-    fun pause() {
-        updatePauseState(PauseUpdateType.PAUSE)
+    /** Reset [currentPlayer]. */
+    private fun resetCurrent() {
+        stopPositionTimer()
+        currentPlayer?.close()
+        currentPlayer = null
     }
 
-    fun unpause() {
-        updatePauseState(PauseUpdateType.UNPAUSE)
+    /** Reset [queuedPlayer]. */
+    private fun resetQueued() {
+        queuedPlayer?.close()
+        queuedPlayer = null
     }
 
-    fun togglePause() {
-        updatePauseState(PauseUpdateType.TOGGLE_PAUSE)
-    }
+    /** Pause the current song. */
+    fun pause() { updatePauseState(PauseUpdateType.PAUSE) }
+    /** Unpause the current song. */
+    fun unpause() { updatePauseState(PauseUpdateType.UNPAUSE) }
+    /** Toggle the current song's paused state. */
+    fun togglePause() { updatePauseState(PauseUpdateType.TOGGLE_PAUSE) }
+
+    private enum class PauseUpdateType { PAUSE, UNPAUSE, TOGGLE_PAUSE }
 
     private fun updatePauseState(type: PauseUpdateType) {
-        handler!!.post(
+        executor.submit(
             Runnable {
-                paused = when (type) {
-                    PauseUpdateType.PAUSE -> {
-                        if (paused) return@Runnable
-                        true
-                    }
-                    PauseUpdateType.UNPAUSE -> {
-                        if (!paused) return@Runnable
-                        false
-                    }
+                val player = currentPlayer ?: return@Runnable
+
+                val newPaused = when (type) {
+                    PauseUpdateType.PAUSE -> true
+                    PauseUpdateType.UNPAUSE -> false
                     PauseUpdateType.TOGGLE_PAUSE -> !paused
                 }
-                if (currentPlayer != null) {
-                    if (paused) {
-                        currentPlayer!!.mediaPlayer!!.pause()
-                        stopPositionTimer()
-                    } else {
-                        // If the file is already fully loaded, play from it instead of a
-                        // stream.
-                        var switchedToFile = false
-                        if (currentPlayer!!.stream != null &&
-                            currentPlayer!!.fileBytes == currentPlayer!!.numBytes
-                        ) {
-                            try {
-                                currentPlayer!!.restartPlayback()
-                                switchedToFile = true
-                            } catch (e: IOException) {
-                                Log.e(TAG, "got error switching to file on unpause: $e")
-                            }
+                if (newPaused == paused) return@Runnable
+
+                paused = newPaused
+                if (paused) {
+                    player.mediaPlayer.pause()
+                    stopPositionTimer()
+                } else {
+                    // If the file is already fully loaded, play from it instead of a stream.
+                    var switchedToFile = false
+                    if (player.stream != null && player.fileBytes == player.totalBytes) {
+                        try {
+                            player.restartPlayback()
+                            switchedToFile = true
+                        } catch (e: IOException) {
+                            Log.e(TAG, "Got error switching to file on unpause: $e")
                         }
-                        if (!switchedToFile) currentPlayer!!.mediaPlayer!!.start()
-                        startPositionTimer()
                     }
+                    if (!switchedToFile) player.mediaPlayer.start()
+                    startPositionTimer()
                 }
                 listenerHandler.post { listener.onPauseStateChange(paused) }
             }
         )
     }
 
-    fun setLowVolume(lowVolume: Boolean) {
-        handler!!.post(
-            Runnable {
-                if (lowVolume == this@Player.lowVolume) return@Runnable
-                this@Player.lowVolume = lowVolume
-                currentPlayer?.setLowVolume(lowVolume)
-                queuedPlayer?.setLowVolume(lowVolume)
-            }
-        )
-    }
+    /** Reduce playback volume (e.g. during a phone call). */
+    var lowVolume: Boolean = false
+        set(value) {
+            executor.submit(
+                Runnable {
+                    if (value != lowVolume) {
+                        lowVolume = value
+                        currentPlayer?.adjustVolume()
+                        queuedPlayer?.adjustVolume()
+                    }
+                }
+            )
+        }
 
-    fun setPreAmpGain(preAmpGain: Double) {
-        handler!!.post(
-            Runnable {
-                if (preAmpGain == this@Player.preAmpGain) return@Runnable
-                this@Player.preAmpGain = preAmpGain
-                currentPlayer?.setPreAmpGain(preAmpGain)
-                queuedPlayer?.setPreAmpGain(preAmpGain)
-            }
-        )
-    }
+    /** Adjust playback volume up or down by specified decibels. */
+    var preAmpGain: Double = 0.0
+        set(value) {
+            executor.submit(
+                Runnable {
+                    if (value != preAmpGain) {
+                        preAmpGain = value
+                        currentPlayer?.adjustVolume()
+                        queuedPlayer?.adjustVolume()
+                    }
+                }
+            )
+        }
 
-    // Periodically invoked to notify the observer about the playback position of the current song.
-    private val positionTask: Runnable = object : Runnable {
+    /** Periodically invoked to notify [listener] about playback position of current song. */
+    private val positionTask = object : Runnable {
         override fun run() {
-            if (currentPlayer == null) {
-                Log.w(TAG, "aborting position task; player is null")
-                return
-            }
-            val path = currentPlayer!!.path
-            val positionMs = currentPlayer!!.mediaPlayer!!.currentPosition
-            val durationMs = currentPlayer!!.mediaPlayer!!.duration
-            listenerHandler.post { listener.onPlaybackPositionChange(path, positionMs, durationMs) }
-            handler!!.postDelayed(this, POSITION_CHANGE_REPORT_MS.toLong())
+            currentPlayer ?: return
+            val player = currentPlayer!!
+            val file = player.file
+            val positionMs = player.mediaPlayer.currentPosition
+            val durationMs = player.mediaPlayer.duration
+            listenerHandler.post { listener.onPlaybackPositionChange(file, positionMs, durationMs) }
         }
     }
+    private var positionFuture: ScheduledFuture<*>? = null
 
-    // Start running |mSongPositionTask|.
+    /** Start running [positionTask]. */
     private fun startPositionTimer() {
-        assertOnLooper(handler!!.looper)
         stopPositionTimer()
-        handler!!.post(positionTask)
+        positionFuture = executor.scheduleAtFixedRate(
+            positionTask, 0, POSITION_CHANGE_REPORT_MS, TimeUnit.MILLISECONDS
+        )
     }
 
-    // Stop running |mSongPositionTask|.
+    /** Stop running [positionTask]. */
     private fun stopPositionTimer() {
-        assertOnLooper(handler!!.looper)
-        handler!!.removeCallbacks(positionTask)
+        positionFuture?.cancel(false)
+        positionFuture = null
     }
 
-    // Implements MediaPlayer.OnCompletionListener.
     override fun onCompletion(player: MediaPlayer) {
-        handler!!.post(
+        executor.submit(
             Runnable {
-                if (currentPlayer == null || currentPlayer!!.mediaPlayer !== player) return@Runnable
+                if (currentPlayer?.mediaPlayer !== player) return@Runnable
+
+                val filePlayer = currentPlayer!!
                 try {
                     // TODO: Any way to get the current position when we're playing a path
                     // rather than an FD? May be unnecessary if playing a path actually
                     // doesn't have buffer underruns that result in premature end of
                     // playback being reported.
-                    val streamPosition = if (currentPlayer!!.stream != null) {
-                        currentPlayer!!.stream!!.channel.position()
-                    } else {
-                        currentPlayer!!.numBytes
-                    }
-                    val numBytes = currentPlayer!!.numBytes
-                    Log.d(TAG, "$player completed playback at $streamPosition of $numBytes")
-                    if (streamPosition < numBytes && currentPlayer!!.stream != null) {
-                        val switchedToFile = currentPlayer!!.restartPlayback()
+                    val streamPos =
+                        if (filePlayer.stream != null) filePlayer.stream!!.channel.position()
+                        else filePlayer.totalBytes
+                    val totalBytes = filePlayer.totalBytes
+                    Log.d(TAG, "$player completed playback at $streamPos of $totalBytes")
+                    if (streamPos < totalBytes && filePlayer.stream != null) {
+                        val switchedToFile = filePlayer.restartPlayback()
                         listenerHandler.post {
                             listener.onPlaybackError(
                                 if (switchedToFile) "Switched to file after buffer underrun"
@@ -428,50 +355,25 @@ class Player(
                         listenerHandler.post { listener.onPlaybackComplete() }
                     }
                 } catch (e: IOException) {
-                    Log.e(TAG, "got error while handling completion of $player: $e")
+                    Log.e(TAG, "Got error while handling completion of $player: $e")
                 }
             }
         )
     }
 
-    // Implements MediaPlayer.OnErrorListener.
     override fun onError(player: MediaPlayer, what: Int, extra: Int): Boolean {
         listenerHandler.post {
             listener.onPlaybackError(
                 "MediaPlayer reported a vague, not-very-useful error: what=$what extra=$extra"
             )
         }
-        // Return false so the completion listener will get called.
-        return false
-    }
-
-    /** Resets |currentPlayer|.  */
-    private fun resetCurrent() {
-        assertOnLooper(handler!!.looper)
-        stopPositionTimer()
-        currentPlayer?.close()
-        currentPlayer = null
-    }
-
-    /** Resets |queuedPlayer|.  */
-    private fun resetQueued() {
-        assertOnLooper(handler!!.looper)
-        queuedPlayer?.close()
-        queuedPlayer = null
+        return false // let completion listener get called
     }
 
     companion object {
         private const val TAG = "Player"
-
-        // Interval between reports to |listener|.
-        private const val POSITION_CHANGE_REPORT_MS = 100
-        private const val SHUTDOWN_TIMEOUT_MS = 1000
-
-        // Reduced volume level to use, in the range [0.0, 1.0].
-        private const val LOW_VOLUME_FRACTION = 0.2f
-    }
-
-    init {
-        this.preAmpGain = preAmpGain
+        private const val POSITION_CHANGE_REPORT_MS = 100L
+        private const val SHUTDOWN_TIMEOUT_MS = 1000L
+        private const val LOW_VOLUME_FRACTION = 0.2f // in [0.0, 1.0]
     }
 }

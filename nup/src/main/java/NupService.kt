@@ -73,7 +73,6 @@ class NupService :
 
     // Plays songs.
     private var player: Player? = null
-    private var playerThread: Thread? = null
 
     // Caches songs.
     private var cache: FileCache? = null
@@ -134,7 +133,7 @@ class NupService :
     private var currentSongPlayedMs: Long = 0
 
     // Local path of the song that's being played.
-    private var currentSongPath: String? = null
+    private var currentFile: File? = null
 
     // Is playback currently paused?
     var paused = false
@@ -217,13 +216,13 @@ class NupService :
         when (focusChange) {
             AudioManager.AUDIOFOCUS_GAIN -> {
                 Log.d(TAG, "Gained audio focus")
-                player!!.setLowVolume(false)
+                player!!.lowVolume = false
             }
             AudioManager.AUDIOFOCUS_LOSS -> Log.d(TAG, "Lost audio focus")
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> Log.d(TAG, "Transiently lost audio focus")
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                 Log.d(TAG, "Transiently lost audio focus (but can duck)")
-                player!!.setLowVolume(true)
+                player!!.lowVolume = true
             }
             else -> Log.d(TAG, "Unhandled audio focus change $focusChange")
         }
@@ -232,7 +231,7 @@ class NupService :
     private val prefsListener = OnSharedPreferenceChangeListener { prefs, key ->
         if (key == NupPreferences.PRE_AMP_GAIN) {
             val gain = prefs.getString(key, NupPreferences.PRE_AMP_GAIN_DEFAULT)!!.toDouble()
-            player!!.setPreAmpGain(gain)
+            player!!.preAmpGain = gain
         }
     }
 
@@ -284,13 +283,10 @@ class NupService :
 
         downloader = Downloader(authenticator!!, prefs!!)
 
-        val gain = prefs!!.getString(
+        player = Player(this, this, handler, audioAttrs!!)
+        player!!.preAmpGain = prefs!!.getString(
             NupPreferences.PRE_AMP_GAIN, NupPreferences.PRE_AMP_GAIN_DEFAULT
         )!!.toDouble()
-        player = Player(this, this, handler, audioAttrs!!, gain)
-        playerThread = Thread(player, "Player")
-        playerThread!!.priority = Thread.MAX_PRIORITY
-        playerThread!!.start()
 
         cache = FileCache(this, this, downloader!!, networkHelper!!)
         cacheThread = Thread(cache, "FileCache")
@@ -369,7 +365,6 @@ class NupService :
         songDb!!.quit()
         player!!.quit()
         cache!!.quit()
-        playerThread!!.join()
         cacheThread!!.join()
         CrashLogger.unregister()
     }
@@ -549,7 +544,7 @@ class NupService :
             val nextEntry = cache!!.getEntry(next.id)
             if (nextEntry != null && nextEntry.isFullyCached) {
                 player!!.queueFile(
-                    nextEntry.localFile.path,
+                    nextEntry.file,
                     nextEntry.totalBytes,
                     next.albumGain,
                     next.peakAmp
@@ -568,7 +563,7 @@ class NupService :
 
     // Stop playing the current song, if any.
     fun stopPlaying() {
-        currentSongPath = null
+        currentFile = null
         player!!.abortPlayback()
     }
 
@@ -606,7 +601,6 @@ class NupService :
 
     fun clearCache() { cache!!.clear() }
 
-    // Implements Player.Listener.
     override fun onPlaybackComplete() {
         assertOnMainThread()
         playbackComplete = true
@@ -615,14 +609,9 @@ class NupService :
         if (currentSongIndex < songs.size - 1) playSongAtIndex(currentSongIndex + 1)
     }
 
-    // Implements Player.Listener.
-    override fun onPlaybackPositionChange(
-        path: String?,
-        positionMs: Int,
-        durationMs: Int
-    ) {
+    override fun onPlaybackPositionChange(file: File, positionMs: Int, durationMs: Int) {
         assertOnMainThread()
-        if (path != currentSongPath) return
+        if (file != currentFile) return
         val song = currentSong!!
         songListener?.onSongPositionChange(song, positionMs, durationMs)
         val elapsed = positionMs - currentSongLastPositionMs
@@ -643,7 +632,6 @@ class NupService :
         updatePlaybackState()
     }
 
-    // Implements Player.Listener.
     override fun onPauseStateChange(paused: Boolean) {
         assertOnMainThread()
         this.paused = paused
@@ -652,8 +640,7 @@ class NupService :
         updatePlaybackState()
     }
 
-    // Implements Player.Listener.
-    override fun onPlaybackError(description: String?) {
+    override fun onPlaybackError(description: String) {
         assertOnMainThread()
         Toast.makeText(this@NupService, description, Toast.LENGTH_LONG).show()
     }
@@ -695,12 +682,7 @@ class NupService :
                     waitingForDownload = false
                     playCacheEntry(entry)
                 } else if (song == nextSong) {
-                    player!!.queueFile(
-                        entry.localFile.path,
-                        entry.totalBytes,
-                        song.albumGain,
-                        song.peakAmp
-                    )
+                    player!!.queueFile(entry.file, entry.totalBytes, song.albumGain, song.peakAmp)
                 }
 
                 songListener?.onSongFileSizeChange(song)
@@ -837,14 +819,14 @@ class NupService :
     }
 
     // Play the local file where a cache entry is stored.
-    private fun playCacheEntry(entry: FileCacheEntry?) {
-        val song = currentSong
-        if (song!!.id != entry!!.songId) {
-            Log.e(TAG, "cache entry ${entry.songId} doesn't match current song ${song.id}")
+    private fun playCacheEntry(entry: FileCacheEntry) {
+        val song = currentSong ?: return
+        if (song.id != entry.songId) {
+            Log.e(TAG, "Cache entry ${entry.songId} doesn't match current song ${song.id}")
             return
         }
-        currentSongPath = entry.localFile.path
-        player!!.playFile(currentSongPath!!, entry.totalBytes, song.albumGain, song.peakAmp)
+        currentFile = entry.file
+        player!!.playFile(entry.file, entry.totalBytes, song.albumGain, song.peakAmp)
         currentSongStartDate = Date()
         cache!!.updateLastAccessTime(entry.songId)
         updateNotification()
@@ -964,9 +946,5 @@ class NupService :
         private const val ACTION_NEXT_TRACK = "nup_next_track"
         private const val ACTION_PREV_TRACK = "nup_prev_track"
         private const val ACTION_MEDIA_BUTTON = "nup_media_button"
-
-        // Choose a filename to use for storing a song locally (used to just use a slightly-mangled
-        // version of the remote path, but I think I saw a problem -- didn't investigate much).
-        private fun chooseLocalFilenameForSong(song: Song) { "${song.id}.mp3" }
     }
 }
