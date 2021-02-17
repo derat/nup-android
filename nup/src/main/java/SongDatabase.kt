@@ -173,20 +173,20 @@ class SongDatabase(
         cursor.moveToFirst()
         while (!cursor.isAfterLast) {
             val song = Song(
-                cursor.getLong(0), // songId
-                cursor.getString(1), // artist
-                cursor.getString(2), // title
-                cursor.getString(3), // album
-                cursor.getString(4), // albumId
-                cursor.getString(5), // url
-                cursor.getString(6), // coverUrl
-                cursor.getInt(7), // lengthSec
-                cursor.getInt(8), // track
-                cursor.getInt(9), // disc
-                cursor.getFloat(10).toDouble(), // trackGain
-                cursor.getFloat(11).toDouble(), // albumGain
-                cursor.getFloat(12).toDouble(), // peakAmp
-                cursor.getFloat(13).toDouble() // rating
+                id = cursor.getLong(0),
+                artist = cursor.getString(1),
+                title = cursor.getString(2),
+                album = cursor.getString(3),
+                albumId = cursor.getString(4),
+                url = cursor.getString(5),
+                coverUrl = cursor.getString(6),
+                lengthSec = cursor.getInt(7),
+                track = cursor.getInt(8),
+                disc = cursor.getInt(9),
+                trackGain = cursor.getFloat(10).toDouble(),
+                albumGain = cursor.getFloat(11).toDouble(),
+                peakAmp = cursor.getFloat(12).toDouble(),
+                rating = cursor.getFloat(13).toDouble(),
             )
             songs.add(song)
             cursor.moveToNext()

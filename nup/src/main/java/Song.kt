@@ -23,7 +23,7 @@ class Song(
     val trackGain: Double,
     val albumGain: Double,
     val peakAmp: Double,
-    val rating: Double
+    val rating: Double,
 ) : Serializable {
     val url: URL? = if (url.isEmpty()) null else URL(url)
     val coverUrl: URL? = if (coverUrl.isEmpty()) null else URL(coverUrl)
