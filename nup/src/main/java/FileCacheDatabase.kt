@@ -92,8 +92,7 @@ class FileCacheDatabase(context: Context, private val musicDir: String) {
     @get:Synchronized
     val songIdsByAge: List<Long>
         get() {
-            val ids: MutableList<Long> = ArrayList()
-            ids.addAll(entries.keys)
+            val ids = entries.keys.toMutableList()
             ids.sortWith(
                 Comparator { a, b -> getEntry(a)!!.lastAccessTime - getEntry(b)!!.lastAccessTime }
             )
@@ -102,19 +101,11 @@ class FileCacheDatabase(context: Context, private val musicDir: String) {
 
     @get:Synchronized
     val totalCachedBytes: Long
-        get() {
-            var bytes: Long = 0
-            for (entry in entries.values) bytes += entry.cachedBytes
-            return bytes
-        }
+        get() = entries.values.map { it.cachedBytes }.sum()
 
     @get:Synchronized
     val allFullyCachedEntries: List<FileCacheEntry>
-        get() {
-            val fullyCachedEntries: MutableList<FileCacheEntry> = ArrayList()
-            for (entry in entries.values) if (entry.isFullyCached) fullyCachedEntries.add(entry)
-            return fullyCachedEntries
-        }
+        get() = entries.values.filter { it.isFullyCached }
 
     companion object {
         private const val TAG = "FileCacheDatabase"
