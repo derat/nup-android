@@ -6,34 +6,33 @@
 package org.erat.nup
 
 import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.util.Log
 import java.io.File
-import java.io.FileOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 
-class CoverLoader(
+/** CoverLoader loads and caches album art. */
+open class CoverLoader(
     private val coverDir: File,
     private val downloader: Downloader,
-    private val bitmapDecoder: BitmapDecoder,
     private val networkHelper: NetworkHelper,
 ) {
     // Guards [filesBeingLoaded].
     private val lock = ReentrantLock()
     // Signaled when a change has been made to [filesBeingLoaded].
     private val loadFinishedCond = lock.newCondition()
-
     // Names of cover files that we're currently fetching.
     private val filesBeingLoaded = HashSet<String>()
 
     // The last cover that we've loaded. We store it here so that we can reuse the already-loaded
     // bitmap in the common case where we're playing an album and need the same cover over and over.
-    private val lastCoverLock = ReentrantLock()
-    private var lastCoverPath: File? = null
-    private var lastCoverBitmap: Bitmap? = null
+    private var lastFile: File? = null
+    private var lastBitmap: Bitmap? = null
+    private val lastLock = ReentrantLock()
 
     /**
      * Load the cover at [url].
@@ -55,11 +54,12 @@ class CoverLoader(
         }
         if (file == null || !file.exists()) return null
 
-        return lastCoverLock.withLock {
-            if (lastCoverPath != null && lastCoverPath == file) return lastCoverBitmap
-            lastCoverPath = file
-            lastCoverBitmap = bitmapDecoder.decodeFile(file)
-            return lastCoverBitmap
+        // TODO: The compiler gives an incorrect "Unreachable code" warning about the next line.
+        return lastLock.withLock {
+            if (lastFile != null && lastFile == file) return lastBitmap
+            lastFile = file
+            lastBitmap = decodeFile(file.path)
+            return lastBitmap
         }
     }
 
@@ -83,7 +83,6 @@ class CoverLoader(
 
         var success = false
         val file = File(coverDir, localFilename)
-        var outputStream: FileOutputStream? = null
         var conn: HttpURLConnection? = null
         try {
             // Check if another thread downloaded it while we were waiting.
@@ -91,23 +90,15 @@ class CoverLoader(
                 success = true
                 return file
             }
-            file.createNewFile()
-            outputStream = FileOutputStream(file)
+
             conn = downloader.download(url, "GET", Downloader.AuthType.STORAGE, null)
             if (conn.responseCode != 200) throw IOException("Status code " + conn.responseCode)
-
-            // TODO: Simplify this.
-            val buffer = ByteArray(BUFFER_SIZE)
-            val inputStream = conn.inputStream
-            var bytesRead: Int
-            while (inputStream.read(buffer).also { bytesRead = it } != -1) {
-                outputStream.write(buffer, 0, bytesRead)
-            }
+            file.createNewFile()
+            file.outputStream().use { conn.inputStream.copyTo(it) }
             success = true
         } catch (e: IOException) {
             Log.e(TAG, "IO error while fetching $url: $e")
         } finally {
-            outputStream?.close()
             conn?.disconnect()
             if (!success && file.exists()) file.delete()
             finishLoad(localFilename)
@@ -121,10 +112,9 @@ class CoverLoader(
         return parts[parts.size - 1]
     }
 
-    // Call before checking for the existence of a local cover file and before
-    // starting to download a remote file.  Waits until |filename| isn't in
-    // |mFilesBeingLoaded| and then adds it.  Must be matched by a call to
-    // finishLoad().
+    // Call before checking for the existence of a local cover file and before starting to download
+    // a remote file. Waits until [filename] isn't in [filesBeingLoaded] and then adds it. Must be
+    // matched by a call to [finishLoad].
     private fun startLoad(filename: String) {
         lock.withLock {
             while (filesBeingLoaded.contains(filename)) loadFinishedCond.await()
@@ -132,9 +122,9 @@ class CoverLoader(
         }
     }
 
-    // Call after checking for the existence of a local file or after completing
-    // a download (either successfully or unsuccessfully -- if unsuccessful, be
-    // sure to remove the file first so that other threads don't try to use it).
+    // Call after checking for the existence of a local file or after completing a download (either
+    // successfully or unsuccessfully -- if unsuccessful, be sure to remove the file first so that
+    // other threads don't try to use it).
     private fun finishLoad(filename: String) {
         lock.withLock {
             if (!filesBeingLoaded.contains(filename)) {
@@ -145,8 +135,10 @@ class CoverLoader(
         }
     }
 
+    /** Decode the bitmap at the given path. */
+    open fun decodeFile(path: String): Bitmap? = BitmapFactory.decodeFile(path)
+
     companion object {
         private const val TAG = "CoverLoader"
-        private const val BUFFER_SIZE = 8 * 1024
     }
 }

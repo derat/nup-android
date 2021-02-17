@@ -297,7 +297,6 @@ class NupService :
         coverLoader = CoverLoader(
             File(externalCacheDir!!, COVER_DIR_NAME),
             downloader!!,
-            BitmapDecoder(),
             networkHelper!!,
         )
 

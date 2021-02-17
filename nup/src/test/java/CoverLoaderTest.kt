@@ -9,13 +9,10 @@ import android.graphics.Bitmap
 import com.google.common.io.Files
 import java.io.BufferedReader
 import java.io.File
-import java.io.FileInputStream
 import java.io.IOException
 import java.io.StringBufferInputStream
 import java.net.HttpURLConnection
 import java.net.URL
-import kotlinx.coroutines.test.TestCoroutineScope
-import org.erat.nup.BitmapDecoder
 import org.erat.nup.CoverLoader
 import org.erat.nup.Downloader
 import org.erat.nup.NetworkHelper
@@ -26,40 +23,30 @@ import org.junit.Test
 import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.MockitoAnnotations
-import org.mockito.stubbing.Answer
 
 class CoverLoaderTest {
-    val scope = TestCoroutineScope()
-
     lateinit var tempDir: File
     lateinit var coverLoader: CoverLoader
     lateinit var bitmapDataMap: HashMap<String, Bitmap>
 
     @Mock lateinit var downloader: Downloader
-    @Mock lateinit var bitmapDecoder: BitmapDecoder
     @Mock lateinit var networkHelper: NetworkHelper
 
     @Before fun setUp() {
         MockitoAnnotations.initMocks(this)
         tempDir = Files.createTempDir()
         bitmapDataMap = HashMap()
-        Mockito.`when`(bitmapDecoder.decodeFile(MockitoHelper.anyObject()))
-            .thenAnswer(
-                Answer<Any?> { invocation ->
-                    var inputStream: FileInputStream? = null
-                    try {
-                        inputStream = FileInputStream(invocation.arguments[0] as File)
-                        val fileData = inputStream.bufferedReader().use(BufferedReader::readText)
-                        return@Answer bitmapDataMap[fileData]
-                    } catch (e: IOException) {
-                        return@Answer null
-                    } finally {
-                        inputStream?.close()
-                    }
+        coverLoader = object : CoverLoader(tempDir, downloader, networkHelper) {
+            override fun decodeFile(path: String): Bitmap? {
+                return try {
+                    val fileData = File(path)
+                        .inputStream().bufferedReader().use(BufferedReader::readText)
+                    bitmapDataMap[fileData]
+                } catch (e: IOException) {
+                    null
                 }
-            )
-
-        coverLoader = CoverLoader(tempDir, downloader, bitmapDecoder, networkHelper)
+            }
+        }
     }
 
     @After fun tearDown() {
@@ -134,9 +121,6 @@ class CoverLoaderTest {
         Assert.assertEquals(BITMAP, coverLoader.loadCover(COVER_URL))
         Assert.assertEquals(BITMAP, coverLoader.loadCover(COVER_URL))
         Assert.assertEquals(BITMAP, coverLoader.loadCover(COVER_URL))
-
-        // The file should've only been decoded once.
-        Mockito.verify(bitmapDecoder, Mockito.times(1)).decodeFile(MockitoHelper.anyObject())
     }
 
     fun createConnection(statusCode: Int, data: String?): HttpURLConnection {
