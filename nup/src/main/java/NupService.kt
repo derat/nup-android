@@ -870,7 +870,7 @@ class NupService :
             val song = songs[index]
             var entry = cache!!.getEntry(song.id)
             if (entry != null && entry.isFullyCached) {
-                // We already have this one.  Pin it to make sure that it
+                // We already have this one. Pin it to make sure that it
                 // doesn't get evicted by a later song.
                 cache!!.pinSongId(song.id)
                 index++

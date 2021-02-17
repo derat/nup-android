@@ -237,6 +237,7 @@ class FileCache constructor(
                         handleSuccess()
                         return
                     }
+
                     when (startDownload()) {
                         DownloadStatus.SUCCESS -> {}
                         DownloadStatus.ABORTED -> return
@@ -250,7 +251,9 @@ class FileCache constructor(
                             return
                         }
                     }
-                    if (!isActive) return
+
+                    if (!isActive) return // handle cancellation
+
                     when (writeFile()) {
                         DownloadStatus.SUCCESS -> {}
                         DownloadStatus.ABORTED -> return
@@ -264,6 +267,7 @@ class FileCache constructor(
                             return
                         }
                     }
+
                     handleSuccess()
                     return
                 } finally {
@@ -447,7 +451,7 @@ class FileCache constructor(
             fun quit() {
                 synchronized(this) {
                     // The thread hasn't started looping yet; tell it to exit before starting.
-                    if (handler != null) {
+                    if (handler == null) {
                         shouldQuit = true
                         return
                     }
