@@ -12,6 +12,7 @@ import android.util.Log
 import java.io.File
 import java.util.Date
 
+/** Persistent data store for [FileCache]. */
 class FileCacheDatabase(context: Context, private val musicDir: String) {
     private val opener: DatabaseOpener
 
@@ -21,45 +22,40 @@ class FileCacheDatabase(context: Context, private val musicDir: String) {
     // Update the database in a background thread.
     private val updater: DatabaseUpdater
     private val updaterThread: Thread
-    @Synchronized
-    private fun loadExistingEntries() {
-        Log.d(TAG, "loading cache entries")
+
+    /** Loads data from SQLite. */
+    @Synchronized private fun loadExistingEntries() {
+        Log.d(TAG, "Loading cache entries")
         val cursor = opener.getDb()
-            .rawQuery(
-                "SELECT SongId, TotalBytes, LastAccessTime FROM CacheEntries",
-                null
-            )
+            .rawQuery("SELECT SongId, TotalBytes, LastAccessTime FROM CacheEntries", null)
         cursor.moveToFirst()
         while (!cursor.isAfterLast) {
             val entry = FileCacheEntry(
-                musicDir, cursor.getLong(0), cursor.getLong(1), cursor.getInt(2)
+                musicDir = musicDir,
+                songId = cursor.getLong(0),
+                totalBytes = cursor.getLong(1),
+                lastAccessTime = cursor.getInt(2),
             )
             val file = entry.localFile
             entry.cachedBytes = if (file.exists()) file.length() else 0
             entries[entry.songId] = entry
             cursor.moveToNext()
         }
-        Log.d(TAG, "finished loading ${entries.size} cache entries")
+        Log.d(TAG, "Finished loading ${entries.size} cache entries")
         cursor.close()
     }
 
-    @Synchronized
-    fun quit() {
+    @Synchronized fun quit() {
         updater.quit()
-        try {
-            updaterThread.join()
-        } catch (e: InterruptedException) {
-        }
+        updaterThread.join()
         opener.close()
     }
 
-    @Synchronized
-    fun getEntry(songId: Long): FileCacheEntry? {
+    @Synchronized fun getEntry(songId: Long): FileCacheEntry? {
         return entries[songId]
     }
 
-    @Synchronized
-    fun addEntry(songId: Long): FileCacheEntry {
+    @Synchronized fun addEntry(songId: Long): FileCacheEntry {
         val accessTime = (Date().time / 1000).toInt()
         val entry = FileCacheEntry(musicDir, songId, 0, accessTime)
         entries[songId] = entry
@@ -70,14 +66,12 @@ class FileCacheDatabase(context: Context, private val musicDir: String) {
         return entry
     }
 
-    @Synchronized
-    fun removeEntry(songId: Long) {
+    @Synchronized fun removeEntry(songId: Long) {
         entries.remove(songId)
         updater.postUpdate("DELETE FROM CacheEntries WHERE SongId = ?", arrayOf<Any>(songId))
     }
 
-    @Synchronized
-    fun setTotalBytes(songId: Long, totalBytes: Long) {
+    @Synchronized fun setTotalBytes(songId: Long, totalBytes: Long) {
         val entry = entries[songId] ?: return
         entry.totalBytes = totalBytes
         updater.postUpdate(
@@ -86,8 +80,7 @@ class FileCacheDatabase(context: Context, private val musicDir: String) {
         )
     }
 
-    @Synchronized
-    fun updateLastAccessTime(songId: Long) {
+    @Synchronized fun updateLastAccessTime(songId: Long) {
         val entry = entries[songId] ?: return
         val now = (Date().time / 1000).toInt()
         entry.lastAccessTime = now
@@ -102,11 +95,7 @@ class FileCacheDatabase(context: Context, private val musicDir: String) {
             val ids: MutableList<Long> = ArrayList()
             ids.addAll(entries.keys)
             ids.sortWith(
-                Comparator { a, b ->
-                    val aTime = getEntry(a)!!.lastAccessTime
-                    val bTime = getEntry(b)!!.lastAccessTime
-                    if (aTime == bTime) 0 else if (aTime < bTime) -1 else 1
-                }
+                Comparator { a, b -> getEntry(a)!!.lastAccessTime - getEntry(b)!!.lastAccessTime }
             )
             return ids
         }

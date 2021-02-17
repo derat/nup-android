@@ -658,26 +658,22 @@ class NupService :
         Toast.makeText(this@NupService, description, Toast.LENGTH_LONG).show()
     }
 
-    // Implements FileCache.Listener.
-    override fun onCacheDownloadError(entry: FileCacheEntry?, reason: String?) {
+    override fun onCacheDownloadError(entry: FileCacheEntry, reason: String) {
         handler.post {
             Toast.makeText(this@NupService, "Got retryable error: $reason", Toast.LENGTH_SHORT)
                 .show()
         }
     }
 
-    // Implements FileCache.Listener.
-    override fun onCacheDownloadFail(entry: FileCacheEntry?, reason: String?) {
+    override fun onCacheDownloadFail(entry: FileCacheEntry, reason: String) {
         handler.post {
-            Log.d(
-                TAG,
-                "got notification that download of song ${entry!!.songId} failed: $reason"
-            )
+            Log.d(TAG, "Download of song ${entry.songId} failed: $reason")
             Toast.makeText(
                 this@NupService,
-                "Download of ${songIdToSong[entry.songId]!!.url} failed: $reason",
+                "Download of ${songIdToSong[entry.songId]?.url} failed: $reason",
                 Toast.LENGTH_LONG
             ).show()
+
             if (entry.songId == downloadSongId) {
                 downloadSongId = -1
                 downloadIndex = -1
@@ -686,14 +682,15 @@ class NupService :
         }
     }
 
-    // Implements FileCache.Listener.
-    override fun onCacheDownloadComplete(entry: FileCacheEntry?) {
+    override fun onCacheDownloadComplete(entry: FileCacheEntry) {
         handler.post(
             Runnable {
-                Log.d(TAG, "got notification that download of song ${entry!!.songId} is done")
+                Log.d(TAG, "Download of song ${entry.songId} completed")
+
                 val song = songIdToSong[entry.songId] ?: return@Runnable
                 song.updateBytes(entry)
                 songDb!!.handleSongCached(song.id)
+
                 if (song == currentSong && waitingForDownload) {
                     waitingForDownload = false
                     playCacheEntry(entry)
@@ -705,7 +702,9 @@ class NupService :
                         song.peakAmp
                     )
                 }
+
                 songListener?.onSongFileSizeChange(song)
+
                 if (entry.songId == downloadSongId) {
                     val nextIndex = downloadIndex + 1
                     downloadSongId = -1
@@ -716,15 +715,14 @@ class NupService :
         )
     }
 
-    // Implements FileCache.Listener.
     override fun onCacheDownloadProgress(
-        entry: FileCacheEntry?,
+        entry: FileCacheEntry,
         downloadedBytes: Long,
         elapsedMs: Long
     ) {
         handler.post(
             Runnable {
-                val song = songIdToSong[entry!!.songId] ?: return@Runnable
+                val song = songIdToSong[entry.songId] ?: return@Runnable
                 song.updateBytes(entry)
                 if (song == currentSong) {
                     if (waitingForDownload &&
@@ -739,11 +737,10 @@ class NupService :
         )
     }
 
-    // Implements FileCache.Listener.
-    override fun onCacheEviction(entry: FileCacheEntry?) {
+    override fun onCacheEviction(entry: FileCacheEntry) {
         handler.post(
             Runnable {
-                Log.d(TAG, "got notification that song ${entry!!.songId} has been evicted")
+                Log.d(TAG, "Song ${entry.songId} was evicted")
                 songDb!!.handleSongEvicted(entry.songId)
                 val song = songIdToSong[entry.songId] ?: return@Runnable
                 song.availableBytes = 0
