@@ -161,9 +161,13 @@ class Player(
         }
     }
 
-    /** Stop the thread. */
+    /** Shut down the player. */
     fun quit() {
-        executor.shutdownNow()
+        executor.submit {
+            resetCurrent()
+            resetQueued()
+        }
+        executor.shutdown()
         executor.awaitTermination(SHUTDOWN_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
     }
 
