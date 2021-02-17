@@ -48,15 +48,14 @@ class Authenticator(private val context: Context) {
 
     /** Asynchronously get an auth token and display a toast. */
     fun authenticateInBackground() = GlobalScope.async(Dispatchers.Main) {
-        val job = async(Dispatchers.IO) {
+        val msg = async(Dispatchers.IO) {
             try {
                 authToken
                 "Authenticated successfully."
             } catch (e: AuthException) {
                 "Authentication failed: $e"
             }
-        }
-        val msg: String = job.await()
+        }.await()
         Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
     }
 

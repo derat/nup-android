@@ -15,18 +15,28 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.ListView
+import kotlin.coroutines.CoroutineContext
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import org.erat.nup.NupActivity.Companion.service
 
-abstract class BrowseActivityBase : ListActivity(), NupService.SongDatabaseUpdateListener {
-    private var display: StatsRowArrayAdapter.Display = StatsRowArrayAdapter.Display.ARTIST
+abstract class BrowseActivityBase :
+    ListActivity(),
+    CoroutineScope,
+    NupService.SongDatabaseUpdateListener {
+    lateinit var job: Job
+    override val coroutineContext: CoroutineContext
+        get() = job + Dispatchers.Main
+
     private val rows: MutableList<StatsRow> = ArrayList()
-    private var adapter: StatsRowArrayAdapter? = null
+    private lateinit var adapter: StatsRowArrayAdapter
 
-    protected var artist: String? = null // artist passed in intent (may be null)
-    protected var onlyCached = false // displaying only cached songs
+    protected lateinit var onlyArtist: String // artist passed in intent (may be null)
+    protected var onlyCached: Boolean = false // displaying only cached songs
 
-    abstract fun getBrowseTitle(): String
-    abstract fun getBrowseDisplay(): StatsRowArrayAdapter.Display
+    abstract val display: StatsRowArrayAdapter.Display
+
     abstract fun onRowClick(row: StatsRow, pos: Int)
     abstract fun fillMenu(menu: ContextMenu, row: StatsRow)
     abstract fun onMenuClick(itemId: Int, row: StatsRow): Boolean
@@ -35,11 +45,9 @@ abstract class BrowseActivityBase : ListActivity(), NupService.SongDatabaseUpdat
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        artist = intent.getStringExtra(BUNDLE_ARTIST)
+        job = Job()
+        onlyArtist = intent.getStringExtra(BUNDLE_ARTIST) ?: ""
         onlyCached = intent.getBooleanExtra(BUNDLE_CACHED, false)
-
-        title = getBrowseTitle()
-        display = getBrowseDisplay()
 
         adapter = StatsRowArrayAdapter(
             this,
@@ -106,15 +114,14 @@ abstract class BrowseActivityBase : ListActivity(), NupService.SongDatabaseUpdat
                     val msg = getString(R.string.loading)
                     rows.add(StatsRow(msg, msg, "", -1))
                     listView.isFastScrollEnabled = false
-                    adapter!!.enabled = false
-                    adapter!!.notifyDataSetChanged()
+                    adapter.enabled = false
+                    adapter.notifyDataSetChanged()
                 } else {
                     rows.addAll(newRows)
                     listView.isFastScrollEnabled = false
-                    adapter!!.enabled = true
-                    adapter!!.notifyDataSetChanged()
+                    adapter.enabled = true
+                    adapter.notifyDataSetChanged()
                     listView.isFastScrollEnabled = true
-                    // Util.resizeListViewToFixFastScroll(listView) // FIXME
                 }
             }
         )

@@ -6,15 +6,18 @@
 package org.erat.nup
 
 import android.content.Intent
-import android.os.AsyncTask
+import android.os.Bundle
 import android.view.ContextMenu
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 
 class BrowseArtistsActivity : BrowseActivityBase() {
-    override fun getBrowseTitle() = getString(
-        if (onlyCached) R.string.browse_cached_artists else R.string.browse_artists
-    )
+    override val display = StatsRowArrayAdapter.Display.ARTIST
 
-    override fun getBrowseDisplay() = StatsRowArrayAdapter.Display.ARTIST
+    public override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setTitle(if (onlyCached) R.string.browse_cached_artists else R.string.browse_artists)
+    }
 
     override fun onRowClick(row: StatsRow, pos: Int) = startBrowseAlbumsActivity(row.key.artist)
 
@@ -50,12 +53,9 @@ class BrowseArtistsActivity : BrowseActivityBase() {
             // If we're displaying all data, then we can return it synchronously.
             !onlyCached -> update(db.getArtistsSortedAlphabetically())
             // Cached data requires an async database query.
-            else -> object : AsyncTask<Void?, Void?, List<StatsRow>>() {
-                protected override fun doInBackground(vararg args: Void?): List<StatsRow> {
-                    return db.cachedArtistsSortedAlphabetically
-                }
-                override fun onPostExecute(rows: List<StatsRow>) = update(rows)
-            }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR)
+            else -> async(Dispatchers.Main) {
+                update(async(Dispatchers.IO) { db.cachedArtistsSortedAlphabetically }.await())
+            }
         }
     }
 

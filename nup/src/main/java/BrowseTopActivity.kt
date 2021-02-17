@@ -6,11 +6,17 @@
 package org.erat.nup
 
 import android.content.Intent
+import android.os.Bundle
 import android.view.ContextMenu
 
 class BrowseTopActivity : BrowseActivityBase() {
-    override fun getBrowseTitle() = getString(R.string.browse)
-    override fun getBrowseDisplay() = StatsRowArrayAdapter.Display.ARTIST_UNSORTED
+    override val display = StatsRowArrayAdapter.Display.ARTIST_UNSORTED
+
+    public override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setTitle(R.string.browse)
+    }
+
     override fun onRowClick(row: StatsRow, pos: Int) {
         when (pos) {
             0 -> startActivityForResult(

@@ -5,23 +5,30 @@
 
 package org.erat.nup
 
-import android.os.AsyncTask
+import android.os.Bundle
 import android.view.ContextMenu
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 
 class BrowseAlbumsActivity : BrowseActivityBase() {
-    override fun getBrowseTitle() = if (artist != null) {
-        getString(
-            if (onlyCached) R.string.browse_cached_albums_fmt else R.string.browse_albums_fmt,
-            artist
-        )
-    } else {
-        getString(if (onlyCached) R.string.browse_cached_albums else R.string.browse_albums)
-    }
+    override val display
+        get() = if (onlyArtist == "") {
+            StatsRowArrayAdapter.Display.ALBUM_ARTIST
+        } else {
+            StatsRowArrayAdapter.Display.ALBUM
+        }
 
-    override fun getBrowseDisplay() = if (artist == null) {
-        StatsRowArrayAdapter.Display.ALBUM_ARTIST
-    } else {
-        StatsRowArrayAdapter.Display.ALBUM
+    public override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+
+        title = if (onlyArtist != "") {
+            getString(
+                if (onlyCached) R.string.browse_cached_albums_fmt else R.string.browse_albums_fmt,
+                onlyArtist
+            )
+        } else {
+            getString(if (onlyCached) R.string.browse_cached_albums else R.string.browse_albums)
+        }
     }
 
     // TODO: Right now, we show the full album by default instead of limiting it to songs by
@@ -33,8 +40,8 @@ class BrowseAlbumsActivity : BrowseActivityBase() {
 
     override fun fillMenu(menu: ContextMenu, row: StatsRow) {
         menu.setHeaderTitle(row.key.album)
-        if (artist != null) {
-            val msg = getString(R.string.browse_songs_by_artist_fmt, artist)
+        if (onlyArtist != "") {
+            val msg = getString(R.string.browse_songs_by_artist_fmt, onlyArtist)
             menu.add(0, MENU_ITEM_BROWSE_SONGS_BY_ARTIST, 0, msg)
         }
         menu.add(0, MENU_ITEM_BROWSE_SONGS_WITH_RATING, 0, R.string.browse_songs_four_stars)
@@ -45,7 +52,7 @@ class BrowseAlbumsActivity : BrowseActivityBase() {
         return when (itemId) {
             MENU_ITEM_BROWSE_SONGS_BY_ARTIST -> {
                 startBrowseSongsActivity(
-                    artist = artist,
+                    artist = onlyArtist,
                     album = row.key.album,
                     albumId = row.key.albumId
                 )
@@ -73,20 +80,21 @@ class BrowseAlbumsActivity : BrowseActivityBase() {
             !db.aggregateDataLoaded -> update(null)
             // If we're displaying all data, then we can return it synchronously.
             !onlyCached -> update(
-                if (artist != null) db.getAlbumsByArtist(artist!!)
+                if (onlyArtist != "") db.getAlbumsByArtist(onlyArtist)
                 else db.getAlbumsSortedAlphabetically()
             )
             // Cached data requires an async database query.
-            else -> object : AsyncTask<Void?, Void?, List<StatsRow>>() {
-                protected override fun doInBackground(vararg args: Void?): List<StatsRow> {
-                    return if (artist != null) {
-                        db.cachedAlbumsByArtist(artist!!)
-                    } else {
-                        db.cachedAlbumsSortedAlphabetically
-                    }
-                }
-                override fun onPostExecute(rows: List<StatsRow>) = update(rows)
-            }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR)
+            else -> async(Dispatchers.Main) {
+                update(
+                    async(Dispatchers.IO) {
+                        if (onlyArtist != "") {
+                            db.cachedAlbumsByArtist(onlyArtist)
+                        } else {
+                            db.cachedAlbumsSortedAlphabetically
+                        }
+                    }.await()
+                )
+            }
         }
     }
 
