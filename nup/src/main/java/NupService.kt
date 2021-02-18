@@ -71,12 +71,8 @@ class NupService :
     // Downloads files.
     private var downloader: Downloader? = null
 
-    // Plays songs.
-    private var player: Player? = null
-
-    // Caches songs.
-    private var cache: FileCache? = null
-    private var cacheThread: Thread? = null
+    private lateinit var player: Player
+    private lateinit var cache: FileCache
 
     // Stores a local listing of all of the songs on the server.
     var songDb: SongDatabase? = null
@@ -168,7 +164,7 @@ class NupService :
             // I don't want to know who's calling.  Why isn't there a more-limited
             // permission?
             if (state == TelephonyManager.CALL_STATE_RINGING) {
-                player!!.pause()
+                player.pause()
                 Toast.makeText(
                     this@NupService,
                     "Paused for incoming call.",
@@ -195,7 +191,7 @@ class NupService :
                             IGNORE_NOISY_AUDIO_AFTER_USER_SWITCH_MS
                         )
                 if (currentSongIndex >= 0 && !paused && !userSwitchedRecently) {
-                    player!!.pause()
+                    player.pause()
                     Toast.makeText(
                         this@NupService,
                         "Paused since unplugged.",
@@ -216,13 +212,13 @@ class NupService :
         when (focusChange) {
             AudioManager.AUDIOFOCUS_GAIN -> {
                 Log.d(TAG, "Gained audio focus")
-                player!!.lowVolume = false
+                player.lowVolume = false
             }
             AudioManager.AUDIOFOCUS_LOSS -> Log.d(TAG, "Lost audio focus")
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> Log.d(TAG, "Transiently lost audio focus")
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                 Log.d(TAG, "Transiently lost audio focus (but can duck)")
-                player!!.lowVolume = true
+                player.lowVolume = true
             }
             else -> Log.d(TAG, "Unhandled audio focus change $focusChange")
         }
@@ -230,8 +226,8 @@ class NupService :
 
     private val prefsListener = OnSharedPreferenceChangeListener { prefs, key ->
         if (key == NupPreferences.PRE_AMP_GAIN) {
-            val gain = prefs.getString(key, NupPreferences.PRE_AMP_GAIN_DEFAULT)!!.toDouble()
-            player!!.preAmpGain = gain
+            player.preAmpGain =
+                prefs.getString(key, NupPreferences.PRE_AMP_GAIN_DEFAULT)!!.toDouble()
         }
     }
 
@@ -284,15 +280,13 @@ class NupService :
         downloader = Downloader(authenticator!!, prefs!!)
 
         player = Player(this, this, handler, audioAttrs!!)
-        player!!.preAmpGain = prefs!!.getString(
+        player.preAmpGain = prefs!!.getString(
             NupPreferences.PRE_AMP_GAIN, NupPreferences.PRE_AMP_GAIN_DEFAULT
         )!!.toDouble()
 
-        cache = FileCache(this, this, downloader!!, networkHelper!!)
-        cacheThread = Thread(cache, "FileCache")
-        cacheThread!!.start()
+        cache = FileCache(this, this, mainExecutor, downloader!!, networkHelper!!)
 
-        songDb = SongDatabase(this, this, cache!!, downloader!!, networkHelper!!)
+        songDb = SongDatabase(this, this, cache, downloader!!, networkHelper!!)
 
         coverLoader = CoverLoader(
             File(externalCacheDir!!, COVER_DIR_NAME),
@@ -309,11 +303,11 @@ class NupService :
         mediaSessionManager = MediaSessionManager(
             this,
             object : MediaSession.Callback() {
-                override fun onPause() { player!!.pause() }
-                override fun onPlay() { player!!.unpause() }
+                override fun onPause() { player.pause() }
+                override fun onPlay() { player.unpause() }
                 override fun onSkipToNext() { playSongAtIndex(currentSongIndex + 1) }
                 override fun onSkipToPrevious() { playSongAtIndex(currentSongIndex - 1) }
-                override fun onStop() { player!!.pause() }
+                override fun onStop() { player.pause() }
             }
         )
         mediaSessionToken = mediaSessionManager!!.token
@@ -362,9 +356,8 @@ class NupService :
         unregisterReceiver(broadcastReceiver)
         mediaSessionManager!!.cleanUp()
         songDb!!.quit()
-        player!!.quit()
-        cache!!.quit()
-        cacheThread!!.join()
+        player.quit()
+        cache.quit()
         CrashLogger.unregister()
     }
 
@@ -434,8 +427,8 @@ class NupService :
         if (notification != null) notificationManager!!.notify(NOTIFICATION_ID, notification)
     }
 
-    fun togglePause() { player!!.togglePause() }
-    fun pause() { player!!.pause() }
+    fun togglePause() { player.togglePause() }
+    fun pause() { player.pause() }
 
     fun clearPlaylist() { removeRangeFromPlaylist(0, songs.size - 1) }
 
@@ -469,7 +462,7 @@ class NupService :
                 currentSongIndex--
             }
             if (downloadIndex == firstIndex) {
-                cache!!.abortDownload(downloadSongId)
+                cache.abortDownload(downloadSongId)
                 downloadSongId = -1
                 downloadIndex = -1
             } else if (downloadIndex > firstIndex) {
@@ -505,10 +498,10 @@ class NupService :
         currentSongPlayedMs = 0
         reportedCurrentSong = false
         playbackComplete = false
-        cache!!.clearPinnedSongIds()
+        cache.clearPinnedSongIds()
 
         // If we've already downloaded the whole file, start playing it.
-        var cacheEntry = cache!!.getEntry(currentSong!!.id)
+        var cacheEntry = cache.getEntry(currentSong!!.id)
         if (cacheEntry != null && cacheEntry.isFullyCached) {
             Log.d(TAG, "file ${currentSong!!.url} already downloaded; playing")
             playCacheEntry(cacheEntry)
@@ -518,7 +511,7 @@ class NupService :
             // TODO: This could actually be a future song that we were already
             // downloading and will soon need to start downloading again.
             if (downloadSongId != -1L && downloadSongId != cacheEntry.songId) {
-                cache!!.abortDownload(downloadSongId)
+                cache.abortDownload(downloadSongId)
                 downloadSongId = -1
                 downloadIndex = -1
             }
@@ -526,10 +519,10 @@ class NupService :
         } else {
             // Otherwise, start downloading it if we've never tried downloading it before,
             // or if we have but it's not currently being downloaded.
-            player!!.abortPlayback()
+            player.abortPlayback()
             if (cacheEntry == null || downloadSongId != cacheEntry.songId) {
-                if (downloadSongId != -1L) cache!!.abortDownload(downloadSongId)
-                cacheEntry = cache!!.downloadSong(song!!)
+                if (downloadSongId != -1L) cache.abortDownload(downloadSongId)
+                cacheEntry = cache.downloadSong(song!!)
                 downloadSongId = song.id
                 downloadIndex = currentSongIndex
             }
@@ -540,19 +533,14 @@ class NupService :
         // Enqueue the next song if we already have it.
         val next = nextSong
         if (next != null) {
-            val nextEntry = cache!!.getEntry(next.id)
+            val nextEntry = cache.getEntry(next.id)
             if (nextEntry != null && nextEntry.isFullyCached) {
-                player!!.queueFile(
-                    nextEntry.file,
-                    nextEntry.totalBytes,
-                    next.albumGain,
-                    next.peakAmp
-                )
+                player.queueFile(nextEntry.file, nextEntry.totalBytes, next.albumGain, next.peakAmp)
             }
         }
 
         // Make sure that we won't drop the song that we're currently playing from the cache.
-        cache!!.pinSongId(song!!.id)
+        cache.pinSongId(song!!.id)
         fetchCoverForSongIfMissing(song)
         updateNotification()
         mediaSessionManager!!.updateSong(song)
@@ -563,7 +551,7 @@ class NupService :
     // Stop playing the current song, if any.
     fun stopPlaying() {
         currentFile = null
-        player!!.abortPlayback()
+        player.abortPlayback()
     }
 
     // Start fetching the cover for a song if it's not loaded already.
@@ -595,10 +583,9 @@ class NupService :
         }
     }
 
-    val totalCachedBytes: Long
-        get() = cache!!.totalCachedBytes
+    val totalCachedBytes: Long get() = cache.totalCachedBytes
 
-    fun clearCache() { cache!!.clear() }
+    fun clearCache() { cache.clear() }
 
     override fun onPlaybackComplete() {
         assertOnMainThread()
@@ -645,55 +632,50 @@ class NupService :
     }
 
     override fun onCacheDownloadError(entry: FileCacheEntry, reason: String) {
-        handler.post {
-            Toast.makeText(this@NupService, "Got retryable error: $reason", Toast.LENGTH_SHORT)
-                .show()
-        }
+        assertOnMainThread()
+        Toast.makeText(this@NupService, "Got retryable error: $reason", Toast.LENGTH_SHORT).show()
     }
 
     override fun onCacheDownloadFail(entry: FileCacheEntry, reason: String) {
-        handler.post {
-            Log.d(TAG, "Download of song ${entry.songId} failed: $reason")
-            Toast.makeText(
-                this@NupService,
-                "Download of ${songIdToSong[entry.songId]?.url} failed: $reason",
-                Toast.LENGTH_LONG
-            ).show()
+        assertOnMainThread()
+        Log.d(TAG, "Download of song ${entry.songId} failed: $reason")
 
-            if (entry.songId == downloadSongId) {
-                downloadSongId = -1
-                downloadIndex = -1
-                waitingForDownload = false
-            }
+        Toast.makeText(
+            this@NupService,
+            "Download of ${songIdToSong[entry.songId]?.url} failed: $reason",
+            Toast.LENGTH_LONG
+        ).show()
+
+        if (entry.songId == downloadSongId) {
+            downloadSongId = -1
+            downloadIndex = -1
+            waitingForDownload = false
         }
     }
 
     override fun onCacheDownloadComplete(entry: FileCacheEntry) {
-        handler.post(
-            Runnable {
-                Log.d(TAG, "Download of song ${entry.songId} completed")
+        assertOnMainThread()
+        Log.d(TAG, "Download of song ${entry.songId} completed")
 
-                val song = songIdToSong[entry.songId] ?: return@Runnable
-                song.updateBytes(entry)
-                songDb!!.handleSongCached(song.id)
+        val song = songIdToSong[entry.songId] ?: return
+        song.updateBytes(entry)
+        songDb!!.handleSongCached(song.id)
 
-                if (song == currentSong && waitingForDownload) {
-                    waitingForDownload = false
-                    playCacheEntry(entry)
-                } else if (song == nextSong) {
-                    player!!.queueFile(entry.file, entry.totalBytes, song.albumGain, song.peakAmp)
-                }
+        if (song == currentSong && waitingForDownload) {
+            waitingForDownload = false
+            playCacheEntry(entry)
+        } else if (song == nextSong) {
+            player.queueFile(entry.file, entry.totalBytes, song.albumGain, song.peakAmp)
+        }
 
-                songListener?.onSongFileSizeChange(song)
+        songListener?.onSongFileSizeChange(song)
 
-                if (entry.songId == downloadSongId) {
-                    val nextIndex = downloadIndex + 1
-                    downloadSongId = -1
-                    downloadIndex = -1
-                    maybeDownloadAnotherSong(nextIndex)
-                }
-            }
-        )
+        if (entry.songId == downloadSongId) {
+            val nextIndex = downloadIndex + 1
+            downloadSongId = -1
+            downloadIndex = -1
+            maybeDownloadAnotherSong(nextIndex)
+        }
     }
 
     override fun onCacheDownloadProgress(
@@ -701,34 +683,30 @@ class NupService :
         downloadedBytes: Long,
         elapsedMs: Long
     ) {
-        handler.post(
-            Runnable {
-                val song = songIdToSong[entry.songId] ?: return@Runnable
-                song.updateBytes(entry)
-                if (song == currentSong) {
-                    if (waitingForDownload &&
-                        canPlaySong(entry, downloadedBytes, elapsedMs, song.lengthSec)
-                    ) {
-                        waitingForDownload = false
-                        playCacheEntry(entry)
-                    }
-                }
-                songListener?.onSongFileSizeChange(song)
+        assertOnMainThread()
+
+        val song = songIdToSong[entry.songId] ?: return
+        song.updateBytes(entry)
+        if (song == currentSong) {
+            if (waitingForDownload &&
+                canPlaySong(entry, downloadedBytes, elapsedMs, song.lengthSec)
+            ) {
+                waitingForDownload = false
+                playCacheEntry(entry)
             }
-        )
+        }
+        songListener?.onSongFileSizeChange(song)
     }
 
     override fun onCacheEviction(entry: FileCacheEntry) {
-        handler.post(
-            Runnable {
-                Log.d(TAG, "Song ${entry.songId} was evicted")
-                songDb!!.handleSongEvicted(entry.songId)
-                val song = songIdToSong[entry.songId] ?: return@Runnable
-                song.availableBytes = 0
-                song.totalBytes = 0
-                songListener?.onSongFileSizeChange(song)
-            }
-        )
+        assertOnMainThread()
+        Log.d(TAG, "Song ${entry.songId} was evicted")
+
+        songDb!!.handleSongEvicted(entry.songId)
+        val song = songIdToSong[entry.songId] ?: return
+        song.availableBytes = 0
+        song.totalBytes = 0
+        songListener?.onSongFileSizeChange(song)
     }
 
     // Implements SongDatabase.Listener.
@@ -775,7 +753,7 @@ class NupService :
         mediaSessionManager!!.updatePlaylist(songs)
         for (song in newSongs) {
             songIdToSong[song.id] = song
-            val entry = cache!!.getEntry(song.id)
+            val entry = cache.getEntry(song.id)
             if (entry != null) {
                 song.updateBytes(entry)
                 songListener?.onSongFileSizeChange(song)
@@ -825,9 +803,9 @@ class NupService :
             return
         }
         currentFile = entry.file
-        player!!.playFile(entry.file, entry.totalBytes, song.albumGain, song.peakAmp)
+        player.playFile(entry.file, entry.totalBytes, song.albumGain, song.peakAmp)
         currentSongStartDate = Date()
-        cache!!.updateLastAccessTime(entry.songId)
+        cache.updateLastAccessTime(entry.songId)
         updateNotification()
         updatePlaybackState()
     }
@@ -849,18 +827,18 @@ class NupService :
             (shouldDownloadAll || index - currentSongIndex <= songsToPreload)
         ) {
             val song = songs[index]
-            var entry = cache!!.getEntry(song.id)
+            var entry = cache.getEntry(song.id)
             if (entry != null && entry.isFullyCached) {
                 // We already have this one. Pin it to make sure that it
                 // doesn't get evicted by a later song.
-                cache!!.pinSongId(song.id)
+                cache.pinSongId(song.id)
                 index++
                 continue
             }
-            cache!!.downloadSong(song)
+            cache.downloadSong(song)
             downloadSongId = song.id
             downloadIndex = index
-            cache!!.pinSongId(song.id)
+            cache.pinSongId(song.id)
             fetchCoverForSongIfMissing(song)
             index++
         }

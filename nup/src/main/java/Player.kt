@@ -172,7 +172,7 @@ class Player(
 
     /** Shut down the player. */
     fun quit() {
-        executor.submit {
+        executor.execute {
             resetCurrent()
             resetQueued()
         }
@@ -182,12 +182,12 @@ class Player(
 
     /** Stop playing the current song (if any). */
     fun abortPlayback() {
-        executor.submit { resetCurrent() }
+        executor.execute { resetCurrent() }
     }
 
     /** Start playback of [file]. */
     fun playFile(file: File, totalBytes: Long, gain: Double, peakAmp: Double) {
-        executor.submit {
+        executor.execute {
             Log.d(TAG, "Playing $file")
             resetCurrent()
             if (queuedPlayer?.file == file) {
@@ -207,7 +207,7 @@ class Player(
 
     /** Queue [file] for future playback. */
     fun queueFile(file: File, totalBytes: Long, gain: Double, peakAmp: Double) {
-        executor.submit task@{
+        executor.execute task@{
             if (queuedPlayer?.file == file) return@task
 
             Log.d(TAG, "Queuing $file")
@@ -245,7 +245,7 @@ class Player(
     private enum class PauseUpdateType { PAUSE, UNPAUSE, TOGGLE_PAUSE }
 
     private fun updatePauseState(type: PauseUpdateType) {
-        executor.submit task@{
+        executor.execute task@{
             val player = currentPlayer ?: return@task
 
             val newPaused = when (type) {
@@ -280,7 +280,7 @@ class Player(
     /** Reduce playback volume (e.g. during a phone call). */
     var lowVolume: Boolean = false
         set(value) {
-            executor.submit {
+            executor.execute {
                 if (value != lowVolume) {
                     field = value
                     currentPlayer?.adjustVolume()
@@ -292,7 +292,7 @@ class Player(
     /** Adjust playback volume up or down by specified decibels. */
     var preAmpGain: Double = 0.0
         set(value) {
-            executor.submit {
+            executor.execute {
                 if (value != preAmpGain) {
                     field = value
                     currentPlayer?.adjustVolume()
@@ -330,7 +330,7 @@ class Player(
     }
 
     override fun onCompletion(player: MediaPlayer) {
-        executor.submit task@{
+        executor.execute task@{
             if (currentPlayer?.mediaPlayer !== player) return@task
 
             val filePlayer = currentPlayer!!
