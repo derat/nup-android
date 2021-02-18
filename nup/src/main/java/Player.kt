@@ -9,12 +9,12 @@ import android.content.Context
 import android.media.AudioAttributes
 import android.media.MediaPlayer
 import android.media.audiofx.LoudnessEnhancer
-import android.os.Handler
 import android.os.PowerManager
 import android.util.Log
 import java.io.File
 import java.io.FileInputStream
 import java.io.IOException
+import java.util.concurrent.Executor
 import java.util.concurrent.Executors
 import java.util.concurrent.ScheduledFuture
 import java.util.concurrent.TimeUnit
@@ -23,7 +23,7 @@ import java.util.concurrent.TimeUnit
 class Player(
     private val context: Context,
     private val listener: Listener,
-    private val listenerHandler: Handler,
+    private val listenerExecutor: Executor,
     private val attrs: AudioAttributes,
 ) : MediaPlayer.OnCompletionListener, MediaPlayer.OnErrorListener {
     private var currentPlayer: FilePlayer? = null
@@ -100,7 +100,7 @@ class Player(
                 true
             } catch (e: IOException) {
                 close()
-                listenerHandler.post { listener.onPlaybackError("Unable to prepare $file: $e") }
+                listenerExecutor.execute { listener.onPlaybackError("Unable to prepare $file: $e") }
                 false
             }
         }
@@ -113,7 +113,7 @@ class Player(
                 loudnessEnhancer.release()
                 stream?.close()
             } catch (e: IOException) {
-                listenerHandler.post { listener.onPlaybackError("Unable to close $file: $e") }
+                listenerExecutor.execute { listener.onPlaybackError("Unable to close $file: $e") }
             }
         }
 
@@ -273,7 +273,7 @@ class Player(
                 if (!switchedToFile) player.mediaPlayer.start()
                 startPositionTimer()
             }
-            listenerHandler.post { listener.onPauseStateChange(paused) }
+            listenerExecutor.execute { listener.onPauseStateChange(paused) }
         }
     }
 
@@ -309,7 +309,7 @@ class Player(
         val file = player.file
         val positionMs = player.mediaPlayer.currentPosition
         val durationMs = player.mediaPlayer.duration
-        listenerHandler.post { listener.onPlaybackPositionChange(file, positionMs, durationMs) }
+        listenerExecutor.execute { listener.onPlaybackPositionChange(file, positionMs, durationMs) }
     }
     private var positionFuture: ScheduledFuture<*>? = null
 
@@ -346,7 +346,7 @@ class Player(
                 Log.d(TAG, "$player completed playback at $streamPos of $totalBytes")
                 if (streamPos < totalBytes && filePlayer.stream != null) {
                     val switchedToFile = filePlayer.restartPlayback()
-                    listenerHandler.post {
+                    listenerExecutor.execute {
                         listener.onPlaybackError(
                             if (switchedToFile) "Switched to file after buffer underrun"
                             else "Reloaded stream after buffer underrun"
@@ -354,7 +354,7 @@ class Player(
                     }
                 } else {
                     resetCurrent()
-                    listenerHandler.post { listener.onPlaybackComplete() }
+                    listenerExecutor.execute { listener.onPlaybackComplete() }
                 }
             } catch (e: IOException) {
                 Log.e(TAG, "Got error while handling completion of $player: $e")
@@ -363,7 +363,7 @@ class Player(
     }
 
     override fun onError(player: MediaPlayer, what: Int, extra: Int): Boolean {
-        listenerHandler.post {
+        listenerExecutor.execute {
             listener.onPlaybackError(
                 "MediaPlayer reported a vague, not-very-useful error: what=$what extra=$extra"
             )

@@ -43,11 +43,12 @@ class SearchFormActivity : Activity(), SongDatabaseUpdateListener {
             if (hasFocus) {
                 val artist = artistEdit!!.text.toString()
                 val albums: MutableList<String> = ArrayList()
-                val albumsWithCounts = if (artist.trim { it <= ' ' }.isEmpty()) service!!
-                    .songDb!!
-                    .getAlbumsSortedAlphabetically() else service!!
-                    .songDb!!
-                    .getAlbumsByArtist(artist)
+                val albumsWithCounts = if (artist.trim { it <= ' ' }.isEmpty()) {
+                    service!!.songDb.getAlbumsSortedAlphabetically()
+                } else {
+                    service!!.songDb.getAlbumsByArtist(artist)
+                }
+
                 for (stats in albumsWithCounts) albums.add(stats.key.album)
                 albumEdit!!.setAdapter(
                     ArrayAdapter(
@@ -121,7 +122,7 @@ class SearchFormActivity : Activity(), SongDatabaseUpdateListener {
     // Implements NupService.SongDatabaseUpdateListener.
     override fun onSongDatabaseUpdate() {
         val artists: MutableList<String> = ArrayList()
-        val artistsWithCounts = service!!.songDb!!.getArtistsSortedByNumSongs()
+        val artistsWithCounts = service!!.songDb.getArtistsSortedByNumSongs()
         for (stats in artistsWithCounts) artists.add(stats.key.artist)
         artistEdit!!.setAdapter(
             ArrayAdapter(

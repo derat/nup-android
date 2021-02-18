@@ -13,6 +13,7 @@ import android.text.TextUtils
 import android.util.Log
 import java.util.Collections
 import java.util.Date
+import java.util.concurrent.Executor
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import org.json.JSONArray
@@ -22,6 +23,7 @@ import org.json.JSONTokener
 class SongDatabase(
     private val context: Context,
     private val listener: Listener,
+    private val listenerExecutor: Executor,
     private val cache: FileCache,
     private val downloader: Downloader,
     private val networkHelper: NetworkHelper
@@ -44,7 +46,9 @@ class SongDatabase(
     private val albumsSortedAlphabetically: MutableList<StatsRow> = ArrayList()
     private val artistAlbums = HashMap<String, MutableList<StatsRow>>()
 
+    /** Notified about changes to the database. */
     interface Listener {
+        /** Called when aggregate stats have been updated. */
         fun onAggregateDataUpdate()
     }
 
@@ -279,7 +283,9 @@ class SongDatabase(
             values.put("ServerTimeNsec", startTimeNsec)
             db.update("LastUpdateTime", values, null, null)
             if (numSongsUpdated > 0) {
-                listener.onSyncProgress(SyncState.UPDATING_STATS, numSongsUpdated)
+                listenerExecutor.execute {
+                    listener.onSyncProgress(SyncState.UPDATING_STATS, numSongsUpdated)
+                }
                 updateStatsTables(db)
                 updateCachedSongs(db)
             }
@@ -360,9 +366,11 @@ class SongDatabase(
                 message[0] = "Couldn't parse response: $e"
                 throw ServerException("bad data")
             }
-            listener.onSyncProgress(
-                if (deleted) SyncState.DELETING_SONGS else SyncState.UPDATING_SONGS, numUpdates
-            )
+            listenerExecutor.execute {
+                listener.onSyncProgress(
+                    if (deleted) SyncState.DELETING_SONGS else SyncState.UPDATING_SONGS, numUpdates
+                )
+            }
         }
         return numUpdates
     }
@@ -445,7 +453,7 @@ class SongDatabase(
 
         // If the song data didn't change and we've already loaded it, bail out early.
         if (!songsUpdated && aggregateDataLoaded) {
-            listener.onAggregateDataUpdate()
+            listenerExecutor.execute { listener.onAggregateDataUpdate() }
             return
         }
         numSongs = 0
@@ -515,7 +523,7 @@ class SongDatabase(
         artistsSortedByNumSongs.addAll(artistsSortedAlphabetically)
         Collections.sort(artistsSortedByNumSongs) { a, b -> b.count - a.count }
         aggregateDataLoaded = true
-        listener.onAggregateDataUpdate()
+        listenerExecutor.execute { listener.onAggregateDataUpdate() }
     }
 
     // Given a query that returns artist, album, album ID, and num songs,

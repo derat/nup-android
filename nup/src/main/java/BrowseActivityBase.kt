@@ -107,7 +107,7 @@ abstract class BrowseActivityBase :
 
     override fun onSongDatabaseUpdate() {
         getRows(
-            service!!.songDb!!,
+            service!!.songDb,
             { newRows: List<StatsRow>? ->
                 rows.clear()
                 if (newRows == null) {

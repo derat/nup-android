@@ -86,7 +86,7 @@ class BrowseSongsActivity : Activity(), OnItemClickListener {
 
             protected override fun doInBackground(vararg args: Void?): List<Song> {
                 return service!!
-                    .songDb!!
+                    .songDb
                     .query(artist, null, album, albumId, minRating, false, false, onlyCached)
             }
 

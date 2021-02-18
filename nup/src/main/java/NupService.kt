@@ -23,7 +23,6 @@ import android.media.session.MediaSession
 import android.net.Uri
 import android.os.AsyncTask
 import android.os.Binder
-import android.os.Handler
 import android.os.IBinder
 import android.preference.PreferenceManager
 import android.telephony.PhoneStateListener
@@ -65,35 +64,20 @@ class NupService :
         fun onSongDatabaseUpdate()
     }
 
-    // Authenticates with Google Cloud Storage.
-    private var authenticator: Authenticator? = null
-
-    // Downloads files.
-    private var downloader: Downloader? = null
-
-    private lateinit var player: Player
-    private lateinit var cache: FileCache
-
-    // Stores a local listing of all of the songs on the server.
-    var songDb: SongDatabase? = null
+    lateinit var songDb: SongDatabase
         private set
 
-    // Loads songs' cover art from local disk or the network.
-    private var coverLoader: CoverLoader? = null
-
-    // Reports song playback to the music server.
-    private var playbackReporter: PlaybackReporter? = null
-
-    // Publishes song metadata and handles remote commands.
-    private var mediaSessionManager: MediaSessionManager? = null
-
-    // Token identifying the session managed by |mMediaSessionManager|.
-    private var mediaSessionToken: MediaSession.Token? = null
-
-    // Updates the notification.
-    private var notificationManager: NotificationManager? = null
-    private var notificationCreator: NotificationCreator? = null
-    private var networkHelper: NetworkHelper? = null
+    private lateinit var authenticator: Authenticator
+    private lateinit var downloader: Downloader
+    private lateinit var player: Player
+    private lateinit var cache: FileCache
+    private lateinit var coverLoader: CoverLoader
+    private lateinit var playbackReporter: PlaybackReporter
+    private lateinit var mediaSessionManager: MediaSessionManager
+    private lateinit var mediaSessionToken: MediaSession.Token
+    private lateinit var notificationManager: NotificationManager
+    private lateinit var notificationCreator: NotificationCreator
+    private lateinit var networkHelper: NetworkHelper
 
     // Points from song ID to Song.
     // This is the canonical set of songs that we've seen.
@@ -151,12 +135,10 @@ class NupService :
     // Last time at which the user was foregrounded or backgrounded.
     private var lastUserSwitchTime: Date? = null
 
-    // Used to run tasks on our thread.
-    private val handler = Handler()
-    private var audioManager: AudioManager? = null
-    private var audioAttrs: AudioAttributes? = null
-    private var telephonyManager: TelephonyManager? = null
-    private var prefs: SharedPreferences? = null
+    private lateinit var audioManager: AudioManager
+    private lateinit var audioAttrs: AudioAttributes
+    private lateinit var telephonyManager: TelephonyManager
+    private lateinit var prefs: SharedPreferences
 
     // Pause when phone calls arrive.
     private val phoneStateListener: PhoneStateListener = object : PhoneStateListener() {
@@ -250,23 +232,23 @@ class NupService :
         }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR)
         networkHelper = NetworkHelper(this)
         authenticator = Authenticator(this)
-        if (networkHelper!!.isNetworkAvailable) authenticateInBackground()
+        if (networkHelper.isNetworkAvailable) authenticateInBackground()
 
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         audioAttrs = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_MEDIA)
             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
             .build()
-        val result = audioManager!!.requestAudioFocus(
+        val result = audioManager.requestAudioFocus(
             AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
                 .setOnAudioFocusChangeListener(audioFocusListener)
-                .setAudioAttributes(audioAttrs!!)
+                .setAudioAttributes(audioAttrs)
                 .build()
         )
         Log.d(TAG, "requested audio focus; got $result")
 
         telephonyManager = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
-        telephonyManager!!.listen(phoneStateListener, PhoneStateListener.LISTEN_CALL_STATE)
+        telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_CALL_STATE)
 
         val filter = IntentFilter()
         filter.addAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
@@ -275,28 +257,22 @@ class NupService :
         registerReceiver(broadcastReceiver, filter)
 
         prefs = PreferenceManager.getDefaultSharedPreferences(this)
-        prefs!!.registerOnSharedPreferenceChangeListener(prefsListener)
+        prefs.registerOnSharedPreferenceChangeListener(prefsListener)
 
-        downloader = Downloader(authenticator!!, prefs!!)
+        downloader = Downloader(authenticator, prefs)
 
-        player = Player(this, this, handler, audioAttrs!!)
-        player.preAmpGain = prefs!!.getString(
+        player = Player(this, this, mainExecutor, audioAttrs)
+        player.preAmpGain = prefs.getString(
             NupPreferences.PRE_AMP_GAIN, NupPreferences.PRE_AMP_GAIN_DEFAULT
         )!!.toDouble()
 
-        cache = FileCache(this, this, mainExecutor, downloader!!, networkHelper!!)
+        cache = FileCache(this, this, mainExecutor, downloader, networkHelper)
+        songDb = SongDatabase(this, this, mainExecutor, cache, downloader, networkHelper)
+        coverLoader = CoverLoader(File(externalCacheDir, COVER_DIR_NAME), downloader, networkHelper)
 
-        songDb = SongDatabase(this, this, cache, downloader!!, networkHelper!!)
-
-        coverLoader = CoverLoader(
-            File(externalCacheDir!!, COVER_DIR_NAME),
-            downloader!!,
-            networkHelper!!,
-        )
-
-        playbackReporter = PlaybackReporter(songDb!!, downloader!!, networkHelper!!)
-        if (networkHelper!!.isNetworkAvailable) {
-            launch(Dispatchers.IO) { playbackReporter!!.reportPending() }
+        playbackReporter = PlaybackReporter(songDb, downloader, networkHelper)
+        if (networkHelper.isNetworkAvailable) {
+            launch(Dispatchers.IO) { playbackReporter.reportPending() }
         }
         // TODO: Listen for the network coming up and send pending reports then too?
 
@@ -310,13 +286,13 @@ class NupService :
                 override fun onStop() { player.pause() }
             }
         )
-        mediaSessionToken = mediaSessionManager!!.token
+        mediaSessionToken = mediaSessionManager.token
 
         notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         notificationCreator = NotificationCreator(
             this,
-            notificationManager!!,
-            mediaSessionToken!!,
+            notificationManager,
+            mediaSessionToken,
             PendingIntent.getActivity(this, 0, Intent(this, NupActivity::class.java), 0),
             PendingIntent.getService(
                 this,
@@ -337,7 +313,7 @@ class NupService :
                 0
             )
         )
-        val notification = notificationCreator!!.createNotification(
+        val notification = notificationCreator.createNotification(
             false,
             currentSong,
             paused,
@@ -350,12 +326,12 @@ class NupService :
 
     override fun onDestroy() {
         Log.d(TAG, "service destroyed")
-        audioManager!!.abandonAudioFocus(audioFocusListener)
-        prefs!!.unregisterOnSharedPreferenceChangeListener(prefsListener)
-        telephonyManager!!.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE)
+        audioManager.abandonAudioFocus(audioFocusListener)
+        prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
+        telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE)
         unregisterReceiver(broadcastReceiver)
-        mediaSessionManager!!.cleanUp()
-        songDb!!.quit()
+        mediaSessionManager.cleanUp()
+        songDb.quit()
         player.quit()
         cache.quit()
         CrashLogger.unregister()
@@ -416,7 +392,7 @@ class NupService :
 
     /** Updates the currently-displayed notification if needed.  */
     private fun updateNotification() {
-        val notification = notificationCreator!!.createNotification(
+        val notification = notificationCreator.createNotification(
             true,
             currentSong,
             paused,
@@ -424,7 +400,7 @@ class NupService :
             currentSongIndex,
             songs.size
         )
-        if (notification != null) notificationManager!!.notify(NOTIFICATION_ID, notification)
+        if (notification != null) notificationManager.notify(NOTIFICATION_ID, notification)
     }
 
     fun togglePause() { player.togglePause() }
@@ -474,7 +450,7 @@ class NupService :
                 playSongAtIndex(currentSongIndex)
             } else {
                 currentSongIndex = -1
-                mediaSessionManager!!.updateSong(null)
+                mediaSessionManager.updateSong(null)
                 updatePlaybackState()
             }
         }
@@ -485,7 +461,7 @@ class NupService :
         }
         songListener?.onPlaylistChange(songs)
         updateNotification()
-        mediaSessionManager!!.updatePlaylist(songs)
+        mediaSessionManager.updatePlaylist(songs)
     }
 
     // Play the song at a particular position in the playlist.
@@ -543,7 +519,7 @@ class NupService :
         cache.pinSongId(song!!.id)
         fetchCoverForSongIfMissing(song)
         updateNotification()
-        mediaSessionManager!!.updateSong(song)
+        mediaSessionManager.updateSong(song)
         updatePlaybackState()
         songListener?.onSongChange(song, currentSongIndex)
     }
@@ -567,7 +543,7 @@ class NupService :
     internal inner class CoverFetchTask(private val song: Song?) :
         AsyncTask<Void?, Void?, Bitmap?>() {
         protected override fun doInBackground(vararg args: Void?): Bitmap? {
-            return coverLoader!!.loadCover(song!!.coverUrl!!)
+            return coverLoader.loadCover(song!!.coverUrl!!)
         }
 
         override fun onPostExecute(bitmap: Bitmap?) {
@@ -577,7 +553,7 @@ class NupService :
                 songListener?.onSongCoverLoad(song)
                 if (song == currentSong) {
                     updateNotification()
-                    mediaSessionManager!!.updateSong(song)
+                    mediaSessionManager.updateSong(song)
                 }
             }
         }
@@ -610,7 +586,7 @@ class NupService :
                 )
             ) {
                 val start = currentSongStartDate!!
-                launch(Dispatchers.IO) { playbackReporter!!.report(song.id, start) }
+                launch(Dispatchers.IO) { playbackReporter.report(song.id, start) }
                 reportedCurrentSong = true
             }
         }
@@ -659,7 +635,7 @@ class NupService :
 
         val song = songIdToSong[entry.songId] ?: return
         song.updateBytes(entry)
-        songDb!!.handleSongCached(song.id)
+        songDb.handleSongCached(song.id)
 
         if (song == currentSong && waitingForDownload) {
             waitingForDownload = false
@@ -700,25 +676,23 @@ class NupService :
 
     override fun onCacheEviction(entry: FileCacheEntry) {
         assertOnMainThread()
-        Log.d(TAG, "Song ${entry.songId} was evicted")
+        Log.d(TAG, "Song ${entry.songId} evicted")
 
-        songDb!!.handleSongEvicted(entry.songId)
+        songDb.handleSongEvicted(entry.songId)
         val song = songIdToSong[entry.songId] ?: return
         song.availableBytes = 0
         song.totalBytes = 0
         songListener?.onSongFileSizeChange(song)
     }
 
-    // Implements SongDatabase.Listener.
     override fun onAggregateDataUpdate() {
-        handler.post {
-            Log.d(TAG, "got notice that aggregate data has been updated")
-            for (listener in songDatabaseUpdateListeners) listener.onSongDatabaseUpdate()
-        }
+        assertOnMainThread()
+        Log.d(TAG, "Aggregate data updated")
+        for (listener in songDatabaseUpdateListeners) listener.onSongDatabaseUpdate()
     }
 
     /** Starts authenticating with Google Cloud Storage in the background.  */
-    fun authenticateInBackground() { authenticator!!.authenticateInBackground() }
+    fun authenticateInBackground() { authenticator.authenticateInBackground() }
 
     // Insert a list of songs into the playlist at a particular position.
     // Plays the first one, if no song is already playing or if we were previously at the end of the
@@ -750,7 +724,7 @@ class NupService :
         if (downloadIndex >= 0 && index <= downloadIndex) downloadIndex += resSongs.size
 
         songListener?.onPlaylistChange(songs)
-        mediaSessionManager!!.updatePlaylist(songs)
+        mediaSessionManager.updatePlaylist(songs)
         for (song in newSongs) {
             songIdToSong[song.id] = song
             val entry = cache.getEntry(song.id)
@@ -817,10 +791,10 @@ class NupService :
             return
         }
         val songsToPreload = Integer.valueOf(
-            prefs!!.getString(
+            prefs.getString(
                 NupPreferences.SONGS_TO_PRELOAD,
                 NupPreferences.SONGS_TO_PRELOAD_DEFAULT
-            )!!
+            ) ?: "0"
         )
         var index = startIndex
         while (index < songs.size &&
@@ -871,9 +845,9 @@ class NupService :
         songsWithCovers.add(song)
     }
 
-    // Notifies |mediaSessionManager| about the current playback state.
+    /** Notify [mediaSessionManager] about the current playback state. */
     private fun updatePlaybackState() {
-        mediaSessionManager!!.updatePlaybackState(
+        mediaSessionManager.updatePlaybackState(
             currentSong,
             paused,
             playbackComplete,
