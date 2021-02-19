@@ -87,7 +87,7 @@ class SearchResultsActivity : Activity() {
                 val newSongs = mutableListOf<Song>()
                 for (query in queries) {
                     newSongs.addAll(
-                        service!!.songDb.query(
+                        service.songDb.query(
                             artist = query.artist,
                             title = query.title,
                             album = query.album,
@@ -165,15 +165,15 @@ class SearchResultsActivity : Activity() {
         val song = songs[info.position]
         return when (item.itemId) {
             MENU_ITEM_PLAY -> {
-                service!!.addSongToPlaylist(song, true)
+                service.addSongToPlaylist(song, true)
                 true
             }
             MENU_ITEM_INSERT -> {
-                service!!.addSongToPlaylist(song, false)
+                service.addSongToPlaylist(song, false)
                 true
             }
             MENU_ITEM_APPEND -> {
-                service!!.appendSongToPlaylist(song)
+                service.appendSongToPlaylist(song)
                 true
             }
             MENU_ITEM_SONG_DETAILS -> {
@@ -194,20 +194,20 @@ class SearchResultsActivity : Activity() {
     }
 
     fun onAppendButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
-        service!!.appendSongsToPlaylist(songs)
+        service.appendSongsToPlaylist(songs)
         setResult(RESULT_OK)
         finish()
     }
 
     fun onInsertButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
-        service!!.addSongsToPlaylist(songs, false)
+        service.addSongsToPlaylist(songs, false)
         setResult(RESULT_OK)
         finish()
     }
 
     fun onReplaceButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
-        service!!.clearPlaylist()
-        service!!.appendSongsToPlaylist(songs)
+        service.clearPlaylist()
+        service.appendSongsToPlaylist(songs)
         setResult(RESULT_OK)
         finish()
     }

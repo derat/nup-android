@@ -32,7 +32,7 @@ class YesNoPreference(context: Context, attrs: AttributeSet?) :
                 GlobalScope.async(Dispatchers.Main) { syncSongList() }
             }
             NupPreferences.CLEAR_CACHE -> {
-                service!!.clearCache()
+                service.clearCache()
                 summary = context.getString(R.string.cache_is_empty)
             }
         }
@@ -44,7 +44,7 @@ class YesNoPreference(context: Context, attrs: AttributeSet?) :
 
     /** Update the summary text for [NupPreferences.SYNC_SONG_LIST]. */
     private fun updateSyncMessage() {
-        val db = service!!.songDb
+        val db = service.songDb
         when {
             !db.aggregateDataLoaded -> { summary = context.getString(R.string.loading_stats) }
             db.lastSyncDate == null -> { summary = context.getString(R.string.never_synced) }
@@ -107,7 +107,7 @@ class YesNoPreference(context: Context, attrs: AttributeSet?) :
 
         val msg = GlobalScope.async(Dispatchers.IO) {
             val message = arrayOf("")
-            service!!.songDb.syncWithServer(listener, context.mainExecutor, message)
+            service.songDb.syncWithServer(listener, context.mainExecutor, message)
             message[0]
         }.await()
 

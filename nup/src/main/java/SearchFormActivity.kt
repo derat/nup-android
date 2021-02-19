@@ -46,9 +46,9 @@ class SearchFormActivity : Activity(), SongDatabaseUpdateListener {
                 val artist = artistEdit.text.toString()
                 val albums = mutableListOf<String>()
                 val albumsWithCounts = if (artist.trim().isEmpty()) {
-                    service!!.songDb.albumsSortedAlphabetically
+                    service.songDb.albumsSortedAlphabetically
                 } else {
-                    service!!.songDb.albumsByArtist(artist)
+                    service.songDb.albumsByArtist(artist)
                 }
                 for (stats in albumsWithCounts) albums.add(stats.key.album)
 
@@ -73,14 +73,14 @@ class SearchFormActivity : Activity(), SongDatabaseUpdateListener {
         substringCheckbox = findViewById<CheckBox>(R.id.substring_checkbox)
         cachedCheckbox = findViewById<CheckBox>(R.id.cached_checkbox)
 
-        service!!.addSongDatabaseUpdateListener(this)
+        service.addSongDatabaseUpdateListener(this)
         onSongDatabaseUpdate()
     }
 
     override fun onDestroy() {
         Log.d(TAG, "Activity destroyed")
         super.onDestroy()
-        service!!.removeSongDatabaseUpdateListener(this)
+        service.removeSongDatabaseUpdateListener(this)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -114,7 +114,7 @@ class SearchFormActivity : Activity(), SongDatabaseUpdateListener {
 
     override fun onSongDatabaseUpdate() {
         val artists = mutableListOf<String>()
-        val artistsWithCounts = service!!.songDb.artistsSortedByNumSongs
+        val artistsWithCounts = service.songDb.artistsSortedByNumSongs
         for (stats in artistsWithCounts) artists.add(stats.key.artist)
         artistEdit.setAdapter(
             ArrayAdapter(

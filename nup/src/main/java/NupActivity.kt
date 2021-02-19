@@ -14,6 +14,7 @@ import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
 import android.os.StrictMode
 import android.os.StrictMode.VmPolicy
 import android.util.Log
@@ -30,43 +31,36 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.ListView
 import android.widget.TextView
-import org.erat.nup.NupService.LocalBinder
-import org.erat.nup.NupService.SongListener
 import org.erat.nup.SongDetailsDialog.createBundle
 import org.erat.nup.SongDetailsDialog.createDialog
 import org.erat.nup.SongDetailsDialog.prepareDialog
 
-class NupActivity : Activity(), SongListener {
-    // UI components that we update dynamically.
-    private var pauseButton: Button? = null
-    private var prevButton: Button? = null
-    private var nextButton: Button? = null
-    private var albumImageView: ImageView? = null
-    private var artistLabel: TextView? = null
-    private var titleLabel: TextView? = null
-    private var albumLabel: TextView? = null
-    private var timeLabel: TextView? = null
-    private var downloadStatusLabel: TextView? = null
-    private var playlistView: ListView? = null
+/** Main activity showing current song and playlist. */
+class NupActivity : Activity(), NupService.SongListener {
+    private var songs = listOf<Song>() // current playlist
+    private var curSongIndex = -1 // index of current song in [songs]
+    private val curSong: Song?
+        get() = if (curSongIndex in 0 until songs.size) songs[curSongIndex] else null
 
-    // Last song-position time passed to onSongPositionChange(), in seconds.
-    // Used to rate-limit how often we update the display so we only do it on integral changes.
-    private var lastSongPositionSec = -1
+    private var lastPosSec = -1 // last song position time passed to [onSongPositionChange]
+    private val songListAdapter = SongListAdapter() // adapts [songs] for [playlistView]
 
-    // Songs in the current playlist.
-    private var songs: List<Song> = ArrayList<Song>()
+    // Context.mainExecutor is annoyingly an Executor rather than a ScheduledExecutorService,
+    // so it seems like we need a Handler instead to be able post delayed tasks.
+    private val handler = Handler(Looper.getMainLooper())
+    private val playSongTask = Runnable { _service?.playSongAtIndex(curSongIndex) }
 
-    // Position in |songs| of the song that we're currently displaying.
-    private var currentSongIndex = -1
+    private lateinit var pauseButton: Button
+    private lateinit var prevButton: Button
+    private lateinit var nextButton: Button
+    private lateinit var albumImageView: ImageView
+    private lateinit var artistLabel: TextView
+    private lateinit var titleLabel: TextView
+    private lateinit var albumLabel: TextView
+    private lateinit var timeLabel: TextView
+    private lateinit var downloadStatusLabel: TextView
+    private lateinit var playlistView: ListView
 
-    // Adapts the song listing to |playlistView|.
-    private val songListAdapter = SongListAdapter()
-
-    // Used to run tasks on our thread.
-    private val handler = Handler()
-
-    // Task that tells the service to play our currently-selected song.
-    private val playSongTask = Runnable { service!!.playSongAtIndex(currentSongIndex) }
     public override fun onCreate(savedInstanceState: Bundle?) {
         StrictMode.setThreadPolicy(
             StrictMode.ThreadPolicy.Builder()
@@ -87,53 +81,57 @@ class NupActivity : Activity(), SongListener {
                 .penaltyDeath()
                 .build()
         )
+
         super.onCreate(savedInstanceState)
-        Log.d(TAG, "activity created")
+        Log.d(TAG, "Activity created")
+
         setContentView(R.layout.main)
-        pauseButton = findViewById<View>(R.id.pause_button) as Button
-        prevButton = findViewById<View>(R.id.prev_button) as Button
-        nextButton = findViewById<View>(R.id.next_button) as Button
-        albumImageView = findViewById<View>(R.id.album_image) as ImageView
-        artistLabel = findViewById<View>(R.id.artist_label) as TextView
-        titleLabel = findViewById<View>(R.id.title_label) as TextView
-        albumLabel = findViewById<View>(R.id.album_label) as TextView
-        timeLabel = findViewById<View>(R.id.time_label) as TextView
-        downloadStatusLabel = findViewById<View>(R.id.download_status_label) as TextView
-        playlistView = findViewById<View>(R.id.playlist) as ListView
+
+        pauseButton = findViewById<Button>(R.id.pause_button)
+        prevButton = findViewById<Button>(R.id.prev_button)
+        nextButton = findViewById<Button>(R.id.next_button)
+        albumImageView = findViewById<ImageView>(R.id.album_image)
+        artistLabel = findViewById<TextView>(R.id.artist_label)
+        titleLabel = findViewById<TextView>(R.id.title_label)
+        albumLabel = findViewById<TextView>(R.id.album_label)
+        timeLabel = findViewById<TextView>(R.id.time_label)
+        downloadStatusLabel = findViewById<TextView>(R.id.download_status_label)
+
+        playlistView = findViewById<ListView>(R.id.playlist)
         registerForContextMenu(playlistView)
-        playlistView!!.adapter = songListAdapter
+        playlistView.adapter = songListAdapter
+
         val serviceIntent = Intent(this, NupService::class.java)
         startService(serviceIntent)
-        bindService(Intent(this, NupService::class.java), connection, 0)
+        bindService(serviceIntent, connection, 0)
+
         volumeControlStream = AudioManager.STREAM_MUSIC
     }
 
     override fun onDestroy() {
-        Log.d(TAG, "activity destroyed")
+        Log.d(TAG, "Activity destroyed")
         super.onDestroy()
-        var stopService = false
-        if (service != null) {
-            service!!.unregisterListener(this)
-            // Shut down the service as well if the playlist is empty.
-            if (service!!.getSongs().size == 0) stopService = true
-        }
+        _service?.unregisterListener(this)
+
+        // Shut down the service as well if the playlist is empty.
+        val stopService = _service?.getSongs()?.isEmpty() ?: false
         unbindService(connection)
         if (stopService) stopService(Intent(this, NupService::class.java))
     }
 
     private val connection: ServiceConnection = object : ServiceConnection {
         override fun onServiceConnected(className: ComponentName, binder: IBinder) {
-            Log.d(TAG, "connected to service")
-            service = (binder as LocalBinder).service
-            service!!.setSongListener(this@NupActivity)
+            Log.d(TAG, "Connected to service")
+            _service = (binder as NupService.LocalBinder).service
+            service.setSongListener(this@NupActivity)
 
             // Get current state from service.
-            onPlaylistChange(service!!.getSongs())
-            onPauseStateChange(service!!.paused)
-            val song = currentSong
-            if (song != null && song == service!!.currentSong) {
-                onSongPositionChange(song, service!!.currentSongLastPositionMs, 0)
-                playlistView!!.smoothScrollToPosition(currentSongIndex)
+            onPlaylistChange(service.getSongs())
+            onPauseStateChange(service.paused)
+            val song = curSong
+            if (song != null && song == service.currentSong) {
+                onSongPositionChange(song, service.currentSongLastPositionMs, 0)
+                playlistView.smoothScrollToPosition(curSongIndex)
             }
 
             // TODO: Go to prefs page if server and account are unset.
@@ -143,57 +141,60 @@ class NupActivity : Activity(), SongListener {
         }
 
         override fun onServiceDisconnected(className: ComponentName) {
-            Log.d(TAG, "disconnected from service")
-            service = null
+            Log.d(TAG, "Disconnected from service")
+            _service = null
         }
     }
 
     fun onPauseButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
-        service!!.togglePause()
+        service.togglePause()
     }
 
     fun onPrevButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
-        if (currentSongIndex <= 0) return
-        service!!.stopPlaying()
-        updateCurrentSongIndex(currentSongIndex - 1)
-        schedulePlaySongTask(SONG_CHANGE_DELAY_MS)
+        if (curSongIndex <= 0) return
+        service.stopPlaying()
+        setCurrentSong(curSongIndex - 1)
+        schedulePlaySong(SONG_CHANGE_DELAY_MS)
     }
 
     fun onNextButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
-        if (currentSongIndex >= songs.size - 1) return
-        service!!.stopPlaying()
-        updateCurrentSongIndex(currentSongIndex + 1)
-        schedulePlaySongTask(SONG_CHANGE_DELAY_MS)
+        if (curSongIndex >= songs.size - 1) return
+        service.stopPlaying()
+        setCurrentSong(curSongIndex + 1)
+        schedulePlaySong(SONG_CHANGE_DELAY_MS)
     }
 
     override fun onSongChange(song: Song, index: Int) {
-        updateCurrentSongIndex(index)
+        runOnUiThread { setCurrentSong(index) }
     }
 
     override fun onSongPositionChange(song: Song, positionMs: Int, durationMs: Int) {
         runOnUiThread(
-            Runnable {
-                if (song != currentSong) return@Runnable
-                val positionSec = positionMs / 1000
-                if (positionSec == lastSongPositionSec) return@Runnable
+            task@{
+                if (song != curSong) return@task
+                val sec = positionMs / 1000
+                if (sec == lastPosSec) return@task
                 // MediaPlayer appears to get confused sometimes and report things like 0:01.
-                val durationSec = Math.max(durationMs / 1000, currentSong!!.lengthSec)
-                timeLabel!!.text = formatDurationProgress(positionSec, durationSec)
-                lastSongPositionSec = positionSec
+                // TODO: Is this still the case?
+                val durationSec = Math.max(durationMs / 1000, song.lengthSec)
+                timeLabel.text = formatDurationProgress(sec, durationSec)
+                lastPosSec = sec
             }
         )
     }
 
     override fun onPauseStateChange(paused: Boolean) {
         runOnUiThread {
-            pauseButton!!.text = getString(if (paused) R.string.play else R.string.pause)
+            pauseButton.text = getString(if (paused) R.string.play else R.string.pause)
         }
     }
 
     override fun onSongCoverLoad(song: Song) {
-        if (song == currentSong) {
-            albumImageView!!.visibility = View.VISIBLE
-            albumImageView!!.setImageBitmap(song!!.coverBitmap)
+        runOnUiThread {
+            if (song == curSong) {
+                albumImageView.visibility = View.VISIBLE
+                albumImageView.setImageBitmap(song.coverBitmap)
+            }
         }
     }
 
@@ -202,60 +203,63 @@ class NupActivity : Activity(), SongListener {
             this.songs = songs
             findViewById<View>(R.id.playlist_heading).visibility =
                 if (this.songs.isEmpty()) View.INVISIBLE else View.VISIBLE
-            updateCurrentSongIndex(service!!.currentSongIndex)
+            setCurrentSong(service.currentSongIndex)
         }
     }
 
     override fun onSongFileSizeChange(song: Song) {
-        val availableBytes = song.availableBytes
-        val totalBytes = song.totalBytes
-        if (song == currentSong) {
-            if (availableBytes == totalBytes) {
-                downloadStatusLabel!!.text = ""
-            } else {
-                downloadStatusLabel!!.text = String.format(
-                    "%,d of %,d KB",
-                    Math.round(availableBytes / 1024.0),
-                    Math.round(totalBytes / 1024.0)
-                )
+        runOnUiThread {
+            val availableBytes = song.availableBytes
+            val totalBytes = song.totalBytes
+            if (song == curSong) {
+                if (availableBytes == totalBytes) {
+                    downloadStatusLabel.text = ""
+                } else {
+                    downloadStatusLabel.text = String.format(
+                        "%,d of %,d KB",
+                        Math.round(availableBytes / 1024.0),
+                        Math.round(totalBytes / 1024.0)
+                    )
+                }
             }
+            songListAdapter.notifyDataSetChanged()
         }
-        songListAdapter.notifyDataSetChanged()
     }
 
-    // Update the onscreen information about the current song.
+    /** Update onscreen information about the current song. */
     private fun updateSongDisplay(song: Song?) {
         if (song == null) {
-            artistLabel!!.text = ""
-            titleLabel!!.text = ""
-            albumLabel!!.text = ""
-            timeLabel!!.text = ""
-            downloadStatusLabel!!.text = ""
-            albumImageView!!.visibility = View.INVISIBLE
+            artistLabel.text = ""
+            titleLabel.text = ""
+            albumLabel.text = ""
+            timeLabel.text = ""
+            downloadStatusLabel.text = ""
+            albumImageView.visibility = View.INVISIBLE
         } else {
-            artistLabel!!.text = song.artist
-            titleLabel!!.text = song.title
-            albumLabel!!.text = song.album
-            timeLabel!!.text = formatDurationProgress(
-                if (song == service!!.currentSong) {
-                    service!!.currentSongLastPositionMs / 1000
+            artistLabel.text = song.artist
+            titleLabel.text = song.title
+            albumLabel.text = song.album
+            timeLabel.text = formatDurationProgress(
+                if (song == service.currentSong) {
+                    service.currentSongLastPositionMs / 1000
                 } else {
                     0
                 },
                 song.lengthSec
             )
-            downloadStatusLabel!!.text = ""
+            downloadStatusLabel.text = ""
+
             if (song.coverBitmap != null) {
-                albumImageView!!.visibility = View.VISIBLE
-                albumImageView!!.setImageBitmap(song.coverBitmap)
+                albumImageView.visibility = View.VISIBLE
+                albumImageView.setImageBitmap(song.coverBitmap)
             } else {
-                albumImageView!!.visibility = View.INVISIBLE
-                service!!.fetchCoverForSongIfMissing(song)
+                albumImageView.visibility = View.INVISIBLE
+                service.fetchCoverForSongIfMissing(song)
             }
         }
 
         // Update the displayed time in response to the next position change we get.
-        lastSongPositionSec = -1
+        lastPosSec = -1
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -265,9 +269,7 @@ class NupActivity : Activity(), SongListener {
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
         val item = menu.findItem(R.id.download_all_menu_item)
-        // TODO: This sometimes runs before the service is bound, resulting in a crash.
-        // Find a better way to handle it.
-        val downloadAll = service?.shouldDownloadAll ?: false
+        val downloadAll = _service?.shouldDownloadAll ?: false
         item.setTitle(if (downloadAll) R.string.dont_download_all else R.string.download_all)
         item.setIcon(
             if (downloadAll) R.drawable.ic_cloud_off_white_24dp
@@ -277,29 +279,32 @@ class NupActivity : Activity(), SongListener {
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
+        // This is hacky, but handle the case where we aren't bound to the service yet.
+        _service ?: return false
+
         return when (item.itemId) {
             R.id.browse_menu_item -> {
-                if (service != null) startActivity(Intent(this, BrowseTopActivity::class.java))
+                startActivity(Intent(this, BrowseTopActivity::class.java))
                 true
             }
             R.id.search_menu_item -> {
-                if (service != null) startActivity(Intent(this, SearchFormActivity::class.java))
+                startActivity(Intent(this, SearchFormActivity::class.java))
                 true
             }
             R.id.pause_menu_item -> {
-                service?.pause()
+                service.pause()
                 true
             }
             R.id.download_all_menu_item -> {
-                service?.shouldDownloadAll = !(service?.shouldDownloadAll ?: false)
+                service.shouldDownloadAll = !service.shouldDownloadAll
                 true
             }
             R.id.settings_menu_item -> {
-                if (service != null) startActivity(Intent(this, SettingsActivity::class.java))
+                startActivity(Intent(this, SettingsActivity::class.java))
                 true
             }
             R.id.exit_menu_item -> {
-                if (service != null) stopService(Intent(this, NupService::class.java))
+                stopService(Intent(this, NupService::class.java))
                 finish()
                 true
             }
@@ -307,7 +312,7 @@ class NupActivity : Activity(), SongListener {
         }
     }
 
-    // Adapts our information about the current playlist and song for the song list view.
+    /** Adapts information about the current playlist and song for the song list view. */
     private inner class SongListAdapter : BaseAdapter() {
         override fun getCount(): Int { return songs.size }
         override fun getItem(position: Int): Any { return position }
@@ -319,12 +324,15 @@ class NupActivity : Activity(), SongListener {
                 val inflater = getSystemService(LAYOUT_INFLATER_SERVICE) as LayoutInflater
                 inflater.inflate(R.layout.playlist_row, null)
             }
-            val artistView = view.findViewById<View>(R.id.artist) as TextView
-            val titleView = view.findViewById<View>(R.id.title) as TextView
-            val percentView = view.findViewById<View>(R.id.percent) as TextView
+
+            val artistView = view.findViewById<TextView>(R.id.artist)
+            val titleView = view.findViewById<TextView>(R.id.title)
+            val percentView = view.findViewById<TextView>(R.id.percent)
             val song = songs[position]
+
             artistView.text = song.artist
             titleView.text = song.title
+
             if (song.totalBytes > 0) {
                 // CHECK MARK from Dingbats.
                 if (song.availableBytes == song.totalBytes) percentView.text = "\u2713"
@@ -339,13 +347,15 @@ class NupActivity : Activity(), SongListener {
             } else {
                 percentView.visibility = View.GONE
             }
-            val currentlyPlaying = position == currentSongIndex
+
+            val currentlyPlaying = position == curSongIndex
             view.setBackgroundColor(
                 resources
                     .getColor(
                         if (currentlyPlaying) R.color.primary else android.R.color.transparent
                     )
             )
+
             artistView.setTextColor(
                 resources
                     .getColor(if (currentlyPlaying) R.color.icons else R.color.primary_text)
@@ -380,23 +390,22 @@ class NupActivity : Activity(), SongListener {
 
     override fun onContextItemSelected(item: MenuItem): Boolean {
         val info = item.menuInfo as AdapterContextMenuInfo
-        val song = songs[info.position]
         return when (item.itemId) {
             MENU_ITEM_PLAY -> {
-                updateCurrentSongIndex(info.position)
-                schedulePlaySongTask(0)
+                setCurrentSong(info.position)
+                schedulePlaySong(0)
                 true
             }
             MENU_ITEM_REMOVE_FROM_LIST -> {
-                service!!.removeFromPlaylist(info.position)
+                service.removeFromPlaylist(info.position)
                 true
             }
             MENU_ITEM_TRUNCATE_LIST -> {
-                service!!.removeRangeFromPlaylist(info.position, songs.size - 1)
+                service.removeRangeFromPlaylist(info.position, songs.size - 1)
                 true
             }
             MENU_ITEM_SONG_DETAILS -> {
-                showDialog(DIALOG_SONG_DETAILS, createBundle(song))
+                showDialog(DIALOG_SONG_DETAILS, createBundle(songs[info.position]))
                 true
             }
             else -> false
@@ -412,21 +421,20 @@ class NupActivity : Activity(), SongListener {
         if (id == DIALOG_SONG_DETAILS) prepareDialog(dialog, args)
     }
 
-    private val currentSong: Song?
-        get() = if (currentSongIndex in 0 until songs.size) songs[currentSongIndex] else null
-
-    private fun updateCurrentSongIndex(index: Int) {
-        currentSongIndex = index
-        updateSongDisplay(currentSong)
+    /** Shows the song at [index] as current in the UI. */
+    private fun setCurrentSong(index: Int) {
+        curSongIndex = index
+        updateSongDisplay(curSong)
         songListAdapter.notifyDataSetChanged()
-        prevButton!!.isEnabled = currentSongIndex > 0
-        nextButton!!.isEnabled = !songs.isEmpty() && currentSongIndex < songs.size - 1
-        pauseButton!!.isEnabled = !songs.isEmpty()
+        prevButton.isEnabled = curSongIndex > 0
+        nextButton.isEnabled = !songs.isEmpty() && curSongIndex < songs.size - 1
+        pauseButton.isEnabled = !songs.isEmpty()
     }
 
-    private fun schedulePlaySongTask(delayMs: Int) {
+    /** Schedule playing the current song in [delayMs]. */
+    private fun schedulePlaySong(delayMs: Long) {
         handler.removeCallbacks(playSongTask)
-        handler.postDelayed(playSongTask, delayMs.toLong())
+        handler.postDelayed(playSongTask, delayMs)
     }
 
     companion object {
@@ -435,7 +443,7 @@ class NupActivity : Activity(), SongListener {
         // Wait this many milliseconds before switching tracks in response to the Prev and Next buttons.
         // This avoids requesting a bunch of tracks that we don't want when the user is repeatedly
         // pressing the button to skip through tracks.
-        private const val SONG_CHANGE_DELAY_MS = 500
+        private const val SONG_CHANGE_DELAY_MS = 500L
 
         // IDs for items in our context menus.
         private const val MENU_ITEM_PLAY = 1
@@ -445,7 +453,7 @@ class NupActivity : Activity(), SongListener {
         private const val DIALOG_SONG_DETAILS = 1
 
         // Persistent service to which we connect.
-        public var service: NupService? = null
-            private set
+        private var _service: NupService? = null
+        public val service: NupService get() = _service!!
     }
 }

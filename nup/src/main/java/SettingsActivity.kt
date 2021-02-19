@@ -37,7 +37,7 @@ class SettingsActivity : PreferenceActivity(), OnPreferenceChangeListener {
         pref.summary = prefs!!.getString(NupPreferences.ACCOUNT, "")
 
         pref = findPreference(NupPreferences.SYNC_SONG_LIST)
-        service!!.addSongDatabaseUpdateListener((pref as YesNoPreference))
+        service.addSongDatabaseUpdateListener((pref as YesNoPreference))
         pref.onSongDatabaseUpdate()
 
         pref = findPreference(NupPreferences.PRE_AMP_GAIN)
@@ -55,7 +55,7 @@ class SettingsActivity : PreferenceActivity(), OnPreferenceChangeListener {
         pref.summary = getString(R.string.cache_size_value, maxCacheMb)
 
         pref = findPreference(NupPreferences.CLEAR_CACHE)
-        val cachedBytes = service!!.totalCachedBytes
+        val cachedBytes = service.totalCachedBytes
         pref.summary = if (cachedBytes > 0) {
             getString(R.string.cache_current_usage, cachedBytes / (1024 * 1024).toDouble())
         } else {
@@ -90,10 +90,9 @@ class SettingsActivity : PreferenceActivity(), OnPreferenceChangeListener {
 
     override fun onDestroy() {
         super.onDestroy()
-        service!!
-            .removeSongDatabaseUpdateListener(
-                (findPreference(NupPreferences.SYNC_SONG_LIST) as YesNoPreference)
-            )
+        service.removeSongDatabaseUpdateListener(
+            findPreference(NupPreferences.SYNC_SONG_LIST) as YesNoPreference
+        )
     }
 
     override fun onPreferenceChange(pref: Preference, value: Any): Boolean {
@@ -113,7 +112,7 @@ class SettingsActivity : PreferenceActivity(), OnPreferenceChangeListener {
             return true
         } else if (pref.key == NupPreferences.ACCOUNT) {
             findPreference(NupPreferences.ACCOUNT).summary = value as String
-            service!!.authenticateInBackground()
+            service.authenticateInBackground()
             return true
         } else if (pref.key == NupPreferences.PRE_AMP_GAIN) {
             return try {

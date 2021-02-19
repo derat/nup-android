@@ -94,7 +94,7 @@ class BrowseSongsActivity : Activity(), OnItemClickListener {
         // Do the query for the songs in the background.
         scope.async(Dispatchers.Main) {
             val newSongs = async(Dispatchers.IO) {
-                service!!.songDb.query(
+                service.songDb.query(
                     artist = artist,
                     album = album,
                     albumId = albumId,
@@ -138,7 +138,7 @@ class BrowseSongsActivity : Activity(), OnItemClickListener {
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.browse_pause_menu_item -> {
-                service!!.pause()
+                service.pause()
                 true
             }
             R.id.browse_return_menu_item -> {
@@ -171,15 +171,15 @@ class BrowseSongsActivity : Activity(), OnItemClickListener {
         val song = songs[info.position]
         return when (item.itemId) {
             MENU_ITEM_PLAY -> {
-                service!!.addSongToPlaylist(song, true)
+                service.addSongToPlaylist(song, true)
                 true
             }
             MENU_ITEM_INSERT -> {
-                service!!.addSongToPlaylist(song, false)
+                service.addSongToPlaylist(song, false)
                 true
             }
             MENU_ITEM_APPEND -> {
-                service!!.appendSongToPlaylist(song)
+                service.appendSongToPlaylist(song)
                 true
             }
             MENU_ITEM_SONG_DETAILS -> {
@@ -192,7 +192,7 @@ class BrowseSongsActivity : Activity(), OnItemClickListener {
 
     override fun onItemClick(parent: AdapterView<*>?, view: View, position: Int, id: Long) {
         val song = songs[position]
-        service!!.appendSongToPlaylist(song)
+        service.appendSongToPlaylist(song)
         Toast.makeText(this, getString(R.string.appended_song_fmt, song.title), Toast.LENGTH_SHORT)
             .show()
     }
@@ -208,22 +208,22 @@ class BrowseSongsActivity : Activity(), OnItemClickListener {
 
     fun onAppendButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
         if (songs.isEmpty()) return
-        service!!.appendSongsToPlaylist(songs)
+        service.appendSongsToPlaylist(songs)
         setResult(RESULT_OK)
         finish()
     }
 
     fun onInsertButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
         if (songs.isEmpty()) return
-        service!!.addSongsToPlaylist(songs, false)
+        service.addSongsToPlaylist(songs, false)
         setResult(RESULT_OK)
         finish()
     }
 
     fun onReplaceButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
         if (songs.isEmpty()) return
-        service!!.clearPlaylist()
-        service!!.appendSongsToPlaylist(songs)
+        service.clearPlaylist()
+        service.appendSongsToPlaylist(songs)
         setResult(RESULT_OK)
         finish()
     }

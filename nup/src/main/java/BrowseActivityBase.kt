@@ -48,12 +48,12 @@ abstract class BrowseActivityBase : ListActivity(), NupService.SongDatabaseUpdat
         )
         listAdapter = adapter
         registerForContextMenu(listView)
-        service!!.addSongDatabaseUpdateListener(this)
+        service.addSongDatabaseUpdateListener(this)
         onSongDatabaseUpdate()
     }
 
     override fun onDestroy() {
-        service!!.removeSongDatabaseUpdateListener(this)
+        service.removeSongDatabaseUpdateListener(this)
         super.onDestroy()
     }
 
@@ -77,7 +77,7 @@ abstract class BrowseActivityBase : ListActivity(), NupService.SongDatabaseUpdat
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
         return when (item.itemId) {
             R.id.browse_pause_menu_item -> {
-                service!!.pause()
+                service.pause()
                 true
             }
             R.id.browse_return_menu_item -> {
@@ -98,7 +98,7 @@ abstract class BrowseActivityBase : ListActivity(), NupService.SongDatabaseUpdat
 
     override fun onSongDatabaseUpdate() {
         getRows(
-            service!!.songDb,
+            service.songDb,
             { newRows: List<StatsRow>? ->
                 rows.clear()
                 if (newRows == null) {
