@@ -10,15 +10,18 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteDatabaseLockedException
 import android.database.sqlite.SQLiteOpenHelper
 import android.util.Log
+import java.util.concurrent.Executors
+import java.util.concurrent.TimeUnit
 
 // This is a simpler class that uses a passed-in SQLiteOpenHelper to create and/or upgrade a
 // database but then manages its own separate writable handle instead of using the helper's.
 // I'm seeing strict mode violations about leaked database cursors that make me suspect that
 // SQLiteOpenHelper is closing its writable handle in the background at times (the docs don't
 // mention this).
+// TODO: No idea if this is still necessary.
 class DatabaseOpener(
     private val context: Context,
-    private val databaseName: String,
+    private val name: String,
     private val openHelper: SQLiteOpenHelper
 ) {
     private var db: SQLiteDatabase? = null
@@ -34,41 +37,52 @@ class DatabaseOpener(
             // far as I know, nobody should be using the database at that point.
             while (true) {
                 try {
-                    val tmpDb = openHelper.writableDatabase
-                    tmpDb.close()
+                    openHelper.writableDatabase.close()
                     break
                 } catch (e: SQLiteDatabaseLockedException) {
-                    Log.e(
-                        TAG,
-                        "database $databaseName was locked while trying to create/upgrade it: $e"
-                    )
+                    Log.e(TAG, "Database $name locked while trying to create/upgrade it: $e")
                 }
             }
+
             while (true) {
                 try {
-                    db = context.openOrCreateDatabase(databaseName, 0, null)
+                    db = context.openOrCreateDatabase(name, 0, null)
                     break
                 } catch (e: SQLiteDatabaseLockedException) {
-                    Log.e(
-                        TAG,
-                        "database $databaseName was locked while trying to open it: $e"
-                    )
+                    Log.e(TAG, "Database $name locked while trying to open it: $e")
                 }
             }
         }
         return db!!
     }
 
-    // Closes the internal database.  Any previously-returned copies of it cannot be used
-    // afterwards.
+    /** Close the database, invalidating previously-returned object. */
     @Synchronized fun close() {
-        if (db != null) {
-            db!!.close()
-            db = null
-        }
+        db?.close()
+        db = null
     }
 
     companion object {
         private const val TAG = "DatabaseOpener"
+    }
+}
+
+/** Runs queries asynchronously (but in-order) against a database. */
+class DatabaseUpdater(private val opener: DatabaseOpener) {
+    private val executor = Executors.newSingleThreadScheduledExecutor()
+
+    /** Shut down the updater. */
+    fun quit() {
+        executor.shutdown()
+        executor.awaitTermination(SHUTDOWN_TIMEOUT_SEC, TimeUnit.SECONDS)
+    }
+
+    /** Run [sql] asynchronously. */
+    fun postUpdate(sql: String, values: Array<Any>?) {
+        executor.execute { opener.getDb().execSQL(sql, values) }
+    }
+
+    companion object {
+        private const val SHUTDOWN_TIMEOUT_SEC = 60L
     }
 }

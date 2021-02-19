@@ -31,10 +31,7 @@ class SongDatabase(
     private val networkHelper: NetworkHelper
 ) {
     private val opener: DatabaseOpener
-
-    // Update the database in a background thread.
     private val updater: DatabaseUpdater
-    private val updaterThread: Thread
 
     var aggregateDataLoaded = false
         private set
@@ -108,10 +105,10 @@ class SongDatabase(
     @Synchronized
     fun quit() {
         updater.quit()
-        updaterThread.join()
         opener.close()
     }
 
+    /** Get songs matching the supplied criteria. */
     fun query(
         artist: String?,
         title: String?,
@@ -120,7 +117,7 @@ class SongDatabase(
         minRating: Double,
         shuffle: Boolean,
         substring: Boolean,
-        onlyCached: Boolean
+        onlyCached: Boolean,
     ): List<Song> {
         class QueryBuilder {
             var selections = ArrayList<String>()
@@ -863,9 +860,6 @@ class SongDatabase(
                 db.endTransaction()
             }
         }
-
         updater = DatabaseUpdater(opener)
-        updaterThread = Thread(updater, "SongDatabase.DatabaseUpdater")
-        updaterThread.start()
     }
 }

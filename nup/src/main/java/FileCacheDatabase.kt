@@ -15,15 +15,11 @@ import java.util.Date
 /** Persistent data store for [FileCache]. */
 class FileCacheDatabase(context: Context, private val musicDir: String) {
     private val opener: DatabaseOpener
-
-    // Map from an entry's song ID to the entry itself.
-    private val entries = HashMap<Long, FileCacheEntry>()
-
-    // Update the database in a background thread.
     private val updater: DatabaseUpdater
-    private val updaterThread: Thread
 
-    /** Loads data from SQLite. */
+    private val entries = mutableMapOf<Long, FileCacheEntry>() // keyed by song ID
+
+    /** Load data from SQLite. */
     @Synchronized private fun loadExistingEntries() {
         Log.d(TAG, "Loading cache entries")
         val cursor = opener.getDb()
@@ -45,7 +41,6 @@ class FileCacheDatabase(context: Context, private val musicDir: String) {
 
     @Synchronized fun quit() {
         updater.quit()
-        updaterThread.join()
         opener.close()
     }
 
@@ -205,7 +200,5 @@ class FileCacheDatabase(context: Context, private val musicDir: String) {
         // Block until we've loaded everything into memory.
         loadExistingEntries()
         updater = DatabaseUpdater(opener)
-        updaterThread = Thread(updater, "FileCacheDatabase.DatabaseUpdater")
-        updaterThread.start()
     }
 }

@@ -81,7 +81,7 @@ class FileCache constructor(
         synchronized(inProgressSongIds) { inProgressSongIds.clear() }
         waitUntilReady()
         executor.shutdown()
-        executor.awaitTermination(SHUTDOWN_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+        executor.awaitTermination(SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS)
         db.quit()
     }
 
@@ -188,7 +188,7 @@ class FileCache constructor(
         private val TAG = "FileCache.DownloadTask"
 
         // Maximum number of seconds to wait before retrying after failure. Never give up!
-        private val MAX_BACKOFF_SEC = 60
+        private val MAX_BACKOFF_SEC = 60L
 
         // Size of buffer used to write data to disk, in bytes.
         private val BUFFER_SIZE = 8 * 1024
@@ -198,7 +198,7 @@ class FileCache constructor(
 
         // How long to wait before retrying after an error.
         // Start at 0 but back off exponentially after errors where we haven't made any progress.
-        private var backoffTimeMs = 0
+        private var backoffTimeMs = 0L
 
         private lateinit var reason: String // failure reason
         private var conn: HttpURLConnection? = null
@@ -221,7 +221,7 @@ class FileCache constructor(
                 try {
                     if (backoffTimeMs > 0) {
                         Log.d(TAG, "Sleeping $backoffTimeMs ms before retrying ${entry.songId}")
-                        SystemClock.sleep(backoffTimeMs.toLong())
+                        SystemClock.sleep(backoffTimeMs)
                     }
 
                     // If the file is fully downloaded already, report success.
@@ -411,7 +411,7 @@ class FileCache constructor(
             threadChecker.assertThread()
             backoffTimeMs = when {
                 madeProgress -> 0
-                backoffTimeMs == 0 -> 1000
+                backoffTimeMs == 0L -> 1000
                 else -> Math.min(backoffTimeMs * 2, MAX_BACKOFF_SEC * 1000)
             }
         }
@@ -444,7 +444,7 @@ class FileCache constructor(
             /** Stop reporting. */
             fun quit() {
                 executor.shutdownNow()
-                executor.awaitTermination(SHUTDOWN_TIMEOUT_MS.toLong(), TimeUnit.MILLISECONDS)
+                executor.awaitTermination(SHUTDOWN_TIMEOUT_MS, TimeUnit.MILLISECONDS)
             }
 
             /** Update the current state of the download. */
