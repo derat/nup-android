@@ -10,6 +10,7 @@ import android.view.ContextMenu
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 
+/** Displays a list of albums. */
 class BrowseAlbumsActivity : BrowseActivityBase() {
     override val display
         get() = if (onlyArtist == "") {
@@ -84,7 +85,7 @@ class BrowseAlbumsActivity : BrowseActivityBase() {
                 else db.albumsSortedAlphabetically
             )
             // Cached data requires an async database query.
-            else -> async(Dispatchers.Main) {
+            else -> scope.async(Dispatchers.Main) {
                 update(
                     async(Dispatchers.IO) {
                         if (onlyArtist != "") {

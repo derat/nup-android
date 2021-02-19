@@ -7,7 +7,6 @@ package org.erat.nup
 
 import android.app.Activity
 import android.app.Dialog
-import android.os.AsyncTask
 import android.os.Bundle
 import android.view.ContextMenu
 import android.view.ContextMenu.ContextMenuInfo
@@ -22,13 +21,24 @@ import android.widget.ListView
 import android.widget.SimpleAdapter
 import android.widget.Toast
 import java.util.Collections
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.async
 import org.erat.nup.NupActivity.Companion.service
 import org.erat.nup.SongDetailsDialog.createBundle
 import org.erat.nup.SongDetailsDialog.createDialog
 import org.erat.nup.SongDetailsDialog.prepareDialog
 
-// This class doesn't extend BrowseActivityBase since it displays a different menu.
+/**
+ * Displays a list of songs.
+ *
+ * This class doesn't extend [BrowseActivityBase] since it displays a different menu
+ * and doesn't display aggregate song counts.
+ */
 class BrowseSongsActivity : Activity(), OnItemClickListener {
+    private val scope = MainScope()
+    private var songs = listOf<Song>()
+
     // Passed-in criteria specifying which songs to display.
     private var artist: String? = null
     private var album: String? = null
@@ -36,16 +46,17 @@ class BrowseSongsActivity : Activity(), OnItemClickListener {
     private var onlyCached = false
     private var minRating = -1.0
 
-    // Songs that we're displaying.
-    private var songs: List<Song> = ArrayList()
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         setContentView(R.layout.browse_songs)
+
         artist = intent.getStringExtra(BrowseActivityBase.BUNDLE_ARTIST)
         album = intent.getStringExtra(BrowseActivityBase.BUNDLE_ALBUM)
         albumId = intent.getStringExtra(BrowseActivityBase.BUNDLE_ALBUM_ID)
         onlyCached = intent.getBooleanExtra(BrowseActivityBase.BUNDLE_CACHED, false)
         minRating = intent.getDoubleExtra(BrowseActivityBase.BUNDLE_MIN_RATING, -1.0)
+
         title = if (album != null) {
             getString(
                 if (onlyCached) {
@@ -68,58 +79,55 @@ class BrowseSongsActivity : Activity(), OnItemClickListener {
             getString(if (onlyCached) R.string.browse_cached_songs else R.string.browse_songs)
         }
 
+        // Create a temporary ArrayAdapter that just says "Loading...".
+        val view = findViewById<View>(R.id.songs) as ListView
+        view.adapter = object : ArrayAdapter<String>(
+            this@BrowseSongsActivity,
+            R.layout.browse_row,
+            R.id.main,
+            mutableListOf<String>(getString(R.string.loading)),
+        ) {
+            override fun areAllItemsEnabled() = false
+            override fun isEnabled(position: Int) = false
+        }
+
         // Do the query for the songs in the background.
-        object : AsyncTask<Void?, Void?, List<Song>>() {
-            override fun onPreExecute() {
-                // Create a temporary ArrayAdapter that just says "Loading...".
-                val items: MutableList<String> = ArrayList()
-                items.add(getString(R.string.loading))
-                val adapter: ArrayAdapter<String> = object : ArrayAdapter<String>(
-                    this@BrowseSongsActivity, R.layout.browse_row, R.id.main, items
-                ) {
-                    override fun areAllItemsEnabled(): Boolean { return false }
-                    override fun isEnabled(position: Int): Boolean { return false }
-                }
-                val view = findViewById<View>(R.id.songs) as ListView
-                view.adapter = adapter
-            }
-
-            protected override fun doInBackground(vararg args: Void?): List<Song> {
-                return service!!
-                    .songDb
-                    .query(artist, null, album, albumId, minRating, false, false, onlyCached)
-            }
-
-            override fun onPostExecute(newSongs: List<Song>) {
-                // The results come back in album order. If we're viewing all songs by
-                // an artist, sort them alphabetically instead.
-                if ((album == null || album!!.isEmpty()) &&
-                    (albumId == null || albumId!!.isEmpty())
-                ) {
-                    Collections.sort(newSongs) { a, b ->
-                        getSongOrderKey(a.title, SongOrder.TITLE)
-                            .compareTo(getSongOrderKey(b.title, SongOrder.TITLE))
-                    }
-                }
-                songs = newSongs
-                val titleKey = "title"
-                val data: MutableList<HashMap<String, String?>> = ArrayList()
-                for (song in songs) {
-                    val map = HashMap<String, String?>()
-                    map[titleKey] = song.title
-                    data.add(map)
-                }
-                val adapter = SimpleAdapter(
-                    this@BrowseSongsActivity,
-                    data,
-                    R.layout.browse_row, arrayOf(titleKey), intArrayOf(R.id.main)
+        scope.async(Dispatchers.Main) {
+            val newSongs = async(Dispatchers.IO) {
+                service!!.songDb.query(
+                    artist = artist,
+                    album = album,
+                    albumId = albumId,
+                    minRating = minRating,
+                    onlyCached = onlyCached
                 )
-                val view = findViewById<View>(R.id.songs) as ListView
-                view.adapter = adapter
-                view.onItemClickListener = this@BrowseSongsActivity
-                registerForContextMenu(view)
+            }.await()
+
+            // The results come back in album order. If we're viewing all songs by
+            // an artist, sort them alphabetically instead.
+            if ((album?.isEmpty() ?: true) && (albumId?.isEmpty() ?: true)) {
+                Collections.sort(newSongs) { a, b ->
+                    getSongOrderKey(a.title, SongOrder.TITLE)
+                        .compareTo(getSongOrderKey(b.title, SongOrder.TITLE))
+                }
             }
-        }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR)
+
+            songs = newSongs
+
+            val titleKey = "title"
+            val data = mutableListOf<Map<String, String>>()
+            for (song in songs) data.add(mapOf(titleKey to song.title))
+            view.adapter = SimpleAdapter(
+                this@BrowseSongsActivity,
+                data,
+                R.layout.browse_row,
+                arrayOf(titleKey),
+                intArrayOf(R.id.main)
+            )
+
+            view.onItemClickListener = this@BrowseSongsActivity
+            registerForContextMenu(view)
+        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -182,7 +190,6 @@ class BrowseSongsActivity : Activity(), OnItemClickListener {
         }
     }
 
-    // Implements AdapterView.OnItemClickListener.
     override fun onItemClick(parent: AdapterView<*>?, view: View, position: Int, id: Long) {
         val song = songs[position]
         service!!.appendSongToPlaylist(song)

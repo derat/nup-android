@@ -9,6 +9,7 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.ContextMenu
 
+/** Displays top-level browsing actions. */
 class BrowseTopActivity : BrowseActivityBase() {
     override val display = StatsRowArrayAdapter.Display.ARTIST_UNSORTED
 

@@ -15,20 +15,12 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.ListView
-import kotlin.coroutines.CoroutineContext
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.MainScope
 import org.erat.nup.NupActivity.Companion.service
 
-abstract class BrowseActivityBase :
-    ListActivity(),
-    CoroutineScope,
-    NupService.SongDatabaseUpdateListener {
-    lateinit var job: Job
-    override val coroutineContext: CoroutineContext
-        get() = job + Dispatchers.Main
-
+/** Base class for Browse*Activity. */
+abstract class BrowseActivityBase : ListActivity(), NupService.SongDatabaseUpdateListener {
+    protected val scope = MainScope()
     private val rows: MutableList<StatsRow> = ArrayList()
     private lateinit var adapter: StatsRowArrayAdapter
 
@@ -45,7 +37,6 @@ abstract class BrowseActivityBase :
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        job = Job()
         onlyArtist = intent.getStringExtra(BUNDLE_ARTIST) ?: ""
         onlyCached = intent.getBooleanExtra(BUNDLE_CACHED, false)
 

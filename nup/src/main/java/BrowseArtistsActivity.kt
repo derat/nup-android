@@ -11,6 +11,7 @@ import android.view.ContextMenu
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 
+/** Displays a list of artists. */
 class BrowseArtistsActivity : BrowseActivityBase() {
     override val display = StatsRowArrayAdapter.Display.ARTIST
 
@@ -53,7 +54,7 @@ class BrowseArtistsActivity : BrowseActivityBase() {
             // If we're displaying all data, then we can return it synchronously.
             !onlyCached -> update(db.artistsSortedAlphabetically)
             // Cached data requires an async database query.
-            else -> async(Dispatchers.Main) {
+            else -> scope.async(Dispatchers.Main) {
                 update(async(Dispatchers.IO) { db.cachedArtistsSortedAlphabetically }.await())
             }
         }

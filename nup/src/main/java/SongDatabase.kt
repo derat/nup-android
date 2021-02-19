@@ -110,14 +110,14 @@ class SongDatabase(
 
     /** Get songs matching the supplied criteria. */
     fun query(
-        artist: String?,
-        title: String?,
-        album: String?,
-        albumId: String?,
-        minRating: Double,
-        shuffle: Boolean,
-        substring: Boolean,
-        onlyCached: Boolean,
+        artist: String? = null,
+        title: String? = null,
+        album: String? = null,
+        albumId: String? = null,
+        minRating: Double = -1.0,
+        shuffle: Boolean = false,
+        substring: Boolean = false,
+        onlyCached: Boolean = false,
     ): List<Song> {
         class QueryBuilder {
             var selections = ArrayList<String>()
