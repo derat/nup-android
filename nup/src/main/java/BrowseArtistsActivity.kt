@@ -51,7 +51,7 @@ class BrowseArtistsActivity : BrowseActivityBase() {
             // If the database isn't ready, display a loading message.
             !db.aggregateDataLoaded -> update(null)
             // If we're displaying all data, then we can return it synchronously.
-            !onlyCached -> update(db.getArtistsSortedAlphabetically())
+            !onlyCached -> update(db.artistsSortedAlphabetically)
             // Cached data requires an async database query.
             else -> async(Dispatchers.Main) {
                 update(async(Dispatchers.IO) { db.cachedArtistsSortedAlphabetically }.await())

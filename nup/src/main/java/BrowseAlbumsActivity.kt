@@ -80,8 +80,8 @@ class BrowseAlbumsActivity : BrowseActivityBase() {
             !db.aggregateDataLoaded -> update(null)
             // If we're displaying all data, then we can return it synchronously.
             !onlyCached -> update(
-                if (onlyArtist != "") db.getAlbumsByArtist(onlyArtist)
-                else db.getAlbumsSortedAlphabetically()
+                if (onlyArtist != "") db.albumsByArtist(onlyArtist)
+                else db.albumsSortedAlphabetically
             )
             // Cached data requires an async database query.
             else -> async(Dispatchers.Main) {

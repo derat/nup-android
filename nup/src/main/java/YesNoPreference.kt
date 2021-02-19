@@ -125,9 +125,8 @@ class YesNoPreference(context: Context, attrs: AttributeSet?) :
             // FIXME: Cancel the sync.
         }
 
-        // Implements SongDatabase.SyncProgressListener.
-        override fun onSyncProgress(state: SongDatabase.SyncState?, numSongs: Int) {
-            publishProgress(state!!.ordinal, numSongs)
+        override fun onSyncProgress(state: SongDatabase.SyncState, numSongs: Int) {
+            publishProgress(state.ordinal, numSongs)
         }
     }
 }

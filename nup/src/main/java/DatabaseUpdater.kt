@@ -9,6 +9,7 @@ import android.os.Handler
 import android.os.Looper
 
 class DatabaseUpdater(private val opener: DatabaseOpener) : Runnable {
+    // TODO: Update this to use Executor instead of Handler/Looper.
     private var handler: Handler? = null
     private var shouldQuit = false
     override fun run() {

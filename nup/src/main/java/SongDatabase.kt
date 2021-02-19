@@ -14,12 +14,14 @@ import android.util.Log
 import java.util.Collections
 import java.util.Date
 import java.util.concurrent.Executor
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONTokener
 
+/** Wraps a SQLite database containing information about all known songs. */
 class SongDatabase(
     private val context: Context,
     private val listener: Listener,
@@ -33,6 +35,7 @@ class SongDatabase(
     // Update the database in a background thread.
     private val updater: DatabaseUpdater
     private val updaterThread: Thread
+
     var aggregateDataLoaded = false
         private set
     var numSongs = 0
@@ -40,11 +43,17 @@ class SongDatabase(
     var lastSyncDate: Date? = null
         private set
 
-    // Int values in these maps are numbers of songs.
-    private val artistsSortedAlphabetically: MutableList<StatsRow> = ArrayList()
-    private val artistsSortedByNumSongs: MutableList<StatsRow> = ArrayList()
-    private val albumsSortedAlphabetically: MutableList<StatsRow> = ArrayList()
-    private val artistAlbums = HashMap<String, MutableList<StatsRow>>()
+    // https://discuss.kotlinlang.org/t/exposing-a-mutable-member-as-immutable/6359
+    private val _artistsSortedAlphabetically = mutableListOf<StatsRow>()
+    private val _artistsSortedByNumSongs = mutableListOf<StatsRow>()
+    private val _albumsSortedAlphabetically = mutableListOf<StatsRow>()
+    private val _artistAlbums = mutableMapOf<String, MutableList<StatsRow>>()
+
+    val artistsSortedAlphabetically: List<StatsRow> = _artistsSortedAlphabetically
+    val artistsSortedByNumSongs: List<StatsRow> = _artistsSortedByNumSongs
+    val albumsSortedAlphabetically: List<StatsRow> = _albumsSortedAlphabetically
+    fun albumsByArtist(artist: String): List<StatsRow> =
+        _artistAlbums[artist.toLowerCase()] ?: listOf()
 
     /** Notified about changes to the database. */
     interface Listener {
@@ -54,18 +63,10 @@ class SongDatabase(
 
     enum class SyncState { UPDATING_SONGS, DELETING_SONGS, UPDATING_STATS }
 
+    /** Notified about progress while synchronizing with the server. */
     interface SyncProgressListener {
-        fun onSyncProgress(state: SyncState?, numSongs: Int)
-    }
-
-    // TODO: Convert these to getters.
-    fun getAlbumsSortedAlphabetically(): List<StatsRow> { return albumsSortedAlphabetically }
-    fun getArtistsSortedAlphabetically(): List<StatsRow> { return artistsSortedAlphabetically }
-    fun getArtistsSortedByNumSongs(): List<StatsRow> { return artistsSortedByNumSongs }
-    fun getAlbumsByArtist(artist: String): List<StatsRow> {
-        val lowerArtist = artist.toLowerCase()
-        if (artistAlbums.containsKey(lowerArtist)) return artistAlbums[lowerArtist]!!
-        else return ArrayList()
+        /** Called when sync progress changes. */
+        fun onSyncProgress(state: SyncState, numSongs: Int)
     }
 
     val cachedArtistsSortedAlphabetically: List<StatsRow>
@@ -167,10 +168,7 @@ class SongDatabase(
                     ) +
                 "LIMIT " + MAX_QUERY_RESULTS
             )
-        Log.d(
-            TAG,
-            "running query \"$query\" with args ${TextUtils.join(", ", builder.selectionArgs)}"
-        )
+        Log.d(TAG, "Running \"$query\" with args ${TextUtils.join(", ", builder.selectionArgs)}")
         val db = opener.getDb()
         val cursor = db.rawQuery(query, builder.selectionArgs.toArray<String>(arrayOf<String>()))
         val songs: MutableList<Song> = ArrayList()
@@ -199,17 +197,17 @@ class SongDatabase(
         return songs
     }
 
-    // Record the fact that a song has been successfully cached.
+    /** Record the fact that a song has been successfully cached. */
     fun handleSongCached(songId: Long) {
         updater.postUpdate("REPLACE INTO CachedSongs (SongId) VALUES(?)", arrayOf(songId))
     }
 
-    // Record the fact that a song has been evicted from the cache.
+    /** Record the fact that a song has been evicted from the cache. */
     fun handleSongEvicted(songId: Long) {
         updater.postUpdate("DELETE FROM CachedSongs WHERE SongId = ?", arrayOf(songId))
     }
 
-    // Add an entry to the PendingPlaybackReports table.
+    /** Add an entry to the PendingPlaybackReports table. */
     fun addPendingPlaybackReport(songId: Long, startDate: Date) {
         updater.postUpdate(
             "REPLACE INTO PendingPlaybackReports (SongId, StartTime) VALUES(?, ?)",
@@ -217,7 +215,7 @@ class SongDatabase(
         )
     }
 
-    // Remove an entry from the PendingPlaybackReports table.
+    /** Remove an entry from the PendingPlaybackReports table. */
     fun removePendingPlaybackReport(songId: Long, startDate: Date) {
         updater.postUpdate(
             "DELETE FROM PendingPlaybackReports WHERE SongId = ? AND StartTime = ?",
@@ -225,15 +223,14 @@ class SongDatabase(
         )
     }
 
-    // Simple struct representing a queued report of a song being played.
+    /** Queued report of a song being played. */
     class PendingPlaybackReport(var songId: Long, var startDate: Date)
 
-    // Get all pending playback reports from the PendingPlaybackReports table.
+    /** Get all pending playback reports from the PendingPlaybackReports table. */
     val allPendingPlaybackReports: List<PendingPlaybackReport>
         get() {
-            val query = "SELECT SongId, StartTime FROM PendingPlaybackReports"
             val db = opener.getDb()
-            val cursor = db.rawQuery(query, null)
+            val cursor = db.rawQuery("SELECT SongId, StartTime FROM PendingPlaybackReports", null)
             cursor.moveToFirst()
             val reports: MutableList<PendingPlaybackReport> = ArrayList()
             while (!cursor.isAfterLast) {
@@ -246,13 +243,16 @@ class SongDatabase(
             return reports
         }
 
+    /** Synchronize the song list with the server. */
     fun syncWithServer(listener: SyncProgressListener, message: Array<String>): Boolean {
         if (!networkHelper.isNetworkAvailable) {
             message[0] = context.getString(R.string.network_is_unavailable)
             return false
         }
+
         var numSongsUpdated = 0
         val db = opener.getDb()
+
         db.beginTransaction()
         try {
             // Ask the server for the current time before we fetch anything.  We'll use this as the
@@ -278,15 +278,17 @@ class SongDatabase(
             } catch (e: ServerException) {
                 return false
             }
+
             val values = ContentValues(2)
             values.put("LocalTimeNsec", Date().time * 1000 * 1000)
             values.put("ServerTimeNsec", startTimeNsec)
             db.update("LastUpdateTime", values, null, null)
+
             if (numSongsUpdated > 0) {
                 listenerExecutor.execute {
                     listener.onSyncProgress(SyncState.UPDATING_STATS, numSongsUpdated)
                 }
-                updateStatsTables(db)
+                updateArtistAlbumStats(db)
                 updateCachedSongs(db)
             }
             db.setTransactionSuccessful()
@@ -300,7 +302,11 @@ class SongDatabase(
 
     class ServerException(reason: String) : Exception(reason)
 
-    // Helper method for SyncWithServer. Returns number of updated songs.
+    /**
+     * Get updated songs from the server on behalf of [syncWithServer].
+     *
+     * @return number of updated songs
+     */
     @Throws(ServerException::class)
     private fun queryServer(
         db: SQLiteDatabase,
@@ -324,7 +330,7 @@ class SongDatabase(
                 serverCursor
             )
             val response = downloader.downloadString(path, message)
-                ?: throw ServerException("download failed")
+                ?: throw ServerException("Download failed")
             serverCursor = ""
             try {
                 val objects = JSONTokener(response).nextValue() as JSONArray
@@ -336,11 +342,12 @@ class SongDatabase(
                             break
                         } else {
                             message[0] = "Item $i from server isn't a JSON object"
-                            throw ServerException("list item not object")
+                            throw ServerException("List item not object")
                         }
                     val songId = jsonSong.getLong("songId")
+
                     if (deleted) {
-                        Log.d(TAG, "deleting song $songId")
+                        Log.d(TAG, "Deleting song $songId")
                         db.delete("Songs", "SongId = ?", arrayOf(java.lang.Long.toString(songId)))
                     } else {
                         val values = ContentValues(14)
@@ -364,23 +371,27 @@ class SongDatabase(
                 }
             } catch (e: JSONException) {
                 message[0] = "Couldn't parse response: $e"
-                throw ServerException("bad data")
+                throw ServerException("Bad data")
             }
+
             listenerExecutor.execute {
                 listener.onSyncProgress(
                     if (deleted) SyncState.DELETING_SONGS else SyncState.UPDATING_SONGS, numUpdates
                 )
             }
         }
+
         return numUpdates
     }
 
-    private fun updateStatsTables(db: SQLiteDatabase) {
-        // Map from lowercased artist name to the first row that we saw in its original case.
-        val artistCaseMap = HashMap<String, String>()
+    /** Rebuild the artistAlbumStats table from the Songs table. */
+    private fun updateArtistAlbumStats(db: SQLiteDatabase) {
+        // Lowercased artist name to the first row that we saw in its original case.
+        val artistCaseMap = mutableMapOf<String, String>()
 
-        // Map from artist name to map from album to number of songs.
-        val artistAlbums = HashMap<String?, HashMap<StatsKey, Int>>()
+        // Artist name to map from album to number of songs.
+        val artistMap = mutableMapOf<String, MutableMap<StatsKey, Int>>()
+
         val cursor = db.rawQuery(
             "SELECT Artist, Album, AlbumId, COUNT(*) " +
                 "  FROM Songs " +
@@ -389,39 +400,33 @@ class SongDatabase(
         )
         cursor.moveToFirst()
         while (!cursor.isAfterLast) {
-            var origArtist = cursor.getString(0)
-            if (origArtist.isEmpty()) origArtist = UNSET_STRING
-
             // Normalize the artist case so that we'll still group all their songs together
             // even if some use different capitalization.
-            val lowerArtist = origArtist.toLowerCase()
-            if (!artistCaseMap.containsKey(lowerArtist)) artistCaseMap[lowerArtist] = origArtist
-            val artist = artistCaseMap[lowerArtist]
+            var origArtist = cursor.getString(0)
+            if (origArtist.isEmpty()) origArtist = UNSET_STRING
+            val artist = artistCaseMap.getOrPut(origArtist.toLowerCase(), { origArtist })
+
             var album = cursor.getString(1)
             if (album.isEmpty()) album = UNSET_STRING
+
             val albumId = cursor.getString(2)
             val numSongs = cursor.getInt(3)
-            var albumMap: HashMap<StatsKey, Int>
-            if (artistAlbums.containsKey(artist)) {
-                albumMap = artistAlbums[artist]!!
-            } else {
-                albumMap = HashMap()
-                artistAlbums[artist] = albumMap
-            }
-            albumMap[StatsKey(origArtist, album, albumId)] = numSongs
+
+            val key = StatsKey(origArtist, album, albumId)
+            artistMap.getOrPut(artist, { mutableMapOf() })[key] = numSongs
             cursor.moveToNext()
         }
         cursor.close()
+
         db.delete("ArtistAlbumStats", null, null)
-        for (artist in artistAlbums.keys) {
-            val artistSortKey = getSongOrderKey(artist!!, SongOrder.ARTIST)
-            val albumMap = artistAlbums[artist]!!
-            for (key in albumMap.keys) {
+        for ((artist, albums) in artistMap) {
+            val artistSortKey = getSongOrderKey(artist, SongOrder.ARTIST)
+            for (key in albums.keys) {
                 val values = ContentValues(6)
                 values.put("Artist", artist)
                 values.put("Album", key.album)
                 values.put("AlbumId", key.albumId)
-                values.put("NumSongs", albumMap[key])
+                values.put("NumSongs", albums[key])
                 values.put("ArtistSortKey", artistSortKey)
                 values.put("AlbumSortKey", getSongOrderKey(key.album, SongOrder.ALBUM))
                 db.insert("ArtistAlbumStats", "", values)
@@ -429,8 +434,7 @@ class SongDatabase(
         }
     }
 
-    // Clear the CachedSongs table and repopulate it with all of the fully-downloaded songs in the
-    // cache.
+    /** Repopulate the CachedSongs table with fully-downloaded songs from the cache. */
     private fun updateCachedSongs(db: SQLiteDatabase) {
         db.delete("CachedSongs", null, null)
         var numSongs = 0
@@ -441,9 +445,10 @@ class SongDatabase(
             db.replace("CachedSongs", null, values)
             numSongs++
         }
-        Log.d(TAG, "learned about $numSongs cached song(s)")
+        Log.d(TAG, "Learned about $numSongs cached song(s)")
     }
 
+    /** Update members containing aggregate data from the database. */
     private fun loadAggregateData(songsUpdated: Boolean) {
         val db = opener.getDb()
         var cursor = db.rawQuery("SELECT LocalTimeNsec FROM LastUpdateTime", null)
@@ -456,15 +461,17 @@ class SongDatabase(
             listenerExecutor.execute { listener.onAggregateDataUpdate() }
             return
         }
-        numSongs = 0
-        artistsSortedAlphabetically.clear()
-        albumsSortedAlphabetically.clear()
-        artistsSortedByNumSongs.clear()
-        artistAlbums.clear()
+
+        _artistsSortedAlphabetically.clear()
+        _albumsSortedAlphabetically.clear()
+        _artistsSortedByNumSongs.clear()
+        _artistAlbums.clear()
+
         cursor = db.rawQuery("SELECT COUNT(*) FROM Songs", null)
         cursor.moveToFirst()
         numSongs = cursor.getInt(0)
         cursor.close()
+
         cursor = db.rawQuery(
             "SELECT Artist, SUM(NumSongs) " +
                 "FROM ArtistAlbumStats " +
@@ -474,7 +481,8 @@ class SongDatabase(
         )
         cursor.moveToFirst()
         while (!cursor.isAfterLast) {
-            artistsSortedAlphabetically.add(StatsRow(cursor.getString(0), "", "", cursor.getInt(1)))
+            _artistsSortedAlphabetically
+                .add(StatsRow(cursor.getString(0), "", "", cursor.getInt(1)))
             cursor.moveToNext()
         }
         cursor.close()
@@ -495,47 +503,43 @@ class SongDatabase(
             val albumId = cursor.getString(2)
             val count = cursor.getInt(3)
             cursor.moveToNext()
+
             if (lastRow != null &&
                 lastRow.key.albumId == albumId &&
-                lastRow.key.album.trim { it <= ' ' }.toLowerCase() ==
-                album.trim { it <= ' ' }.toLowerCase()
+                lastRow.key.album.trim().toLowerCase() == album.trim().toLowerCase()
             ) {
                 lastRow.count += count
             } else {
-                val row = StatsRow(artist, album, albumId, count)
-                albumsSortedAlphabetically.add(row)
-                lastRow = row
+                _albumsSortedAlphabetically.add(StatsRow(artist, album, albumId, count))
+                lastRow = _albumsSortedAlphabetically.last()
             }
 
             // TODO: Consider aggregating by album ID so that we have the full count from
             // each album rather than just songs exactly matching the artist. This will
             // affect the count displayed when navigating from BrowseArtistsActivity to
             // BrowseAlbumsActivity.
-            val lowerArtist = artist.toLowerCase()
-            var albums = artistAlbums[lowerArtist]
-            if (albums == null) {
-                albums = ArrayList()
-                artistAlbums[lowerArtist] = albums
-            }
-            albums.add(StatsRow(artist, album, albumId, count))
+            _artistAlbums.getOrPut(artist.toLowerCase(), { mutableListOf() })
+                .add(StatsRow(artist, album, albumId, count))
         }
         cursor.close()
-        artistsSortedByNumSongs.addAll(artistsSortedAlphabetically)
-        Collections.sort(artistsSortedByNumSongs) { a, b -> b.count - a.count }
+
+        _artistsSortedByNumSongs.addAll(_artistsSortedAlphabetically)
+        Collections.sort(_artistsSortedByNumSongs) { a, b -> b.count - a.count }
+
         aggregateDataLoaded = true
         listenerExecutor.execute { listener.onAggregateDataUpdate() }
     }
 
-    // Given a query that returns artist, album, album ID, and num songs,
-    // returns its results in sorted order.
+    /** Get sorted results from a query returning artist, album, album ID, and num songs. */
     private fun getSortedRows(
         query: String,
         selectionArgs: Array<String>?,
         order: SongOrder,
     ): List<StatsRow> {
+        val rows = mutableListOf<StatsRow>()
         val db = opener.getDb()
+
         val cursor = db.rawQuery(query, selectionArgs)
-        val rows: MutableList<StatsRow> = ArrayList()
         cursor.moveToFirst()
         while (!cursor.isAfterLast) {
             var artist = cursor.getString(0)
@@ -548,6 +552,7 @@ class SongDatabase(
             cursor.moveToNext()
         }
         cursor.close()
+
         sortStatsRows(rows, order)
         return rows
     }
@@ -558,9 +563,10 @@ class SongDatabase(
         // Special user-visible string that we use to represent a blank field.
         // It should be something that doesn't legitimately appear in any fields,
         // so "[unknown]" is out (MusicBrainz uses it for unknown artists).
-        const val UNSET_STRING = "[unset]"
-        private const val MAX_QUERY_RESULTS = "250"
+        private const val UNSET_STRING = "[unset]"
+
         private const val DATABASE_NAME = "NupSongs"
+        private const val MAX_QUERY_RESULTS = 250
         private const val DATABASE_VERSION = 15
         private const val SERVER_SONG_BATCH_SIZE = 100
 
@@ -587,6 +593,7 @@ class SongDatabase(
         private const val CREATE_SONGS_ALBUM_INDEX_SQL = "CREATE INDEX Album ON Songs (Album)"
         private const val CREATE_SONGS_ALBUM_ID_INDEX_SQL =
             "CREATE INDEX AlbumId ON Songs (AlbumId)"
+
         private const val CREATE_ARTIST_ALBUM_STATS_SQL = (
             "CREATE TABLE ArtistAlbumStats (" +
                 "  Artist VARCHAR(256) NOT NULL, " +
@@ -600,6 +607,7 @@ class SongDatabase(
             "CREATE INDEX ArtistSortKey ON ArtistAlbumStats (ArtistSortKey)"
         private const val CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL =
             "CREATE INDEX AlbumSortKey ON ArtistAlbumStats (AlbumSortKey)"
+
         private const val CREATE_LAST_UPDATE_TIME_SQL = (
             "CREATE TABLE LastUpdateTime (" +
                 "  LocalTimeNsec INTEGER NOT NULL, " +
@@ -607,8 +615,10 @@ class SongDatabase(
             )
         private const val INSERT_LAST_UPDATE_TIME_SQL =
             "INSERT INTO LastUpdateTime (LocalTimeNsec, ServerTimeNsec) VALUES(0, 0)"
+
         private const val CREATE_CACHED_SONGS_SQL =
-            "CREATE TABLE CachedSongs (" + "  SongId INTEGER PRIMARY KEY NOT NULL)"
+            "CREATE TABLE CachedSongs (SongId INTEGER PRIMARY KEY NOT NULL)"
+
         private const val CREATE_PENDING_PLAYBACK_REPORTS_SQL = (
             "CREATE TABLE PendingPlaybackReports (" +
                 "  SongId INTEGER NOT NULL, " +
@@ -635,7 +645,7 @@ class SongDatabase(
                 }
 
                 override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
-                    Log.d(TAG, "onUpgrade: $oldVersion -> $newVersion")
+                    Log.d(TAG, "Upgrading from $oldVersion to $newVersion")
                     db.beginTransaction()
                     try {
                         for (nextVersion in (oldVersion + 1)..newVersion) {
@@ -647,7 +657,7 @@ class SongDatabase(
                     }
                 }
 
-                // Upgrade the database from the version before |newVersion| to |newVersion|.
+                // Upgrade the database from the version before [newVersion] to [newVersion].
                 // The only reason I'm keeping the old upgrade steps is for reference when
                 // writing new ones.
                 private fun upgradeFromPreviousVersion(db: SQLiteDatabase, newVersion: Int) {
@@ -780,10 +790,10 @@ class SongDatabase(
                         )
                     } else if (newVersion == 12 || newVersion == 13) {
                         // Versions 12 and 13: Update sort ordering.
-                        // It isn't actually safe to call updateStatsTables() like this, since
+                        // It isn't actually safe to call updateArtistAlbumStats() like this, since
                         // it could be now be assuming a schema different than the one used in
                         // these old versions.
-                        updateStatsTables(db)
+                        updateArtistAlbumStats(db)
                     } else if (newVersion == 14) {
                         // Version 14: Add AlbumId, TrackGain, AlbumGain, and PeakAmp to Songs.
                         db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp")
@@ -832,7 +842,7 @@ class SongDatabase(
                         )
                         db.execSQL(CREATE_ARTIST_ALBUM_STATS_ARTIST_SORT_KEY_INDEX_SQL)
                         db.execSQL(CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL)
-                        updateStatsTables(db)
+                        updateArtistAlbumStats(db)
                     } else {
                         throw RuntimeException(
                             "Got request to upgrade database to unknown version $newVersion"
@@ -843,7 +853,7 @@ class SongDatabase(
         opener = DatabaseOpener(context, DATABASE_NAME, helper)
 
         // Get some info from the database in a background thread.
-        GlobalScope.launch {
+        GlobalScope.launch(Dispatchers.IO) {
             loadAggregateData(false)
             val db = opener.getDb()
             db.beginTransaction()
