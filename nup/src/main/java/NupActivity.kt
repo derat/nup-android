@@ -267,7 +267,7 @@ class NupActivity : Activity(), SongListener {
         val item = menu.findItem(R.id.download_all_menu_item)
         // TODO: This sometimes runs before the service is bound, resulting in a crash.
         // Find a better way to handle it.
-        val downloadAll = if (service != null) service!!.getShouldDownloadAll() else false
+        val downloadAll = service?.shouldDownloadAll ?: false
         item.setTitle(if (downloadAll) R.string.dont_download_all else R.string.download_all)
         item.setIcon(
             if (downloadAll) R.drawable.ic_cloud_off_white_24dp
@@ -291,7 +291,7 @@ class NupActivity : Activity(), SongListener {
                 true
             }
             R.id.download_all_menu_item -> {
-                service?.setShouldDownloadAll(!(service?.getShouldDownloadAll() ?: false))
+                service?.shouldDownloadAll = !(service?.shouldDownloadAll ?: false)
                 true
             }
             R.id.settings_menu_item -> {

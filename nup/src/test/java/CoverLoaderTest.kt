@@ -13,6 +13,7 @@ import java.io.IOException
 import java.io.StringBufferInputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import kotlinx.coroutines.runBlocking
 import org.erat.nup.CoverLoader
 import org.erat.nup.Downloader
 import org.erat.nup.NetworkHelper
@@ -73,11 +74,11 @@ class CoverLoaderTest {
 
         // The first load request for each cover should result in it being downloaded, but it should
         // be cached after that.
-        Assert.assertEquals(BITMAP_1, coverLoader.loadCover(COVER_URL_1))
-        Assert.assertEquals(BITMAP_2, coverLoader.loadCover(COVER_URL_2))
-        Assert.assertEquals(BITMAP_1, coverLoader.loadCover(COVER_URL_1))
-        Assert.assertEquals(BITMAP_1, coverLoader.loadCover(COVER_URL_1))
-        Assert.assertEquals(BITMAP_2, coverLoader.loadCover(COVER_URL_2))
+        Assert.assertEquals(BITMAP_1, load(COVER_URL_1))
+        Assert.assertEquals(BITMAP_2, load(COVER_URL_2))
+        Assert.assertEquals(BITMAP_1, load(COVER_URL_1))
+        Assert.assertEquals(BITMAP_1, load(COVER_URL_1))
+        Assert.assertEquals(BITMAP_2, load(COVER_URL_2))
 
         Mockito.verify(downloader, Mockito.times(1))
             .download(COVER_URL_1, "GET", Downloader.AuthType.STORAGE, null)
@@ -88,7 +89,7 @@ class CoverLoaderTest {
     @Test fun skipDownloadWhenNetworkUnavailable() {
         val COVER_URL = URL("https://www.example.com/cover.jpg")
         Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(false)
-        Assert.assertNull(coverLoader.loadCover(COVER_URL))
+        Assert.assertNull(load(COVER_URL))
         Mockito.verify(downloader, Mockito.never())
             .download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null)
     }
@@ -99,7 +100,7 @@ class CoverLoaderTest {
         val conn = createConnection(404, null)
         Mockito.`when`(downloader.download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null))
             .thenReturn(conn)
-        Assert.assertNull(coverLoader.loadCover(COVER_URL))
+        Assert.assertNull(load(COVER_URL))
     }
 
     @Test fun returnNullForIOException() {
@@ -107,7 +108,7 @@ class CoverLoaderTest {
         val COVER_URL = URL("https://www.example.com/cover.jpg")
         Mockito.`when`(downloader.download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null))
             .thenThrow(IOException())
-        Assert.assertNull(coverLoader.loadCover(COVER_URL))
+        Assert.assertNull(load(COVER_URL))
     }
 
     @Test fun cacheDecodedBitmap() {
@@ -118,9 +119,9 @@ class CoverLoaderTest {
         val conn = createConnection(200, DATA)
         Mockito.`when`(downloader.download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null))
             .thenReturn(conn)
-        Assert.assertEquals(BITMAP, coverLoader.loadCover(COVER_URL))
-        Assert.assertEquals(BITMAP, coverLoader.loadCover(COVER_URL))
-        Assert.assertEquals(BITMAP, coverLoader.loadCover(COVER_URL))
+        Assert.assertEquals(BITMAP, load(COVER_URL))
+        Assert.assertEquals(BITMAP, load(COVER_URL))
+        Assert.assertEquals(BITMAP, load(COVER_URL))
     }
 
     fun createConnection(statusCode: Int, data: String?): HttpURLConnection {
@@ -135,4 +136,6 @@ class CoverLoaderTest {
         bitmapDataMap[data] = bitmap
         return bitmap
     }
+
+    fun load(url: URL): Bitmap? = runBlocking { coverLoader.loadCover(url) }
 }

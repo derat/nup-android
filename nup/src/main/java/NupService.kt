@@ -21,7 +21,6 @@ import android.media.AudioManager
 import android.media.AudioManager.OnAudioFocusChangeListener
 import android.media.session.MediaSession
 import android.net.Uri
-import android.os.AsyncTask
 import android.os.Binder
 import android.os.IBinder
 import android.preference.PreferenceManager
@@ -32,18 +31,17 @@ import android.widget.Toast
 import java.io.File
 import java.util.Arrays
 import java.util.Date
-import kotlin.coroutines.CoroutineContext
-import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
+import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
 class NupService :
     Service(),
-    CoroutineScope,
     Player.Listener,
     FileCache.Listener,
     SongDatabase.Listener {
+    /** Listener for changes to song- and playlist-related state. */
     interface SongListener {
         /** Called when switching to a new track in the playlist. */
         fun onSongChange(song: Song, index: Int)
@@ -59,10 +57,14 @@ class NupService :
         fun onPlaylistChange(songs: List<Song>)
     }
 
-    // Listener for the song database's aggregate data being updated.
+    /** Listener for [SongDatabase]'s aggregate data being updated. */
     interface SongDatabaseUpdateListener {
+        /** Called when data is updated. */
         fun onSongDatabaseUpdate()
     }
+
+    private val scope = MainScope()
+    private val binder: IBinder = LocalBinder()
 
     lateinit var songDb: SongDatabase
         private set
@@ -78,67 +80,47 @@ class NupService :
     private lateinit var notificationManager: NotificationManager
     private lateinit var notificationCreator: NotificationCreator
     private lateinit var networkHelper: NetworkHelper
-
-    // Points from song ID to Song.
-    // This is the canonical set of songs that we've seen.
-    private val songIdToSong = HashMap<Long, Song>()
-
-    // ID of the song that's currently being downloaded.
-    private var downloadSongId: Long = -1
-
-    // Index into |mSongs| of the song that's currently being downloaded.
-    private var downloadIndex = -1
-
-    // Are we currently waiting for a file to be downloaded before we can play it?
-    private var waitingForDownload = false
-
-    // Have we temporarily been told to download all queued songs?
-    private var shouldDownloadAll = false
-
-    // Current playlist.
-    private val songs = ArrayList<Song>()
-
-    // Index of the song in |mSongs| that's being played.
-    var currentSongIndex = -1
-        private set
-
-    // Time at which we started playing the current song.
-    private var currentSongStartDate: Date? = null
-
-    // Last playback position we were notified about for the current song.
-    var currentSongLastPositionMs = 0
-        private set
-
-    // Total time during which we've played the current song, in milliseconds.
-    private var currentSongPlayedMs: Long = 0
-
-    // Local path of the song that's being played.
-    private var currentFile: File? = null
-
-    // Is playback currently paused?
-    var paused = false
-        private set
-
-    // Are we done playing the current song?
-    private var playbackComplete = false
-
-    // Have we reported the fact that we've played the current song?
-    private var reportedCurrentSong = false
-    private val binder: IBinder = LocalBinder()
-
-    // Songs whose covers are currently being fetched.
-    private val songCoverFetches = HashSet<Song?>()
-
-    // Songs whose covers we're currently keeping in memory.
-    private val songsWithCovers: MutableList<Song?> = ArrayList()
-
-    // Last time at which the user was foregrounded or backgrounded.
-    private var lastUserSwitchTime: Date? = null
-
     private lateinit var audioManager: AudioManager
     private lateinit var audioAttrs: AudioAttributes
     private lateinit var telephonyManager: TelephonyManager
     private lateinit var prefs: SharedPreferences
+
+    private val songIdToSong = HashMap<Long, Song>() // canonical [Song]s indexed by ID
+
+    // TODO: Rename to _songs and replace getSongs() with a getter.
+    private val songs = ArrayList<Song>() // current playlist
+    var currentSongIndex = -1 // index into [songs]
+        private set
+    var currentSongLastPositionMs = 0 // last playback position for current song
+        private set
+    private var currentFile: File? = null // local path of current song
+    private var currentSongStartDate: Date? = null // time at which current song was started
+    private var currentSongPlayedMs: Long = 0 // total time spent playing current song
+
+    var paused = false // playback currently paused
+        private set
+    private var playbackComplete = false // done playing current song
+    private var reportedCurrentSong = false // already reported playback of current song to server
+
+    private var downloadSongId: Long = -1 // ID of currently-downloaded song
+    private var downloadIndex = -1 // index into [songs] of currently-downloaded song
+    private var waitingForDownload = false // waiting for file to be download so we can play it
+
+    /** Download all queued songs instead of honoring pref. */
+    var shouldDownloadAll: Boolean = false
+        set(value) {
+            if (value != shouldDownloadAll) {
+                field = value
+                if (!songs.isEmpty() && shouldDownloadAll && downloadSongId == -1L) {
+                    maybeDownloadAnotherSong(if (currentSongIndex >= 0) currentSongIndex else 0)
+                }
+            }
+        }
+
+    private val songCoverFetches = HashSet<Song>() // songs whose covers are being fetched
+    private val songsWithCovers = mutableListOf<Song>() // songs whose covers are in-memory
+
+    private var lastUserSwitchTime: Date? = null // time when user was last fore/backgrounded
 
     // Pause when phone calls arrive.
     private val phoneStateListener: PhoneStateListener = object : PhoneStateListener() {
@@ -149,13 +131,14 @@ class NupService :
                 player.pause()
                 Toast.makeText(
                     this@NupService,
-                    "Paused for incoming call.",
+                    "Paused for incoming call",
                     Toast.LENGTH_SHORT
                 ).show()
             }
         }
     }
 
+    // Listen for miscellaneous broadcasts.
     private val broadcastReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             if (AudioManager.ACTION_AUDIO_BECOMING_NOISY == intent.action) {
@@ -167,16 +150,14 @@ class NupService :
                 // sent due to headphones being unplugged (why?), so that doesn't seem to
                 // help for ignoring this. Instead, ignore these intents for a brief period
                 // after user-switch broadcast intents.
-                val userSwitchedRecently = (lastUserSwitchTime == null) ||
-                    (
-                        Date().time - lastUserSwitchTime!!.time <=
-                            IGNORE_NOISY_AUDIO_AFTER_USER_SWITCH_MS
-                        )
+                val last = lastUserSwitchTime
+                val userSwitchedRecently = last == null ||
+                    Date().time - last.time <= IGNORE_NOISY_AUDIO_AFTER_USER_SWITCH_MS
                 if (currentSongIndex >= 0 && !paused && !userSwitchedRecently) {
                     player.pause()
                     Toast.makeText(
                         this@NupService,
-                        "Paused since unplugged.",
+                        "Paused since unplugged",
                         Toast.LENGTH_SHORT
                     ).show()
                 }
@@ -190,6 +171,7 @@ class NupService :
         }
     }
 
+    // Listen for changes to audio focus.
     private val audioFocusListener = OnAudioFocusChangeListener { focusChange ->
         when (focusChange) {
             AudioManager.AUDIOFOCUS_GAIN -> {
@@ -217,19 +199,16 @@ class NupService :
     private val songDatabaseUpdateListeners = HashSet<SongDatabaseUpdateListener>()
 
     override fun onCreate() {
-        Log.d(TAG, "service created")
+        Log.d(TAG, "Service created")
 
         // It'd be nice to set this up before we do anything else, but getExternalFilesDir() blocks.
-        // :-/
-        object : AsyncTask<Void?, Void?, File>() {
-            protected override fun doInBackground(vararg args: Void?): File {
-                return File(getExternalFilesDir(null), CRASH_SUBDIRECTORY)
-            }
+        scope.async(Dispatchers.Main) {
+            val dir = async(Dispatchers.IO) {
+                File(getExternalFilesDir(null), CRASH_DIR_NAME)
+            }.await()
+            CrashLogger.register(dir)
+        }
 
-            override fun onPostExecute(dir: File) {
-                CrashLogger.register(dir)
-            }
-        }.executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR)
         networkHelper = NetworkHelper(this)
         authenticator = Authenticator(this)
         if (networkHelper.isNetworkAvailable) authenticateInBackground()
@@ -245,7 +224,7 @@ class NupService :
                 .setAudioAttributes(audioAttrs)
                 .build()
         )
-        Log.d(TAG, "requested audio focus; got $result")
+        Log.d(TAG, "Requested audio focus; got $result")
 
         telephonyManager = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
         telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_CALL_STATE)
@@ -272,7 +251,7 @@ class NupService :
 
         playbackReporter = PlaybackReporter(songDb, downloader, networkHelper)
         if (networkHelper.isNetworkAvailable) {
-            launch(Dispatchers.IO) { playbackReporter.reportPending() }
+            scope.launch(Dispatchers.IO) { playbackReporter.reportPending() }
         }
         // TODO: Listen for the network coming up and send pending reports then too?
 
@@ -295,22 +274,13 @@ class NupService :
             mediaSessionToken,
             PendingIntent.getActivity(this, 0, Intent(this, NupActivity::class.java), 0),
             PendingIntent.getService(
-                this,
-                0,
-                Intent(ACTION_TOGGLE_PAUSE, Uri.EMPTY, this, NupService::class.java),
-                0
+                this, 0, Intent(ACTION_TOGGLE_PAUSE, Uri.EMPTY, this, NupService::class.java), 0
             ),
             PendingIntent.getService(
-                this,
-                0,
-                Intent(ACTION_PREV_TRACK, Uri.EMPTY, this, NupService::class.java),
-                0
+                this, 0, Intent(ACTION_PREV_TRACK, Uri.EMPTY, this, NupService::class.java), 0
             ),
             PendingIntent.getService(
-                this,
-                0,
-                Intent(ACTION_NEXT_TRACK, Uri.EMPTY, this, NupService::class.java),
-                0
+                this, 0, Intent(ACTION_NEXT_TRACK, Uri.EMPTY, this, NupService::class.java), 0
             )
         )
         val notification = notificationCreator.createNotification(
@@ -325,7 +295,7 @@ class NupService :
     }
 
     override fun onDestroy() {
-        Log.d(TAG, "service destroyed")
+        Log.d(TAG, "Service destroyed")
         audioManager.abandonAudioFocus(audioFocusListener)
         prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
         telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE)
@@ -338,7 +308,7 @@ class NupService :
     }
 
     override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
-        Log.d(TAG, "received start id $startId: $intent")
+        Log.d(TAG, "Received start ID $startId: $intent")
         when (intent.action) {
             ACTION_TOGGLE_PAUSE -> togglePause()
             ACTION_NEXT_TRACK -> playSongAtIndex(currentSongIndex + 1)
@@ -348,10 +318,6 @@ class NupService :
     }
 
     override fun onBind(intent: Intent): IBinder? { return binder }
-
-    private var coroutineJob = Job()
-    override val coroutineContext: CoroutineContext
-        get() = Dispatchers.IO + coroutineJob
 
     fun getSongs(): List<Song> { return songs }
 
@@ -369,18 +335,12 @@ class NupService :
         songDatabaseUpdateListeners.remove(listener)
     }
 
-    fun getShouldDownloadAll(): Boolean { return shouldDownloadAll }
-    fun setShouldDownloadAll(downloadAll: Boolean) {
-        if (downloadAll == shouldDownloadAll) return
-        shouldDownloadAll = downloadAll
-        if (!songs.isEmpty() && downloadAll && downloadSongId == -1L) {
-            maybeDownloadAnotherSong(if (currentSongIndex >= 0) currentSongIndex else 0)
-        }
-    }
-
-    // Unregister an object that might be registered as one or more of our listeners.
-    // Typically called when the object is an activity that's getting destroyed so
-    // we'll drop our references to it.
+    /**
+     * Unregister an object that might be registered as one or more of our listeners.
+     *
+     * Typically called when the object is an activity that's getting destroyed so
+     * we'll drop our references to it.
+     */
     fun unregisterListener(`object`: Any) {
         if (songListener === `object`) songListener = null
     }
@@ -422,29 +382,29 @@ class NupService :
 
     fun removeFromPlaylist(index: Int) { removeRangeFromPlaylist(index, index) }
 
-    // Remove a range of songs from the playlist.
+    /** Remove a range of songs from the playlist. */
     fun removeRangeFromPlaylist(firstIndex: Int, lastIndex: Int) {
-        var firstIndex = firstIndex
-        var lastIndex = lastIndex
-        if (firstIndex < 0) firstIndex = 0
-        if (lastIndex >= songs.size) lastIndex = songs.size - 1
+        val first = Math.max(firstIndex, 0)
+        val last = Math.min(lastIndex, songs.size - 1)
+
         var removedPlaying = false
-        for (numToRemove in lastIndex - firstIndex + 1 downTo 1) {
-            songs.removeAt(firstIndex)
-            if (currentSongIndex == firstIndex) {
+        for (numToRemove in (last - first + 1) downTo 1) {
+            songs.removeAt(first)
+            if (currentSongIndex == first) {
                 removedPlaying = true
                 stopPlaying()
-            } else if (currentSongIndex > firstIndex) {
+            } else if (currentSongIndex > first) {
                 currentSongIndex--
             }
-            if (downloadIndex == firstIndex) {
+            if (downloadIndex == first) {
                 cache.abortDownload(downloadSongId)
                 downloadSongId = -1
                 downloadIndex = -1
-            } else if (downloadIndex > firstIndex) {
+            } else if (downloadIndex > first) {
                 downloadIndex--
             }
         }
+
         if (removedPlaying) {
             if (!songs.isEmpty() && currentSongIndex < songs.size) {
                 playSongAtIndex(currentSongIndex)
@@ -459,16 +419,20 @@ class NupService :
         if (downloadSongId == -1L && !songs.isEmpty() && currentSongIndex < songs.size - 1) {
             maybeDownloadAnotherSong(currentSongIndex + 1)
         }
+
         songListener?.onPlaylistChange(songs)
         updateNotification()
         mediaSessionManager.updatePlaylist(songs)
     }
 
-    // Play the song at a particular position in the playlist.
+    /** Play the song at [index] in [songs]. */
     fun playSongAtIndex(index: Int) {
         if (index < 0 || index >= songs.size) return
+
         currentSongIndex = index
-        val song = currentSong
+
+        val song = currentSong!!
+
         currentSongStartDate = null
         currentSongLastPositionMs = 0
         currentSongPlayedMs = 0
@@ -477,9 +441,9 @@ class NupService :
         cache.clearPinnedSongIds()
 
         // If we've already downloaded the whole file, start playing it.
-        var cacheEntry = cache.getEntry(currentSong!!.id)
+        var cacheEntry = cache.getEntry(song.id)
         if (cacheEntry != null && cacheEntry.isFullyCached) {
-            Log.d(TAG, "file ${currentSong!!.url} already downloaded; playing")
+            Log.d(TAG, "${song.url} already downloaded; playing")
             playCacheEntry(cacheEntry)
 
             // If we're downloading some other song (maybe we were downloading the
@@ -498,7 +462,7 @@ class NupService :
             player.abortPlayback()
             if (cacheEntry == null || downloadSongId != cacheEntry.songId) {
                 if (downloadSongId != -1L) cache.abortDownload(downloadSongId)
-                cacheEntry = cache.downloadSong(song!!)
+                cache.downloadSong(song)
                 downloadSongId = song.id
                 downloadIndex = currentSongIndex
             }
@@ -516,7 +480,7 @@ class NupService :
         }
 
         // Make sure that we won't drop the song that we're currently playing from the cache.
-        cache.pinSongId(song!!.id)
+        cache.pinSongId(song.id)
         fetchCoverForSongIfMissing(song)
         updateNotification()
         mediaSessionManager.updateSong(song)
@@ -524,32 +488,25 @@ class NupService :
         songListener?.onSongChange(song, currentSongIndex)
     }
 
-    // Stop playing the current song, if any.
+    /** Stop playing the current song, if any. */
     fun stopPlaying() {
         currentFile = null
         player.abortPlayback()
     }
 
-    // Start fetching the cover for a song if it's not loaded already.
-    fun fetchCoverForSongIfMissing(song: Song?) {
-        if (song!!.coverBitmap != null || song.coverUrl == null) return
-        if (!songCoverFetches.contains(song)) {
-            songCoverFetches.add(song)
-            CoverFetchTask(song).executeOnExecutor(AsyncTask.THREAD_POOL_EXECUTOR)
-        }
-    }
-
-    // Fetches the cover bitmap for a particular song.
-    internal inner class CoverFetchTask(private val song: Song?) :
-        AsyncTask<Void?, Void?, Bitmap?>() {
-        protected override fun doInBackground(vararg args: Void?): Bitmap? {
-            return coverLoader.loadCover(song!!.coverUrl!!)
+    /** Start fetching [song]'s cover if it's not loaded already. */
+    fun fetchCoverForSongIfMissing(song: Song) {
+        if (song.coverBitmap != null || song.coverUrl == null || songCoverFetches.contains(song)) {
+            return
         }
 
-        override fun onPostExecute(bitmap: Bitmap?) {
+        songCoverFetches.add(song)
+        scope.async(Dispatchers.Main) {
+            val bitmap = async(Dispatchers.IO) { coverLoader.loadCover(song.coverUrl) }.await()
             storeCoverForSong(song, bitmap)
             songCoverFetches.remove(song)
-            if (song!!.coverBitmap != null) {
+
+            if (song.coverBitmap != null) {
                 songListener?.onSongCoverLoad(song)
                 if (song == currentSong) {
                     updateNotification()
@@ -586,7 +543,7 @@ class NupService :
                 )
             ) {
                 val start = currentSongStartDate!!
-                launch(Dispatchers.IO) { playbackReporter.report(song.id, start) }
+                scope.launch(Dispatchers.IO) { playbackReporter.report(song.id, start) }
                 reportedCurrentSong = true
             }
         }
@@ -691,15 +648,20 @@ class NupService :
         for (listener in songDatabaseUpdateListeners) listener.onSongDatabaseUpdate()
     }
 
-    /** Starts authenticating with Google Cloud Storage in the background.  */
+    /** Start authenticating with Google Cloud Storage in the background.  */
     fun authenticateInBackground() { authenticator.authenticateInBackground() }
 
-    // Insert a list of songs into the playlist at a particular position.
-    // Plays the first one, if no song is already playing or if we were previously at the end of the
-    // playlist and we've appended to it. Returns true if we started playing.
+    /**
+     * Insert a list of songs into the playlist at a particular position.
+     *
+     * Plays the first one, if no song is already playing or if we were previously at the end of the
+     * playlist and we've appended to it.
+     *
+     * @return true if playback started
+     */
     private fun insertSongs(insSongs: List<Song>, index: Int): Boolean {
         if (index < 0 || index > songs.size) {
-            Log.e(TAG, "ignoring request to insert ${insSongs.size} song(s) at index $index")
+            Log.e(TAG, "Ignoring request to insert ${insSongs.size} song(s) at index $index")
             return false
         }
 
@@ -754,22 +716,21 @@ class NupService :
         return played
     }
 
-    // Do we have enough of a song downloaded at a fast enough rate that we'll probably
-    // finish downloading it before playback reaches the end of the song?
+    /** Estimate if we're downloading [entry] fast enough to play it uninterrupted. */
     private fun canPlaySong(
-        entry: FileCacheEntry?,
+        entry: FileCacheEntry,
         downloadedBytes: Long,
         elapsedMs: Long,
         songLengthSec: Int
     ): Boolean {
-        if (entry!!.isFullyCached) return true
+        if (entry.isFullyCached) return true
         val bytesPerMs = downloadedBytes.toDouble() / elapsedMs
         val remainingMs = ((entry.totalBytes - entry.cachedBytes) / bytesPerMs).toLong()
         return entry.cachedBytes >= MIN_BYTES_BEFORE_PLAYING &&
             remainingMs + EXTRA_BUFFER_MS <= songLengthSec * 1000
     }
 
-    // Play the local file where a cache entry is stored.
+    /** Play [entry] . */
     private fun playCacheEntry(entry: FileCacheEntry) {
         val song = currentSong ?: return
         if (song.id != entry.songId) {
@@ -784,10 +745,12 @@ class NupService :
         updatePlaybackState()
     }
 
-    // Try to download the next not-yet-downloaded song in the playlist.
+    /** Try to download the next not-yet-downloaded song in the playlist. */
     private fun maybeDownloadAnotherSong(startIndex: Int) {
+        assertOnMainThread()
+
         if (downloadSongId != -1L) {
-            Log.e(TAG, "aborting prefetch since download of song $downloadSongId is in progress")
+            Log.e(TAG, "Aborting prefetch since download of song $downloadSongId is in progress")
             return
         }
         val songsToPreload = Integer.valueOf(
@@ -818,8 +781,11 @@ class NupService :
         }
     }
 
-    // Set |song|'s cover bitmap to |bitmap|.
-    // Also makes sure that we don't have more than |MAX_LOADED_COVERS| bitmaps in-memory.
+    /**
+     * Set [song]'s cover bitmap to [bitmap].
+     *
+     * Also makes sure that we don't have more than |MAX_LOADED_COVERS| bitmaps in-memory.
+     */
     private fun storeCoverForSong(song: Song?, bitmap: Bitmap?) {
         song!!.coverBitmap = bitmap
         val existingIndex = songsWithCovers.indexOf(song)
@@ -839,7 +805,7 @@ class NupService :
 
         // If we're full, drop the cover from the first song on the list.
         if (songsWithCovers.size == MAX_LOADED_COVERS) {
-            songsWithCovers[0]!!.coverBitmap = null
+            songsWithCovers[0].coverBitmap = null
             songsWithCovers.removeAt(0)
         }
         songsWithCovers.add(song)
@@ -861,36 +827,15 @@ class NupService :
     companion object {
         private const val TAG = "NupService"
 
-        // Identifier used for our "currently playing" notification.
-        // Note: Using 0 makes the service not run in the foreground and the notification not show up.
-        // Yay, that was fun to figure out.
-        private const val NOTIFICATION_ID = 1
-
-        // Don't start playing a song until we have at least this many bytes of it.
-        private const val MIN_BYTES_BEFORE_PLAYING = 128 * 1024L
-
-        // Don't start playing a song until we think we'll finish downloading the whole file at the
-        // current rate sooner than this many milliseconds before the song would end (whew).
-        private const val EXTRA_BUFFER_MS = 10 * 1000L
-
-        // Maximum number of cover bitmaps to keep in memory at once.
-        private const val MAX_LOADED_COVERS = 3
-
-        // Name of directory where cover images are stored.
-        private const val COVER_DIR_NAME = "covers"
-
-        // If we receive a playback update with a position more than this many milliseconds beyond the
-        // last one we received, we assume that something has gone wrong and ignore it.
-        private const val MAX_POSITION_REPORT_MS = 5 * 1000L
-
-        // Report a song unconditionally if we've played it for this many milliseconds.
-        private const val REPORT_PLAYBACK_THRESHOLD_MS = 240 * 1000L
-
-        // Ignore AUDIO_BECOMING_NOISY broadcast intents for this long after a user switch.
+        private const val NOTIFICATION_ID = 1 // "currently playing" notification (can't be 0)
+        private const val MIN_BYTES_BEFORE_PLAYING = 128 * 1024L // bytes needed before playing
+        private const val EXTRA_BUFFER_MS = 10 * 1000L // headroom needed to play song
+        private const val MAX_LOADED_COVERS = 3 // max number of cover bitmaps to keep in memory
+        private const val COVER_DIR_NAME = "covers" // cache subdir where cover images are stored
+        private const val CRASH_DIR_NAME = "crashes" // files subdir where crashes are written
+        private const val MAX_POSITION_REPORT_MS = 5 * 1000L // threshold for playback updates
+        private const val REPORT_PLAYBACK_THRESHOLD_MS = 240 * 1000L // reporting threshold
         private const val IGNORE_NOISY_AUDIO_AFTER_USER_SWITCH_MS = 1000L
-
-        // Subdirectory where crash reports are written.
-        private const val CRASH_SUBDIRECTORY = "crashes"
 
         // Intent actions.
         private const val ACTION_TOGGLE_PAUSE = "nup_toggle_pause"

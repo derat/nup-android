@@ -41,8 +41,7 @@ open class CoverLoader(
      *
      * @return cover image or null if unavailable
      */
-    // TODO: Add 'suspend' after callers have been updated to not use AsyncTask.
-    fun loadCover(url: URL): Bitmap? {
+    suspend fun loadCover(url: URL): Bitmap? {
         // Ensure that the cover dir exists.
         coverDir.mkdirs()
         var file = lookForLocalCover(url)
