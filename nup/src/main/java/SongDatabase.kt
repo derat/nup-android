@@ -60,12 +60,6 @@ class SongDatabase(
 
     enum class SyncState { UPDATING_SONGS, DELETING_SONGS, UPDATING_STATS }
 
-    /** Notified about progress while synchronizing with the server. */
-    interface SyncProgressListener {
-        /** Called when sync progress changes. */
-        fun onSyncProgress(state: SyncState, numSongs: Int)
-    }
-
     val cachedArtistsSortedAlphabetically: List<StatsRow>
         get() = getSortedRows(
             "SELECT s.Artist, '' AS Album, '' AS AlbumId, COUNT(*) " +
@@ -240,8 +234,18 @@ class SongDatabase(
             return reports
         }
 
+    /** Notified about progress while synchronizing with the server. */
+    interface SyncProgressListener {
+        /** Called when sync progress changes. */
+        fun onSyncProgress(state: SyncState, numSongs: Int)
+    }
+
     /** Synchronize the song list with the server. */
-    fun syncWithServer(listener: SyncProgressListener, message: Array<String>): Boolean {
+    fun syncWithServer(
+        listener: SyncProgressListener,
+        listenerExecutor: Executor,
+        message: Array<String>
+    ): Boolean {
         if (!networkHelper.isNetworkAvailable) {
             message[0] = context.getString(R.string.network_is_unavailable)
             return false
@@ -270,8 +274,10 @@ class SongDatabase(
             val prevStartTimeNsec = dbCursor.getLong(0)
             dbCursor.close()
             try {
-                numSongsUpdated += queryServer(db, prevStartTimeNsec, false, listener, message)
-                numSongsUpdated += queryServer(db, prevStartTimeNsec, true, listener, message)
+                numSongsUpdated +=
+                    queryServer(db, prevStartTimeNsec, false, listener, listenerExecutor, message)
+                numSongsUpdated +=
+                    queryServer(db, prevStartTimeNsec, true, listener, listenerExecutor, message)
             } catch (e: ServerException) {
                 return false
             }
@@ -310,6 +316,7 @@ class SongDatabase(
         prevStartTimeNsec: Long,
         deleted: Boolean,
         listener: SyncProgressListener,
+        listenerExecutor: Executor,
         message: Array<String>
     ): Int {
         var numUpdates = 0
