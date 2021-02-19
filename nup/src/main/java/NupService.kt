@@ -330,7 +330,7 @@ class NupService :
         prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
         telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE)
         unregisterReceiver(broadcastReceiver)
-        mediaSessionManager.cleanUp()
+        mediaSessionManager.release()
         songDb.quit()
         player.quit()
         cache.quit()
