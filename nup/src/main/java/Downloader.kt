@@ -16,6 +16,7 @@ import java.net.SocketTimeoutException
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 
+/** Downloads HTTP resources. */
 // TODO: Make this non-open if possible after switching to Robolectric.
 open class Downloader(
     private val authenticator: Authenticator,
@@ -25,16 +26,22 @@ open class Downloader(
      * either unset or incorrect. */
     class PrefException(reason: String?) : Exception(reason)
 
-    enum class AuthType { SERVER, STORAGE }
+    /** Authentication methods that can be used when downloading resources. */
+    enum class AuthType {
+        /** HTTP basic auth with username and password from prefs. */
+        SERVER,
+        /** Google account fetched using [Authenticator]. */
+        STORAGE,
+    }
 
     /**
-     * Starts a download of a given URL.
+     * Start a download of [url].
      *
      * @param url URL to download
      * @param method HTTP method, e.g. "GET" or "POST"
      * @param authType authentication type to use
      * @param headers additional HTTP headers (may be null)
-     * @return active HTTP connection; `disconnect` must be called
+     * @return active HTTP connection; [disconnect] must be called
      */
     @Throws(IOException::class)
     fun download(
@@ -43,21 +50,23 @@ open class Downloader(
         authType: AuthType,
         headers: Map<String, String>?,
     ): HttpURLConnection {
-        Log.d(TAG, "starting $method to $url")
+        Log.d(TAG, "$method $url")
         val conn = url.openConnection() as HttpsURLConnection
         conn.connectTimeout = CONNECT_TIMEOUT_MS
         conn.readTimeout = READ_TIMEOUT_MS
         conn.requestMethod = method
+
         if (headers != null) {
             for ((key, value) in headers) {
                 conn.setRequestProperty(key, value)
             }
         }
+
         if (authType == AuthType.SERVER) {
             // Add Authorization header if username and password prefs are set.
-            val username = prefs.getString(NupPreferences.USERNAME, "")
-            val password = prefs.getString(NupPreferences.PASSWORD, "")
-            if (!username!!.isEmpty() && !password!!.isEmpty()) {
+            val username = prefs.getString(NupPreferences.USERNAME, "") ?: ""
+            val password = prefs.getString(NupPreferences.PASSWORD, "") ?: ""
+            if (!username.isEmpty() && !password.isEmpty()) {
                 conn.setRequestProperty(
                     "Authorization",
                     "Basic " + Base64.encodeToString(
@@ -70,24 +79,30 @@ open class Downloader(
                 val token = authenticator.authToken
                 conn.setRequestProperty("Authorization", "Bearer $token")
             } catch (e: Authenticator.AuthException) {
-                Log.e(TAG, "failed to get auth token: $e")
+                Log.e(TAG, "Failed to get auth token: $e")
             }
         }
+
         return try {
             conn.connect()
-            Log.d(TAG, "got ${conn.responseCode} (${conn.responseMessage}) for $url")
+            Log.d(TAG, "Got ${conn.responseCode} (${conn.responseMessage}) for $url")
             conn
         } catch (e: SocketTimeoutException) {
-            Log.e(TAG, "got timeout for $url", e)
+            Log.e(TAG, "Timeout for $url", e)
             conn.disconnect()
             throw IOException(e.toString())
         } catch (e: IOException) {
-            Log.e(TAG, "got IO exception for $url", e)
+            Log.e(TAG, "IO exception for $url", e)
             conn.disconnect()
             throw e
         }
     }
 
+    /**
+     * Download text data from the server.
+     *
+     * @return data, or null if download failed
+     */
     fun downloadString(path: String, error: Array<String>): String? {
         var conn: HttpURLConnection? = null
         return try {
@@ -119,27 +134,21 @@ open class Downloader(
 
     @Throws(PrefException::class)
     fun getServerUrl(path: String): URL {
-        val server = prefs.getString(NupPreferences.SERVER_URL, "")
-        if (server!!.isEmpty()) {
-            throw PrefException("Server URL is not configured")
-        }
+        val server = prefs.getString(NupPreferences.SERVER_URL, "") ?: ""
+        if (server.isEmpty()) throw PrefException("Server URL not configured")
+
         val serverUrl: URL = try {
             URL(server)
         } catch (e: MalformedURLException) {
-            throw PrefException("Unable to parse server URL $server (${e.message})")
+            throw PrefException("Unable to parse server URL \"$server\" (${e.message})")
         }
 
         // Check protocol and set port.
         val protocol = serverUrl.protocol
-        val port: Int
-        port = if (protocol == "http") {
-            if (serverUrl.port > 0) serverUrl.port else 80
-        } else if (protocol == "https") {
-            if (serverUrl.port > 0) serverUrl.port else 443
-        } else {
-            throw PrefException(
-                "Unknown server URL scheme \"$protocol\" (should be \"http\" or \"https\")"
-            )
+        val port = when (protocol) {
+            "http" -> if (serverUrl.port > 0) serverUrl.port else 80
+            "https" -> if (serverUrl.port > 0) serverUrl.port else 443
+            else -> throw PrefException("Unsupported server URL scheme \"$protocol\"")
         }
 
         // Now build the real URL.
