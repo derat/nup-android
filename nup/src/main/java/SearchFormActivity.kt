@@ -19,38 +19,40 @@ import android.widget.Spinner
 import org.erat.nup.NupActivity.Companion.service
 import org.erat.nup.NupService.SongDatabaseUpdateListener
 
+/** Displays a form for searching for songs. */
 class SearchFormActivity : Activity(), SongDatabaseUpdateListener {
-    // Various parts of our UI.
-    private var artistEdit: AutoCompleteTextView? = null
-    private var albumEdit: AutoCompleteTextView? = null
-    private var titleEdit: EditText? = null
-    private var shuffleCheckbox: CheckBox? = null
-    private var substringCheckbox: CheckBox? = null
-    private var cachedCheckbox: CheckBox? = null
-    private var minRatingSpinner: Spinner? = null
+    private lateinit var artistEdit: AutoCompleteTextView
+    private lateinit var albumEdit: AutoCompleteTextView
+    private lateinit var titleEdit: EditText
+    private lateinit var shuffleCheckbox: CheckBox
+    private lateinit var substringCheckbox: CheckBox
+    private lateinit var cachedCheckbox: CheckBox
+    private lateinit var minRatingSpinner: Spinner
+
     public override fun onCreate(savedInstanceState: Bundle?) {
-        Log.d(TAG, "activity created")
+        Log.d(TAG, "Activity created")
         super.onCreate(savedInstanceState)
+
         setTitle(R.string.search)
         setContentView(R.layout.search)
-        artistEdit = findViewById<View>(R.id.artist_edit_text) as AutoCompleteTextView
-        titleEdit = findViewById<View>(R.id.title_edit_text) as EditText
+        artistEdit = findViewById<AutoCompleteTextView>(R.id.artist_edit_text)
+        titleEdit = findViewById<EditText>(R.id.title_edit_text)
 
         // When the album field gets the focus, set its suggestions based on the currently-entered
         // artist.
-        albumEdit = findViewById<View>(R.id.album_edit_text) as AutoCompleteTextView
-        albumEdit!!.onFocusChangeListener = OnFocusChangeListener { _, hasFocus ->
+        albumEdit = findViewById<AutoCompleteTextView>(R.id.album_edit_text)
+        albumEdit.onFocusChangeListener = OnFocusChangeListener { _, hasFocus ->
             if (hasFocus) {
-                val artist = artistEdit!!.text.toString()
-                val albums: MutableList<String> = ArrayList()
-                val albumsWithCounts = if (artist.trim { it <= ' ' }.isEmpty()) {
+                val artist = artistEdit.text.toString()
+                val albums = mutableListOf<String>()
+                val albumsWithCounts = if (artist.trim().isEmpty()) {
                     service!!.songDb.albumsSortedAlphabetically
                 } else {
                     service!!.songDb.albumsByArtist(artist)
                 }
-
                 for (stats in albumsWithCounts) albums.add(stats.key.album)
-                albumEdit!!.setAdapter(
+
+                albumEdit.setAdapter(
                     ArrayAdapter(
                         this@SearchFormActivity,
                         android.R.layout.simple_dropdown_item_1line,
@@ -59,33 +61,26 @@ class SearchFormActivity : Activity(), SongDatabaseUpdateListener {
                 )
             }
         }
-        minRatingSpinner = findViewById<View>(R.id.min_rating_spinner) as Spinner
+
+        minRatingSpinner = findViewById<Spinner>(R.id.min_rating_spinner)
         val adapter = ArrayAdapter.createFromResource(
             this, R.array.min_rating_array, android.R.layout.simple_spinner_item
         )
         adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        minRatingSpinner!!.adapter = adapter
-        shuffleCheckbox = findViewById<View>(R.id.shuffle_checkbox) as CheckBox
-        substringCheckbox = findViewById<View>(R.id.substring_checkbox) as CheckBox
-        cachedCheckbox = findViewById<View>(R.id.cached_checkbox) as CheckBox
+        minRatingSpinner.adapter = adapter
+
+        shuffleCheckbox = findViewById<CheckBox>(R.id.shuffle_checkbox)
+        substringCheckbox = findViewById<CheckBox>(R.id.substring_checkbox)
+        cachedCheckbox = findViewById<CheckBox>(R.id.cached_checkbox)
+
         service!!.addSongDatabaseUpdateListener(this)
         onSongDatabaseUpdate()
     }
 
     override fun onDestroy() {
-        Log.d(TAG, "activity destroyed")
+        Log.d(TAG, "Activity destroyed")
         super.onDestroy()
         service!!.removeSongDatabaseUpdateListener(this)
-    }
-
-    private fun resetForm() {
-        artistEdit!!.setText("")
-        albumEdit!!.setText("")
-        titleEdit!!.setText("")
-        shuffleCheckbox!!.isChecked = false
-        substringCheckbox!!.isChecked = true
-        cachedCheckbox!!.isChecked = false
-        minRatingSpinner!!.setSelection(0, true)
     }
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
@@ -94,37 +89,34 @@ class SearchFormActivity : Activity(), SongDatabaseUpdateListener {
 
     fun onSearchButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
         val intent = Intent(this, SearchResultsActivity::class.java)
-        intent.putExtra(
-            SearchResultsActivity.BUNDLE_ARTIST, artistEdit!!.text.toString().trim { it <= ' ' }
-        )
-        intent.putExtra(
-            SearchResultsActivity.BUNDLE_TITLE,
-            titleEdit!!.text.toString().trim { it <= ' ' }
-        )
-        intent.putExtra(
-            SearchResultsActivity.BUNDLE_ALBUM,
-            albumEdit!!.text.toString().trim { it <= ' ' }
-        )
+        intent.putExtra(SearchResultsActivity.BUNDLE_ARTIST, artistEdit.text.toString().trim())
+        intent.putExtra(SearchResultsActivity.BUNDLE_TITLE, titleEdit.text.toString().trim())
+        intent.putExtra(SearchResultsActivity.BUNDLE_ALBUM, albumEdit.text.toString().trim())
         intent.putExtra(
             SearchResultsActivity.BUNDLE_MIN_RATING,
-            minRatingSpinner!!.selectedItemPosition / 4.0
+            minRatingSpinner.selectedItemPosition / 4.0
         )
-        intent.putExtra(SearchResultsActivity.BUNDLE_SHUFFLE, shuffleCheckbox!!.isChecked)
-        intent.putExtra(SearchResultsActivity.BUNDLE_SUBSTRING, substringCheckbox!!.isChecked)
-        intent.putExtra(SearchResultsActivity.BUNDLE_CACHED, cachedCheckbox!!.isChecked)
+        intent.putExtra(SearchResultsActivity.BUNDLE_SHUFFLE, shuffleCheckbox.isChecked)
+        intent.putExtra(SearchResultsActivity.BUNDLE_SUBSTRING, substringCheckbox.isChecked)
+        intent.putExtra(SearchResultsActivity.BUNDLE_CACHED, cachedCheckbox.isChecked)
         startActivityForResult(intent, RESULTS_REQUEST_CODE)
     }
 
     fun onResetButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
-        resetForm()
+        artistEdit.setText("")
+        albumEdit.setText("")
+        titleEdit.setText("")
+        shuffleCheckbox.isChecked = false
+        substringCheckbox.isChecked = true
+        cachedCheckbox.isChecked = false
+        minRatingSpinner.setSelection(0, true)
     }
 
-    // Implements NupService.SongDatabaseUpdateListener.
     override fun onSongDatabaseUpdate() {
-        val artists: MutableList<String> = ArrayList()
+        val artists = mutableListOf<String>()
         val artistsWithCounts = service!!.songDb.artistsSortedByNumSongs
         for (stats in artistsWithCounts) artists.add(stats.key.artist)
-        artistEdit!!.setAdapter(
+        artistEdit.setAdapter(
             ArrayAdapter(
                 this@SearchFormActivity,
                 android.R.layout.simple_dropdown_item_1line,
