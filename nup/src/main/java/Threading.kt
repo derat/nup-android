@@ -33,7 +33,7 @@ fun assertNotOnMainThread() {
  * @param executor created using [Executors.newSingleThreadScheduledExecutor]
  */
 class ThreadChecker(executor: ExecutorService) {
-    private lateinit var thread: Thread // [executor]'s thread
+    private val thread: Thread // [executor]'s thread
 
     /** Crash if not called from [executor]'s thread. */
     fun assertThread() {
