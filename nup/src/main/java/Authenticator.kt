@@ -7,7 +7,6 @@ package org.erat.nup
 
 import android.content.Context
 import android.os.Bundle
-import android.preference.PreferenceManager
 import android.util.Log
 import android.widget.Toast
 import com.google.android.gms.auth.GoogleAuthException
@@ -22,18 +21,22 @@ import kotlinx.coroutines.async
 class Authenticator(private val context: Context) {
     class AuthException(reason: String) : Exception(reason)
 
+    /** Google account to use. */
+    var account = ""
+
     /** Synchronously get an auth token for Google Cloud Storage. */
     // TODO: Mark this as 'suspend' after callers have been updated.
     @get:Throws(AuthException::class)
     val authToken: String
         get() {
-            val prefs = PreferenceManager.getDefaultSharedPreferences(context)
-            val accountName = prefs.getString(NupPreferences.ACCOUNT, "")!!
-            if (accountName.isEmpty()) throw AuthException("Account isn't set")
+            if (account.isEmpty()) throw AuthException("Account isn't set")
             var token = try {
-                Log.d(TAG, "Attempting to get token for $accountName")
+                Log.d(TAG, "Attempting to get token for $account")
                 val bundle = Bundle()
-                GoogleAuthUtil.getTokenWithNotification(context, accountName, SCOPE, bundle)
+                // TODO: This is deprecated. Apparently you're supposed to pass an Account object
+                // rather than a string now, which presumably requires using AccountManager in the
+                // settings activity to let the user choose their account. Or something.
+                GoogleAuthUtil.getTokenWithNotification(context, account, SCOPE, bundle)
             } catch (e: UserRecoverableNotifiedException) {
                 throw AuthException("User action required")
             } catch (e: GoogleAuthException) {

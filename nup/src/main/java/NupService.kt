@@ -68,6 +68,7 @@ class NupService :
         private set
 
     private lateinit var authenticator: Authenticator
+    private lateinit var networkHelper: NetworkHelper
     private lateinit var downloader: Downloader
     private lateinit var player: Player
     private lateinit var cache: FileCache
@@ -77,7 +78,6 @@ class NupService :
     private lateinit var mediaSessionToken: MediaSession.Token
     private lateinit var notificationManager: NotificationManager
     private lateinit var notificationCreator: NotificationCreator
-    private lateinit var networkHelper: NetworkHelper
     private lateinit var audioManager: AudioManager
     private lateinit var audioAttrs: AudioAttributes
     private lateinit var audioFocusReq: AudioFocusRequest
@@ -107,7 +107,7 @@ class NupService :
     private var playbackComplete = false // done playing [curSong]
     private var reported = false // already reported playback of [curSong] to server
 
-    private var songsToPreload = 0
+    private var songsToPreload = 0 // set from pref
     private var downloadSongId: Long = -1 // ID of currently-downloading song
     private var downloadIndex = -1 // index into [songs] of currently-downloading song
     private var waitingForDownload = false // waiting for file to be download so we can play it
@@ -216,10 +216,6 @@ class NupService :
             CrashLogger.register(dir)
         }
 
-        networkHelper = NetworkHelper(this)
-        authenticator = Authenticator(this)
-        if (networkHelper.isNetworkAvailable) authenticateInBackground()
-
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         audioAttrs = AudioAttributes.Builder()
             .setUsage(AudioAttributes.USAGE_MEDIA)
@@ -241,17 +237,14 @@ class NupService :
         filter.addAction(Intent.ACTION_USER_FOREGROUND)
         registerReceiver(broadcastReceiver, filter)
 
+        networkHelper = NetworkHelper(this)
+        authenticator = Authenticator(this)
         downloader = Downloader(authenticator)
         player = Player(this, this, mainExecutor, audioAttrs)
         cache = FileCache(this, this, mainExecutor, downloader, networkHelper)
         songDb = SongDatabase(this, this, mainExecutor, cache, downloader, networkHelper)
         coverLoader = CoverLoader(this, downloader, networkHelper)
-
         playbackReporter = PlaybackReporter(songDb, downloader, networkHelper)
-        if (networkHelper.isNetworkAvailable) {
-            scope.launch(Dispatchers.IO) { playbackReporter.reportPending() }
-        }
-        // TODO: Listen for the network coming up and send pending reports then too?
 
         // Read prefs on the IO thread to avoid blocking the UI.
         scope.launch(Dispatchers.Main) {
@@ -261,11 +254,20 @@ class NupService :
             prefs.registerOnSharedPreferenceChangeListener(prefsListener)
 
             // Load initial settings.
+            applyPref(NupPreferences.ACCOUNT)
+            applyPref(NupPreferences.CACHE_SIZE)
+            applyPref(NupPreferences.DOWNLOAD_RATE)
             applyPref(NupPreferences.PASSWORD)
             applyPref(NupPreferences.PRE_AMP_GAIN)
             applyPref(NupPreferences.USERNAME)
             applyPref(NupPreferences.SERVER_URL)
             applyPref(NupPreferences.SONGS_TO_PRELOAD)
+
+            if (networkHelper.isNetworkAvailable) {
+                if (!authenticator.account.isEmpty()) authenticateInBackground()
+                launch(Dispatchers.IO) { playbackReporter.reportPending() }
+                // TODO: Listen for the network coming up and send pending reports then too?
+            }
         }
 
         mediaSessionManager = MediaSessionManager(
@@ -359,6 +361,15 @@ class NupService :
     /** Read and apply [key]. */
     private suspend fun applyPref(key: String) {
         when (key) {
+            NupPreferences.ACCOUNT -> authenticator.account = readPref(key, "")
+            NupPreferences.CACHE_SIZE -> {
+                val size = readPref(key, NupPreferences.CACHE_SIZE_DEFAULT).toLong()
+                cache.maxBytes = if (size > 0) size * 1024 * 1024 else size
+            }
+            NupPreferences.DOWNLOAD_RATE -> {
+                val rate = readPref(key, NupPreferences.DOWNLOAD_RATE_DEFAULT).toLong()
+                cache.maxRate = if (rate > 0) rate * 1024 else rate
+            }
             NupPreferences.PASSWORD -> downloader.password = readPref(key, "")
             NupPreferences.PRE_AMP_GAIN -> {
                 player.preAmpGain = readPref(key, NupPreferences.PRE_AMP_GAIN_DEFAULT).toDouble()

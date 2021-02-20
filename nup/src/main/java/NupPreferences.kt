@@ -11,11 +11,11 @@ object NupPreferences {
     const val PASSWORD = "password"
     const val ACCOUNT = "account"
     const val SYNC_SONG_LIST = "sync_song_list"
-    const val PRE_AMP_GAIN = "pre_amp_gain"
-    const val CACHE_SIZE = "cache_size"
+    const val PRE_AMP_GAIN = "pre_amp_gain" // positive or negative decibels
+    const val CACHE_SIZE = "cache_size" // megabytes
     const val CLEAR_CACHE = "clear_cache"
     const val SONGS_TO_PRELOAD = "songs_to_preload"
-    const val DOWNLOAD_RATE = "download_rate"
+    const val DOWNLOAD_RATE = "download_rate" // kilobytes per second
     const val PRE_AMP_GAIN_DEFAULT = "0"
     const val CACHE_SIZE_DEFAULT = "512"
     const val CACHE_SIZE_MINIMUM = 20

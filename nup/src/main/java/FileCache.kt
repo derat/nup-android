@@ -6,12 +6,10 @@
 package org.erat.nup
 
 import android.content.Context
-import android.content.SharedPreferences
 import android.net.wifi.WifiManager
 import android.net.wifi.WifiManager.WifiLock
 import android.os.Environment
 import android.os.SystemClock
-import android.preference.PreferenceManager
 import android.util.Log
 import java.io.File
 import java.io.FileNotFoundException
@@ -62,10 +60,12 @@ class FileCache constructor(
     private val executor = Executors.newSingleThreadScheduledExecutor()
     private val threadChecker = ThreadChecker(executor)
 
+    var maxRate = 0L // maximum download rate in bytes/sec; unlimited if <= 0
+    var maxBytes = 0L // max cache size; unlimited if <= 0
+
     private val inProgressSongIds = HashSet<Long>() // songs currently being downloaded
     private val pinnedSongIds = HashSet<Long>() // songs that shouldn't be purged
 
-    private lateinit var prefs: SharedPreferences
     private lateinit var musicDir: File // directory where music files are written
     private lateinit var db: FileCacheDatabase
     private var ready = false // true after [db] has been initialized
@@ -339,14 +339,6 @@ class FileCache constructor(
                 return DownloadStatus.FATAL_ERROR
             }
 
-            val maxBytesPerSecond =
-                java.lang.Long.valueOf(
-                    prefs.getString(
-                        NupPreferences.DOWNLOAD_RATE,
-                        NupPreferences.DOWNLOAD_RATE_DEFAULT
-                    )!!
-                ) * 1024
-
             val reporter = ProgressReporter(entry)
 
             try {
@@ -365,9 +357,8 @@ class FileCache constructor(
                     entry.incrementCachedBytes(bytesRead.toLong())
                     reporter.update(bytesWritten.toLong(), elapsedMs)
 
-                    if (maxBytesPerSecond > 0) {
-                        val expectedMs =
-                            (bytesWritten / maxBytesPerSecond.toFloat() * 1000).toLong()
+                    if (maxRate > 0) {
+                        val expectedMs = (bytesWritten / maxRate.toFloat() * 1000).toLong()
                         if (elapsedMs < expectedMs) SystemClock.sleep(expectedMs - elapsedMs)
                     }
                 }
@@ -481,19 +472,15 @@ class FileCache constructor(
      *
      * We delete the least-recently-accessed files first, ignoring ones
      * that are currently being downloaded or are pinned.
+     *
+     * @return true if the space is now available
      */
     @Synchronized private fun makeSpace(neededBytes: Long): Boolean {
         threadChecker.assertThread()
 
-        val maxBytes = java.lang.Long.valueOf(
-            prefs.getString(
-                NupPreferences.CACHE_SIZE,
-                NupPreferences.CACHE_SIZE_DEFAULT
-            )!!
-        ) * 1024 * 1024
+        if (maxBytes <= 0) return true
         var availableBytes = maxBytes - totalCachedBytes
         if (neededBytes <= availableBytes) return true
-
         Log.d(TAG, "Making space for $neededBytes bytes ($availableBytes available)")
 
         val songIds = db.songIdsByAge
@@ -562,7 +549,6 @@ class FileCache constructor(
         // Avoid hitting the disk on the main thread.
         // (Note that [waitUntilReady] will still hold everything up. :-/)
         executor.execute {
-            prefs = PreferenceManager.getDefaultSharedPreferences(context)
             wifiLock = (context.getSystemService(Context.WIFI_SERVICE) as WifiManager)
                 .createWifiLock(WifiManager.WIFI_MODE_FULL, context.getString(R.string.app_name))
             wifiLock.setReferenceCounted(false)
