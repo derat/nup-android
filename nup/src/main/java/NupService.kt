@@ -312,7 +312,9 @@ class NupService :
     override fun onDestroy() {
         Log.d(TAG, "Service destroyed")
         audioManager.abandonAudioFocusRequest(audioFocusReq)
-        prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
+        if (this::prefs.isInitialized) {
+            prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
+        }
         telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE)
         unregisterReceiver(broadcastReceiver)
         mediaSessionManager.release()
@@ -322,9 +324,9 @@ class NupService :
         CrashLogger.unregister()
     }
 
-    override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "Received start ID $startId: $intent")
-        when (intent.action) {
+        when (intent?.action) {
             ACTION_TOGGLE_PAUSE -> togglePause()
             ACTION_NEXT_TRACK -> playSongAtIndex(curSongIndex + 1)
             ACTION_PREV_TRACK -> playSongAtIndex(curSongIndex - 1)
