@@ -13,12 +13,10 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
-import android.content.SharedPreferences.OnSharedPreferenceChangeListener
 import android.graphics.Bitmap
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
-import android.media.AudioManager.OnAudioFocusChangeListener
 import android.media.session.MediaSession
 import android.net.Uri
 import android.os.Binder
@@ -109,6 +107,7 @@ class NupService :
     private var playbackComplete = false // done playing [curSong]
     private var reported = false // already reported playback of [curSong] to server
 
+    private var songsToPreload = 0
     private var downloadSongId: Long = -1 // ID of currently-downloading song
     private var downloadIndex = -1 // index into [songs] of currently-downloading song
     private var waitingForDownload = false // waiting for file to be download so we can play it
@@ -179,7 +178,7 @@ class NupService :
     }
 
     // Listen for changes to audio focus.
-    private val audioFocusListener = OnAudioFocusChangeListener { focusChange ->
+    private val audioFocusListener = AudioManager.OnAudioFocusChangeListener { focusChange ->
         when (focusChange) {
             AudioManager.AUDIOFOCUS_GAIN -> {
                 Log.d(TAG, "Gained audio focus")
@@ -195,10 +194,11 @@ class NupService :
         }
     }
 
-    private val prefsListener = OnSharedPreferenceChangeListener { prefs, key ->
-        if (key == NupPreferences.PRE_AMP_GAIN) {
-            player.preAmpGain =
-                prefs.getString(key, NupPreferences.PRE_AMP_GAIN_DEFAULT)!!.toDouble()
+    private val prefsListener = SharedPreferences.OnSharedPreferenceChangeListener {
+        prefs, key ->
+        run {
+            check(prefs == this@NupService.prefs) { "Wrong prefs $prefs" }
+            scope.launch(Dispatchers.Main) { applyPref(key) }
         }
     }
 
@@ -241,16 +241,8 @@ class NupService :
         filter.addAction(Intent.ACTION_USER_FOREGROUND)
         registerReceiver(broadcastReceiver, filter)
 
-        prefs = PreferenceManager.getDefaultSharedPreferences(this)
-        prefs.registerOnSharedPreferenceChangeListener(prefsListener)
-
-        downloader = Downloader(authenticator, prefs)
-
+        downloader = Downloader(authenticator)
         player = Player(this, this, mainExecutor, audioAttrs)
-        player.preAmpGain = prefs.getString(
-            NupPreferences.PRE_AMP_GAIN, NupPreferences.PRE_AMP_GAIN_DEFAULT
-        )!!.toDouble()
-
         cache = FileCache(this, this, mainExecutor, downloader, networkHelper)
         songDb = SongDatabase(this, this, mainExecutor, cache, downloader, networkHelper)
         coverLoader = CoverLoader(this, downloader, networkHelper)
@@ -260,6 +252,21 @@ class NupService :
             scope.launch(Dispatchers.IO) { playbackReporter.reportPending() }
         }
         // TODO: Listen for the network coming up and send pending reports then too?
+
+        // Read prefs on the IO thread to avoid blocking the UI.
+        scope.launch(Dispatchers.Main) {
+            prefs = async(Dispatchers.IO) {
+                PreferenceManager.getDefaultSharedPreferences(this@NupService)
+            }.await()
+            prefs.registerOnSharedPreferenceChangeListener(prefsListener)
+
+            // Load initial settings.
+            applyPref(NupPreferences.PASSWORD)
+            applyPref(NupPreferences.PRE_AMP_GAIN)
+            applyPref(NupPreferences.USERNAME)
+            applyPref(NupPreferences.SERVER_URL)
+            applyPref(NupPreferences.SONGS_TO_PRELOAD)
+        }
 
         mediaSessionManager = MediaSessionManager(
             this,
@@ -348,6 +355,25 @@ class NupService :
         val service: NupService
             get() = this@NupService
     }
+
+    /** Read and apply [key]. */
+    private suspend fun applyPref(key: String) {
+        when (key) {
+            NupPreferences.PASSWORD -> downloader.password = readPref(key, "")
+            NupPreferences.PRE_AMP_GAIN -> {
+                player.preAmpGain = readPref(key, NupPreferences.PRE_AMP_GAIN_DEFAULT).toDouble()
+            }
+            NupPreferences.USERNAME -> downloader.username = readPref(key, "")
+            NupPreferences.SERVER_URL -> downloader.server = readPref(key, "")
+            NupPreferences.SONGS_TO_PRELOAD -> {
+                songsToPreload = readPref(key, NupPreferences.SONGS_TO_PRELOAD_DEFAULT).toInt()
+            }
+        }
+    }
+
+    /** Return [key]'s value, falling back to [default]. */
+    private suspend fun readPref(key: String, default: String) =
+        scope.async(Dispatchers.IO) { prefs.getString(key, default)!! }.await()
 
     /** Updates the currently-displayed notification if needed.  */
     private fun updateNotification() {
@@ -751,12 +777,6 @@ class NupService :
             Log.e(TAG, "Aborting prefetch since download of song $downloadSongId is in progress")
             return
         }
-        val songsToPreload = Integer.valueOf(
-            prefs.getString(
-                NupPreferences.SONGS_TO_PRELOAD,
-                NupPreferences.SONGS_TO_PRELOAD_DEFAULT
-            ) ?: "0"
-        )
         var index = startIndex
         while (index < songs.size &&
             (shouldDownloadAll || index - curSongIndex <= songsToPreload)

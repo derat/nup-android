@@ -5,7 +5,6 @@
 
 package org.erat.nup
 
-import android.content.SharedPreferences
 import android.util.Base64
 import android.util.Log
 import java.io.BufferedReader
@@ -18,10 +17,7 @@ import javax.net.ssl.HttpsURLConnection
 
 /** Downloads HTTP resources. */
 // TODO: Make this non-open if possible after switching to Robolectric.
-open class Downloader(
-    private val authenticator: Authenticator,
-    private val prefs: SharedPreferences,
-) {
+open class Downloader(private val authenticator: Authenticator) {
     /* Thrown when the request couldn't be constructed because some preferences that we need are
      * either unset or incorrect. */
     class PrefException(reason: String?) : Exception(reason)
@@ -33,6 +29,11 @@ open class Downloader(
         /** Google account fetched using [Authenticator]. */
         STORAGE,
     }
+
+    // Configuration needed to perform downloads.
+    var username = ""
+    var password = ""
+    var server = ""
 
     /**
      * Start a download of [url].
@@ -64,8 +65,6 @@ open class Downloader(
 
         if (authType == AuthType.SERVER) {
             // Add Authorization header if username and password prefs are set.
-            val username = prefs.getString(NupPreferences.USERNAME, "") ?: ""
-            val password = prefs.getString(NupPreferences.PASSWORD, "") ?: ""
             if (!username.isEmpty() && !password.isEmpty()) {
                 conn.setRequestProperty(
                     "Authorization",
@@ -134,7 +133,6 @@ open class Downloader(
 
     @Throws(PrefException::class)
     fun getServerUrl(path: String): URL {
-        val server = prefs.getString(NupPreferences.SERVER_URL, "") ?: ""
         if (server.isEmpty()) throw PrefException("Server URL not configured")
 
         val serverUrl: URL = try {
