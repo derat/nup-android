@@ -31,9 +31,7 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.ListView
 import android.widget.TextView
-import org.erat.nup.SongDetailsDialog.createBundle
-import org.erat.nup.SongDetailsDialog.createDialog
-import org.erat.nup.SongDetailsDialog.prepareDialog
+import androidx.core.content.ContextCompat
 
 /** Main activity showing current song and playlist. */
 class NupActivity : Activity(), NupService.SongListener {
@@ -114,7 +112,7 @@ class NupActivity : Activity(), NupService.SongListener {
         _service?.unregisterListener(this)
 
         // Shut down the service as well if the playlist is empty.
-        val stopService = _service?.getSongs()?.isEmpty() ?: false
+        val stopService = _service?.songs?.isEmpty() ?: false
         unbindService(connection)
         if (stopService) stopService(Intent(this, NupService::class.java))
     }
@@ -126,11 +124,11 @@ class NupActivity : Activity(), NupService.SongListener {
             service.setSongListener(this@NupActivity)
 
             // Get current state from service.
-            onPlaylistChange(service.getSongs())
+            onPlaylistChange(service.songs)
             onPauseStateChange(service.paused)
             val song = curSong
-            if (song != null && song == service.currentSong) {
-                onSongPositionChange(song, service.currentSongLastPositionMs, 0)
+            if (song != null && song == service.curSong) {
+                onSongPositionChange(song, service.lastPosMs, 0)
                 playlistView.smoothScrollToPosition(curSongIndex)
             }
 
@@ -203,7 +201,7 @@ class NupActivity : Activity(), NupService.SongListener {
             this.songs = songs
             findViewById<View>(R.id.playlist_heading).visibility =
                 if (this.songs.isEmpty()) View.INVISIBLE else View.VISIBLE
-            setCurrentSong(service.currentSongIndex)
+            setCurrentSong(service.curSongIndex)
         }
     }
 
@@ -240,11 +238,7 @@ class NupActivity : Activity(), NupService.SongListener {
             titleLabel.text = song.title
             albumLabel.text = song.album
             timeLabel.text = formatDurationProgress(
-                if (song == service.currentSong) {
-                    service.currentSongLastPositionMs / 1000
-                } else {
-                    0
-                },
+                if (song == service.curSong) service.lastPosMs / 1000 else 0,
                 song.lengthSec
             )
             downloadStatusLabel.text = ""
@@ -350,24 +344,18 @@ class NupActivity : Activity(), NupService.SongListener {
 
             val currentlyPlaying = position == curSongIndex
             view.setBackgroundColor(
-                resources
-                    .getColor(
-                        if (currentlyPlaying) R.color.primary else android.R.color.transparent
-                    )
+                ContextCompat.getColor(
+                    this@NupActivity,
+                    if (currentlyPlaying) R.color.primary else android.R.color.transparent
+                )
             )
+            val textColor = ContextCompat.getColor(
+                this@NupActivity, if (currentlyPlaying) R.color.icons else R.color.primary_text
+            )
+            artistView.setTextColor(textColor)
+            titleView.setTextColor(textColor)
+            percentView.setTextColor(textColor)
 
-            artistView.setTextColor(
-                resources
-                    .getColor(if (currentlyPlaying) R.color.icons else R.color.primary_text)
-            )
-            titleView.setTextColor(
-                resources
-                    .getColor(if (currentlyPlaying) R.color.icons else R.color.primary_text)
-            )
-            percentView.setTextColor(
-                resources
-                    .getColor(if (currentlyPlaying) R.color.icons else R.color.primary_text)
-            )
             return view
         }
     }
@@ -405,7 +393,10 @@ class NupActivity : Activity(), NupService.SongListener {
                 true
             }
             MENU_ITEM_SONG_DETAILS -> {
-                showDialog(DIALOG_SONG_DETAILS, createBundle(songs[info.position]))
+                showDialog(
+                    DIALOG_SONG_DETAILS,
+                    SongDetailsDialog.createBundle(songs[info.position])
+                )
                 true
             }
             else -> false
@@ -413,12 +404,12 @@ class NupActivity : Activity(), NupService.SongListener {
     }
 
     override fun onCreateDialog(id: Int, args: Bundle): Dialog? {
-        return if (id == DIALOG_SONG_DETAILS) createDialog(this) else null
+        return if (id == DIALOG_SONG_DETAILS) SongDetailsDialog.createDialog(this) else null
     }
 
     override fun onPrepareDialog(id: Int, dialog: Dialog, args: Bundle) {
         super.onPrepareDialog(id, dialog, args)
-        if (id == DIALOG_SONG_DETAILS) prepareDialog(dialog, args)
+        if (id == DIALOG_SONG_DETAILS) SongDetailsDialog.prepareDialog(dialog, args)
     }
 
     /** Shows the song at [index] as current in the UI. */

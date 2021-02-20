@@ -82,28 +82,35 @@ class NupService :
     private lateinit var networkHelper: NetworkHelper
     private lateinit var audioManager: AudioManager
     private lateinit var audioAttrs: AudioAttributes
+    private lateinit var audioFocusReq: AudioFocusRequest
     private lateinit var telephonyManager: TelephonyManager
     private lateinit var prefs: SharedPreferences
 
     private val songIdToSong = HashMap<Long, Song>() // canonical [Song]s indexed by ID
+    private val _songs = mutableListOf<Song>() // current playlist
+    public val songs: List<Song> get() = _songs
 
-    // TODO: Rename to _songs and replace getSongs() with a getter.
-    private val songs = ArrayList<Song>() // current playlist
-    var currentSongIndex = -1 // index into [songs]
+    var curSongIndex = -1 // index into [_songs]
         private set
-    var currentSongLastPositionMs = 0 // last playback position for current song
+    var lastPosMs = 0 // last playback position for current song
         private set
-    private var currentFile: File? = null // local path of current song
-    private var currentSongStartDate: Date? = null // time at which current song was started
-    private var currentSongPlayedMs: Long = 0 // total time spent playing current song
+
+    val curSong: Song?
+        get() = if (curSongIndex in 0..(songs.size - 1)) songs[curSongIndex] else null
+    val nextSong: Song?
+        get() = if (curSongIndex in 0..(songs.size - 2)) songs[curSongIndex + 1] else null
+
+    private var curFile: File? = null // local path of [curSong]
+    private var playStart: Date? = null // time at which [curSong] was started
+    private var playedMs: Long = 0 // total time spent playing [curSong]
 
     var paused = false // playback currently paused
         private set
-    private var playbackComplete = false // done playing current song
-    private var reportedCurrentSong = false // already reported playback of current song to server
+    private var playbackComplete = false // done playing [curSong]
+    private var reported = false // already reported playback of [curSong] to server
 
-    private var downloadSongId: Long = -1 // ID of currently-downloaded song
-    private var downloadIndex = -1 // index into [songs] of currently-downloaded song
+    private var downloadSongId: Long = -1 // ID of currently-downloading song
+    private var downloadIndex = -1 // index into [songs] of currently-downloading song
     private var waitingForDownload = false // waiting for file to be download so we can play it
 
     /** Download all queued songs instead of honoring pref. */
@@ -112,7 +119,7 @@ class NupService :
             if (value != shouldDownloadAll) {
                 field = value
                 if (!songs.isEmpty() && shouldDownloadAll && downloadSongId == -1L) {
-                    maybeDownloadAnotherSong(if (currentSongIndex >= 0) currentSongIndex else 0)
+                    maybeDownloadAnotherSong(if (curSongIndex >= 0) curSongIndex else 0)
                 }
             }
         }
@@ -120,7 +127,7 @@ class NupService :
     private val songCoverFetches = HashSet<Song>() // songs whose covers are being fetched
     private val songsWithCovers = mutableListOf<Song>() // songs whose covers are in-memory
 
-    private var lastUserSwitchTime: Date? = null // time when user was last fore/backgrounded
+    private var lastUserSwitch: Date? = null // time when user was last fore/backgrounded
 
     // Pause when phone calls arrive.
     private val phoneStateListener: PhoneStateListener = object : PhoneStateListener() {
@@ -150,10 +157,10 @@ class NupService :
                 // sent due to headphones being unplugged (why?), so that doesn't seem to
                 // help for ignoring this. Instead, ignore these intents for a brief period
                 // after user-switch broadcast intents.
-                val last = lastUserSwitchTime
+                val last = lastUserSwitch
                 val userSwitchedRecently = last == null ||
                     Date().time - last.time <= IGNORE_NOISY_AUDIO_AFTER_USER_SWITCH_MS
-                if (currentSongIndex >= 0 && !paused && !userSwitchedRecently) {
+                if (curSongIndex >= 0 && !paused && !userSwitchedRecently) {
                     player.pause()
                     Toast.makeText(
                         this@NupService,
@@ -163,10 +170,10 @@ class NupService :
                 }
             } else if (Intent.ACTION_USER_BACKGROUND == intent.action) {
                 Log.d(TAG, "User is backgrounded")
-                lastUserSwitchTime = Date()
+                lastUserSwitch = Date()
             } else if (Intent.ACTION_USER_FOREGROUND == intent.action) {
                 Log.d(TAG, "User is foregrounded")
-                lastUserSwitchTime = Date()
+                lastUserSwitch = Date()
             }
         }
     }
@@ -218,12 +225,11 @@ class NupService :
             .setUsage(AudioAttributes.USAGE_MEDIA)
             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
             .build()
-        val result = audioManager.requestAudioFocus(
-            AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-                .setOnAudioFocusChangeListener(audioFocusListener)
-                .setAudioAttributes(audioAttrs)
-                .build()
-        )
+        audioFocusReq = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+            .setOnAudioFocusChangeListener(audioFocusListener)
+            .setAudioAttributes(audioAttrs)
+            .build()
+        val result = audioManager.requestAudioFocus(audioFocusReq)
         Log.d(TAG, "Requested audio focus; got $result")
 
         telephonyManager = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
@@ -260,8 +266,8 @@ class NupService :
             object : MediaSession.Callback() {
                 override fun onPause() { player.pause() }
                 override fun onPlay() { player.unpause() }
-                override fun onSkipToNext() { playSongAtIndex(currentSongIndex + 1) }
-                override fun onSkipToPrevious() { playSongAtIndex(currentSongIndex - 1) }
+                override fun onSkipToNext() { playSongAtIndex(curSongIndex + 1) }
+                override fun onSkipToPrevious() { playSongAtIndex(curSongIndex - 1) }
                 override fun onStop() { player.pause() }
             }
         )
@@ -285,10 +291,10 @@ class NupService :
         )
         val notification = notificationCreator.createNotification(
             false,
-            currentSong,
+            curSong,
             paused,
             playbackComplete,
-            currentSongIndex,
+            curSongIndex,
             songs.size
         )
         startForeground(NOTIFICATION_ID, notification)
@@ -296,7 +302,7 @@ class NupService :
 
     override fun onDestroy() {
         Log.d(TAG, "Service destroyed")
-        audioManager.abandonAudioFocus(audioFocusListener)
+        audioManager.abandonAudioFocusRequest(audioFocusReq)
         prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
         telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE)
         unregisterReceiver(broadcastReceiver)
@@ -311,20 +317,13 @@ class NupService :
         Log.d(TAG, "Received start ID $startId: $intent")
         when (intent.action) {
             ACTION_TOGGLE_PAUSE -> togglePause()
-            ACTION_NEXT_TRACK -> playSongAtIndex(currentSongIndex + 1)
-            ACTION_PREV_TRACK -> playSongAtIndex(currentSongIndex - 1)
+            ACTION_NEXT_TRACK -> playSongAtIndex(curSongIndex + 1)
+            ACTION_PREV_TRACK -> playSongAtIndex(curSongIndex - 1)
         }
         return START_STICKY
     }
 
     override fun onBind(intent: Intent): IBinder? { return binder }
-
-    fun getSongs(): List<Song> { return songs }
-
-    val currentSong: Song?
-        get() = if (currentSongIndex in 0..(songs.size - 1)) songs[currentSongIndex] else null
-    val nextSong: Song?
-        get() = if (currentSongIndex in 0..(songs.size - 2)) songs[currentSongIndex + 1] else null
 
     fun setSongListener(listener: SongListener?) { songListener = listener }
 
@@ -354,10 +353,10 @@ class NupService :
     private fun updateNotification() {
         val notification = notificationCreator.createNotification(
             true,
-            currentSong,
+            curSong,
             paused,
             playbackComplete,
-            currentSongIndex,
+            curSongIndex,
             songs.size
         )
         if (notification != null) notificationManager.notify(NOTIFICATION_ID, notification)
@@ -375,7 +374,7 @@ class NupService :
         addSongsToPlaylist(ArrayList(Arrays.asList(song)), play)
     }
     fun addSongsToPlaylist(newSongs: List<Song>, forcePlay: Boolean) {
-        val index = currentSongIndex
+        val index = curSongIndex
         val alreadyPlayed = insertSongs(newSongs, if (index < 0) 0 else index + 1)
         if (forcePlay && !alreadyPlayed) playSongAtIndex(if (index < 0) 0 else index + 1)
     }
@@ -389,12 +388,12 @@ class NupService :
 
         var removedPlaying = false
         for (numToRemove in (last - first + 1) downTo 1) {
-            songs.removeAt(first)
-            if (currentSongIndex == first) {
+            _songs.removeAt(first)
+            if (curSongIndex == first) {
                 removedPlaying = true
                 stopPlaying()
-            } else if (currentSongIndex > first) {
-                currentSongIndex--
+            } else if (curSongIndex > first) {
+                curSongIndex--
             }
             if (downloadIndex == first) {
                 cache.abortDownload(downloadSongId)
@@ -406,18 +405,18 @@ class NupService :
         }
 
         if (removedPlaying) {
-            if (!songs.isEmpty() && currentSongIndex < songs.size) {
-                playSongAtIndex(currentSongIndex)
+            if (!songs.isEmpty() && curSongIndex < songs.size) {
+                playSongAtIndex(curSongIndex)
             } else {
-                currentSongIndex = -1
+                curSongIndex = -1
                 mediaSessionManager.updateSong(null)
                 updatePlaybackState()
             }
         }
 
         // Maybe the e.g. now-next-to-be-played song isn't downloaded yet.
-        if (downloadSongId == -1L && !songs.isEmpty() && currentSongIndex < songs.size - 1) {
-            maybeDownloadAnotherSong(currentSongIndex + 1)
+        if (downloadSongId == -1L && !songs.isEmpty() && curSongIndex < songs.size - 1) {
+            maybeDownloadAnotherSong(curSongIndex + 1)
         }
 
         songListener?.onPlaylistChange(songs)
@@ -429,14 +428,13 @@ class NupService :
     fun playSongAtIndex(index: Int) {
         if (index < 0 || index >= songs.size) return
 
-        currentSongIndex = index
+        curSongIndex = index
+        val song = curSong!!
 
-        val song = currentSong!!
-
-        currentSongStartDate = null
-        currentSongLastPositionMs = 0
-        currentSongPlayedMs = 0
-        reportedCurrentSong = false
+        playStart = null
+        lastPosMs = 0
+        playedMs = 0
+        reported = false
         playbackComplete = false
         cache.clearPinnedSongIds()
 
@@ -455,7 +453,7 @@ class NupService :
                 downloadSongId = -1
                 downloadIndex = -1
             }
-            maybeDownloadAnotherSong(currentSongIndex + 1)
+            maybeDownloadAnotherSong(curSongIndex + 1)
         } else {
             // Otherwise, start downloading it if we've never tried downloading it before,
             // or if we have but it's not currently being downloaded.
@@ -464,7 +462,7 @@ class NupService :
                 if (downloadSongId != -1L) cache.abortDownload(downloadSongId)
                 cache.downloadSong(song)
                 downloadSongId = song.id
-                downloadIndex = currentSongIndex
+                downloadIndex = curSongIndex
             }
             waitingForDownload = true
             updatePlaybackState()
@@ -485,12 +483,12 @@ class NupService :
         updateNotification()
         mediaSessionManager.updateSong(song)
         updatePlaybackState()
-        songListener?.onSongChange(song, currentSongIndex)
+        songListener?.onSongChange(song, curSongIndex)
     }
 
     /** Stop playing the current song, if any. */
     fun stopPlaying() {
-        currentFile = null
+        curFile = null
         player.abortPlayback()
     }
 
@@ -508,7 +506,7 @@ class NupService :
 
             if (song.coverBitmap != null) {
                 songListener?.onSongCoverLoad(song)
-                if (song == currentSong) {
+                if (song == curSong) {
                     updateNotification()
                     mediaSessionManager.updateSong(song)
                 }
@@ -525,29 +523,29 @@ class NupService :
         playbackComplete = true
         updateNotification()
         updatePlaybackState()
-        if (currentSongIndex < songs.size - 1) playSongAtIndex(currentSongIndex + 1)
+        if (curSongIndex < songs.size - 1) playSongAtIndex(curSongIndex + 1)
     }
 
     override fun onPlaybackPositionChange(file: File, positionMs: Int, durationMs: Int) {
         assertOnMainThread()
-        if (file != currentFile) return
-        val song = currentSong!!
+        if (file != curFile) return
+        val song = curSong!!
         songListener?.onSongPositionChange(song, positionMs, durationMs)
-        val elapsed = positionMs - currentSongLastPositionMs
+        val elapsed = positionMs - lastPosMs
         if (elapsed > 0 && elapsed <= MAX_POSITION_REPORT_MS) {
-            currentSongPlayedMs += elapsed.toLong()
+            playedMs += elapsed.toLong()
             // TODO: Add a currentSongReportThresholdMs or similar member to simplify this.
-            if (!reportedCurrentSong && (
-                currentSongPlayedMs >= Math.max(durationMs, song.lengthSec * 1000) / 2 ||
-                    currentSongPlayedMs >= REPORT_PLAYBACK_THRESHOLD_MS
+            if (!reported && (
+                playedMs >= Math.max(durationMs, song.lengthSec * 1000) / 2 ||
+                    playedMs >= REPORT_PLAYBACK_THRESHOLD_MS
                 )
             ) {
-                val start = currentSongStartDate!!
+                val start = playStart!!
                 scope.launch(Dispatchers.IO) { playbackReporter.report(song.id, start) }
-                reportedCurrentSong = true
+                reported = true
             }
         }
-        currentSongLastPositionMs = positionMs
+        lastPosMs = positionMs
         updatePlaybackState()
     }
 
@@ -594,7 +592,7 @@ class NupService :
         song.updateBytes(entry)
         songDb.handleSongCached(song.id)
 
-        if (song == currentSong && waitingForDownload) {
+        if (song == curSong && waitingForDownload) {
             waitingForDownload = false
             playCacheEntry(entry)
         } else if (song == nextSong) {
@@ -620,7 +618,7 @@ class NupService :
 
         val song = songIdToSong[entry.songId] ?: return
         song.updateBytes(entry)
-        if (song == currentSong) {
+        if (song == curSong) {
             if (waitingForDownload &&
                 canPlaySong(entry, downloadedBytes, elapsedMs, song.lengthSec)
             ) {
@@ -681,8 +679,8 @@ class NupService :
             }
         }
 
-        songs.addAll(index, resSongs)
-        if (currentSongIndex >= 0 && index <= currentSongIndex) currentSongIndex += resSongs.size
+        _songs.addAll(index, resSongs)
+        if (curSongIndex >= 0 && index <= curSongIndex) curSongIndex += resSongs.size
         if (downloadIndex >= 0 && index <= downloadIndex) downloadIndex += resSongs.size
 
         songListener?.onPlaylistChange(songs)
@@ -698,14 +696,14 @@ class NupService :
         var played = false
         when {
             // If we didn't have any songs, then start playing the first one we added.
-            currentSongIndex == -1 -> {
+            curSongIndex == -1 -> {
                 playSongAtIndex(0)
                 played = true
             }
             // If we were previously done playing (because we reached the end of the playlist),
             // then start playing the first song we added.
-            currentSongIndex < songs.size - 1 && playbackComplete -> {
-                playSongAtIndex(currentSongIndex + 1)
+            curSongIndex < songs.size - 1 && playbackComplete -> {
+                playSongAtIndex(curSongIndex + 1)
                 played = true
             }
             // Otherwise, consider downloading the new songs if we're not already downloading
@@ -732,14 +730,14 @@ class NupService :
 
     /** Play [entry] . */
     private fun playCacheEntry(entry: FileCacheEntry) {
-        val song = currentSong ?: return
+        val song = curSong ?: return
         if (song.id != entry.songId) {
             Log.e(TAG, "Cache entry ${entry.songId} doesn't match current song ${song.id}")
             return
         }
-        currentFile = entry.file
+        curFile = entry.file
         player.playFile(entry.file, entry.totalBytes, song.albumGain, song.peakAmp)
-        currentSongStartDate = Date()
+        playStart = Date()
         cache.updateLastAccessTime(entry.songId)
         updateNotification()
         updatePlaybackState()
@@ -761,7 +759,7 @@ class NupService :
         )
         var index = startIndex
         while (index < songs.size &&
-            (shouldDownloadAll || index - currentSongIndex <= songsToPreload)
+            (shouldDownloadAll || index - curSongIndex <= songsToPreload)
         ) {
             val song = songs[index]
             var entry = cache.getEntry(song.id)
@@ -814,12 +812,12 @@ class NupService :
     /** Notify [mediaSessionManager] about the current playback state. */
     private fun updatePlaybackState() {
         mediaSessionManager.updatePlaybackState(
-            currentSong,
+            curSong,
             paused,
             playbackComplete,
             waitingForDownload,
-            currentSongLastPositionMs.toLong(),
-            currentSongIndex,
+            lastPosMs.toLong(),
+            curSongIndex,
             songs.size
         )
     }
