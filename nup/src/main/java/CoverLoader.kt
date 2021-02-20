@@ -5,6 +5,7 @@
 
 package org.erat.nup
 
+import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.util.Log
@@ -12,21 +13,27 @@ import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.launch
 
 /** CoverLoader loads and caches album art. */
 open class CoverLoader(
-    private val coverDir: File,
+    context: Context,
     private val downloader: Downloader,
     private val networkHelper: NetworkHelper,
 ) {
-    // Guards [filesBeingLoaded].
-    private val lock = ReentrantLock()
-    // Signaled when a change has been made to [filesBeingLoaded].
-    private val loadFinishedCond = lock.newCondition()
-    // Names of cover files that we're currently fetching.
-    private val filesBeingLoaded = HashSet<String>()
+    private lateinit var coverDir: File // dir where files are cached
+    private var ready = false // true after [coverDir] has been initialized
+    private val readyLock: Lock = ReentrantLock() // guards [ready]
+    private val readyCond = readyLock.newCondition() // signaled when [ready] becomes true
+
+    private val filesBeingLoaded = mutableSetOf<String>() // names of files being fetched
+    private val loadLock = ReentrantLock() // guards [filesBeingLoaded]
+    private val loadFinishedCond = loadLock.newCondition() // signaled for [filesBeingLoaded]
 
     // The last cover that we've loaded. We store it here so that we can reuse the already-loaded
     // bitmap in the common case where we're playing an album and need the same cover over and over.
@@ -35,15 +42,15 @@ open class CoverLoader(
     private val lastLock = ReentrantLock()
 
     /**
-     * Load the cover at [url].
+     * Synchronously load the cover at [url].
      *
      * Tries to find the cover locally first; then goes to the server.
      *
      * @return cover image or null if unavailable
      */
     suspend fun loadCover(url: URL): Bitmap? {
-        // Ensure that the cover dir exists.
-        coverDir.mkdirs()
+        waitUntilReady() // wait for [coverDir]
+
         var file = lookForLocalCover(url)
         if (file != null) {
             Log.d(TAG, "Found local file ${file.name}")
@@ -62,7 +69,7 @@ open class CoverLoader(
         }
     }
 
-    private fun lookForLocalCover(url: URL): File? {
+    private suspend fun lookForLocalCover(url: URL): File? {
         val filename = getFilenameForUrl(url)
         startLoad(filename)
         try {
@@ -74,7 +81,7 @@ open class CoverLoader(
         return null
     }
 
-    private fun downloadCover(url: URL): File? {
+    private suspend fun downloadCover(url: URL): File? {
         if (!networkHelper.isNetworkAvailable) return null
 
         val localFilename = getFilenameForUrl(url)
@@ -115,7 +122,7 @@ open class CoverLoader(
     // a remote file. Waits until [filename] isn't in [filesBeingLoaded] and then adds it. Must be
     // matched by a call to [finishLoad].
     private fun startLoad(filename: String) {
-        lock.withLock {
+        loadLock.withLock {
             while (filesBeingLoaded.contains(filename)) loadFinishedCond.await()
             filesBeingLoaded.add(filename)
         }
@@ -125,7 +132,7 @@ open class CoverLoader(
     // successfully or unsuccessfully -- if unsuccessful, be sure to remove the file first so that
     // other threads don't try to use it).
     private fun finishLoad(filename: String) {
-        lock.withLock {
+        loadLock.withLock {
             if (!filesBeingLoaded.contains(filename)) {
                 throw RuntimeException("Got report of finished load of unknown file $filename")
             }
@@ -134,10 +141,28 @@ open class CoverLoader(
         }
     }
 
+    /** Wait until [ready] becomes true. */
+    private fun waitUntilReady() {
+        readyLock.withLock { while (!ready) readyCond.await() }
+    }
+
     /** Decode the bitmap at the given path. */
     open fun decodeFile(path: String): Bitmap? = BitmapFactory.decodeFile(path)
 
     companion object {
         private const val TAG = "CoverLoader"
+        private const val DIR_NAME = "covers"
+    }
+
+    init {
+        // [externalCacheDir] hits the disk, so do it in the background.
+        GlobalScope.launch(Dispatchers.IO) {
+            coverDir = File(context.externalCacheDir, DIR_NAME)
+            coverDir.mkdirs()
+            readyLock.withLock {
+                ready = true
+                readyCond.signal()
+            }
+        }
     }
 }

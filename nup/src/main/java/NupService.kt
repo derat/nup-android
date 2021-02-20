@@ -23,11 +23,11 @@ import android.media.session.MediaSession
 import android.net.Uri
 import android.os.Binder
 import android.os.IBinder
-import android.preference.PreferenceManager
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 import android.util.Log
 import android.widget.Toast
+import androidx.preference.PreferenceManager
 import java.io.File
 import java.util.Arrays
 import java.util.Date
@@ -253,7 +253,7 @@ class NupService :
 
         cache = FileCache(this, this, mainExecutor, downloader, networkHelper)
         songDb = SongDatabase(this, this, mainExecutor, cache, downloader, networkHelper)
-        coverLoader = CoverLoader(File(externalCacheDir, COVER_DIR_NAME), downloader, networkHelper)
+        coverLoader = CoverLoader(this, downloader, networkHelper)
 
         playbackReporter = PlaybackReporter(songDb, downloader, networkHelper)
         if (networkHelper.isNetworkAvailable) {
@@ -829,7 +829,6 @@ class NupService :
         private const val MIN_BYTES_BEFORE_PLAYING = 128 * 1024L // bytes needed before playing
         private const val EXTRA_BUFFER_MS = 10 * 1000L // headroom needed to play song
         private const val MAX_LOADED_COVERS = 3 // max number of cover bitmaps to keep in memory
-        private const val COVER_DIR_NAME = "covers" // cache subdir where cover images are stored
         private const val CRASH_DIR_NAME = "crashes" // files subdir where crashes are written
         private const val MAX_POSITION_REPORT_MS = 5 * 1000L // threshold for playback updates
         private const val REPORT_PLAYBACK_THRESHOLD_MS = 240 * 1000L // reporting threshold

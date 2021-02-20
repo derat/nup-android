@@ -6,13 +6,14 @@
 package org.erat.nup.test
 
 import android.graphics.Bitmap
-import com.google.common.io.Files
+import android.test.mock.MockContext
 import java.io.BufferedReader
+import java.io.ByteArrayInputStream
 import java.io.File
 import java.io.IOException
-import java.io.StringBufferInputStream
 import java.net.HttpURLConnection
 import java.net.URL
+import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
 import org.erat.nup.CoverLoader
 import org.erat.nup.Downloader
@@ -30,14 +31,19 @@ class CoverLoaderTest {
     lateinit var coverLoader: CoverLoader
     lateinit var bitmapDataMap: HashMap<String, Bitmap>
 
+    @Mock lateinit var context: MockContext
     @Mock lateinit var downloader: Downloader
     @Mock lateinit var networkHelper: NetworkHelper
 
     @Before fun setUp() {
         MockitoAnnotations.initMocks(this)
-        tempDir = Files.createTempDir()
+
+        tempDir = Files.createTempDirectory(null).toFile()
+        tempDir.deleteOnExit()
+        Mockito.`when`(context.externalCacheDir).thenReturn(tempDir)
+
         bitmapDataMap = HashMap()
-        coverLoader = object : CoverLoader(tempDir, downloader, networkHelper) {
+        coverLoader = object : CoverLoader(context, downloader, networkHelper) {
             override fun decodeFile(path: String): Bitmap? {
                 return try {
                     val fileData = File(path)
@@ -127,7 +133,9 @@ class CoverLoaderTest {
     fun createConnection(statusCode: Int, data: String?): HttpURLConnection {
         val conn = Mockito.mock(HttpURLConnection::class.java)
         Mockito.`when`(conn.responseCode).thenReturn(statusCode)
-        if (data != null) Mockito.`when`(conn.inputStream).thenReturn(StringBufferInputStream(data))
+        if (data != null) {
+            Mockito.`when`(conn.inputStream).thenReturn(ByteArrayInputStream(data.toByteArray()))
+        }
         return conn
     }
 
