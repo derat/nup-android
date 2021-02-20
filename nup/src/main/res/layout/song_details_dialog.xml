@@ -1,72 +1,37 @@
-<TableLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:layout_width="wrap_content"
-    android:layout_height="wrap_content"
-    android:shrinkColumns="1"
-    android:padding="10dp"
-    >
+<TableLayout
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  android:layout_width="wrap_content"
+  android:layout_height="wrap_content"
+  android:shrinkColumns="1"
+  android:padding="10dp"
+>
   <TableRow>
-    <TextView
-        style="@style/SongDetailsLabel"
-        android:text="@string/artist_colon"
-        />
-    <TextView
-        android:id="@+id/artist"
-        style="@style/SongDetailsValue"
-        />
+    <TextView style="@style/SongDetailsLabel" android:text="@string/artist_colon" />
+    <TextView android:id="@+id/artist" style="@style/SongDetailsValue" />
   </TableRow>
 
   <TableRow>
-    <TextView
-        style="@style/SongDetailsLabel"
-        android:text="@string/title_colon"
-        />
-    <TextView
-        android:id="@+id/title"
-        style="@style/SongDetailsValue"
-        />
+    <TextView style="@style/SongDetailsLabel" android:text="@string/title_colon" />
+    <TextView android:id="@+id/title" style="@style/SongDetailsValue" />
   </TableRow>
 
   <TableRow>
-    <TextView
-        style="@style/SongDetailsLabel"
-        android:text="@string/album_colon"
-        />
-    <TextView
-        android:id="@+id/album"
-        style="@style/SongDetailsValue"
-        />
+    <TextView style="@style/SongDetailsLabel" android:text="@string/album_colon" />
+    <TextView android:id="@+id/album" style="@style/SongDetailsValue" />
   </TableRow>
 
   <TableRow>
-    <TextView
-        style="@style/SongDetailsLabel"
-        android:text="@string/track_colon"
-        />
-    <TextView
-        android:id="@+id/track"
-        style="@style/SongDetailsValue"
-        />
+    <TextView style="@style/SongDetailsLabel" android:text="@string/track_colon" />
+    <TextView android:id="@+id/track" style="@style/SongDetailsValue" />
   </TableRow>
 
   <TableRow>
-    <TextView
-        style="@style/SongDetailsLabel"
-        android:text="@string/length_colon"
-        />
-    <TextView
-        android:id="@+id/length"
-        style="@style/SongDetailsValue"
-        />
+    <TextView style="@style/SongDetailsLabel" android:text="@string/length_colon" />
+    <TextView android:id="@+id/length" style="@style/SongDetailsValue" />
   </TableRow>
 
   <TableRow>
-    <TextView
-        style="@style/SongDetailsLabel"
-        android:text="@string/rating_colon"
-        />
-    <TextView
-        android:id="@+id/rating"
-        style="@style/SongDetailsValue"
-        />
+    <TextView style="@style/SongDetailsLabel" android:text="@string/rating_colon" />
+    <TextView android:id="@+id/rating" style="@style/SongDetailsValue" />
   </TableRow>
 </TableLayout>

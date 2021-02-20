@@ -1,67 +1,68 @@
-<?xml version="1.0" encoding="utf-8"?>
-<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
-    android:layout_width="fill_parent"
-    android:layout_height="fill_parent"
-    >
+<?xml version="1.0" encoding="utf-8" ?>
+<LinearLayout
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  android:orientation="vertical"
+  android:layout_width="fill_parent"
+  android:layout_height="fill_parent"
+>
   <LinearLayout
-      android:orientation="horizontal"
-      android:layout_width="fill_parent"
-      android:layout_height="wrap_content"
-      android:paddingLeft="@dimen/grid2"
-      android:paddingRight="@dimen/grid2"
-      android:paddingTop="@dimen/grid2"
-      android:paddingBottom="@dimen/grid1"
-      android:background="@color/background"
-      android:elevation="@dimen/height1"
-      >
+    android:orientation="horizontal"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:paddingLeft="@dimen/grid2"
+    android:paddingRight="@dimen/grid2"
+    android:paddingTop="@dimen/grid2"
+    android:paddingBottom="@dimen/grid1"
+    android:background="@color/background"
+    android:elevation="@dimen/height1"
+  >
     <Button
-        android:id="@+id/append_button"
-        style="@style/Button"
-        android:text="@string/append"
-        android:onClick="onAppendButtonClicked"
-        />
+      android:id="@+id/append_button"
+      style="@style/Button"
+      android:text="@string/append"
+      android:onClick="onAppendButtonClicked"
+    />
     <Button
-        android:id="@+id/insert_button"
-        style="@style/Button"
-        android:text="@string/insert"
-        android:onClick="onInsertButtonClicked"
-        />
+      android:id="@+id/insert_button"
+      style="@style/Button"
+      android:text="@string/insert"
+      android:onClick="onInsertButtonClicked"
+    />
     <Button
-        android:id="@+id/replace_button"
-        style="@style/Button"
-        android:text="@string/replace"
-        android:onClick="onReplaceButtonClicked"
-        />
+      android:id="@+id/replace_button"
+      style="@style/Button"
+      android:text="@string/replace"
+      android:onClick="onReplaceButtonClicked"
+    />
   </LinearLayout>
 
   <LinearLayout
-      android:id="@+id/results_heading"
-      android:orientation="horizontal"
-      android:layout_width="fill_parent"
-      android:layout_height="wrap_content"
-      android:paddingLeft="@dimen/grid2"
-      android:paddingRight="@dimen/grid2"
-      android:background="@color/background"
-      android:elevation="@dimen/height1"
-      >
+    android:id="@+id/results_heading"
+    android:orientation="horizontal"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:paddingLeft="@dimen/grid2"
+    android:paddingRight="@dimen/grid2"
+    android:background="@color/background"
+    android:elevation="@dimen/height1"
+  >
     <TextView
-        style="@style/SongListArtist"
-        android:text="@string/artist"
-        android:textStyle="bold"
-        />
+      style="@style/SongListArtist"
+      android:text="@string/artist"
+      android:textStyle="bold"
+    />
     <TextView
-        style="@style/SongListTitle"
-        android:layout_weight="2"
-        android:text="@string/title"
-        android:textStyle="bold"
-        />
+      style="@style/SongListTitle"
+      android:layout_weight="2"
+      android:text="@string/title"
+      android:textStyle="bold"
+    />
   </LinearLayout>
 
   <ListView
-      android:id="@+id/results"
-      android:layout_width="fill_parent"
-      android:layout_height="fill_parent"
-      android:divider="@android:color/transparent"
-      />
+    android:id="@+id/results"
+    android:layout_width="fill_parent"
+    android:layout_height="fill_parent"
+    android:divider="@android:color/transparent"
+  />
 </LinearLayout>

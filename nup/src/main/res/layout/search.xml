@@ -1,117 +1,116 @@
-<?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="vertical"
-    android:layout_width="fill_parent"
-    android:layout_height="fill_parent"
-    >
+<?xml version="1.0" encoding="utf-8" ?>
+<RelativeLayout
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  android:orientation="vertical"
+  android:layout_width="fill_parent"
+  android:layout_height="fill_parent"
+>
   <ScrollView
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:layout_alignParentTop="true"
+  >
+    <LinearLayout
+      xmlns:android="http://schemas.android.com/apk/res/android"
+      android:orientation="vertical"
       android:layout_width="fill_parent"
       android:layout_height="wrap_content"
-      android:layout_alignParentTop="true"
-      >
-    <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
-        android:orientation="vertical"
-        android:layout_width="fill_parent"
+      android:padding="@dimen/grid2"
+    >
+      <TextView
+        android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:padding="@dimen/grid2"
-        >
-      <TextView
-          android:layout_width="wrap_content"
-          android:layout_height="wrap_content"
-          android:text="@string/artist"
-          />
+        android:text="@string/artist"
+      />
       <AutoCompleteTextView
-          android:id="@+id/artist_edit_text"
-          style="@style/SearchTextField"
-          android:completionThreshold="1"
-          />
+        android:id="@+id/artist_edit_text"
+        style="@style/SearchTextField"
+        android:completionThreshold="1"
+      />
       <TextView
-          android:layout_width="wrap_content"
-          android:layout_height="wrap_content"
-          android:text="@string/title"
-          />
-      <EditText
-          android:id="@+id/title_edit_text"
-          style="@style/SearchTextField"
-          />
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/title"
+      />
+      <EditText android:id="@+id/title_edit_text" style="@style/SearchTextField" />
       <TextView
-          android:layout_width="wrap_content"
-          android:layout_height="wrap_content"
-          android:text="@string/album"
-          />
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="@string/album"
+      />
       <AutoCompleteTextView
-          android:id="@+id/album_edit_text"
-          style="@style/SearchTextField"
-          android:completionThreshold="1"
-          />
+        android:id="@+id/album_edit_text"
+        style="@style/SearchTextField"
+        android:completionThreshold="1"
+      />
 
       <LinearLayout
-          android:orientation="horizontal"
-          android:layout_width="fill_parent"
-          android:layout_height="wrap_content"
-          >
+        android:orientation="horizontal"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+      >
         <CheckBox
-            android:id="@+id/substring_checkbox"
-            style="@style/SearchCheckbox"
-            android:checked="true"
-            android:text="@string/substring"
-            />
+          android:id="@+id/substring_checkbox"
+          style="@style/SearchCheckbox"
+          android:checked="true"
+          android:text="@string/substring"
+        />
         <CheckBox
-            android:id="@+id/shuffle_checkbox"
-            style="@style/SearchCheckbox"
-            android:text="@string/shuffle"
-            />
+          android:id="@+id/shuffle_checkbox"
+          style="@style/SearchCheckbox"
+          android:text="@string/shuffle"
+        />
         <CheckBox
-            android:id="@+id/cached_checkbox"
-            style="@style/SearchCheckbox"
-            android:text="@string/cached"
-            />
+          android:id="@+id/cached_checkbox"
+          style="@style/SearchCheckbox"
+          android:text="@string/cached"
+        />
       </LinearLayout>
 
       <RelativeLayout
-          android:orientation="horizontal"
-          android:layout_width="fill_parent"
-          android:layout_height="wrap_content"
-          android:paddingTop="@dimen/grid1"
-          >
+        android:orientation="horizontal"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:paddingTop="@dimen/grid1"
+      >
         <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_toLeftOf="@+id/min_rating_spinner"
-            android:layout_centerVertical="true"
-            android:paddingRight="@dimen/textgrid"
-            android:textSize="@dimen/material_text_body1"
-            android:text="@string/minimum_rating_label"
-            />
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_toLeftOf="@+id/min_rating_spinner"
+          android:layout_centerVertical="true"
+          android:paddingRight="@dimen/textgrid"
+          android:textSize="@dimen/material_text_body1"
+          android:text="@string/minimum_rating_label"
+        />
         <Spinner
-            android:id="@+id/min_rating_spinner"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_alignParentRight="true"
-            android:prompt="@string/minimum_rating"
-            />
+          android:id="@+id/min_rating_spinner"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_alignParentRight="true"
+          android:prompt="@string/minimum_rating"
+        />
       </RelativeLayout>
     </LinearLayout>
   </ScrollView>
 
   <LinearLayout
-      android:orientation="horizontal"
-      android:layout_width="fill_parent"
-      android:layout_height="wrap_content"
-      android:layout_alignParentBottom="true"
-      android:padding="@dimen/grid1"
-      >
+    android:orientation="horizontal"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:layout_alignParentBottom="true"
+    android:padding="@dimen/grid1"
+  >
     <Button
-        android:id="@+id/search_button"
-        style="@style/Button"
-        android:text="@string/search"
-        android:onClick="onSearchButtonClicked"
-        />
+      android:id="@+id/search_button"
+      style="@style/Button"
+      android:text="@string/search"
+      android:onClick="onSearchButtonClicked"
+    />
     <Button
-        android:id="@+id/reset_button"
-        style="@style/Button"
-        android:text="@string/reset"
-        android:onClick="onResetButtonClicked"
-        />
+      android:id="@+id/reset_button"
+      style="@style/Button"
+      android:text="@string/reset"
+      android:onClick="onResetButtonClicked"
+    />
   </LinearLayout>
 </RelativeLayout>

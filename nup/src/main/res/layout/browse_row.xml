@@ -1,24 +1,27 @@
-<?xml version="1.0" encoding="utf-8"?>
-<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
-    android:orientation="horizontal"
-    android:layout_width="fill_parent"
-    android:layout_height="wrap_content"
-    android:paddingLeft="@dimen/grid2"
-    android:paddingRight="@dimen/grid2"
-    >
-  <TextView xmlns:android="http://schemas.android.com/apk/res/android"
-      android:id="@+id/main"
-      style="@style/BrowseRowText"
-      android:layout_alignParentLeft="true"
-      android:layout_toLeftOf="@+id/extra"
-      android:paddingRight="@dimen/textgrid"
-      android:textColor="@color/primary_text"
-      />
-  <TextView xmlns:android="http://schemas.android.com/apk/res/android"
-      android:id="@+id/extra"
-      style="@style/BrowseRowText"
-      android:layout_alignParentRight="true"
-      android:paddingLeft="@dimen/grid1"
-      android:textColor="@color/secondary_text"
-      />
+<?xml version="1.0" encoding="utf-8" ?>
+<RelativeLayout
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  android:orientation="horizontal"
+  android:layout_width="fill_parent"
+  android:layout_height="wrap_content"
+  android:paddingLeft="@dimen/grid2"
+  android:paddingRight="@dimen/grid2"
+>
+  <TextView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/main"
+    style="@style/BrowseRowText"
+    android:layout_alignParentLeft="true"
+    android:layout_toLeftOf="@+id/extra"
+    android:paddingRight="@dimen/textgrid"
+    android:textColor="@color/primary_text"
+  />
+  <TextView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/extra"
+    style="@style/BrowseRowText"
+    android:layout_alignParentRight="true"
+    android:paddingLeft="@dimen/grid1"
+    android:textColor="@color/secondary_text"
+  />
 </RelativeLayout>

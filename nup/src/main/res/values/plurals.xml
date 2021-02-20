@@ -1,4 +1,4 @@
-<?xml version="1.0" encoding="utf-8"?>
+<?xml version="1.0" encoding="utf-8" ?>
 <resources>
   <plurals name="search_found_songs_fmt">
     <item quantity="one">Found %d song.</item>
