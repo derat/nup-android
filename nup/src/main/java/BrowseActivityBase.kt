@@ -5,7 +5,6 @@
 
 package org.erat.nup
 
-import android.app.ListActivity
 import android.content.Intent
 import android.os.Bundle
 import android.view.ContextMenu
@@ -15,11 +14,13 @@ import android.view.MenuItem
 import android.view.View
 import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.ListView
+import androidx.appcompat.app.AppCompatActivity
+import androidx.fragment.app.ListFragment
 import kotlinx.coroutines.MainScope
 import org.erat.nup.NupActivity.Companion.service
 
-/** Base class for Browse*Activity. */
-abstract class BrowseActivityBase : ListActivity(), NupService.SongDatabaseUpdateListener {
+/** Base class for Browse*Activity that shows a scrollable list of items. */
+abstract class BrowseActivityBase : AppCompatActivity(), NupService.SongDatabaseUpdateListener {
     protected val scope = MainScope()
     private val rows: MutableList<StatsRow> = ArrayList()
     private lateinit var adapter: StatsRowArrayAdapter
@@ -28,7 +29,6 @@ abstract class BrowseActivityBase : ListActivity(), NupService.SongDatabaseUpdat
     protected var onlyCached: Boolean = false // displaying only cached songs
 
     abstract val display: StatsRowArrayAdapter.Display
-
     abstract fun onRowClick(row: StatsRow, pos: Int)
     abstract fun fillMenu(menu: ContextMenu, row: StatsRow)
     abstract fun onMenuClick(itemId: Int, row: StatsRow): Boolean
@@ -40,14 +40,12 @@ abstract class BrowseActivityBase : ListActivity(), NupService.SongDatabaseUpdat
         onlyArtist = intent.getStringExtra(BUNDLE_ARTIST) ?: ""
         onlyCached = intent.getBooleanExtra(BUNDLE_CACHED, false)
 
-        adapter = StatsRowArrayAdapter(
-            this,
-            R.layout.browse_row,
-            rows,
-            display,
-        )
-        listAdapter = adapter
-        registerForContextMenu(listView)
+        adapter = StatsRowArrayAdapter(this, R.layout.browse_row, rows, display)
+        supportFragmentManager
+            .beginTransaction()
+            .replace(android.R.id.content, BrowseListFragment(adapter))
+            .commit()
+
         service.addSongDatabaseUpdateListener(this)
         onSongDatabaseUpdate()
     }
@@ -60,10 +58,6 @@ abstract class BrowseActivityBase : ListActivity(), NupService.SongDatabaseUpdat
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
         menuInflater.inflate(R.menu.browse_menu, menu)
         return true
-    }
-
-    override fun onListItemClick(listView: ListView, view: View, position: Int, id: Long) {
-        onRowClick(rows[position], position)
     }
 
     override fun onCreateContextMenu(menu: ContextMenu, view: View, menuInfo: ContextMenuInfo) {
@@ -101,19 +95,8 @@ abstract class BrowseActivityBase : ListActivity(), NupService.SongDatabaseUpdat
             service.songDb,
             { newRows: List<StatsRow>? ->
                 rows.clear()
-                if (newRows == null) {
-                    val msg = getString(R.string.loading)
-                    rows.add(StatsRow(msg, msg, "", -1))
-                    listView.isFastScrollEnabled = false
-                    adapter.enabled = false
-                    adapter.notifyDataSetChanged()
-                } else {
-                    rows.addAll(newRows)
-                    listView.isFastScrollEnabled = false
-                    adapter.enabled = true
-                    adapter.notifyDataSetChanged()
-                    listView.isFastScrollEnabled = true
-                }
+                if (newRows != null) rows.addAll(newRows)
+                adapter.notifyDataSetChanged()
             }
         )
     }
@@ -145,5 +128,21 @@ abstract class BrowseActivityBase : ListActivity(), NupService.SongDatabaseUpdat
         const val BUNDLE_ALBUM_ID = "album_id"
         const val BUNDLE_MIN_RATING = "min_rating"
         const val BUNDLE_CACHED = "cached"
+    }
+}
+
+/** Displays a list on behalf of [BrowseActivityBase]. */
+class BrowseListFragment(val adapter: StatsRowArrayAdapter) : ListFragment() {
+    override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
+        super.onViewCreated(view, savedInstanceState)
+
+        listAdapter = adapter
+        listView.isFastScrollEnabled = true
+        setEmptyText(getString(R.string.loading))
+        (activity as BrowseActivityBase).registerForContextMenu(listView)
+    }
+
+    override fun onListItemClick(listView: ListView, view: View, position: Int, id: Long) {
+        (activity as BrowseActivityBase).onRowClick(adapter.rows[position], position)
     }
 }

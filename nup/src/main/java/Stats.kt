@@ -45,7 +45,7 @@ fun sortStatsRows(stats: List<StatsRow>, order: SongOrder) {
 class StatsRowArrayAdapter(
     context: Context,
     textViewResourceId: Int,
-    private val rows: List<StatsRow>,
+    val rows: List<StatsRow>,
     private val display: Display,
 ) : ArrayAdapter<StatsRow>(context, textViewResourceId, rows), SectionIndexer {
     /** Whether rows are enabled or not. */

@@ -27,10 +27,10 @@
       <meta-data android:name="android.app.searchable" android:resource="@xml/searchable" />
     </activity>
 
-    <activity android:name=".BrowseAlbumsActivity" android:theme="@style/AppThemeOld" />
-    <activity android:name=".BrowseArtistsActivity" android:theme="@style/AppThemeOld" />
+    <activity android:name=".BrowseAlbumsActivity" android:theme="@style/AppTheme" />
+    <activity android:name=".BrowseArtistsActivity" android:theme="@style/AppTheme" />
     <activity android:name=".BrowseSongsActivity" android:theme="@style/AppTheme" />
-    <activity android:name=".BrowseTopActivity" android:theme="@style/AppThemeOld" />
+    <activity android:name=".BrowseTopActivity" android:theme="@style/AppTheme" />
     <activity android:name=".SearchFormActivity" android:theme="@style/AppTheme" />
     <activity android:name=".SettingsActivity" android:theme="@style/AppTheme" />
 
