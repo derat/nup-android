@@ -5,7 +5,6 @@
 
 package org.erat.nup
 
-import android.app.Dialog
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
@@ -393,23 +392,11 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
                 true
             }
             MENU_ITEM_SONG_DETAILS -> {
-                showDialog(
-                    DIALOG_SONG_DETAILS,
-                    SongDetailsDialog.createBundle(songs[info.position])
-                )
+                showSongDetailsDialog(this, songs[info.position])
                 true
             }
             else -> false
         }
-    }
-
-    override fun onCreateDialog(id: Int, args: Bundle): Dialog? {
-        return if (id == DIALOG_SONG_DETAILS) SongDetailsDialog.createDialog(this) else null
-    }
-
-    override fun onPrepareDialog(id: Int, dialog: Dialog, args: Bundle) {
-        super.onPrepareDialog(id, dialog, args)
-        if (id == DIALOG_SONG_DETAILS) SongDetailsDialog.prepareDialog(dialog, args)
     }
 
     /** Shows the song at [index] as current in the UI. */
@@ -441,7 +428,6 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         private const val MENU_ITEM_REMOVE_FROM_LIST = 2
         private const val MENU_ITEM_TRUNCATE_LIST = 3
         private const val MENU_ITEM_SONG_DETAILS = 4
-        private const val DIALOG_SONG_DETAILS = 1
 
         // Persistent service to which we connect.
         private var _service: NupService? = null

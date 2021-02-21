@@ -5,7 +5,6 @@
 
 package org.erat.nup
 
-import android.app.Dialog
 import android.os.Bundle
 import android.view.ContextMenu
 import android.view.ContextMenu.ContextMenuInfo
@@ -25,9 +24,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.async
 import org.erat.nup.NupActivity.Companion.service
-import org.erat.nup.SongDetailsDialog.createBundle
-import org.erat.nup.SongDetailsDialog.createDialog
-import org.erat.nup.SongDetailsDialog.prepareDialog
 
 /**
  * Displays a list of songs.
@@ -183,7 +179,7 @@ class BrowseSongsActivity : AppCompatActivity(), OnItemClickListener {
                 true
             }
             MENU_ITEM_SONG_DETAILS -> {
-                showDialog(DIALOG_SONG_DETAILS, createBundle(song))
+                showSongDetailsDialog(this, song)
                 true
             }
             else -> false
@@ -195,15 +191,6 @@ class BrowseSongsActivity : AppCompatActivity(), OnItemClickListener {
         service.appendSongToPlaylist(song)
         Toast.makeText(this, getString(R.string.appended_song_fmt, song.title), Toast.LENGTH_SHORT)
             .show()
-    }
-
-    override fun onCreateDialog(id: Int, args: Bundle): Dialog? {
-        return if (id == DIALOG_SONG_DETAILS) createDialog(this) else null
-    }
-
-    override fun onPrepareDialog(id: Int, dialog: Dialog, args: Bundle) {
-        super.onPrepareDialog(id, dialog, args)
-        if (id == DIALOG_SONG_DETAILS) prepareDialog(dialog, args)
     }
 
     fun onAppendButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
@@ -236,6 +223,5 @@ class BrowseSongsActivity : AppCompatActivity(), OnItemClickListener {
         private const val MENU_ITEM_INSERT = 2
         private const val MENU_ITEM_APPEND = 3
         private const val MENU_ITEM_SONG_DETAILS = 4
-        private const val DIALOG_SONG_DETAILS = 1
     }
 }

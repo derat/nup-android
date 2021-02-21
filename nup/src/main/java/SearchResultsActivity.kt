@@ -5,7 +5,6 @@
 
 package org.erat.nup
 
-import android.app.Dialog
 import android.app.ProgressDialog
 import android.app.SearchManager
 import android.content.Intent
@@ -24,9 +23,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.async
 import org.erat.nup.NupActivity.Companion.service
-import org.erat.nup.SongDetailsDialog.createBundle
-import org.erat.nup.SongDetailsDialog.createDialog
-import org.erat.nup.SongDetailsDialog.prepareDialog
 
 /** Displays a list of songs from a search result. */
 class SearchResultsActivity : AppCompatActivity() {
@@ -177,20 +173,11 @@ class SearchResultsActivity : AppCompatActivity() {
                 true
             }
             MENU_ITEM_SONG_DETAILS -> {
-                showDialog(DIALOG_SONG_DETAILS, createBundle(song))
+                showSongDetailsDialog(this, song)
                 true
             }
             else -> false
         }
-    }
-
-    override fun onCreateDialog(id: Int, args: Bundle): Dialog? {
-        return if (id == DIALOG_SONG_DETAILS) createDialog(this) else null
-    }
-
-    override fun onPrepareDialog(id: Int, dialog: Dialog, args: Bundle) {
-        super.onPrepareDialog(id, dialog, args)
-        if (id == DIALOG_SONG_DETAILS) prepareDialog(dialog, args)
     }
 
     fun onAppendButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
@@ -229,7 +216,5 @@ class SearchResultsActivity : AppCompatActivity() {
         private const val MENU_ITEM_INSERT = 2
         private const val MENU_ITEM_APPEND = 3
         private const val MENU_ITEM_SONG_DETAILS = 4
-
-        private const val DIALOG_SONG_DETAILS = 1
     }
 }
