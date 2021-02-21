@@ -91,7 +91,7 @@ class BrowseAlbumsActivity : BrowseActivityBase() {
                         if (onlyArtist != "") {
                             db.cachedAlbumsByArtist(onlyArtist)
                         } else {
-                            db.cachedAlbumsSortedAlphabetically
+                            db.cachedAlbumsSortedAlphabetically()
                         }
                     }.await()
                 )

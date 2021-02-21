@@ -29,7 +29,7 @@ class PlaybackReporter(
     /** Synchronously report all unreported songs. */
     suspend fun reportPending() {
         lock.withLock() {
-            for (report in songDb.allPendingPlaybackReports) {
+            for (report in songDb.allPendingPlaybackReports()) {
                 if (send(report.songId, report.startDate)) {
                     songDb.removePendingPlaybackReport(report.songId, report.startDate)
                 }

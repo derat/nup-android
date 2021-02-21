@@ -60,31 +60,29 @@ class SongDatabase(
 
     enum class SyncState { UPDATING_SONGS, DELETING_SONGS, UPDATING_STATS }
 
-    val cachedArtistsSortedAlphabetically: List<StatsRow>
-        get() = getSortedRows(
-            "SELECT s.Artist, '' AS Album, '' AS AlbumId, COUNT(*) " +
-                "FROM Songs s " +
-                "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
-                "GROUP BY LOWER(TRIM(s.Artist))",
-            null,
-            SongOrder.ARTIST,
-        )
+    suspend fun cachedArtistsSortedAlphabetically(): List<StatsRow> = getSortedRows(
+        "SELECT s.Artist, '' AS Album, '' AS AlbumId, COUNT(*) " +
+            "FROM Songs s " +
+            "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
+            "GROUP BY LOWER(TRIM(s.Artist))",
+        null,
+        SongOrder.ARTIST,
+    )
 
     // TODO: It'd be better to use most-frequent-artist logic here similar
     // to what [loadAggregateData] does for [albumsSortedAlphabetically].
     // I haven't figured out how to do that solely with SQL, though, and
     // I'd rather not write one-off code here.
-    val cachedAlbumsSortedAlphabetically: List<StatsRow>
-        get() = getSortedRows(
-            "SELECT MIN(s.Artist), s.Album, s.AlbumId, COUNT(*) " +
-                "FROM Songs s " +
-                "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
-                "GROUP BY LOWER(TRIM(s.Album)), s.AlbumId",
-            null,
-            SongOrder.ALBUM,
-        )
+    suspend fun cachedAlbumsSortedAlphabetically(): List<StatsRow> = getSortedRows(
+        "SELECT MIN(s.Artist), s.Album, s.AlbumId, COUNT(*) " +
+            "FROM Songs s " +
+            "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
+            "GROUP BY LOWER(TRIM(s.Album)), s.AlbumId",
+        null,
+        SongOrder.ALBUM,
+    )
 
-    fun cachedAlbumsByArtist(artist: String): List<StatsRow> {
+    suspend fun cachedAlbumsByArtist(artist: String): List<StatsRow> {
         return getSortedRows(
             "SELECT '' AS Artist, s.Album, s.AlbumId, COUNT(*) " +
                 "FROM Songs s " +
@@ -103,7 +101,7 @@ class SongDatabase(
     }
 
     /** Get songs matching the supplied criteria. */
-    fun query(
+    suspend fun query(
         artist: String? = null,
         title: String? = null,
         album: String? = null,
@@ -218,21 +216,20 @@ class SongDatabase(
     class PendingPlaybackReport(var songId: Long, var startDate: Date)
 
     /** Get all pending playback reports from the PendingPlaybackReports table. */
-    val allPendingPlaybackReports: List<PendingPlaybackReport>
-        get() {
-            val db = opener.getDb()
-            val cursor = db.rawQuery("SELECT SongId, StartTime FROM PendingPlaybackReports", null)
-            cursor.moveToFirst()
-            val reports: MutableList<PendingPlaybackReport> = ArrayList()
-            while (!cursor.isAfterLast) {
-                reports.add(
-                    PendingPlaybackReport(cursor.getLong(0), Date(cursor.getLong(1) * 1000))
-                )
-                cursor.moveToNext()
-            }
-            cursor.close()
-            return reports
+    fun allPendingPlaybackReports(): List<PendingPlaybackReport> {
+        val db = opener.getDb()
+        val cursor = db.rawQuery("SELECT SongId, StartTime FROM PendingPlaybackReports", null)
+        cursor.moveToFirst()
+        val reports: MutableList<PendingPlaybackReport> = ArrayList()
+        while (!cursor.isAfterLast) {
+            reports.add(
+                PendingPlaybackReport(cursor.getLong(0), Date(cursor.getLong(1) * 1000))
+            )
+            cursor.moveToNext()
         }
+        cursor.close()
+        return reports
+    }
 
     /** Notified about progress while synchronizing with the server. */
     interface SyncProgressListener {
@@ -241,7 +238,7 @@ class SongDatabase(
     }
 
     /** Synchronize the song list with the server. */
-    fun syncWithServer(
+    suspend fun syncWithServer(
         listener: SyncProgressListener,
         listenerExecutor: Executor,
         message: Array<String>
@@ -311,7 +308,7 @@ class SongDatabase(
      * @return number of updated songs
      */
     @Throws(ServerException::class)
-    private fun queryServer(
+    private suspend fun queryServer(
         db: SQLiteDatabase,
         prevStartTimeNsec: Long,
         deleted: Boolean,
@@ -535,7 +532,7 @@ class SongDatabase(
     }
 
     /** Get sorted results from a query returning artist, album, album ID, and num songs. */
-    private fun getSortedRows(
+    private suspend fun getSortedRows(
         query: String,
         selectionArgs: Array<String>?,
         order: SongOrder,

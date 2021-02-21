@@ -31,7 +31,7 @@ class Authenticator(private val context: Context) {
         get() {
             if (account.isEmpty()) throw AuthException("Account isn't set")
             var token = try {
-                Log.d(TAG, "Attempting to get token for $account")
+                Log.d(TAG, "Getting token for $account")
                 val bundle = Bundle()
                 // TODO: This is deprecated. Apparently you're supposed to pass an Account object
                 // rather than a string now, which presumably requires using AccountManager in the
@@ -45,7 +45,6 @@ class Authenticator(private val context: Context) {
                 throw AuthException("IO error: $e")
             }
             if (token == null) throw AuthException("Didn't receive auth token")
-            Log.d(TAG, "Got token")
             return token
         }
 

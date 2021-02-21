@@ -55,7 +55,7 @@ class BrowseArtistsActivity : BrowseActivityBase() {
             !onlyCached -> update(db.artistsSortedAlphabetically)
             // Cached data requires an async database query.
             else -> scope.async(Dispatchers.Main) {
-                update(async(Dispatchers.IO) { db.cachedArtistsSortedAlphabetically }.await())
+                update(async(Dispatchers.IO) { db.cachedArtistsSortedAlphabetically() }.await())
             }
         }
     }
