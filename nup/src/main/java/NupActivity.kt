@@ -266,10 +266,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         val item = menu.findItem(R.id.download_all_menu_item)
         val downloadAll = _service?.shouldDownloadAll ?: false
         item.setTitle(if (downloadAll) R.string.dont_download_all else R.string.download_all)
-        item.setIcon(
-            if (downloadAll) R.drawable.ic_cloud_off_white_24dp
-            else R.drawable.ic_cloud_download_white_24dp
-        )
+        item.setIcon(if (downloadAll) R.drawable.download_off else R.drawable.download)
         return true
     }
 

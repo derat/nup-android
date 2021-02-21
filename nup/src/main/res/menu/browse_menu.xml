@@ -1,13 +1,20 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<menu xmlns:android="http://schemas.android.com/apk/res/android">
+<menu
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:app="http://schemas.android.com/apk/res-auto"
+>
   <item
     android:id="@+id/browse_pause_menu_item"
     android:icon="@drawable/pause"
     android:title="@string/pause"
+    app:iconTint="#fff"
+    app:showAsAction="ifRoom|withText"
   />
   <item
     android:id="@+id/browse_return_menu_item"
-    android:icon="@android:drawable/ic_menu_close_clear_cancel"
+    android:icon="@drawable/close"
     android:title="@string/return_to_player"
+    app:iconTint="#fff"
+    app:showAsAction="ifRoom|withText"
   />
 </menu>

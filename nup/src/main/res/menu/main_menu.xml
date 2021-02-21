@@ -5,36 +5,42 @@
 >
   <item
     android:id="@+id/browse_menu_item"
-    android:icon="@drawable/ic_add_circle_outline_white_24dp"
+    android:icon="@drawable/plus_circle_outline"
     android:title="@string/browse"
+    app:iconTint="#fff"
     app:showAsAction="ifRoom|withText"
   />
   <item
     android:id="@+id/search_menu_item"
-    android:icon="@drawable/ic_search_white_24dp"
+    android:icon="@drawable/magnify"
     android:title="@string/search"
+    app:iconTint="#fff"
     app:showAsAction="ifRoom|withText"
   />
   <item
     android:id="@+id/pause_menu_item"
     android:icon="@drawable/pause"
     android:title="@string/pause"
+    app:iconTint="#fff"
   />
   <item
     android:id="@+id/download_all_menu_item"
-    android:icon="@drawable/ic_cloud_download_white_24dp"
+    android:icon="@drawable/download"
     android:title="@string/download_all"
+    app:iconTint="#fff"
   />
   <item
     android:id="@+id/settings_menu_item"
-    android:icon="@drawable/ic_settings_white_24dp"
+    android:icon="@drawable/cog"
     android:title="@string/settings"
+    app:iconTint="#fff"
     app:showAsAction="ifRoom|withText"
   />
   <item
     android:id="@+id/exit_menu_item"
-    android:icon="@drawable/ic_close_white_24dp"
+    android:icon="@drawable/close"
     android:title="@string/exit"
+    app:iconTint="#fff"
     app:showAsAction="ifRoom|withText"
   />
 </menu>
