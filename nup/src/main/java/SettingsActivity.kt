@@ -8,6 +8,7 @@ package org.erat.nup
 import android.app.ProgressDialog
 import android.content.Context
 import android.os.Bundle
+import android.os.StrictMode
 import android.text.InputType
 import android.util.AttributeSet
 import android.widget.Toast
@@ -69,7 +70,13 @@ class SettingsFragment :
     }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
-        setPreferencesFromResource(R.xml.settings, rootKey)
+        // https://stackoverflow.com/a/49843629/6882947
+        val origPolicy = StrictMode.allowThreadDiskReads()
+        try {
+            setPreferencesFromResource(R.xml.settings, rootKey)
+        } finally {
+            StrictMode.setThreadPolicy(origPolicy)
+        }
 
         val decimal = InputType.TYPE_NUMBER_FLAG_DECIMAL
         val noSuggest = InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
