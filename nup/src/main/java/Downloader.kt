@@ -34,6 +34,10 @@ open class Downloader(private val authenticator: Authenticator) {
     var username = ""
     var password = ""
     var server = ""
+        set(value) {
+            field = value
+            if (!field.isEmpty() && !field.contains("//")) field = "https://" + field
+        }
 
     /**
      * Start a download of [url].

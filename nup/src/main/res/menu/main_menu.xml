@@ -1,16 +1,19 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<menu xmlns:android="http://schemas.android.com/apk/res/android">
+<menu
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:app="http://schemas.android.com/apk/res-auto"
+>
   <item
     android:id="@+id/browse_menu_item"
     android:icon="@drawable/ic_add_circle_outline_white_24dp"
     android:title="@string/browse"
-    android:showAsAction="ifRoom|withText"
+    app:showAsAction="ifRoom|withText"
   />
   <item
     android:id="@+id/search_menu_item"
     android:icon="@drawable/ic_search_white_24dp"
     android:title="@string/search"
-    android:showAsAction="ifRoom|withText"
+    app:showAsAction="ifRoom|withText"
   />
   <item
     android:id="@+id/pause_menu_item"
@@ -26,12 +29,12 @@
     android:id="@+id/settings_menu_item"
     android:icon="@drawable/ic_settings_white_24dp"
     android:title="@string/settings"
-    android:showAsAction="ifRoom|withText"
+    app:showAsAction="ifRoom|withText"
   />
   <item
     android:id="@+id/exit_menu_item"
     android:icon="@drawable/ic_close_white_24dp"
     android:title="@string/exit"
-    android:showAsAction="ifRoom|withText"
+    app:showAsAction="ifRoom|withText"
   />
 </menu>

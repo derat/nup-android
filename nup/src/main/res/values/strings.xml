@@ -3,7 +3,7 @@
   <string name="app_name">nup</string>
 
   <string name="account">Account</string>
-  <string name="account_description">Account used for authentication</string>
+  <string name="account_description">Google Cloud Storage account</string>
   <string name="album">Album</string>
   <string name="album_colon">Album:</string>
   <string name="albums">Albums</string>
@@ -31,20 +31,17 @@
   <string name="cache_is_empty">Cache is empty</string>
   <string name="cache_current_usage">Current usage: %.1f MB</string>
   <string name="cache_size">Cache size</string>
-  <string name="cache_size_description">Maximum size of data stored on SD card in MB</string>
-  <string name="cache_size_invalid">Cache must be at least %d MB.</string>
+  <string name="cache_size_description">Local music cache in MB</string>
   <string name="cache_size_value">%d MB</string>
   <string name="cached">Cached</string>
   <string name="channel_name">nup</string>
   <string name="channel_description">Music playback status</string>
   <string name="clear_cache">Clear cache</string>
-  <string name="clear_cache_message">Delete all cached music from the SD card?</string>
+  <string name="clear_cache_message">Delete all locally-cached music?</string>
   <string name="dont_download_all">Don\'t download all</string>
   <string name="download_all">Download all</string>
   <string name="download_rate">Download rate</string>
-  <string
-    name="download_rate_description"
-  >Maximum music download rate in KB/sec (0 for unlimited)</string>
+  <string name="download_rate_description">Limit in KB/sec (0 is unlimited)</string>
   <string name="download_rate_value">%d KB/sec</string>
   <string name="exit">Exit</string>
   <string name="insert">Insert</string>
@@ -58,11 +55,12 @@
   <string name="never_synced">Never synced</string>
   <string name="no_results">No results.</string>
   <string name="password">Password</string>
+  <string name="password_description">HTTP Basic Auth with server</string>
   <string name="pause">Pause</string>
   <string name="play">Play</string>
   <string name="prev">Prev</string>
   <string name="pre_amp_gain">Pre-amp gain</string>
-  <string name="pre_amp_gain_description">Pre-amp gain in dB</string>
+  <string name="pre_amp_gain_description">Adjustment in dB</string>
   <string name="pre_amp_gain_value">%+.1f dB</string>
   <string name="querying_database">Querying database.</string>
   <string name="rating_colon">Rating:</string>
@@ -75,20 +73,18 @@
   <string name="search_results">Search results</string>
   <string name="searching">Searching...</string>
   <string name="server_url">Server URL</string>
-  <string
-    name="server_url_description"
-  >Music server, e.g. \"https://www.example.org:1234/\".</string>
+  <string name="server_url_description">Google App Engine server</string>
   <string name="settings">Settings</string>
   <string name="shuffle">Shuffle</string>
   <string name="syncing_song_list">Syncing song list</string>
   <string name="song_details_ellipsis">Song details...</string>
   <string name="songs_to_preload">Songs to preload</string>
-  <string name="songs_to_preload_description">Number of songs to load in advance</string>
+  <string name="songs_to_preload_description">Upcoming playlist songs to load</string>
   <string name="startup_message_title">Service is running.</string>
   <string name="startup_message_text">Feed me some songs.</string>
   <string name="sync_progress_rebuilding_stats_tables">Rebuilding stats tables...</string>
   <string name="sync_song_list">Sync song list</string>
-  <string name="sync_song_list_message">Sync the server\'s song list?</string>
+  <string name="sync_song_list_message">Sync local song list from the server?</string>
   <string name="substring">Substring</string>
   <string name="title">Title</string>
   <string name="title_colon">Title:</string>
@@ -96,7 +92,7 @@
   <string name="truncate_list">Truncate list</string>
   <string name="unlimited">Unlimited</string>
   <string name="username">Username</string>
-  <string name="username_description">Used for HTTP basic authentication with the server.</string>
+  <string name="username_description">HTTP basic auth with server</string>
 
   <string-array name="min_rating_array">
     <item>★</item>

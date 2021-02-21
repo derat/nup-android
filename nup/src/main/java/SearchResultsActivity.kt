@@ -5,7 +5,6 @@
 
 package org.erat.nup
 
-import android.app.Activity
 import android.app.Dialog
 import android.app.ProgressDialog
 import android.app.SearchManager
@@ -20,6 +19,7 @@ import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.ListView
 import android.widget.SimpleAdapter
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.async
@@ -29,7 +29,7 @@ import org.erat.nup.SongDetailsDialog.createDialog
 import org.erat.nup.SongDetailsDialog.prepareDialog
 
 /** Displays a list of songs from a search result. */
-class SearchResultsActivity : Activity() {
+class SearchResultsActivity : AppCompatActivity() {
     private val scope = MainScope()
     private var songs = listOf<Song>()
 

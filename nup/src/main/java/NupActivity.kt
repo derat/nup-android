@@ -5,7 +5,6 @@
 
 package org.erat.nup
 
-import android.app.Activity
 import android.app.Dialog
 import android.content.ComponentName
 import android.content.Intent
@@ -31,10 +30,11 @@ import android.widget.Button
 import android.widget.ImageView
 import android.widget.ListView
 import android.widget.TextView
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 
 /** Main activity showing current song and playlist. */
-class NupActivity : Activity(), NupService.SongListener {
+class NupActivity : AppCompatActivity(), NupService.SongListener {
     private var songs = listOf<Song>() // current playlist
     private var curSongIndex = -1 // index of current song in [songs]
     private val curSong: Song?

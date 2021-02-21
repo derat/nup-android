@@ -5,7 +5,6 @@
 
 package org.erat.nup
 
-import android.app.Activity
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
@@ -16,11 +15,12 @@ import android.widget.AutoCompleteTextView
 import android.widget.CheckBox
 import android.widget.EditText
 import android.widget.Spinner
+import androidx.appcompat.app.AppCompatActivity
 import org.erat.nup.NupActivity.Companion.service
 import org.erat.nup.NupService.SongDatabaseUpdateListener
 
 /** Displays a form for searching for songs. */
-class SearchFormActivity : Activity(), SongDatabaseUpdateListener {
+class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
     private lateinit var artistEdit: AutoCompleteTextView
     private lateinit var albumEdit: AutoCompleteTextView
     private lateinit var titleEdit: EditText

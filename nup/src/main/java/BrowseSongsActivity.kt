@@ -5,7 +5,6 @@
 
 package org.erat.nup
 
-import android.app.Activity
 import android.app.Dialog
 import android.os.Bundle
 import android.view.ContextMenu
@@ -20,6 +19,7 @@ import android.widget.ArrayAdapter
 import android.widget.ListView
 import android.widget.SimpleAdapter
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import java.util.Collections
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
@@ -35,7 +35,7 @@ import org.erat.nup.SongDetailsDialog.prepareDialog
  * This class doesn't extend [BrowseActivityBase] since it displays a different menu
  * and doesn't display aggregate song counts.
  */
-class BrowseSongsActivity : Activity(), OnItemClickListener {
+class BrowseSongsActivity : AppCompatActivity(), OnItemClickListener {
     private val scope = MainScope()
     private var songs = listOf<Song>()
 

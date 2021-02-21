@@ -61,6 +61,11 @@ class NupService :
         fun onSongDatabaseUpdate()
     }
 
+    /** Listener for [FileCache]'s size changing. */
+    interface FileCacheSizeChangeListener {
+        fun onFileCacheSizeChange()
+    }
+
     private val scope = MainScope()
     private val binder: IBinder = LocalBinder()
 
@@ -84,7 +89,7 @@ class NupService :
     private lateinit var telephonyManager: TelephonyManager
     private lateinit var prefs: SharedPreferences
 
-    private val songIdToSong = HashMap<Long, Song>() // canonical [Song]s indexed by ID
+    private val songIdToSong = mutableMapOf<Long, Song>() // canonical [Song]s indexed by ID
     private val _songs = mutableListOf<Song>() // current playlist
     public val songs: List<Song> get() = _songs
 
@@ -123,7 +128,7 @@ class NupService :
             }
         }
 
-    private val songCoverFetches = HashSet<Song>() // songs whose covers are being fetched
+    private val songCoverFetches = mutableSetOf<Song>() // songs whose covers are being fetched
     private val songsWithCovers = mutableListOf<Song>() // songs whose covers are in-memory
 
     private var lastUserSwitch: Date? = null // time when user was last fore/backgrounded
@@ -203,7 +208,8 @@ class NupService :
     }
 
     private var songListener: SongListener? = null
-    private val songDatabaseUpdateListeners = HashSet<SongDatabaseUpdateListener>()
+    private val songDatabaseUpdateListeners = mutableSetOf<SongDatabaseUpdateListener>()
+    private val fileCacheSizeChangeListeners = mutableSetOf<FileCacheSizeChangeListener>()
 
     override fun onCreate() {
         Log.d(TAG, "Service created")
@@ -264,7 +270,6 @@ class NupService :
             applyPref(NupPreferences.SONGS_TO_PRELOAD)
 
             if (networkHelper.isNetworkAvailable) {
-                if (!authenticator.account.isEmpty()) authenticateInBackground()
                 launch(Dispatchers.IO) { playbackReporter.reportPending() }
                 // TODO: Listen for the network coming up and send pending reports then too?
             }
@@ -345,6 +350,13 @@ class NupService :
         songDatabaseUpdateListeners.remove(listener)
     }
 
+    fun addFileCacheSizeChangeListener(listener: FileCacheSizeChangeListener) {
+        fileCacheSizeChangeListeners.add(listener)
+    }
+    fun removeFileCacheSizeChangeListener(listener: FileCacheSizeChangeListener) {
+        fileCacheSizeChangeListeners.remove(listener)
+    }
+
     /**
      * Unregister an object that might be registered as one or more of our listeners.
      *
@@ -363,7 +375,11 @@ class NupService :
     /** Read and apply [key]. */
     private suspend fun applyPref(key: String) {
         when (key) {
-            NupPreferences.ACCOUNT -> authenticator.account = readPref(key, "")
+            NupPreferences.ACCOUNT -> {
+                val acct = readPref(key, "")
+                authenticator.account = acct
+                if (!acct.isEmpty()) authenticator.authenticateInBackground()
+            }
             NupPreferences.CACHE_SIZE -> {
                 val size = readPref(key, NupPreferences.CACHE_SIZE_DEFAULT).toLong()
                 cache.maxBytes = if (size > 0) size * 1024 * 1024 else size
@@ -639,6 +655,7 @@ class NupService :
         }
 
         songListener?.onSongFileSizeChange(song)
+        for (listener in fileCacheSizeChangeListeners) listener.onFileCacheSizeChange()
 
         if (entry.songId == downloadSongId) {
             val nextIndex = downloadIndex + 1
@@ -673,10 +690,13 @@ class NupService :
         Log.d(TAG, "Song ${entry.songId} evicted")
 
         songDb.handleSongEvicted(entry.songId)
-        val song = songIdToSong[entry.songId] ?: return
-        song.availableBytes = 0
-        song.totalBytes = 0
-        songListener?.onSongFileSizeChange(song)
+        val song = songIdToSong[entry.songId]
+        if (song != null) {
+            song.availableBytes = 0
+            song.totalBytes = 0
+            songListener?.onSongFileSizeChange(song)
+        }
+        for (listener in fileCacheSizeChangeListeners) listener.onFileCacheSizeChange()
     }
 
     override fun onAggregateDataUpdate() {
@@ -684,9 +704,6 @@ class NupService :
         Log.d(TAG, "Aggregate data updated")
         for (listener in songDatabaseUpdateListeners) listener.onSongDatabaseUpdate()
     }
-
-    /** Start authenticating with Google Cloud Storage in the background.  */
-    fun authenticateInBackground() { authenticator.authenticateInBackground() }
 
     /**
      * Insert a list of songs into the playlist at a particular position.
