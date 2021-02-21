@@ -25,12 +25,12 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.BaseAdapter
-import android.widget.Button
 import android.widget.ImageView
 import android.widget.ListView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.google.android.material.button.MaterialButton
 
 /** Main activity showing current song and playlist. */
 class NupActivity : AppCompatActivity(), NupService.SongListener {
@@ -47,9 +47,9 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
     private val handler = Handler(Looper.getMainLooper())
     private val playSongTask = Runnable { _service?.playSongAtIndex(curSongIndex) }
 
-    private lateinit var pauseButton: Button
-    private lateinit var prevButton: Button
-    private lateinit var nextButton: Button
+    private lateinit var pauseButton: MaterialButton
+    private lateinit var prevButton: MaterialButton
+    private lateinit var nextButton: MaterialButton
     private lateinit var albumImageView: ImageView
     private lateinit var artistLabel: TextView
     private lateinit var titleLabel: TextView
@@ -84,9 +84,11 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
         setContentView(R.layout.main)
 
-        pauseButton = findViewById<Button>(R.id.pause_button)
-        prevButton = findViewById<Button>(R.id.prev_button)
-        nextButton = findViewById<Button>(R.id.next_button)
+        pauseButton = findViewById<MaterialButton>(R.id.pause_button)
+        prevButton = findViewById<MaterialButton>(R.id.prev_button)
+        nextButton = findViewById<MaterialButton>(R.id.next_button)
+        updateButtonStates()
+
         albumImageView = findViewById<ImageView>(R.id.album_image)
         artistLabel = findViewById<TextView>(R.id.artist_label)
         titleLabel = findViewById<TextView>(R.id.title_label)
@@ -182,7 +184,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
     override fun onPauseStateChange(paused: Boolean) {
         runOnUiThread {
-            pauseButton.text = getString(if (paused) R.string.play else R.string.pause)
+            pauseButton.setIconResource(if (paused) R.drawable.play else R.drawable.pause)
         }
     }
 
@@ -404,6 +406,11 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         curSongIndex = index
         updateSongDisplay(curSong)
         songListAdapter.notifyDataSetChanged()
+        updateButtonStates()
+    }
+
+    /** Update state of playback buttons. */
+    private fun updateButtonStates() {
         prevButton.isEnabled = curSongIndex > 0
         nextButton.isEnabled = !songs.isEmpty() && curSongIndex < songs.size - 1
         pauseButton.isEnabled = !songs.isEmpty()
@@ -417,6 +424,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
     companion object {
         private const val TAG = "NupActivity"
+        private const val DISABLED_BUTTON_ALPHA = 64
 
         // Wait this many milliseconds before switching tracks in response to the Prev and Next buttons.
         // This avoids requesting a bunch of tracks that we don't want when the user is repeatedly

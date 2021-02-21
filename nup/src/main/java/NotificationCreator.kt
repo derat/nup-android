@@ -99,28 +99,23 @@ class NotificationCreator(
         val showLabels = numActions < 3
 
         if (showPlayPause) {
-            val icon = if (paused) {
-                R.drawable.ic_play_arrow_black_36dp
-            } else {
-                R.drawable.ic_pause_black_36dp
-            }
             val label = if (paused) R.string.play else R.string.pause
             builder.addAction(
-                icon,
+                if (paused) R.drawable.play else R.drawable.pause,
                 if (showLabels) context.getString(label) else "",
                 togglePauseIntent
             )
         }
         if (showPrev) {
             builder.addAction(
-                R.drawable.ic_skip_previous_black_36dp,
+                R.drawable.skip_previous,
                 if (showLabels) context.getString(R.string.prev) else "",
                 prevTrackIntent
             )
         }
         if (showNext) {
             builder.addAction(
-                R.drawable.ic_skip_next_black_36dp,
+                R.drawable.skip_next,
                 if (showLabels) context.getString(R.string.next) else "",
                 nextTrackIntent
             )

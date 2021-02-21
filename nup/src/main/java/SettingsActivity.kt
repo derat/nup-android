@@ -81,13 +81,14 @@ class SettingsFragment :
         val decimal = InputType.TYPE_NUMBER_FLAG_DECIMAL
         val noSuggest = InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         val number = InputType.TYPE_CLASS_NUMBER
-        val password = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+        val password = InputType.TYPE_TEXT_VARIATION_PASSWORD
         val signed = InputType.TYPE_NUMBER_FLAG_SIGNED
+        val text = InputType.TYPE_CLASS_TEXT
 
-        configEditText(NupPreferences.SERVER_URL, simpleSummary, noSuggest, false)
-        configEditText(NupPreferences.USERNAME, simpleSummary, noSuggest, false)
-        configEditText(NupPreferences.PASSWORD, null, password, false)
-        configEditText(NupPreferences.ACCOUNT, simpleSummary, noSuggest, false)
+        configEditText(NupPreferences.SERVER_URL, simpleSummary, text or noSuggest, false)
+        configEditText(NupPreferences.USERNAME, simpleSummary, text or noSuggest, false)
+        configEditText(NupPreferences.PASSWORD, null, text or password, false)
+        configEditText(NupPreferences.ACCOUNT, simpleSummary, text or noSuggest, false)
         configEditText(NupPreferences.PRE_AMP_GAIN, gainSummary, number or decimal or signed, true)
         configEditText(NupPreferences.CACHE_SIZE, cacheSizeSummary, number, false)
         configEditText(NupPreferences.SONGS_TO_PRELOAD, songsSummary, number, true)

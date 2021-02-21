@@ -2,7 +2,7 @@
 <menu xmlns:android="http://schemas.android.com/apk/res/android">
   <item
     android:id="@+id/browse_pause_menu_item"
-    android:icon="@drawable/ic_menu_play_clip"
+    android:icon="@drawable/pause"
     android:title="@string/pause"
   />
   <item

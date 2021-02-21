@@ -9,10 +9,10 @@
     android:orientation="horizontal"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
-    android:paddingLeft="@dimen/grid2"
-    android:paddingRight="@dimen/grid2"
-    android:paddingTop="@dimen/grid2"
-    android:paddingBottom="@dimen/grid1"
+    android:paddingLeft="12dp"
+    android:paddingRight="12dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
     android:background="@color/background"
     android:elevation="@dimen/height1"
   >
@@ -22,12 +22,14 @@
       android:text="@string/append"
       android:onClick="onAppendButtonClicked"
     />
+    <Space android:layout_width="12dp" android:layout_height="fill_parent" />
     <Button
       android:id="@+id/insert_button"
       style="@style/Button"
       android:text="@string/insert"
       android:onClick="onInsertButtonClicked"
     />
+    <Space android:layout_width="12dp" android:layout_height="fill_parent" />
     <Button
       android:id="@+id/replace_button"
       style="@style/Button"

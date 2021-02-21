@@ -1,27 +1,30 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <LinearLayout
   xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:app="http://schemas.android.com/apk/res-auto"
   android:orientation="vertical"
   android:layout_width="fill_parent"
   android:layout_height="fill_parent"
 >
   <LinearLayout
     android:orientation="horizontal"
+    android:gravity="center_vertical"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
-    android:paddingLeft="@dimen/grid2"
-    android:paddingRight="@dimen/grid2"
-    android:paddingTop="@dimen/grid2"
+    android:paddingLeft="12dp"
+    android:paddingRight="12dp"
+    android:paddingTop="8dp"
+    android:paddingBottom="8dp"
     android:background="@color/background"
     android:elevation="@dimen/height1"
   >
     <ImageView
       android:id="@+id/album_image"
-      android:layout_width="80dp"
-      android:layout_height="80dp"
+      android:layout_width="100dp"
+      android:layout_height="100dp"
       android:adjustViewBounds="true"
       android:scaleType="centerInside"
-      android:paddingRight="@dimen/grid1"
+      android:paddingRight="12dp"
     />
     <LinearLayout
       android:orientation="vertical"
@@ -64,29 +67,33 @@
     android:orientation="horizontal"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
-    android:paddingLeft="@dimen/grid2"
-    android:paddingRight="@dimen/grid2"
-    android:paddingTop="@dimen/grid1"
-    android:paddingBottom="@dimen/grid1"
+    android:paddingLeft="12dp"
+    android:paddingRight="12dp"
+    android:paddingBottom="12dp"
     android:background="@color/background"
     android:elevation="@dimen/height1"
   >
     <Button
-      android:id="@+id/pause_button"
-      style="@style/Button"
-      android:text="@string/pause"
-      android:onClick="onPauseButtonClicked"
-    />
-    <Button
       android:id="@+id/prev_button"
-      style="@style/Button"
-      android:text="@string/prev"
+      style="@style/IconButton"
+      app:icon="@drawable/skip_previous"
+      app:iconGravity="textStart"
       android:onClick="onPrevButtonClicked"
     />
+    <Space android:layout_width="12dp" android:layout_height="fill_parent" />
+    <Button
+      android:id="@+id/pause_button"
+      style="@style/IconButton"
+      app:icon="@drawable/play"
+      app:iconGravity="textStart"
+      android:onClick="onPauseButtonClicked"
+    />
+    <Space android:layout_width="12dp" android:layout_height="fill_parent" />
     <Button
       android:id="@+id/next_button"
-      style="@style/Button"
-      android:text="@string/next"
+      style="@style/IconButton"
+      app:icon="@drawable/skip_next"
+      app:iconGravity="textStart"
       android:onClick="onNextButtonClicked"
     />
   </LinearLayout>
@@ -96,8 +103,8 @@
     android:orientation="horizontal"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
-    android:paddingLeft="@dimen/grid2"
-    android:paddingRight="@dimen/grid2"
+    android:paddingLeft="16dp"
+    android:paddingRight="16dp"
     android:background="@color/background"
     android:elevation="@dimen/height1"
   >
