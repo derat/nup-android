@@ -42,7 +42,7 @@ class PlaybackReporterTest {
         val reportPath = getReportPath(SONG_ID, START_DATE)
         reportUrl = getReportUrl(reportPath)
         Mockito.`when`(downloader.getServerUrl(reportPath)).thenReturn(reportUrl)
-        Mockito.`when`(songDb.allPendingPlaybackReports)
+        Mockito.`when`(songDb.allPendingPlaybackReports())
             .thenReturn(ArrayList())
     }
 
@@ -50,7 +50,7 @@ class PlaybackReporterTest {
         Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(true)
 
         val reporter = createReporter()
-        Mockito.`when`(songDb.allPendingPlaybackReports)
+        Mockito.`when`(songDb.allPendingPlaybackReports())
             .thenReturn(Arrays.asList(PendingPlaybackReport(SONG_ID, START_DATE)))
         Mockito.`when`(downloader.download(reportUrl, "POST", Downloader.AuthType.SERVER, null))
             .thenReturn(successConn)
@@ -76,7 +76,7 @@ class PlaybackReporterTest {
 
     @Test fun deferReportOnServerError() {
         Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(true)
-        Mockito.`when`(songDb.allPendingPlaybackReports)
+        Mockito.`when`(songDb.allPendingPlaybackReports())
             .thenReturn(Arrays.asList(PendingPlaybackReport(SONG_ID, START_DATE)))
         Mockito.`when`(downloader.download(reportUrl, "POST", Downloader.AuthType.SERVER, null))
             .thenReturn(serverErrorConn)
@@ -91,7 +91,7 @@ class PlaybackReporterTest {
 
     @Test fun reportPendingAtCreation() {
         Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(true)
-        Mockito.`when`(songDb.allPendingPlaybackReports)
+        Mockito.`when`(songDb.allPendingPlaybackReports())
             .thenReturn(Arrays.asList(PendingPlaybackReport(SONG_ID, START_DATE)))
         Mockito.`when`(downloader.download(reportUrl, "POST", Downloader.AuthType.SERVER, null))
             .thenReturn(successConn)
@@ -113,7 +113,7 @@ class PlaybackReporterTest {
         val OLD_REPORT_PATH = getReportPath(OLD_SONG_ID, OLD_START_DATE)
         val OLD_REPORT_URL = getReportUrl(OLD_REPORT_PATH)
         Mockito.`when`(downloader.getServerUrl(OLD_REPORT_PATH)).thenReturn(OLD_REPORT_URL)
-        Mockito.`when`(songDb.allPendingPlaybackReports).thenReturn(
+        Mockito.`when`(songDb.allPendingPlaybackReports()).thenReturn(
             Arrays.asList(
                 PendingPlaybackReport(OLD_SONG_ID, OLD_START_DATE),
                 PendingPlaybackReport(SONG_ID, START_DATE)
@@ -141,7 +141,7 @@ class PlaybackReporterTest {
         val NEW_REPORT_PATH = getReportPath(NEW_SONG_ID, NEW_START_DATE)
         val NEW_REPORT_URL = getReportUrl(NEW_REPORT_PATH)
         Mockito.`when`(downloader.getServerUrl(NEW_REPORT_PATH)).thenReturn(NEW_REPORT_URL)
-        Mockito.`when`(songDb.allPendingPlaybackReports)
+        Mockito.`when`(songDb.allPendingPlaybackReports())
             .thenReturn(
                 Arrays.asList(
                     PendingPlaybackReport(SONG_ID, START_DATE),
