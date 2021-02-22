@@ -340,19 +340,19 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
                 percentView.visibility = View.GONE
             }
 
-            val currentlyPlaying = position == curSongIndex
+            val active = position == curSongIndex
+
             view.setBackgroundColor(
                 ContextCompat.getColor(
                     this@NupActivity,
-                    if (currentlyPlaying) R.color.primary else android.R.color.transparent
+                    if (active) R.color.primary else android.R.color.transparent
                 )
             )
-            val textColor = ContextCompat.getColor(
-                this@NupActivity, if (currentlyPlaying) R.color.icons else R.color.primary_text
-            )
-            artistView.setTextColor(textColor)
-            titleView.setTextColor(textColor)
-            percentView.setTextColor(textColor)
+
+            val style = if (active) R.style.SongListActive else R.style.SongListInactive
+            artistView.setTextAppearance(style)
+            titleView.setTextAppearance(style)
+            percentView.setTextAppearance(style)
 
             return view
         }

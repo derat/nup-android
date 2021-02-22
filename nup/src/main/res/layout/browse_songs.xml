@@ -7,6 +7,7 @@
 >
   <!-- TODO: This is duplicated in search_results.xml. Move it to a fragment? -->
   <LinearLayout
+    style="@style/Raised"
     android:orientation="horizontal"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
@@ -14,8 +15,6 @@
     android:paddingRight="@dimen/horizontal_padding"
     android:paddingTop="@dimen/vertical_padding"
     android:paddingBottom="@dimen/vertical_padding"
-    android:background="@color/background"
-    android:elevation="@dimen/height1"
   >
     <Button
       android:id="@+id/append_button"
@@ -43,6 +42,5 @@
     android:id="@+id/songs"
     android:layout_width="fill_parent"
     android:layout_height="fill_parent"
-    android:elevation="0dp"
   />
 </LinearLayout>

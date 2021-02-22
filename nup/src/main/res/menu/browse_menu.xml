@@ -7,14 +7,14 @@
     android:id="@+id/browse_pause_menu_item"
     android:icon="@drawable/pause"
     android:title="@string/pause"
-    app:iconTint="#fff"
+    app:iconTint="?android:attr/textColorPrimary"
     app:showAsAction="ifRoom|withText"
   />
   <item
     android:id="@+id/browse_return_menu_item"
     android:icon="@drawable/close"
     android:title="@string/return_to_player"
-    app:iconTint="#fff"
+    app:iconTint="?android:attr/textColorPrimary"
     app:showAsAction="ifRoom|withText"
   />
 </menu>

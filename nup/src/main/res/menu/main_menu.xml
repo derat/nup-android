@@ -7,40 +7,40 @@
     android:id="@+id/browse_menu_item"
     android:icon="@drawable/plus_circle_outline"
     android:title="@string/browse"
-    app:iconTint="#fff"
+    app:iconTint="?android:attr/textColorPrimary"
     app:showAsAction="ifRoom|withText"
   />
   <item
     android:id="@+id/search_menu_item"
     android:icon="@drawable/magnify"
     android:title="@string/search"
-    app:iconTint="#fff"
+    app:iconTint="?android:attr/textColorPrimary"
     app:showAsAction="ifRoom|withText"
   />
   <item
     android:id="@+id/pause_menu_item"
     android:icon="@drawable/pause"
     android:title="@string/pause"
-    app:iconTint="#fff"
+    app:iconTint="?android:attr/textColorPrimary"
   />
   <item
     android:id="@+id/download_all_menu_item"
     android:icon="@drawable/download"
     android:title="@string/download_all"
-    app:iconTint="#fff"
+    app:iconTint="?android:attr/textColorPrimary"
   />
   <item
     android:id="@+id/settings_menu_item"
     android:icon="@drawable/cog"
     android:title="@string/settings"
-    app:iconTint="#fff"
+    app:iconTint="?android:attr/textColorPrimary"
     app:showAsAction="ifRoom|withText"
   />
   <item
     android:id="@+id/exit_menu_item"
     android:icon="@drawable/close"
     android:title="@string/exit"
-    app:iconTint="#fff"
+    app:iconTint="?android:attr/textColorPrimary"
     app:showAsAction="ifRoom|withText"
   />
 </menu>

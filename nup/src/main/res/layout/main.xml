@@ -7,6 +7,7 @@
   android:layout_height="fill_parent"
 >
   <LinearLayout
+    style="@style/Raised"
     android:orientation="horizontal"
     android:gravity="center_vertical"
     android:layout_width="fill_parent"
@@ -14,8 +15,6 @@
     android:paddingLeft="@dimen/horizontal_padding"
     android:paddingRight="@dimen/horizontal_padding"
     android:paddingTop="@dimen/vertical_padding"
-    android:background="@color/background"
-    android:elevation="@dimen/height1"
   >
     <ImageView
       android:id="@+id/album_image"
@@ -30,39 +29,27 @@
       android:layout_width="fill_parent"
       android:layout_height="wrap_content"
     >
-      <TextView
-        android:id="@+id/artist_label"
-        style="@style/PlayingSongText"
-        android:textStyle="bold"
-      />
-      <TextView
-        android:id="@+id/title_label"
-        style="@style/PlayingSongText"
-        android:textStyle="italic"
-      />
-      <TextView android:id="@+id/album_label" style="@style/PlayingSongText" />
+      <TextView android:id="@+id/artist_label" style="@style/PlayingSongArtist" />
+      <TextView android:id="@+id/title_label" style="@style/PlayingSongTitle" />
+      <TextView android:id="@+id/album_label" style="@style/PlayingSongAlbum" />
       <LinearLayout
         android:orientation="horizontal"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
       >
-        <TextView
-          android:id="@+id/time_label"
-          style="@style/PlayingSongText"
-          android:textColor="@color/secondary_text"
-        />
+        <TextView android:id="@+id/time_label" style="@style/PlayingSongTime" />
         <TextView
           android:id="@+id/download_status_label"
-          style="@style/PlayingSongText"
+          style="@style/PlayingSongDownload"
           android:layout_width="fill_parent"
           android:gravity="right"
-          android:textColor="@color/secondary_text"
         />
       </LinearLayout>
     </LinearLayout>
   </LinearLayout>
 
   <LinearLayout
+    style="@style/Raised"
     android:orientation="horizontal"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
@@ -70,43 +57,37 @@
     android:paddingRight="@dimen/horizontal_padding"
     android:paddingTop="@dimen/vertical_padding"
     android:paddingBottom="@dimen/vertical_padding"
-    android:background="@color/background"
-    android:elevation="@dimen/height1"
   >
-    <Button
+  <Button
       android:id="@+id/prev_button"
       style="@style/IconButton"
       app:icon="@drawable/skip_previous"
-      app:iconGravity="textStart"
       android:onClick="onPrevButtonClicked"
     />
-    <Space android:layout_width="@dimen/button_spacing" android:layout_height="fill_parent" />
-    <Button
+  <Space android:layout_width="@dimen/button_spacing" android:layout_height="fill_parent" />
+  <Button
       android:id="@+id/pause_button"
       style="@style/IconButton"
       app:icon="@drawable/play"
-      app:iconGravity="textStart"
       android:onClick="onPauseButtonClicked"
     />
-    <Space android:layout_width="@dimen/button_spacing" android:layout_height="fill_parent" />
-    <Button
+  <Space android:layout_width="@dimen/button_spacing" android:layout_height="fill_parent" />
+  <Button
       android:id="@+id/next_button"
       style="@style/IconButton"
       app:icon="@drawable/skip_next"
-      app:iconGravity="textStart"
       android:onClick="onNextButtonClicked"
     />
-  </LinearLayout>
+</LinearLayout>
 
   <LinearLayout
+    style="@style/Raised"
     android:id="@+id/playlist_heading"
     android:orientation="horizontal"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
     android:paddingLeft="@dimen/horizontal_padding"
     android:paddingRight="@dimen/horizontal_padding"
-    android:background="@color/background"
-    android:elevation="@dimen/height1"
   >
     <TextView
       style="@style/SongListArtist"

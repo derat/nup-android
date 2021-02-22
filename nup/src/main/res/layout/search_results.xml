@@ -6,6 +6,7 @@
   android:layout_height="fill_parent"
 >
   <LinearLayout
+    style="@style/Raised"
     android:orientation="horizontal"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
@@ -13,8 +14,6 @@
     android:paddingRight="@dimen/horizontal_padding"
     android:paddingTop="@dimen/vertical_padding"
     android:paddingBottom="@dimen/vertical_padding"
-    android:background="@color/background"
-    android:elevation="@dimen/height1"
   >
     <Button
       android:id="@+id/append_button"
@@ -39,14 +38,13 @@
   </LinearLayout>
 
   <LinearLayout
+    style="@style/Raised"
     android:id="@+id/results_heading"
     android:orientation="horizontal"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
     android:paddingLeft="@dimen/horizontal_padding"
     android:paddingRight="@dimen/horizontal_padding"
-    android:background="@color/background"
-    android:elevation="@dimen/height1"
   >
     <TextView
       style="@style/SongListArtist"
