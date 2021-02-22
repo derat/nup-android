@@ -88,7 +88,7 @@ open class Downloader(private val authenticator: Authenticator) {
 
         return try {
             conn.connect()
-            Log.d(TAG, "Got ${conn.responseCode} (${conn.responseMessage}) for $url")
+            Log.d(TAG, "${conn.responseCode} (${conn.responseMessage}) for $url")
             conn
         } catch (e: SocketTimeoutException) {
             Log.e(TAG, "Timeout for $url", e)
