@@ -4,8 +4,8 @@
   android:orientation="horizontal"
   android:layout_width="fill_parent"
   android:layout_height="wrap_content"
-  android:paddingLeft="@dimen/grid2"
-  android:paddingRight="@dimen/grid2"
+  android:paddingLeft="@dimen/horizontal_padding"
+  android:paddingRight="@dimen/horizontal_padding"
 >
   <TextView android:id="@+id/artist" style="@style/SongListArtist" />
   <TextView android:id="@+id/title" style="@style/SongListTitle" android:layout_weight="2" />

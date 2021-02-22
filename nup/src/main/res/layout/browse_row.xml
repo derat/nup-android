@@ -4,8 +4,8 @@
   android:orientation="horizontal"
   android:layout_width="fill_parent"
   android:layout_height="wrap_content"
-  android:paddingLeft="@dimen/grid2"
-  android:paddingRight="@dimen/grid2"
+  android:paddingLeft="@dimen/horizontal_padding"
+  android:paddingRight="@dimen/horizontal_padding"
 >
   <TextView
     xmlns:android="http://schemas.android.com/apk/res/android"
@@ -13,7 +13,6 @@
     style="@style/BrowseRowText"
     android:layout_alignParentLeft="true"
     android:layout_toLeftOf="@+id/extra"
-    android:paddingRight="@dimen/textgrid"
     android:textColor="@color/primary_text"
   />
   <TextView
@@ -21,7 +20,7 @@
     android:id="@+id/extra"
     style="@style/BrowseRowText"
     android:layout_alignParentRight="true"
-    android:paddingLeft="@dimen/grid1"
+    android:paddingLeft="@dimen/text_spacing"
     android:textColor="@color/secondary_text"
   />
 </RelativeLayout>

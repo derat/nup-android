@@ -4,8 +4,8 @@
   android:orientation="horizontal"
   android:layout_width="fill_parent"
   android:layout_height="wrap_content"
-  android:paddingLeft="@dimen/grid2"
-  android:paddingRight="@dimen/grid2"
+  android:paddingLeft="@dimen/horizontal_padding"
+  android:paddingRight="@dimen/horizontal_padding"
 >
   <TextView android:id="@+id/artist" style="@style/SongListArtist" />
   <RelativeLayout
@@ -23,13 +23,8 @@
     />
     <TextView
       android:id="@+id/percent"
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
+      style="@style/SongListPercent"
       android:layout_alignParentRight="true"
-      android:paddingTop="2dp"
-      android:paddingLeft="@dimen/textgrid"
-      android:textSize="@dimen/material_text_caption"
-      android:singleLine="true"
     />
   </RelativeLayout>
 </LinearLayout>
