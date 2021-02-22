@@ -5,7 +5,6 @@
 
 package org.erat.nup
 
-import android.app.ProgressDialog
 import android.app.SearchManager
 import android.content.Intent
 import android.os.Bundle
@@ -15,6 +14,7 @@ import android.view.ContextMenu.ContextMenuInfo
 import android.view.MenuItem
 import android.view.View
 import android.widget.AdapterView.AdapterContextMenuInfo
+import android.widget.Button
 import android.widget.ListView
 import android.widget.SimpleAdapter
 import android.widget.Toast
@@ -70,15 +70,6 @@ class SearchResultsActivity : AppCompatActivity() {
         }
 
         scope.async(Dispatchers.Main) {
-            // TODO: Support canceling.
-            val dialog = ProgressDialog.show(
-                this@SearchResultsActivity,
-                getString(R.string.searching),
-                getString(R.string.querying_database),
-                true, // indeterminate
-                true, // cancelable
-            )
-
             songs = async(Dispatchers.IO) {
                 val newSongs = mutableListOf<Song>()
                 for (query in queries) {
@@ -97,6 +88,8 @@ class SearchResultsActivity : AppCompatActivity() {
                 newSongs
             }.await()
 
+            findViewById<View>(R.id.progress)!!.visibility = View.GONE
+
             if (!songs.isEmpty()) {
                 val artistKey = "artist"
                 val titleKey = "title"
@@ -105,7 +98,7 @@ class SearchResultsActivity : AppCompatActivity() {
                     data.add(mapOf(artistKey to song.artist, titleKey to song.title))
                 }
 
-                val view = findViewById<View>(R.id.results) as ListView
+                val view = findViewById<ListView>(R.id.results)
                 view.adapter = SimpleAdapter(
                     this@SearchResultsActivity,
                     data,
@@ -114,9 +107,11 @@ class SearchResultsActivity : AppCompatActivity() {
                     intArrayOf(R.id.artist, R.id.title)
                 )
                 registerForContextMenu(view)
-            }
 
-            dialog.dismiss()
+                findViewById<Button>(R.id.append_button)!!.isEnabled = true
+                findViewById<Button>(R.id.insert_button)!!.isEnabled = true
+                findViewById<Button>(R.id.replace_button)!!.isEnabled = true
+            }
 
             Toast.makeText(
                 this@SearchResultsActivity,

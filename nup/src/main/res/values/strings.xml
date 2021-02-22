@@ -62,7 +62,6 @@
   <string name="pre_amp_gain">Pre-amp gain</string>
   <string name="pre_amp_gain_description">Adjustment in dB</string>
   <string name="pre_amp_gain_value">%+.1f dB</string>
-  <string name="querying_database">Querying database.</string>
   <string name="rating_colon">Rating:</string>
   <string name="reset">Reset</string>
   <string name="remove_from_list">Remove from list</string>
@@ -71,7 +70,6 @@
   <string name="search">Search</string>
   <string name="search_hint">Search songs</string>
   <string name="search_results">Search results</string>
-  <string name="searching">Searching...</string>
   <string name="server_url">Server URL</string>
   <string name="server_url_description">Google App Engine server</string>
   <string name="settings">Settings</string>

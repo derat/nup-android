@@ -118,6 +118,11 @@
     <item name="android:textSize">@dimen/search_checkbox_text</item>
   </style>
 
+  <style name="Progress">
+    <item name="android:alpha">0.15</item>
+    <item name="android:indeterminateTint">?android:attr/textColorPrimary</item>
+  </style>
+
   <style name="AppPreference">
     <item name="android:layout">@layout/preference_material</item>
   </style>
