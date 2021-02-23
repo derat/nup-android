@@ -6,8 +6,6 @@
 package org.erat.nup
 
 import android.content.Context
-import android.net.wifi.WifiManager
-import android.net.wifi.WifiManager.WifiLock
 import android.os.Environment
 import android.os.SystemClock
 import android.util.Log
@@ -50,13 +48,6 @@ class FileCache constructor(
     // Status returned by [DownloadTask.startDownload] and [DownloadTask.writeFile].
     private enum class DownloadStatus { SUCCESS, ABORTED, RETRYABLE_ERROR, FATAL_ERROR }
 
-    // Current state of our use of the wifi connection.
-    private enum class WifiState {
-        ACTIVE, // We have an active download.
-        WAITING, // No active downloads; waiting for another one to start before releasing the lock.
-        INACTIVE, // No active downloads and the lock is released.
-    }
-
     private val executor = Executors.newSingleThreadScheduledExecutor()
     private val threadChecker = ThreadChecker(executor)
 
@@ -71,10 +62,6 @@ class FileCache constructor(
     private var ready = false // true after [db] has been initialized
     private val readyLock: Lock = ReentrantLock()
     private val readyCond = readyLock.newCondition()
-
-    private var wifiState = WifiState.INACTIVE
-    private lateinit var wifiLock: WifiLock
-    private var wifiLockFuture: ScheduledFuture<*>? = null // runs [updateWifiLock]
 
     /** Shut down the cache. */
     fun quit() {
@@ -113,7 +100,6 @@ class FileCache constructor(
             }
             inProgressSongIds.remove(songId)
         }
-        executor.execute { updateWifiLock() }
         Log.d(TAG, "Canceled download of song $songId")
     }
 
@@ -129,7 +115,6 @@ class FileCache constructor(
         waitUntilReady()
         executor.execute {
             synchronized(inProgressSongIds) { inProgressSongIds.clear() }
-            updateWifiLock()
             clearPinnedSongIds()
             for (songId: Long in db.songIdsByAge) {
                 val entry = db.getEntry(songId) ?: continue
@@ -214,8 +199,6 @@ class FileCache constructor(
                 handleFailure()
                 return
             }
-
-            updateWifiLock()
 
             while (true) {
                 try {
@@ -387,14 +370,12 @@ class FileCache constructor(
         private fun handleFailure() {
             threadChecker.assertThread()
             synchronized(inProgressSongIds) { inProgressSongIds.remove(entry.songId) }
-            updateWifiLock()
             listenerExecutor.execute { listener.onCacheDownloadFail(entry, reason) }
         }
 
         private fun handleSuccess() {
             threadChecker.assertThread()
             synchronized(inProgressSongIds) { inProgressSongIds.remove(entry.songId) }
-            updateWifiLock()
             listenerExecutor.execute { listener.onCacheDownloadComplete(entry) }
         }
 
@@ -508,40 +489,8 @@ class FileCache constructor(
         return neededBytes <= availableBytes
     }
 
-    /** Acquire or release the wifi lock, depending on our current state. */
-    private fun updateWifiLock() {
-        threadChecker.assertThread()
-
-        wifiLockFuture?.cancel(false)
-        wifiLockFuture = null
-
-        val active = synchronized(inProgressSongIds) { !inProgressSongIds.isEmpty() }
-        when {
-            active -> {
-                Log.d(TAG, "Acquiring wifi lock")
-                wifiState = WifiState.ACTIVE
-                wifiLock.acquire()
-            }
-            wifiState == WifiState.ACTIVE -> {
-                Log.d(TAG, "Waiting $RELEASE_WIFI_LOCK_DELAY_SEC sec before releasing wifi lock")
-                wifiState = WifiState.WAITING
-                wifiLockFuture = executor.schedule(
-                    { updateWifiLock() },
-                    RELEASE_WIFI_LOCK_DELAY_SEC,
-                    TimeUnit.SECONDS
-                )
-            }
-            else -> {
-                Log.d(TAG, "Releasing wifi lock")
-                wifiState = WifiState.INACTIVE
-                wifiLock.release()
-            }
-        }
-    }
-
     companion object {
         private const val TAG = "FileCache"
-        private const val RELEASE_WIFI_LOCK_DELAY_SEC = 600L
         private const val SHUTDOWN_TIMEOUT_MS = 1000L
     }
 
@@ -549,10 +498,6 @@ class FileCache constructor(
         // Avoid hitting the disk on the main thread.
         // (Note that [waitUntilReady] will still hold everything up. :-/)
         executor.execute {
-            wifiLock = (context.getSystemService(Context.WIFI_SERVICE) as WifiManager)
-                .createWifiLock(WifiManager.WIFI_MODE_FULL, context.getString(R.string.app_name))
-            wifiLock.setReferenceCounted(false)
-
             val state = Environment.getExternalStorageState()
             if (state != Environment.MEDIA_MOUNTED) {
                 Log.e(TAG, "Media has state $state; we need ${Environment.MEDIA_MOUNTED}")
