@@ -53,15 +53,18 @@ open class CoverLoader(
 
         var file = lookForLocalCover(url)
         if (file != null) {
-            Log.d(TAG, "Found local file ${file.name}")
+            Log.d(TAG, "Using local file ${file.name}")
         } else {
-            file = downloadCover(url)
-            if (file != null) Log.d(TAG, "Fetched remote file ${file.name}")
+            file = downloadCover(url) ?: return null
+            Log.d(TAG, "Fetched remote file ${file.name}")
         }
-        if (file == null || !file.exists()) return null
 
-        // TODO: The compiler gives an incorrect "Unreachable code" warning about the next line.
-        return lastLock.withLock {
+        if (!file.exists()) {
+            Log.e(TAG, "${file.name} disappeared")
+            return null
+        }
+
+        lastLock.withLock {
             if (lastFile != null && lastFile == file) return lastBitmap
             lastFile = file
             lastBitmap = decodeFile(file.path)
