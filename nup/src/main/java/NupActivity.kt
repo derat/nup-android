@@ -64,18 +64,22 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
                 .detectDiskReads()
                 .detectDiskWrites()
                 .detectNetwork()
-                .penaltyLog()
+                .detectResourceMismatches()
                 .penaltyDeathOnNetwork()
+                .penaltyDialog()
+                .penaltyLog()
                 .build()
         )
-        // TODO: Not including detectActivityLeaks() since I'm getting leaks of Browse*Activity
-        // objects that I don't understand.
+        // TODO: Add detectIncorrectContextUse (added in S).
         StrictMode.setVmPolicy(
             VmPolicy.Builder()
+                .detectActivityLeaks()
+                .detectCleartextNetwork()
+                // TODO: android.view.SurfaceControl: https://github.com/derat/nup-android/issues/11
                 .detectLeakedClosableObjects()
+                .detectLeakedRegistrationObjects()
                 .detectLeakedSqlLiteObjects()
                 .penaltyLog()
-                .penaltyDeath()
                 .build()
         )
 
