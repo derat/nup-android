@@ -56,12 +56,14 @@
     <item name="android:paddingRight">4dp</item>
     <item name="android:textSize">@dimen/song_list_text</item>
     <item name="android:singleLine">true</item>
+    <item name="android:textColor">?android:attr/textColorPrimary</item>
   </style>
   <style name="SongListTitle">
     <item name="android:layout_width">fill_parent</item>
     <item name="android:layout_height">wrap_content</item>
     <item name="android:textSize">@dimen/song_list_text</item>
     <item name="android:singleLine">true</item>
+    <item name="android:textColor">?android:attr/textColorPrimary</item>
   </style>
   <style name="SongListPercent">
     <item name="android:layout_width">wrap_content</item>
@@ -70,12 +72,6 @@
     <item name="android:paddingLeft">4dp</item>
     <item name="android:textSize">@dimen/song_list_percent</item>
     <item name="android:singleLine">true</item>
-  </style>
-  <!-- Used to programatically set the text color for text views when active/inactive. -->
-  <style name="SongListActive">
-    <item name="android:textColor">@color/icons</item>
-  </style>
-  <style name="SongListInactive">
     <item name="android:textColor">?android:attr/textColorPrimary</item>
   </style>
 
