@@ -6,18 +6,18 @@
 package org.erat.nup
 
 import android.content.Context
-import android.media.MediaDescription
-import android.media.MediaMetadata
-import android.media.Rating
-import android.media.session.MediaSession
-import android.media.session.MediaSession.QueueItem
-import android.media.session.PlaybackState
+import android.support.v4.media.MediaDescriptionCompat
+import android.support.v4.media.MediaMetadataCompat
+import android.support.v4.media.RatingCompat
+import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.MediaSessionCompat.QueueItem
+import android.support.v4.media.session.PlaybackStateCompat
 
 /** Updates [MediaSession] data for the current song. */
-class MediaSessionManager constructor(context: Context, callback: MediaSession.Callback) {
-    private val session: MediaSession
+class MediaSessionManager constructor(context: Context, callback: MediaSessionCompat.Callback) {
+    private val session: MediaSessionCompat
 
-    val token: MediaSession.Token
+    val token: MediaSessionCompat.Token
         get() = session.sessionToken
 
     /** Release the session. */
@@ -32,26 +32,26 @@ class MediaSessionManager constructor(context: Context, callback: MediaSession.C
             return
         }
 
-        val builder = MediaMetadata.Builder()
-        setString(builder, MediaMetadata.METADATA_KEY_ARTIST, song.artist)
-        setString(builder, MediaMetadata.METADATA_KEY_TITLE, song.title)
-        setString(builder, MediaMetadata.METADATA_KEY_ALBUM, song.album)
+        val builder = MediaMetadataCompat.Builder()
+        setString(builder, MediaMetadataCompat.METADATA_KEY_ARTIST, song.artist)
+        setString(builder, MediaMetadataCompat.METADATA_KEY_TITLE, song.title)
+        setString(builder, MediaMetadataCompat.METADATA_KEY_ALBUM, song.album)
 
         if (song.rating >= 0.0) {
             builder.putRating(
-                MediaMetadata.METADATA_KEY_RATING,
-                Rating.newStarRating(
-                    Rating.RATING_5_STARS, (1.0 + song.rating * 4.0).toFloat()
+                MediaMetadataCompat.METADATA_KEY_RATING,
+                RatingCompat.newStarRating(
+                    RatingCompat.RATING_5_STARS, (1.0 + song.rating * 4.0).toFloat()
                 )
             )
         }
         if (song.track > 0) {
-            builder.putLong(MediaMetadata.METADATA_KEY_TRACK_NUMBER, song.track.toLong())
+            builder.putLong(MediaMetadataCompat.METADATA_KEY_TRACK_NUMBER, song.track.toLong())
         }
         if (song.disc > 0) {
-            builder.putLong(MediaMetadata.METADATA_KEY_DISC_NUMBER, song.disc.toLong())
+            builder.putLong(MediaMetadataCompat.METADATA_KEY_DISC_NUMBER, song.disc.toLong())
         }
-        builder.putLong(MediaMetadata.METADATA_KEY_DURATION, song.lengthSec * 1000L)
+        builder.putLong(MediaMetadataCompat.METADATA_KEY_DURATION, song.lengthSec * 1000L)
 
         val bitmap = song.coverBitmap
         if (bitmap != null) {
@@ -59,7 +59,7 @@ class MediaSessionManager constructor(context: Context, callback: MediaSession.C
             // the bitmap, which then causes a crash when we try to use it later:
             // https://code.google.com/p/android/issues/detail?id=74967
             builder.putBitmap(
-                MediaMetadata.METADATA_KEY_ALBUM_ART,
+                MediaMetadataCompat.METADATA_KEY_ALBUM_ART,
                 bitmap.copy(bitmap.config, true)
             )
         }
@@ -77,29 +77,29 @@ class MediaSessionManager constructor(context: Context, callback: MediaSession.C
         songIndex: Int,
         numSongs: Int
     ) {
-        val builder = PlaybackState.Builder()
+        val builder = PlaybackStateCompat.Builder()
         if (song != null) builder.setActiveQueueItemId(song.id)
 
         builder.setState(
             when {
-                numSongs == 0 -> PlaybackState.STATE_NONE
-                buffering -> PlaybackState.STATE_BUFFERING
-                playbackComplete && songIndex == numSongs - 1 -> PlaybackState.STATE_STOPPED
-                playbackComplete -> PlaybackState.STATE_SKIPPING_TO_NEXT
-                paused -> PlaybackState.STATE_PAUSED
-                else -> PlaybackState.STATE_PLAYING
+                numSongs == 0 -> PlaybackStateCompat.STATE_NONE
+                buffering -> PlaybackStateCompat.STATE_BUFFERING
+                playbackComplete && songIndex == numSongs - 1 -> PlaybackStateCompat.STATE_STOPPED
+                playbackComplete -> PlaybackStateCompat.STATE_SKIPPING_TO_NEXT
+                paused -> PlaybackStateCompat.STATE_PAUSED
+                else -> PlaybackStateCompat.STATE_PLAYING
             },
             positionMs, 1.0f
         )
 
         var actions: Long = 0
         if (!playbackComplete) {
-            actions = actions or PlaybackState.ACTION_PLAY_PAUSE
-            if (paused) actions = actions or PlaybackState.ACTION_PLAY
-            else actions = actions or PlaybackState.ACTION_PAUSE
+            actions = actions or PlaybackStateCompat.ACTION_PLAY_PAUSE
+            if (paused) actions = actions or PlaybackStateCompat.ACTION_PLAY
+            else actions = actions or PlaybackStateCompat.ACTION_PAUSE
         }
-        if (songIndex > 0) actions = actions or PlaybackState.ACTION_SKIP_TO_PREVIOUS
-        if (songIndex < numSongs - 1) actions = actions or PlaybackState.ACTION_SKIP_TO_NEXT
+        if (songIndex > 0) actions = actions or PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+        if (songIndex < numSongs - 1) actions = actions or PlaybackStateCompat.ACTION_SKIP_TO_NEXT
         builder.setActions(actions)
 
         session.setPlaybackState(builder.build())
@@ -109,7 +109,7 @@ class MediaSessionManager constructor(context: Context, callback: MediaSession.C
     fun updatePlaylist(songs: List<Song>) {
         val queue: MutableList<QueueItem> = ArrayList()
         for (song in songs) {
-            val desc = MediaDescription.Builder()
+            val desc = MediaDescriptionCompat.Builder()
                 .setMediaId(java.lang.Long.toString(song.id))
                 .setTitle(song.title)
                 .setSubtitle(song.artist) // TODO: Set icon too, maybe.
@@ -120,7 +120,7 @@ class MediaSessionManager constructor(context: Context, callback: MediaSession.C
     }
 
     /** Set [key] to [value] if the latter is a non-null, non-empty string. */
-    private fun setString(builder: MediaMetadata.Builder, key: String, value: String?) {
+    private fun setString(builder: MediaMetadataCompat.Builder, key: String, value: String?) {
         if (!value.isNullOrEmpty()) builder.putString(key, value)
     }
 
@@ -129,11 +129,8 @@ class MediaSessionManager constructor(context: Context, callback: MediaSession.C
     }
 
     init {
-        session = MediaSession(context, "nup")
-        session.setFlags(
-            MediaSession.FLAG_HANDLES_MEDIA_BUTTONS or MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS
-        )
-        session.setRatingType(Rating.RATING_5_STARS)
+        session = MediaSessionCompat(context, "nup")
+        session.setRatingType(RatingCompat.RATING_5_STARS)
         session.setCallback(callback)
         session.isActive = true
 

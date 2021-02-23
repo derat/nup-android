@@ -17,10 +17,10 @@ import android.graphics.Bitmap
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
-import android.media.session.MediaSession
 import android.net.Uri
 import android.os.Binder
 import android.os.IBinder
+import android.support.v4.media.session.MediaSessionCompat
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 import android.util.Log
@@ -80,7 +80,7 @@ class NupService :
     private lateinit var coverLoader: CoverLoader
     private lateinit var playbackReporter: PlaybackReporter
     private lateinit var mediaSessionManager: MediaSessionManager
-    private lateinit var mediaSessionToken: MediaSession.Token
+    private lateinit var mediaSessionToken: MediaSessionCompat.Token
     private lateinit var notificationManager: NotificationManager
     private lateinit var notificationCreator: NotificationCreator
     private lateinit var audioManager: AudioManager
@@ -277,7 +277,7 @@ class NupService :
 
         mediaSessionManager = MediaSessionManager(
             this,
-            object : MediaSession.Callback() {
+            object : MediaSessionCompat.Callback() {
                 override fun onPause() { player.pause() }
                 override fun onPlay() { player.unpause() }
                 override fun onSkipToNext() { playSongAtIndex(curSongIndex + 1) }
@@ -285,13 +285,12 @@ class NupService :
                 override fun onStop() { player.pause() }
             }
         )
-        mediaSessionToken = mediaSessionManager.token
 
         notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         notificationCreator = NotificationCreator(
             this,
             notificationManager,
-            mediaSessionToken,
+            mediaSessionManager.token,
             PendingIntent.getActivity(this, 0, Intent(this, NupActivity::class.java), 0),
             PendingIntent.getService(
                 this, 0, Intent(ACTION_TOGGLE_PAUSE, Uri.EMPTY, this, NupService::class.java), 0

@@ -6,19 +6,22 @@
 package org.erat.nup
 
 import android.app.Notification
-import android.app.Notification.MediaStyle
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.content.Context
-import android.media.session.MediaSession
 import android.os.Build
+import android.support.v4.media.session.MediaSessionCompat
+import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat
+import androidx.media.app.NotificationCompat.MediaStyle
 
 /** Creates system notifications. */
 class NotificationCreator(
     private val context: Context,
     manager: NotificationManager,
-    private val mediaSessionToken: MediaSession.Token,
+    private val mediaSessionToken: MediaSessionCompat.Token,
     private val launchActivityIntent: PendingIntent,
     private val togglePauseIntent: PendingIntent,
     private val prevTrackIntent: PendingIntent,
@@ -51,7 +54,7 @@ class NotificationCreator(
     ): Notification? {
         val showPlayPause = song != null && !playbackComplete
         val showPrev = songIndex in 1 until numSongs
-        val showNext = songIndex in 0 until numSongs
+        val showNext = songIndex in 0 until (numSongs - 1)
         if (onlyIfChanged &&
             song != null &&
             song.id == songId &&
@@ -71,18 +74,16 @@ class NotificationCreator(
         showingPrev = showPrev
         showingNext = showNext
 
-        val builder = Notification.Builder(context)
+        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle(song?.artist ?: context.getString(R.string.startup_message_title))
             .setContentText(song?.title ?: context.getString(R.string.startup_message_text))
             .setSmallIcon(R.drawable.status)
-            .setColor(context.resources.getColor(R.color.primary))
-            .setVisibility(Notification.VISIBILITY_PUBLIC)
+            .setColor(ContextCompat.getColor(context, R.color.primary))
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(launchActivityIntent)
             .setOngoing(true)
             .setWhen(System.currentTimeMillis())
             .setShowWhen(false)
-
-        if (Build.VERSION.SDK_INT >= 26) builder.setChannelId(CHANNEL_ID)
 
         if (song == null) return builder.build()
 
@@ -90,7 +91,7 @@ class NotificationCreator(
 
         val style = MediaStyle()
         style.setMediaSession(mediaSessionToken)
-        builder.style = style
+        builder.setStyle(style)
 
         val numActions = (if (showPlayPause) 1 else 0) +
             (if (showPrev) 1 else 0) +
@@ -98,26 +99,32 @@ class NotificationCreator(
 
         val showLabels = numActions < 3
 
+        if (showPrev) {
+            builder.addAction(
+                NotificationCompat.Action.Builder(
+                    R.drawable.skip_previous,
+                    if (showLabels) context.getString(R.string.prev) else "",
+                    prevTrackIntent,
+                ).build()
+            )
+        }
         if (showPlayPause) {
             val label = if (paused) R.string.play else R.string.pause
             builder.addAction(
-                if (paused) R.drawable.play else R.drawable.pause,
-                if (showLabels) context.getString(label) else "",
-                togglePauseIntent
-            )
-        }
-        if (showPrev) {
-            builder.addAction(
-                R.drawable.skip_previous,
-                if (showLabels) context.getString(R.string.prev) else "",
-                prevTrackIntent
+                NotificationCompat.Action.Builder(
+                    if (paused) R.drawable.play else R.drawable.pause,
+                    if (showLabels) context.getString(label) else "",
+                    togglePauseIntent,
+                ).build()
             )
         }
         if (showNext) {
             builder.addAction(
-                R.drawable.skip_next,
-                if (showLabels) context.getString(R.string.next) else "",
-                nextTrackIntent
+                NotificationCompat.Action.Builder(
+                    R.drawable.skip_next,
+                    if (showLabels) context.getString(R.string.next) else "",
+                    nextTrackIntent,
+                ).build()
             )
         }
 
@@ -145,7 +152,7 @@ class NotificationCreator(
             val channel = NotificationChannel(
                 CHANNEL_ID,
                 context.getString(R.string.channel_name),
-                NotificationManager.IMPORTANCE_DEFAULT
+                NotificationManagerCompat.IMPORTANCE_DEFAULT
             )
             channel.description = context.getString(R.string.channel_description)
             manager.createNotificationChannel(channel)
