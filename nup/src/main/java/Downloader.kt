@@ -17,7 +17,7 @@ import javax.net.ssl.HttpsURLConnection
 
 /** Downloads HTTP resources. */
 // TODO: Make this non-open if possible after switching to Robolectric.
-open class Downloader(private val authenticator: Authenticator) {
+open class Downloader() {
     /* Thrown when the request couldn't be constructed because some preferences that we need are
      * either unset or incorrect. */
     class PrefException(reason: String?) : Exception(reason)
@@ -26,8 +26,8 @@ open class Downloader(private val authenticator: Authenticator) {
     enum class AuthType {
         /** HTTP basic auth with username and password from prefs. */
         SERVER,
-        /** Google account fetched using [Authenticator]. */
-        STORAGE,
+        /** No authentication. */
+        NONE,
     }
 
     // Configuration needed to perform downloads.
@@ -67,23 +67,19 @@ open class Downloader(private val authenticator: Authenticator) {
             }
         }
 
-        if (authType == AuthType.SERVER) {
-            // Add Authorization header if username and password prefs are set.
-            if (!username.isEmpty() && !password.isEmpty()) {
-                conn.setRequestProperty(
-                    "Authorization",
-                    "Basic " + Base64.encodeToString(
-                        "$username:$password".toByteArray(), Base64.NO_WRAP
+        when (authType) {
+            AuthType.SERVER -> {
+                // Add Authorization header if username and password prefs are set.
+                if (!username.isEmpty() && !password.isEmpty()) {
+                    conn.setRequestProperty(
+                        "Authorization",
+                        "Basic " + Base64.encodeToString(
+                            "$username:$password".toByteArray(), Base64.NO_WRAP
+                        )
                     )
-                )
+                }
             }
-        } else if (authType == AuthType.STORAGE) {
-            try {
-                val token = authenticator.authToken
-                conn.setRequestProperty("Authorization", "Bearer $token")
-            } catch (e: Authenticator.AuthException) {
-                Log.e(TAG, "Failed to get auth token: $e")
-            }
+            AuthType.NONE -> {}
         }
 
         return try {

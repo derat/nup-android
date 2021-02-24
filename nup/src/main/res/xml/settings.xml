@@ -22,12 +22,6 @@
       android:dialogMessage="@string/password_description"
       app:iconSpaceReserved="false"
     />
-    <EditTextPreference
-      android:key="account"
-      android:title="@string/account"
-      android:dialogMessage="@string/account_description"
-      app:iconSpaceReserved="false"
-    />
     <org.erat.nup.YesNoPreference
       android:key="sync_song_list"
       android:title="@string/sync_song_list"

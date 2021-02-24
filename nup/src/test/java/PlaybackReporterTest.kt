@@ -22,9 +22,11 @@ import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.MockitoAnnotations
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class PlaybackReporterTest {
     val SONG_ID: Long = 1234
     val START_DATE = Date(1000 * 1469974953L)
+
     val scope = TestCoroutineScope()
 
     @Mock lateinit var songDb: SongDatabase

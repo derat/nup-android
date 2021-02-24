@@ -63,72 +63,78 @@ class CoverLoaderTest {
     @Test fun downloadAndCacheCovers() {
         Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(true)
 
-        val COVER_URL_1 = URL("https://www.example.com/cover1.jpg")
-        val DATA_1 = "foo"
-        val BITMAP_1 = createAndRegisterBitmap(DATA_1)
-        val conn1 = createConnection(200, DATA_1)
-        Mockito.`when`(downloader.download(COVER_URL_1, "GET", Downloader.AuthType.STORAGE, null))
+        val file1 = "cover1.jpg"
+        val data1 = "foo"
+        val bitmap1 = createAndRegisterBitmap(data1)
+        val conn1 = createConnection(200, data1)
+        Mockito.`when`(downloader.getServerUrl(getPath(file1))).thenReturn(getUrl(file1))
+        Mockito.`when`(downloader.download(getUrl(file1), "GET", Downloader.AuthType.SERVER, null))
             .thenReturn(conn1)
 
-        val COVER_URL_2 = URL("https://www.example.com/cover2.jpg")
-        val DATA_2 = "bar"
-        val BITMAP_2 = createAndRegisterBitmap(DATA_2)
-        val conn2 = createConnection(200, DATA_2)
-        Mockito.`when`(
-            downloader.download(COVER_URL_2, "GET", Downloader.AuthType.STORAGE, null)
-        ).thenReturn(conn2)
+        val file2 = "cover2.jpg"
+        val data2 = "bar"
+        val bitmap2 = createAndRegisterBitmap(data2)
+        val conn2 = createConnection(200, data2)
+        Mockito.`when`(downloader.getServerUrl(getPath(file2))).thenReturn(getUrl(file2))
+        Mockito.`when`(downloader.download(getUrl(file2), "GET", Downloader.AuthType.SERVER, null))
+            .thenReturn(conn2)
 
         // The first load request for each cover should result in it being downloaded, but it should
         // be cached after that.
-        Assert.assertEquals(BITMAP_1, load(COVER_URL_1))
-        Assert.assertEquals(BITMAP_2, load(COVER_URL_2))
-        Assert.assertEquals(BITMAP_1, load(COVER_URL_1))
-        Assert.assertEquals(BITMAP_1, load(COVER_URL_1))
-        Assert.assertEquals(BITMAP_2, load(COVER_URL_2))
+        Assert.assertEquals(bitmap1, load(file1))
+        Assert.assertEquals(bitmap2, load(file2))
+        Assert.assertEquals(bitmap1, load(file1))
+        Assert.assertEquals(bitmap1, load(file1))
+        Assert.assertEquals(bitmap2, load(file2))
 
         Mockito.verify(downloader, Mockito.times(1))
-            .download(COVER_URL_1, "GET", Downloader.AuthType.STORAGE, null)
+            .download(getUrl(file1), "GET", Downloader.AuthType.SERVER, null)
         Mockito.verify(downloader, Mockito.times(1))
-            .download(COVER_URL_2, "GET", Downloader.AuthType.STORAGE, null)
+            .download(getUrl(file2), "GET", Downloader.AuthType.SERVER, null)
     }
 
     @Test fun skipDownloadWhenNetworkUnavailable() {
-        val COVER_URL = URL("https://www.example.com/cover.jpg")
+        val file = "cover.jpg"
         Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(false)
-        Assert.assertNull(load(COVER_URL))
-        Mockito.verify(downloader, Mockito.never())
-            .download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null)
+        Assert.assertNull(load(file))
+        Mockito.verifyZeroInteractions(downloader)
     }
 
     @Test fun returnNullForMissingFile() {
         Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(true)
-        val COVER_URL = URL("https://www.example.com/cover.jpg")
+        val file = "cover.jpg"
         val conn = createConnection(404, null)
-        Mockito.`when`(downloader.download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null))
+        Mockito.`when`(downloader.getServerUrl(getPath(file))).thenReturn(getUrl(file))
+        Mockito.`when`(downloader.download(getUrl(file), "GET", Downloader.AuthType.SERVER, null))
             .thenReturn(conn)
-        Assert.assertNull(load(COVER_URL))
+        Assert.assertNull(load(file))
     }
 
     @Test fun returnNullForIOException() {
         Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(true)
-        val COVER_URL = URL("https://www.example.com/cover.jpg")
-        Mockito.`when`(downloader.download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null))
+        val file = "cover.jpg"
+        Mockito.`when`(downloader.getServerUrl(getPath(file))).thenReturn(getUrl(file))
+        Mockito.`when`(downloader.download(getUrl(file), "GET", Downloader.AuthType.SERVER, null))
             .thenThrow(IOException())
-        Assert.assertNull(load(COVER_URL))
+        Assert.assertNull(load(file))
     }
 
     @Test fun cacheDecodedBitmap() {
         Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(true)
-        val COVER_URL = URL("https://www.example.com/cover.jpg")
-        val DATA = "foo"
-        val BITMAP = createAndRegisterBitmap(DATA)
-        val conn = createConnection(200, DATA)
-        Mockito.`when`(downloader.download(COVER_URL, "GET", Downloader.AuthType.STORAGE, null))
+        val file = "cover.jpg"
+        val data = "foo"
+        val bitmap = createAndRegisterBitmap(data)
+        val conn = createConnection(200, data)
+        Mockito.`when`(downloader.getServerUrl(getPath(file))).thenReturn(getUrl(file))
+        Mockito.`when`(downloader.download(getUrl(file), "GET", Downloader.AuthType.SERVER, null))
             .thenReturn(conn)
-        Assert.assertEquals(BITMAP, load(COVER_URL))
-        Assert.assertEquals(BITMAP, load(COVER_URL))
-        Assert.assertEquals(BITMAP, load(COVER_URL))
+        Assert.assertEquals(bitmap, load(file))
+        Assert.assertEquals(bitmap, load(file))
+        Assert.assertEquals(bitmap, load(file))
     }
+
+    fun getPath(filename: String) = "/cover?filename=$filename&size=256"
+    fun getUrl(filename: String) = URL("https://www.example.org" + getPath(filename))
 
     fun createConnection(statusCode: Int, data: String?): HttpURLConnection {
         val conn = Mockito.mock(HttpURLConnection::class.java)
@@ -145,5 +151,5 @@ class CoverLoaderTest {
         return bitmap
     }
 
-    fun load(url: URL): Bitmap? = runBlocking { coverLoader.loadCover(url) }
+    fun load(path: String): Bitmap? = runBlocking { coverLoader.loadCover(path) }
 }

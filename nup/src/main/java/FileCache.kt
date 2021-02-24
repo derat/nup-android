@@ -15,6 +15,7 @@ import java.io.FileOutputStream
 import java.io.IOException
 import java.net.HttpURLConnection
 import java.net.URL
+import java.net.URLEncoder
 import java.util.Date
 import java.util.concurrent.Executor
 import java.util.concurrent.Executors
@@ -141,8 +142,8 @@ class FileCache constructor(
             inProgressSongIds.add(song.id)
         }
 
-        if (song.url == null) {
-            Log.e(TAG, "Song ${song.id} has missing URL")
+        if (song.filename == "") {
+            Log.e(TAG, "Song ${song.id} has empty path")
             return null
         }
 
@@ -150,8 +151,10 @@ class FileCache constructor(
         if (entry == null) entry = db.addEntry(song.id)
         else db.updateLastAccessTime(song.id)
 
-        Log.d(TAG, "Posting download of ${song.id} from ${song.url} to ${entry.file.path}")
-        executor.execute(DownloadTask(entry, song.url))
+        val enc = URLEncoder.encode(song.filename, "UTF-8")
+        val url = downloader.getServerUrl("/song_data?filename=$enc")
+        Log.d(TAG, "Posting download of ${song.id} from $url to ${entry.file.path}")
+        executor.execute(DownloadTask(entry, url))
         return entry
     }
 
@@ -266,7 +269,7 @@ class FileCache constructor(
                     Log.d(TAG, "Resuming download at byte ${entry.cachedBytes}")
                     headers["Range"] = String.format("bytes=%d-", entry.cachedBytes)
                 }
-                conn = downloader.download(url, "GET", Downloader.AuthType.STORAGE, headers)
+                conn = downloader.download(url, "GET", Downloader.AuthType.SERVER, headers)
                 val status = conn!!.getResponseCode()
                 Log.d(TAG, "Got $status from server")
                 if (status != 200 && status != 206) {

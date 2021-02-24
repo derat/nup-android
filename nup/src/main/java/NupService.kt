@@ -72,7 +72,6 @@ class NupService :
     lateinit var songDb: SongDatabase
         private set
 
-    private lateinit var authenticator: Authenticator
     private lateinit var networkHelper: NetworkHelper
     private lateinit var downloader: Downloader
     private lateinit var player: Player
@@ -244,8 +243,7 @@ class NupService :
         registerReceiver(broadcastReceiver, filter)
 
         networkHelper = NetworkHelper(this)
-        authenticator = Authenticator(this)
-        downloader = Downloader(authenticator)
+        downloader = Downloader()
         player = Player(this, this, mainExecutor, audioAttrs)
         cache = FileCache(this, this, mainExecutor, downloader, networkHelper)
         songDb = SongDatabase(this, this, mainExecutor, cache, downloader, networkHelper)
@@ -260,7 +258,6 @@ class NupService :
             prefs.registerOnSharedPreferenceChangeListener(prefsListener)
 
             // Load initial settings.
-            applyPref(NupPreferences.ACCOUNT)
             applyPref(NupPreferences.CACHE_SIZE)
             applyPref(NupPreferences.DOWNLOAD_RATE)
             applyPref(NupPreferences.PASSWORD)
@@ -374,11 +371,6 @@ class NupService :
     /** Read and apply [key]. */
     private suspend fun applyPref(key: String) {
         when (key) {
-            NupPreferences.ACCOUNT -> {
-                val acct = readPref(key, "")
-                authenticator.account = acct
-                if (!acct.isEmpty()) authenticator.authenticateInBackground()
-            }
             NupPreferences.CACHE_SIZE -> {
                 val size = readPref(key, NupPreferences.CACHE_SIZE_DEFAULT).toLong()
                 cache.maxBytes = if (size > 0) size * 1024 * 1024 else size
@@ -495,7 +487,7 @@ class NupService :
         // If we've already downloaded the whole file, start playing it.
         var cacheEntry = cache.getEntry(song.id)
         if (cacheEntry != null && cacheEntry.isFullyCached) {
-            Log.d(TAG, "${song.url} already downloaded; playing")
+            Log.d(TAG, "\"${song.filename}\" already downloaded; playing")
             playCacheEntry(cacheEntry)
 
             // If we're downloading some other song (maybe we were downloading the
@@ -548,13 +540,16 @@ class NupService :
 
     /** Start fetching [song]'s cover if it's not loaded already. */
     fun fetchCoverForSongIfMissing(song: Song) {
-        if (song.coverBitmap != null || song.coverUrl == null || songCoverFetches.contains(song)) {
+        if (song.coverBitmap != null ||
+            song.coverFilename == "" ||
+            songCoverFetches.contains(song)
+        ) {
             return
         }
 
         songCoverFetches.add(song)
         scope.async(Dispatchers.Main) {
-            val bitmap = async(Dispatchers.IO) { coverLoader.loadCover(song.coverUrl) }.await()
+            val bitmap = async(Dispatchers.IO) { coverLoader.loadCover(song.coverFilename) }.await()
             storeCoverForSong(song, bitmap)
             songCoverFetches.remove(song)
 
@@ -627,7 +622,7 @@ class NupService :
 
         Toast.makeText(
             this@NupService,
-            "Download of ${songIdToSong[entry.songId]?.url} failed: $reason",
+            "Download of \"${songIdToSong[entry.songId]?.filename}\" failed: $reason",
             Toast.LENGTH_LONG
         ).show()
 

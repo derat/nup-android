@@ -137,7 +137,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
                 playlistView.smoothScrollToPosition(curSongIndex)
             }
 
-            // TODO: Go to prefs page if server and account are unset.
+            // TODO: Go to prefs page if server is unset.
             if (songs.isEmpty()) {
                 startActivity(Intent(this@NupActivity, BrowseTopActivity::class.java))
             }

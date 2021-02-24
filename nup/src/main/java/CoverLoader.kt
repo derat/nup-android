@@ -12,7 +12,7 @@ import android.util.Log
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
-import java.net.URL
+import java.net.URLEncoder
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -42,20 +42,20 @@ open class CoverLoader(
     private val lastLock = ReentrantLock()
 
     /**
-     * Synchronously load the cover at [url].
+     * Synchronously load the cover at [path] (corresponding to [Song.coverFilename]).
      *
      * Tries to find the cover locally first; then goes to the server.
      *
      * @return cover image or null if unavailable
      */
-    suspend fun loadCover(url: URL): Bitmap? {
+    suspend fun loadCover(path: String): Bitmap? {
         waitUntilReady() // wait for [coverDir]
 
-        var file = lookForLocalCover(url)
+        var file = lookForLocalCover(path)
         if (file != null) {
             Log.d(TAG, "Using local file ${file.name}")
         } else {
-            file = downloadCover(url) ?: return null
+            file = downloadCover(path) ?: return null
             Log.d(TAG, "Fetched remote file ${file.name}")
         }
 
@@ -72,8 +72,8 @@ open class CoverLoader(
         }
     }
 
-    private suspend fun lookForLocalCover(url: URL): File? {
-        val filename = getFilenameForUrl(url)
+    private suspend fun lookForLocalCover(path: String): File? {
+        val filename = getFilenameForPath(path)
         startLoad(filename)
         try {
             val file = File(coverDir, filename)
@@ -84,14 +84,16 @@ open class CoverLoader(
         return null
     }
 
-    private suspend fun downloadCover(url: URL): File? {
+    private suspend fun downloadCover(path: String): File? {
         if (!networkHelper.isNetworkAvailable) return null
 
-        val localFilename = getFilenameForUrl(url)
-        startLoad(localFilename)
+        val filename = getFilenameForPath(path)
+        startLoad(filename)
 
         var success = false
-        val file = File(coverDir, localFilename)
+        val file = File(coverDir, filename)
+        val enc = URLEncoder.encode(path, "UTF-8")
+        val url = downloader.getServerUrl("/cover?filename=$enc&size=$COVER_SIZE")
         var conn: HttpURLConnection? = null
         try {
             // Check if another thread downloaded it while we were waiting.
@@ -100,7 +102,7 @@ open class CoverLoader(
                 return file
             }
 
-            conn = downloader.download(url, "GET", Downloader.AuthType.STORAGE, null)
+            conn = downloader.download(url, "GET", Downloader.AuthType.SERVER, null)
             if (conn.responseCode != 200) throw IOException("Status code " + conn.responseCode)
             file.createNewFile()
             file.outputStream().use { conn.inputStream.copyTo(it) }
@@ -110,14 +112,14 @@ open class CoverLoader(
         } finally {
             conn?.disconnect()
             if (!success && file.exists()) file.delete()
-            finishLoad(localFilename)
+            finishLoad(filename)
         }
 
         return if (success) file else null
     }
 
-    private fun getFilenameForUrl(url: URL): String {
-        val parts = url.path.split("/").toTypedArray()
+    private fun getFilenameForPath(path: String): String {
+        val parts = path.split("/").toTypedArray()
         return parts[parts.size - 1]
     }
 
@@ -155,6 +157,7 @@ open class CoverLoader(
     companion object {
         private const val TAG = "CoverLoader"
         private const val DIR_NAME = "covers"
+        private const val COVER_SIZE = 256
     }
 
     init {

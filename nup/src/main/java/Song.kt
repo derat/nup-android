@@ -7,7 +7,6 @@ package org.erat.nup
 
 import android.graphics.Bitmap
 import java.io.Serializable
-import java.net.URL
 
 class Song(
     val id: Long,
@@ -15,8 +14,8 @@ class Song(
     val title: String,
     val album: String,
     val albumId: String,
-    url: String,
-    coverUrl: String,
+    val filename: String,
+    val coverFilename: String,
     val lengthSec: Int,
     val track: Int,
     val disc: Int,
@@ -25,9 +24,6 @@ class Song(
     val peakAmp: Double,
     val rating: Double,
 ) : Serializable {
-    val url: URL? = if (url.isEmpty()) null else URL(url)
-    val coverUrl: URL? = if (coverUrl.isEmpty()) null else URL(coverUrl)
-
     var coverBitmap: Bitmap? = null
 
     // Number of bytes available to us (i.e. what we have on disk).

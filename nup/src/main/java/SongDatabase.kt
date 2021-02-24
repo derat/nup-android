@@ -145,7 +145,7 @@ class SongDatabase(
             if (minRating >= 0.0) java.lang.Double.toString(minRating) else null, false
         )
         val query = (
-            "SELECT s.SongId, Artist, Title, Album, AlbumId, Url, CoverUrl, Length, " +
+            "SELECT s.SongId, Artist, Title, Album, AlbumId, Filename, CoverFilename, Length, " +
                 "TrackNumber, DiscNumber, TrackGain, AlbumGain, PeakAmp, Rating " +
                 "FROM Songs s " +
                 (if (onlyCached) "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " else "") +
@@ -169,8 +169,8 @@ class SongDatabase(
                 title = cursor.getString(2),
                 album = cursor.getString(3),
                 albumId = cursor.getString(4),
-                url = cursor.getString(5),
-                coverUrl = cursor.getString(6),
+                filename = cursor.getString(5),
+                coverFilename = cursor.getString(6),
                 lengthSec = cursor.getInt(7),
                 track = cursor.getInt(8),
                 disc = cursor.getInt(9),
@@ -353,8 +353,8 @@ class SongDatabase(
                     } else {
                         val values = ContentValues(14)
                         values.put("SongId", songId)
-                        values.put("Url", jsonSong.getString("url"))
-                        values.put("CoverUrl", jsonSong.optString("coverUrl"))
+                        values.put("Filename", jsonSong.getString("filename"))
+                        values.put("CoverFilename", jsonSong.optString("coverFilename"))
                         values.put("Artist", jsonSong.getString("artist"))
                         values.put("Title", jsonSong.getString("title"))
                         values.put("Album", jsonSong.getString("album"))
@@ -568,27 +568,27 @@ class SongDatabase(
 
         private const val DATABASE_NAME = "NupSongs"
         private const val MAX_QUERY_RESULTS = 250
-        private const val DATABASE_VERSION = 15
+        private const val DATABASE_VERSION = 16
         private const val SERVER_SONG_BATCH_SIZE = 100
 
         // IMPORTANT NOTE: When updating any of these, you must replace all previous references in
         // upgradeFromPreviousVersion() with the hardcoded older version of the string.
         private const val CREATE_SONGS_SQL = (
             "CREATE TABLE Songs (" +
-                "  SongId INTEGER PRIMARY KEY NOT NULL, " +
-                "  Url VARCHAR(256) NOT NULL, " +
-                "  CoverUrl VARCHAR(256) NOT NULL, " +
-                "  Artist VARCHAR(256) NOT NULL, " +
-                "  Title VARCHAR(256) NOT NULL, " +
-                "  Album VARCHAR(256) NOT NULL, " +
-                "  AlbumId VARCHAR(256) NOT NULL, " +
-                "  TrackNumber INTEGER NOT NULL, " +
-                "  DiscNumber INTEGER NOT NULL, " +
-                "  Length INTEGER NOT NULL, " +
-                "  TrackGain FLOAT NOT NULL, " +
-                "  AlbumGain FLOAT NOT NULL, " +
-                "  PeakAmp FLOAT NOT NULL, " +
-                "  Rating FLOAT NOT NULL)"
+                "SongId INTEGER PRIMARY KEY NOT NULL, " +
+                "Filename VARCHAR(256) NOT NULL, " +
+                "CoverFilename VARCHAR(256) NOT NULL, " +
+                "Artist VARCHAR(256) NOT NULL, " +
+                "Title VARCHAR(256) NOT NULL, " +
+                "Album VARCHAR(256) NOT NULL, " +
+                "AlbumId VARCHAR(256) NOT NULL, " +
+                "TrackNumber INTEGER NOT NULL, " +
+                "DiscNumber INTEGER NOT NULL, " +
+                "Length INTEGER NOT NULL, " +
+                "TrackGain FLOAT NOT NULL, " +
+                "AlbumGain FLOAT NOT NULL, " +
+                "PeakAmp FLOAT NOT NULL, " +
+                "Rating FLOAT NOT NULL)"
             )
         private const val CREATE_SONGS_ARTIST_INDEX_SQL = "CREATE INDEX Artist ON Songs (Artist)"
         private const val CREATE_SONGS_ALBUM_INDEX_SQL = "CREATE INDEX Album ON Songs (Album)"
@@ -597,12 +597,12 @@ class SongDatabase(
 
         private const val CREATE_ARTIST_ALBUM_STATS_SQL = (
             "CREATE TABLE ArtistAlbumStats (" +
-                "  Artist VARCHAR(256) NOT NULL, " +
-                "  Album VARCHAR(256) NOT NULL, " +
-                "  AlbumId VARCHAR(256) NOT NULL, " +
-                "  NumSongs INTEGER NOT NULL, " +
-                "  ArtistSortKey VARCHAR(256) NOT NULL, " +
-                "  AlbumSortKey VARCHAR(256) NOT NULL)"
+                "Artist VARCHAR(256) NOT NULL, " +
+                "Album VARCHAR(256) NOT NULL, " +
+                "AlbumId VARCHAR(256) NOT NULL, " +
+                "NumSongs INTEGER NOT NULL, " +
+                "ArtistSortKey VARCHAR(256) NOT NULL, " +
+                "AlbumSortKey VARCHAR(256) NOT NULL)"
             )
         private const val CREATE_ARTIST_ALBUM_STATS_ARTIST_SORT_KEY_INDEX_SQL =
             "CREATE INDEX ArtistSortKey ON ArtistAlbumStats (ArtistSortKey)"
@@ -611,8 +611,8 @@ class SongDatabase(
 
         private const val CREATE_LAST_UPDATE_TIME_SQL = (
             "CREATE TABLE LastUpdateTime (" +
-                "  LocalTimeNsec INTEGER NOT NULL, " +
-                "  ServerTimeNsec INTEGER NOT NULL)"
+                "LocalTimeNsec INTEGER NOT NULL, " +
+                "ServerTimeNsec INTEGER NOT NULL)"
             )
         private const val INSERT_LAST_UPDATE_TIME_SQL =
             "INSERT INTO LastUpdateTime (LocalTimeNsec, ServerTimeNsec) VALUES(0, 0)"
@@ -622,9 +622,9 @@ class SongDatabase(
 
         private const val CREATE_PENDING_PLAYBACK_REPORTS_SQL = (
             "CREATE TABLE PendingPlaybackReports (" +
-                "  SongId INTEGER NOT NULL, " +
-                "  StartTime INTEGER NOT NULL, " +
-                "  PRIMARY KEY (SongId, StartTime))"
+                "SongId INTEGER NOT NULL, " +
+                "StartTime INTEGER NOT NULL, " +
+                "PRIMARY KEY (SongId, StartTime))"
             )
     }
 
@@ -844,6 +844,41 @@ class SongDatabase(
                         db.execSQL(CREATE_ARTIST_ALBUM_STATS_ARTIST_SORT_KEY_INDEX_SQL)
                         db.execSQL(CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL)
                         updateArtistAlbumStats(db)
+                    } else if (newVersion == 16) {
+                        // Version 16: Replace Url and CoverUrl with Filename and CoverFilename.
+                        db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp")
+                        db.execSQL(
+                            "CREATE TABLE Songs (" +
+                                "SongId INTEGER PRIMARY KEY NOT NULL, " +
+                                "Filename VARCHAR(256) NOT NULL, " +
+                                "CoverFilename VARCHAR(256) NOT NULL, " +
+                                "Artist VARCHAR(256) NOT NULL, " +
+                                "Title VARCHAR(256) NOT NULL, " +
+                                "Album VARCHAR(256) NOT NULL, " +
+                                "AlbumId VARCHAR(256) NOT NULL, " +
+                                "TrackNumber INTEGER NOT NULL, " +
+                                "DiscNumber INTEGER NOT NULL, " +
+                                "Length INTEGER NOT NULL, " +
+                                "TrackGain FLOAT NOT NULL, " +
+                                "AlbumGain FLOAT NOT NULL, " +
+                                "PeakAmp FLOAT NOT NULL, " +
+                                "Rating FLOAT NOT NULL)"
+                        )
+                        db.execSQL(
+                            "INSERT INTO Songs " +
+                                "SELECT SongId, '', '', Artist, Title, Album, AlbumId, " +
+                                "TrackNumber, DiscNumber, Length, TrackGain, AlbumGain, " +
+                                "PeakAmp, Rating FROM SongsTmp"
+                        )
+                        db.execSQL("DROP TABLE SongsTmp")
+                        db.execSQL(CREATE_SONGS_ARTIST_INDEX_SQL)
+                        db.execSQL(CREATE_SONGS_ALBUM_INDEX_SQL)
+                        db.execSQL(CREATE_SONGS_ALBUM_ID_INDEX_SQL)
+                        // I'm deeming it too hard to convert URLs to filenames,
+                        // so force a full sync.
+                        db.execSQL(
+                            "UPDATE LastUpdateTime SET LocalTimeNsec = 0, ServerTimeNsec = 0"
+                        )
                     } else {
                         throw RuntimeException(
                             "Got request to upgrade database to unknown version $newVersion"

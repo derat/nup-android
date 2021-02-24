@@ -88,7 +88,6 @@ class SettingsFragment :
         configEditText(NupPreferences.SERVER_URL, simpleSummary, text or noSuggest, false)
         configEditText(NupPreferences.USERNAME, simpleSummary, text or noSuggest, false)
         configEditText(NupPreferences.PASSWORD, null, text or password, false)
-        configEditText(NupPreferences.ACCOUNT, simpleSummary, text or noSuggest, false)
         configEditText(NupPreferences.PRE_AMP_GAIN, gainSummary, number or decimal or signed, true)
         configEditText(NupPreferences.CACHE_SIZE, cacheSizeSummary, number, false)
         configEditText(NupPreferences.SONGS_TO_PRELOAD, songsSummary, number, true)

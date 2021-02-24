@@ -9,7 +9,6 @@ object NupPreferences {
     const val SERVER_URL = "server_url"
     const val USERNAME = "username"
     const val PASSWORD = "password"
-    const val ACCOUNT = "account"
     const val SYNC_SONG_LIST = "sync_song_list"
     const val PRE_AMP_GAIN = "pre_amp_gain" // positive or negative decibels
     const val CACHE_SIZE = "cache_size" // megabytes

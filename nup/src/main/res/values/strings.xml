@@ -2,8 +2,6 @@
 <resources>
   <string name="app_name">nup</string>
 
-  <string name="account">Account</string>
-  <string name="account_description">Google Cloud Storage account</string>
   <string name="album">Album</string>
   <string name="album_colon">Album:</string>
   <string name="albums">Albums</string>
