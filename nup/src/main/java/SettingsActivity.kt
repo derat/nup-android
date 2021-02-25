@@ -5,13 +5,12 @@
 
 package org.erat.nup
 
-import android.app.ProgressDialog
 import android.content.Context
+import android.content.res.Resources
 import android.os.Bundle
 import android.os.StrictMode
 import android.text.InputType
 import android.util.AttributeSet
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.DialogPreference
 import androidx.preference.EditTextPreference
@@ -23,7 +22,6 @@ import java.text.SimpleDateFormat
 import java.util.Date
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
-import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import org.erat.nup.NupActivity.Companion.service
 
@@ -57,10 +55,16 @@ class SettingsFragment :
     PreferenceFragmentCompat(),
     NupService.SongDatabaseUpdateListener,
     NupService.FileCacheSizeChangeListener {
+
+    // Cached values from [onSongDatabaseSyncChange].
+    private var syncState = SongDatabase.SyncState.IDLE
+    private var syncUpdatedSongs = 0
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         service.addSongDatabaseUpdateListener(this)
         service.addFileCacheSizeChangeListener(this)
+        syncState = service.songDb.syncState
     }
 
     override fun onDestroy() {
@@ -93,8 +97,10 @@ class SettingsFragment :
         configEditText(NupPreferences.SONGS_TO_PRELOAD, songsSummary, number, true)
         configEditText(NupPreferences.DOWNLOAD_RATE, rateSummary, number, true)
 
-        findPreference<YesNoPreference>(NupPreferences.SYNC_SONG_LIST)!!
-            .setSummaryProvider(syncSummary)
+        val syncPref = findPreference<YesNoPreference>(NupPreferences.SYNC_SONG_LIST)!!
+        syncPref.setSummaryProvider(syncSummary)
+        syncPref.setEnabled(syncState == SongDatabase.SyncState.IDLE)
+
         findPreference<YesNoPreference>(NupPreferences.CLEAR_CACHE)!!
             .setSummaryProvider(clearCacheSummary)
     }
@@ -113,10 +119,22 @@ class SettingsFragment :
         }
     }
 
+    override fun onSongDatabaseSyncChange(state: SongDatabase.SyncState, updatedSongs: Int) {
+        // Force the pref's summary (showing sync progress) to be updated and disable
+        // it while a sync is in progress.
+        syncState = state
+        syncUpdatedSongs = updatedSongs
+
+        val pref = findPreference<YesNoPreference>(NupPreferences.SYNC_SONG_LIST)!!
+        pref.setEnabled(state == SongDatabase.SyncState.IDLE)
+        pref.notifyChanged()
+    }
+
     override fun onSongDatabaseUpdate() {
         // Force the pref's summary (showing the last sync date) to be updated.
         findPreference<YesNoPreference>(NupPreferences.SYNC_SONG_LIST)!!.notifyChanged()
     }
+
     override fun onFileCacheSizeChange() {
         // Force the pref's summary (showing the current cache size) to be updated.
         findPreference<YesNoPreference>(NupPreferences.CLEAR_CACHE)!!.notifyChanged()
@@ -155,25 +173,14 @@ class SettingsFragment :
     val simpleSummary = EditTextPreference.SimpleSummaryProvider.getInstance()
     val syncSummary = object : SummaryProvider<YesNoPreference> {
         override fun provideSummary(preference: YesNoPreference): String {
-            val db = service.songDb
-            return when {
-                !db.aggregateDataLoaded -> getString(R.string.loading_stats)
-                db.lastSyncDate == null -> getString(R.string.never_synced)
-                else -> {
-                    val last = db.lastSyncDate!!
-                    val dateFormat = SimpleDateFormat("yyyyMMdd")
-                    return resources.getQuantityString(
-                        R.plurals.sync_status_fmt,
-                        db.numSongs,
-                        db.numSongs,
-                        if (dateFormat.format(last) == dateFormat.format(Date())) {
-                            SimpleDateFormat.getTimeInstance().format(last)
-                        } else {
-                            SimpleDateFormat.getDateInstance().format(last)
-                        }
-                    )
-                }
-            }
+            return getSyncSummary(
+                resources,
+                syncState,
+                syncUpdatedSongs,
+                service.songDb.numSongs,
+                service.songDb.aggregateDataLoaded,
+                service.songDb.lastSyncDate,
+            )
         }
     }
     val gainSummary = object : SummaryProvider<EditTextPreference> {
@@ -212,6 +219,40 @@ class SettingsFragment :
     }
 }
 
+private val dateFormat = SimpleDateFormat("yyyyMMdd")
+
+/** Construct summary text for the sync preference. */
+private fun getSyncSummary(
+    res: Resources,
+    state: SongDatabase.SyncState,
+    updatedSongs: Int,
+    totalSongs: Int,
+    aggregateDataLoaded: Boolean,
+    lastSyncDate: Date?,
+): String {
+    return when (state) {
+        SongDatabase.SyncState.IDLE -> {
+            if (!aggregateDataLoaded) return res.getString(R.string.loading_stats)
+            if (lastSyncDate == null) return res.getString(R.string.never_synced)
+
+            val date = if (dateFormat.format(lastSyncDate) == dateFormat.format(Date())) {
+                SimpleDateFormat.getTimeInstance().format(lastSyncDate)
+            } else {
+                SimpleDateFormat.getDateInstance().format(lastSyncDate)
+            }
+            res.getQuantityString(R.plurals.sync_status_fmt, totalSongs, totalSongs, date)
+        }
+        SongDatabase.SyncState.STARTING ->
+            res.getString(R.string.sync_progress_starting)
+        SongDatabase.SyncState.UPDATING_SONGS ->
+            res.getQuantityString(R.plurals.sync_update_fmt, updatedSongs, updatedSongs)
+        SongDatabase.SyncState.DELETING_SONGS ->
+            res.getQuantityString(R.plurals.sync_delete_fmt, updatedSongs, updatedSongs)
+        SongDatabase.SyncState.UPDATING_STATS ->
+            res.getString(R.string.sync_progress_rebuilding_stats_tables)
+    }
+}
+
 /**
  * Preference showing an okay/cancel dialog and performing an action.
  *
@@ -240,60 +281,12 @@ class YesNoPreferenceDialogFragment : PreferenceDialogFragmentCompat() {
         if (!positiveResult) return
         val key = getPreference().key
         when (key) {
-            NupPreferences.SYNC_SONG_LIST -> GlobalScope.launch(Dispatchers.Main) { syncSongList() }
+            NupPreferences.SYNC_SONG_LIST -> GlobalScope.launch(Dispatchers.IO) {
+                service.songDb.syncWithServer()
+            }
             NupPreferences.CLEAR_CACHE -> service.clearCache()
             else -> throw RuntimeException("Unhandled preference $key")
         }
-    }
-
-    /** Sync songs from the server. */
-    private suspend fun syncSongList() {
-        // TODO: ProgressDialog is deprecated; stop using it. Also get rid of this ridiculous
-        // context hack -- we can't use our own context since the dialog is getting closed.
-        val ctx = SettingsActivity.singleton!!
-        val dialog = ProgressDialog.show(
-            ctx,
-            ctx.getString(R.string.syncing_song_list),
-            ctx.resources.getQuantityString(R.plurals.sync_update_fmt, 0, 0),
-            true, // indeterminate
-            false, // cancelable
-        )
-
-        // Create a listener that updates the dialog to describe sync progress.
-        val listener = object : SongDatabase.SyncProgressListener {
-            override fun onSyncProgress(state: SongDatabase.SyncState, numSongs: Int) {
-                assertOnMainThread()
-
-                when (state) {
-                    SongDatabase.SyncState.UPDATING_SONGS -> {
-                        dialog.progress = numSongs
-                        dialog.setMessage(
-                            ctx.resources
-                                .getQuantityString(R.plurals.sync_update_fmt, numSongs, numSongs)
-                        )
-                    }
-                    SongDatabase.SyncState.DELETING_SONGS -> {
-                        dialog.progress = numSongs
-                        dialog.setMessage(
-                            ctx.resources
-                                .getQuantityString(R.plurals.sync_delete_fmt, numSongs, numSongs)
-                        )
-                    }
-                    SongDatabase.SyncState.UPDATING_STATS -> {
-                        dialog.setMessage(
-                            ctx.getString(R.string.sync_progress_rebuilding_stats_tables)
-                        )
-                    }
-                }
-            }
-        }
-
-        // Actually perform the sync.
-        val msg = GlobalScope.async(Dispatchers.IO) {
-            service.songDb.syncWithServer(listener, ctx.mainExecutor).message
-        }.await()
-        dialog.dismiss()
-        Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()
     }
 
     companion object {

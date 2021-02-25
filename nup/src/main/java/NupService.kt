@@ -57,6 +57,8 @@ class NupService :
 
     /** Listener for [SongDatabase]'s aggregate data being updated. */
     interface SongDatabaseUpdateListener {
+        /** Called when the synchronization state changes. */
+        fun onSongDatabaseSyncChange(state: SongDatabase.SyncState, updatedSongs: Int)
         /** Called when data is updated. */
         fun onSongDatabaseUpdate()
     }
@@ -691,6 +693,19 @@ class NupService :
             songListener?.onSongFileSizeChange(song)
         }
         for (listener in fileCacheSizeChangeListeners) listener.onFileCacheSizeChange()
+    }
+
+    override fun onSyncChange(state: SongDatabase.SyncState, updatedSongs: Int) {
+        assertOnMainThread()
+        Log.d(TAG, "Sync state changed to ${state.name} ($updatedSongs song(s))")
+        for (listener in songDatabaseUpdateListeners) {
+            listener.onSongDatabaseSyncChange(state, updatedSongs)
+        }
+    }
+
+    override fun onSyncDone(success: Boolean, message: String) {
+        assertOnMainThread()
+        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
     }
 
     override fun onAggregateDataUpdate() {

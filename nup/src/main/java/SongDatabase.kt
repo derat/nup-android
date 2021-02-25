@@ -37,28 +37,34 @@ class SongDatabase(
         private set
     var numSongs = 0
         private set
+    var syncState = SyncState.IDLE
+        private set
     var lastSyncDate: Date? = null
         private set
 
     // https://discuss.kotlinlang.org/t/exposing-a-mutable-member-as-immutable/6359
-    private val _artistsSortedAlphabetically = mutableListOf<StatsRow>()
-    private val _artistsSortedByNumSongs = mutableListOf<StatsRow>()
-    private val _albumsSortedAlphabetically = mutableListOf<StatsRow>()
-    private val _artistAlbums = mutableMapOf<String, MutableList<StatsRow>>()
+    private var _artistsSortedAlphabetically = mutableListOf<StatsRow>()
+    private var _artistsSortedByNumSongs = mutableListOf<StatsRow>()
+    private var _albumsSortedAlphabetically = mutableListOf<StatsRow>()
+    private var _artistAlbums = mutableMapOf<String, MutableList<StatsRow>>()
 
-    val artistsSortedAlphabetically: List<StatsRow> = _artistsSortedAlphabetically
-    val artistsSortedByNumSongs: List<StatsRow> = _artistsSortedByNumSongs
-    val albumsSortedAlphabetically: List<StatsRow> = _albumsSortedAlphabetically
+    val artistsSortedAlphabetically: List<StatsRow> get() = _artistsSortedAlphabetically
+    val artistsSortedByNumSongs: List<StatsRow> get() = _artistsSortedByNumSongs
+    val albumsSortedAlphabetically: List<StatsRow> get() = _albumsSortedAlphabetically
     fun albumsByArtist(artist: String): List<StatsRow> =
         _artistAlbums[artist.toLowerCase()] ?: listOf()
 
+    enum class SyncState { IDLE, STARTING, UPDATING_SONGS, DELETING_SONGS, UPDATING_STATS }
+
     /** Notified about changes to the database. */
     interface Listener {
+        /** Called when [syncState] changes. */
+        fun onSyncChange(state: SyncState, updatedSongs: Int)
+        /** Called synchronization finishes (either successfully or not). */
+        fun onSyncDone(success: Boolean, message: String)
         /** Called when aggregate stats have been updated. */
         fun onAggregateDataUpdate()
     }
-
-    enum class SyncState { UPDATING_SONGS, DELETING_SONGS, UPDATING_STATS }
 
     suspend fun cachedArtistsSortedAlphabetically(): List<StatsRow> = getSortedRows(
         "SELECT s.Artist, '' AS Album, '' AS AlbumId, COUNT(*) " +
@@ -230,25 +236,39 @@ class SongDatabase(
         return reports
     }
 
-    /** Notified about progress while synchronizing with the server. */
-    interface SyncProgressListener {
-        /** Called when sync progress changes. */
-        fun onSyncProgress(state: SyncState, numSongs: Int)
-    }
-
-    /** Result of a call to [syncWithServer]. */
-    data class SyncResult(val success: Boolean, val message: String)
-
     /** Synchronize the song list with the server. */
-    suspend fun syncWithServer(
-        listener: SyncProgressListener,
-        listenerExecutor: Executor,
-    ): SyncResult {
-        if (!networkHelper.isNetworkAvailable) {
-            return SyncResult(false, context.getString(R.string.network_is_unavailable))
+    suspend fun syncWithServer() {
+        synchronized(this) {
+            if (syncState != SyncState.IDLE) {
+                notifySyncDone(false, context.getString(R.string.sync_already))
+                return
+            }
+            setSyncState(SyncState.STARTING, 0)
         }
 
-        var numSongsUpdated = 0
+        try {
+            if (!networkHelper.isNetworkAvailable) {
+                notifySyncDone(false, context.getString(R.string.network_is_unavailable))
+                return
+            }
+            val res = syncSongs()
+            if (!res.success) {
+                notifySyncDone(false, res.error!!)
+                return
+            }
+            loadAggregateData(res.updatedSongs > 0)
+            notifySyncDone(true, context.getString(R.string.sync_complete))
+        } finally {
+            setSyncState(SyncState.IDLE, 0)
+        }
+    }
+
+    /** Result of a call to [syncSongs]. */
+    data class SyncSongsResult(val success: Boolean, val updatedSongs: Int, val error: String?)
+
+    /** Update local list of songs on behalf of [syncWithServer]. */
+    private suspend fun syncSongs(): SyncSongsResult {
+        var updatedSongs = 0
         val db = opener.getDb()
 
         db.beginTransaction()
@@ -256,36 +276,31 @@ class SongDatabase(
             // Ask the server for the current time before we fetch anything.  We'll use this as the
             // starting point for the next sync, to handle the case where some songs in the server
             // are updated while we're doing this sync.
-            val (startTimeStr, error) = downloader.downloadString("/now_nsec")
-            startTimeStr ?: return SyncResult(false, error!!)
-            var startTimeNsec = startTimeStr.toLong()
+            val (startStr, error) = downloader.downloadString("/now_nsec")
+            startStr ?: return SyncSongsResult(false, 0, error!!)
+            var startNs = startStr.toLong()
 
             // Start where we left off last time.
             val dbCursor = db.rawQuery("SELECT ServerTimeNsec FROM LastUpdateTime", null)
             dbCursor.moveToFirst()
-            val prevStartTimeNsec = dbCursor.getLong(0)
+            val prevStartNs = dbCursor.getLong(0)
             dbCursor.close()
+
             try {
-                numSongsUpdated += queryServer(
-                    db, prevStartTimeNsec, false, listener, listenerExecutor
-                )
-                numSongsUpdated += queryServer(
-                    db, prevStartTimeNsec, true, listener, listenerExecutor
-                )
+                updatedSongs += queryServer(db, prevStartNs, false)
+                updatedSongs += queryServer(db, prevStartNs, true)
             } catch (e: ServerException) {
                 Log.e(TAG, e.message!!)
-                return SyncResult(false, e.message)
+                return SyncSongsResult(false, updatedSongs, e.message)
             }
 
             val values = ContentValues(2)
             values.put("LocalTimeNsec", Date().time * 1000 * 1000)
-            values.put("ServerTimeNsec", startTimeNsec)
+            values.put("ServerTimeNsec", startNs)
             db.update("LastUpdateTime", values, null, null)
 
-            if (numSongsUpdated > 0) {
-                listenerExecutor.execute {
-                    listener.onSyncProgress(SyncState.UPDATING_STATS, numSongsUpdated)
-                }
+            if (updatedSongs > 0) {
+                setSyncState(SyncState.UPDATING_STATS, 0)
                 updateArtistAlbumStats(db)
                 updateCachedSongs(db)
             }
@@ -293,15 +308,25 @@ class SongDatabase(
         } finally {
             db.endTransaction()
         }
-        loadAggregateData(numSongsUpdated > 0)
-        return SyncResult(true, "Synchronization complete.")
+        return SyncSongsResult(true, updatedSongs, null)
+    }
+
+    /** Update [syncState] and notify [listener]. */
+    private fun setSyncState(state: SyncState, updatedSongs: Int) {
+        syncState = state
+        listenerExecutor.execute { listener.onSyncChange(state, updatedSongs) }
+    }
+
+    /** Notify [listener] that a sync attempt has finished. */
+    private fun notifySyncDone(success: Boolean, message: String) {
+        listenerExecutor.execute { listener.onSyncDone(success, message) }
     }
 
     /** Thrown by [queryServer] if an error is encountered. */
     class ServerException(reason: String) : Exception(reason)
 
     /**
-     * Get updated songs from the server on behalf of [syncWithServer].
+     * Get updated songs from the server on behalf of [syncSongs].
      *
      * @return number of updated songs
      */
@@ -310,8 +335,6 @@ class SongDatabase(
         db: SQLiteDatabase,
         prevStartTimeNsec: Long,
         deleted: Boolean,
-        listener: SyncProgressListener,
-        listenerExecutor: Executor,
     ): Int {
         var numUpdates = 0
 
@@ -370,11 +393,10 @@ class SongDatabase(
                 throw ServerException("Couldn't parse response: $e")
             }
 
-            listenerExecutor.execute {
-                listener.onSyncProgress(
-                    if (deleted) SyncState.DELETING_SONGS else SyncState.UPDATING_SONGS, numUpdates
-                )
-            }
+            setSyncState(
+                if (deleted) SyncState.DELETING_SONGS else SyncState.UPDATING_SONGS,
+                numUpdates,
+            )
         }
 
         return numUpdates
@@ -449,7 +471,8 @@ class SongDatabase(
         val db = opener.getDb()
         var cursor = db.rawQuery("SELECT LocalTimeNsec FROM LastUpdateTime", null)
         cursor.moveToFirst()
-        lastSyncDate = if (cursor.getLong(0) > 0) Date(cursor.getLong(0) / (1000 * 1000)) else null
+        val newSyncDate =
+            if (cursor.getLong(0) > 0) Date(cursor.getLong(0) / (1000 * 1000)) else null
         cursor.close()
 
         // If the song data didn't change and we've already loaded it, bail out early.
@@ -458,15 +481,16 @@ class SongDatabase(
             return
         }
 
-        _artistsSortedAlphabetically.clear()
-        _albumsSortedAlphabetically.clear()
-        _artistsSortedByNumSongs.clear()
-        _artistAlbums.clear()
-
         cursor = db.rawQuery("SELECT COUNT(*) FROM Songs", null)
         cursor.moveToFirst()
-        numSongs = cursor.getInt(0)
+        val newNumSongs = cursor.getInt(0)
         cursor.close()
+
+        // Avoid modifying the live members.
+        val newArtistsAlpha = mutableListOf<StatsRow>()
+        val newArtistsNumSongs = mutableListOf<StatsRow>()
+        val newAlbumsAlpha = mutableListOf<StatsRow>()
+        val newArtistAlbums = mutableMapOf<String, MutableList<StatsRow>>()
 
         cursor = db.rawQuery(
             "SELECT Artist, SUM(NumSongs) " +
@@ -477,8 +501,7 @@ class SongDatabase(
         )
         cursor.moveToFirst()
         while (!cursor.isAfterLast) {
-            _artistsSortedAlphabetically
-                .add(StatsRow(cursor.getString(0), "", "", cursor.getInt(1)))
+            newArtistsAlpha.add(StatsRow(cursor.getString(0), "", "", cursor.getInt(1)))
             cursor.moveToNext()
         }
         cursor.close()
@@ -506,23 +529,30 @@ class SongDatabase(
             ) {
                 lastRow.count += count
             } else {
-                _albumsSortedAlphabetically.add(StatsRow(artist, album, albumId, count))
-                lastRow = _albumsSortedAlphabetically.last()
+                newAlbumsAlpha.add(StatsRow(artist, album, albumId, count))
+                lastRow = newAlbumsAlpha.last()
             }
 
             // TODO: Consider aggregating by album ID so that we have the full count from
             // each album rather than just songs exactly matching the artist. This will
             // affect the count displayed when navigating from BrowseArtistsActivity to
             // BrowseAlbumsActivity.
-            _artistAlbums.getOrPut(artist.toLowerCase(), { mutableListOf() })
+            newArtistAlbums.getOrPut(artist.toLowerCase(), { mutableListOf() })
                 .add(StatsRow(artist, album, albumId, count))
         }
         cursor.close()
 
-        _artistsSortedByNumSongs.addAll(_artistsSortedAlphabetically)
-        Collections.sort(_artistsSortedByNumSongs) { a, b -> b.count - a.count }
+        newArtistsNumSongs.addAll(newArtistsAlpha)
+        Collections.sort(newArtistsNumSongs) { a, b -> b.count - a.count }
 
+        lastSyncDate = newSyncDate
+        numSongs = newNumSongs
+        _artistsSortedAlphabetically = newArtistsAlpha
+        _albumsSortedAlphabetically = newAlbumsAlpha
+        _artistsSortedByNumSongs = newArtistsNumSongs
+        _artistAlbums = newArtistAlbums
         aggregateDataLoaded = true
+
         listenerExecutor.execute { listener.onAggregateDataUpdate() }
     }
 

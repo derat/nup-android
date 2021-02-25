@@ -112,6 +112,8 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
         minRatingSpinner.setSelection(0, true)
     }
 
+    override fun onSongDatabaseSyncChange(state: SongDatabase.SyncState, updatedSongs: Int) {}
+
     override fun onSongDatabaseUpdate() {
         val artists = mutableListOf<String>()
         val artistsWithCounts = service.songDb.artistsSortedByNumSongs
