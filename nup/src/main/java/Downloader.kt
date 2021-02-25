@@ -97,22 +97,26 @@ open class Downloader() {
         }
     }
 
-    /**
-     * Download text data from the server.
-     *
-     * @return data, or null if download failed
-     */
-    fun downloadString(path: String, error: Array<String>): String? {
+    /** Result from [downloadString] containing either data or an error. */
+    data class DownloadStringResult(val data: String?, val error: String?)
+
+    /** Download text data from the server. */
+    fun downloadString(path: String): DownloadStringResult {
         var conn: HttpURLConnection? = null
         return try {
             conn = download(getServerUrl(path), "GET", AuthType.SERVER, null)
             val status = conn.responseCode
             if (status != 200) {
-                error[0] = "Got $status from server (${conn.responseMessage})"
-                return null
+                return DownloadStringResult(
+                    null,
+                    "Got $status from server (${conn.responseMessage})"
+                )
             }
             return try {
-                conn.inputStream.bufferedReader().use(BufferedReader::readText)
+                DownloadStringResult(
+                    conn.inputStream.bufferedReader().use(BufferedReader::readText),
+                    null
+                )
             } finally {
                 // This isn't documented as being necessary, but it seems to be needed to avoid
                 // android.os.strictmode.LeakedClosableViolation when syncing songs. Oddly, this
@@ -121,11 +125,9 @@ open class Downloader() {
                 conn.inputStream.close()
             }
         } catch (e: PrefException) {
-            error[0] = e.message ?: "Pref error ($e)"
-            null
+            DownloadStringResult(null, e.message ?: "Pref error ($e)")
         } catch (e: IOException) {
-            error[0] = "IO error ($e)"
-            null
+            DownloadStringResult(null, "IO error ($e)")
         } finally {
             conn?.disconnect()
         }

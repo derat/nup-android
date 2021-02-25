@@ -290,9 +290,7 @@ class YesNoPreferenceDialogFragment : PreferenceDialogFragmentCompat() {
 
         // Actually perform the sync.
         val msg = GlobalScope.async(Dispatchers.IO) {
-            val message = arrayOf("")
-            service.songDb.syncWithServer(listener, ctx.mainExecutor, message)
-            message[0]
+            service.songDb.syncWithServer(listener, ctx.mainExecutor).message
         }.await()
         dialog.dismiss()
         Toast.makeText(ctx, msg, Toast.LENGTH_SHORT).show()

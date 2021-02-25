@@ -141,8 +141,7 @@ class SongDatabase(
         builder.add("Album LIKE ?", album, substring)
         builder.add("AlbumId = ?", albumId, false)
         builder.add(
-            "Rating >= ?",
-            if (minRating >= 0.0) java.lang.Double.toString(minRating) else null, false
+            "Rating >= ?", if (minRating >= 0.0) minRating.toString() else null, false
         )
         val query = (
             "SELECT s.SongId, Artist, Title, Album, AlbumId, Filename, CoverFilename, Length, " +
@@ -237,15 +236,16 @@ class SongDatabase(
         fun onSyncProgress(state: SyncState, numSongs: Int)
     }
 
+    /** Result of a call to [syncWithServer]. */
+    data class SyncResult(val success: Boolean, val message: String)
+
     /** Synchronize the song list with the server. */
     suspend fun syncWithServer(
         listener: SyncProgressListener,
         listenerExecutor: Executor,
-        message: Array<String>
-    ): Boolean {
+    ): SyncResult {
         if (!networkHelper.isNetworkAvailable) {
-            message[0] = context.getString(R.string.network_is_unavailable)
-            return false
+            return SyncResult(false, context.getString(R.string.network_is_unavailable))
         }
 
         var numSongsUpdated = 0
@@ -256,14 +256,9 @@ class SongDatabase(
             // Ask the server for the current time before we fetch anything.  We'll use this as the
             // starting point for the next sync, to handle the case where some songs in the server
             // are updated while we're doing this sync.
-            val startTimeStr = downloader.downloadString("/now_nsec", message) ?: return false
-            var startTimeNsec: Long
-            try {
-                startTimeNsec = java.lang.Long.valueOf(startTimeStr)
-            } catch (e: NumberFormatException) {
-                message[0] = "Unable to parse time: $startTimeStr"
-                return false
-            }
+            val (startTimeStr, error) = downloader.downloadString("/now_nsec")
+            startTimeStr ?: return SyncResult(false, error!!)
+            var startTimeNsec = startTimeStr.toLong()
 
             // Start where we left off last time.
             val dbCursor = db.rawQuery("SELECT ServerTimeNsec FROM LastUpdateTime", null)
@@ -271,12 +266,15 @@ class SongDatabase(
             val prevStartTimeNsec = dbCursor.getLong(0)
             dbCursor.close()
             try {
-                numSongsUpdated +=
-                    queryServer(db, prevStartTimeNsec, false, listener, listenerExecutor, message)
-                numSongsUpdated +=
-                    queryServer(db, prevStartTimeNsec, true, listener, listenerExecutor, message)
+                numSongsUpdated += queryServer(
+                    db, prevStartTimeNsec, false, listener, listenerExecutor
+                )
+                numSongsUpdated += queryServer(
+                    db, prevStartTimeNsec, true, listener, listenerExecutor
+                )
             } catch (e: ServerException) {
-                return false
+                Log.e(TAG, e.message!!)
+                return SyncResult(false, e.message)
             }
 
             val values = ContentValues(2)
@@ -296,10 +294,10 @@ class SongDatabase(
             db.endTransaction()
         }
         loadAggregateData(numSongsUpdated > 0)
-        message[0] = "Synchronization complete."
-        return true
+        return SyncResult(true, "Synchronization complete.")
     }
 
+    /** Thrown by [queryServer] if an error is encountered. */
     class ServerException(reason: String) : Exception(reason)
 
     /**
@@ -314,7 +312,6 @@ class SongDatabase(
         deleted: Boolean,
         listener: SyncProgressListener,
         listenerExecutor: Executor,
-        message: Array<String>
     ): Int {
         var numUpdates = 0
 
@@ -330,8 +327,8 @@ class SongDatabase(
                 SERVER_SONG_BATCH_SIZE,
                 serverCursor
             )
-            val response = downloader.downloadString(path, message)
-                ?: throw ServerException("Download failed")
+            val (response, error) = downloader.downloadString(path)
+            response ?: throw ServerException(error!!)
             serverCursor = ""
             try {
                 val objects = JSONTokener(response).nextValue() as JSONArray
@@ -342,14 +339,13 @@ class SongDatabase(
                             serverCursor = objects.getString(i)
                             break
                         } else {
-                            message[0] = "Item $i from server isn't a JSON object"
-                            throw ServerException("List item not object")
+                            throw ServerException("Item $i from server isn't a JSON object")
                         }
                     val songId = jsonSong.getLong("songId")
 
                     if (deleted) {
                         Log.d(TAG, "Deleting song $songId")
-                        db.delete("Songs", "SongId = ?", arrayOf(java.lang.Long.toString(songId)))
+                        db.delete("Songs", "SongId = ?", arrayOf(songId.toString()))
                     } else {
                         val values = ContentValues(14)
                         values.put("SongId", songId)
@@ -371,8 +367,7 @@ class SongDatabase(
                     numUpdates++
                 }
             } catch (e: JSONException) {
-                message[0] = "Couldn't parse response: $e"
-                throw ServerException("Bad data")
+                throw ServerException("Couldn't parse response: $e")
             }
 
             listenerExecutor.execute {
