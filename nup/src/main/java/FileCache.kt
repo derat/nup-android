@@ -272,19 +272,42 @@ class FileCache constructor(
                 conn = downloader.download(url, "GET", Downloader.AuthType.SERVER, headers)
                 val status = conn!!.getResponseCode()
                 Log.d(TAG, "Got $status from server")
-                if (status != 200 && status != 206) {
-                    reason = "Got status code $status"
-                    return DownloadStatus.FATAL_ERROR
-                }
+                when (status) {
+                    200 -> {
+                        // Update the cache entry with the total file size.
+                        val len = conn!!.getContentLengthLong()
+                        if (len <= 1) {
+                            reason = "Got invalid content length $len"
+                            return DownloadStatus.FATAL_ERROR
+                        }
+                        db.setTotalBytes(entry.songId, len)
+                    }
+                    206 -> {
+                        val range = getRangeInfo(conn!!)
+                        if (range == null) {
+                            reason = "Failed parsing response range"
+                            return DownloadStatus.FATAL_ERROR
+                        }
+                        Log.d(TAG, "Got range ${range.start}-${range.end}/${range.size}")
 
-                // Update the cache entry with the total file size.
-                if (status == 200) {
-                    val len = conn!!.getContentLengthLong()
-                    if (len <= 1) {
-                        reason = "Got invalid content length $len"
+                        // Check that the response started at the offset we asked for.
+                        if (range.start != entry.cachedBytes) {
+                            reason = "Range starts at ${range.start}; need ${entry.cachedBytes}"
+                            return DownloadStatus.FATAL_ERROR
+                        }
+
+                        if (entry.totalBytes == 0L) {
+                            db.setTotalBytes(entry.songId, range.size)
+                        } else if (range.size != entry.totalBytes) {
+                            // TODO: Update the saved size and delete the cached data.
+                            reason = "Size ${range.size} doesn't match expected ${entry.totalBytes}"
+                            return DownloadStatus.FATAL_ERROR
+                        }
+                    }
+                    else -> {
+                        reason = "Got status code $status"
                         return DownloadStatus.FATAL_ERROR
                     }
-                    db.setTotalBytes(entry.songId, len)
                 }
             } catch (e: IOException) {
                 reason = "IO error while starting download"
@@ -316,7 +339,6 @@ class FileCache constructor(
 
             val statusCode = conn!!.responseCode
             try {
-                // TODO: Also check the Content-Range header.
                 val append = (statusCode == 206)
                 outputStream = FileOutputStream(entry.file, append)
                 if (!append) entry.cachedBytes = 0
@@ -378,6 +400,9 @@ class FileCache constructor(
 
         private fun handleSuccess() {
             threadChecker.assertThread()
+            // TODO: If we didn't get the whole file (because it's huge and the server
+            // just gave us a partial reply), post another download task instead of reporting
+            // that we're done.
             synchronized(inProgressSongIds) { inProgressSongIds.remove(entry.songId) }
             listenerExecutor.execute { listener.onCacheDownloadComplete(entry) }
         }
@@ -451,6 +476,26 @@ class FileCache constructor(
         synchronized(inProgressSongIds) { return inProgressSongIds.contains(songId) }
     }
 
+    /** Parses [conn]'s Content-Range header (if present). */
+    private fun getRangeInfo(conn: HttpURLConnection): RangeInfo? {
+        val vals = conn.getHeaderFields()["Content-Range"]
+        if (vals == null || vals.isEmpty()) return null
+
+        var match = fullRangeRegexp.find(vals[0])
+        if (match != null) {
+            val size = match.groupValues[1].toLong()
+            return RangeInfo(0, size - 1, size)
+        }
+
+        match = explicitRangeRegexp.find(vals[0])
+        if (match == null) return null
+        val (start, end, size) = match.destructured
+        return RangeInfo(start.toLong(), end.toLong(), size.toLong())
+    }
+
+    /** Describes the data range provided in an HTTP response. */
+    private class RangeInfo(val start: Long, val end: Long, val size: Long)
+
     /**
      * Try to make room for [neededBytes] in the cache.
      *
@@ -495,6 +540,10 @@ class FileCache constructor(
     companion object {
         private const val TAG = "FileCache"
         private const val SHUTDOWN_TIMEOUT_MS = 1000L
+
+        // Used by [getRangeInfo].
+        val fullRangeRegexp = Regex("^bytes */(\\d+)$")
+        val explicitRangeRegexp = Regex("^bytes (\\d+)-(\\d+)/(\\d+)$")
     }
 
     init {
