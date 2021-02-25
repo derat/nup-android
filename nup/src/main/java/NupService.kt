@@ -34,6 +34,7 @@ import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 
+/** Foreground service that plays music, manages databases, etc. */
 class NupService :
     Service(),
     Player.Listener,
