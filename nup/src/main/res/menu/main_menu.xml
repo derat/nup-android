@@ -8,14 +8,14 @@
     android:icon="@drawable/plus_circle_outline"
     android:title="@string/browse"
     app:iconTint="?android:attr/textColorPrimary"
-    app:showAsAction="ifRoom|withText"
+    app:showAsAction="always|withText"
   />
   <item
     android:id="@+id/search_menu_item"
     android:icon="@drawable/magnify"
     android:title="@string/search"
     app:iconTint="?android:attr/textColorPrimary"
-    app:showAsAction="ifRoom|withText"
+    app:showAsAction="always|withText"
   />
   <item
     android:id="@+id/pause_menu_item"
