@@ -20,6 +20,7 @@ import android.media.AudioManager
 import android.net.Uri
 import android.os.Binder
 import android.os.IBinder
+import android.os.StrictMode
 import android.support.v4.media.session.MediaSessionCompat
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
@@ -253,6 +254,18 @@ class NupService :
         coverLoader = CoverLoader(this, downloader, networkHelper)
         playbackReporter = PlaybackReporter(songDb, downloader, networkHelper)
 
+        // Sigh. This hits the disk, but it crashes with "java.lang.RuntimeException: Can't create
+        // handler inside thread Thread[DefaultDispatcher-worker-2,5,main] that has not called
+        // Looper.prepare()" while inflating PreferenceScreen when I call it on the IO thread. I
+        // haven't been able to find any official documentation giving a full example of the right
+        // way to implement preferences.
+        val origPolicy = StrictMode.allowThreadDiskReads()
+        try {
+            PreferenceManager.setDefaultValues(this@NupService, R.xml.settings, false)
+        } finally {
+            StrictMode.setThreadPolicy(origPolicy)
+        }
+
         // Read prefs on the IO thread to avoid blocking the UI.
         scope.launch(Dispatchers.Main) {
             prefs = async(Dispatchers.IO) {
@@ -375,28 +388,24 @@ class NupService :
     private suspend fun applyPref(key: String) {
         when (key) {
             NupPreferences.CACHE_SIZE -> {
-                val size = readPref(key, NupPreferences.CACHE_SIZE_DEFAULT).toLong()
+                val size = readPref(key).toLong()
                 cache.maxBytes = if (size > 0) size * 1024 * 1024 else size
             }
             NupPreferences.DOWNLOAD_RATE -> {
-                val rate = readPref(key, NupPreferences.DOWNLOAD_RATE_DEFAULT).toLong()
+                val rate = readPref(key).toLong()
                 cache.maxRate = if (rate > 0) rate * 1024 else rate
             }
-            NupPreferences.PASSWORD -> downloader.password = readPref(key, "")
-            NupPreferences.PRE_AMP_GAIN -> {
-                player.preAmpGain = readPref(key, NupPreferences.PRE_AMP_GAIN_DEFAULT).toDouble()
-            }
-            NupPreferences.USERNAME -> downloader.username = readPref(key, "")
-            NupPreferences.SERVER_URL -> downloader.server = readPref(key, "")
-            NupPreferences.SONGS_TO_PRELOAD -> {
-                songsToPreload = readPref(key, NupPreferences.SONGS_TO_PRELOAD_DEFAULT).toInt()
-            }
+            NupPreferences.PASSWORD -> downloader.password = readPref(key)
+            NupPreferences.PRE_AMP_GAIN -> player.preAmpGain = readPref(key).toDouble()
+            NupPreferences.USERNAME -> downloader.username = readPref(key)
+            NupPreferences.SERVER_URL -> downloader.server = readPref(key)
+            NupPreferences.SONGS_TO_PRELOAD -> songsToPreload = readPref(key).toInt()
         }
     }
 
-    /** Return [key]'s value, falling back to [default]. */
-    private suspend fun readPref(key: String, default: String) =
-        scope.async(Dispatchers.IO) { prefs.getString(key, default)!! }.await()
+    /** Return [key]'s value. */
+    private suspend fun readPref(key: String) =
+        scope.async(Dispatchers.IO) { prefs.getString(key, null)!! }.await()
 
     /** Updates the currently-displayed notification if needed.  */
     private fun updateNotification() {

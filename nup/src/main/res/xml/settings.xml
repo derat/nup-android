@@ -6,18 +6,21 @@
   <PreferenceCategory android:title="Server" app:iconSpaceReserved="false">
     <EditTextPreference
       android:key="server_url"
+      android:defaultValue=""
       android:title="@string/server_url"
       android:dialogMessage="@string/server_url_description"
       app:iconSpaceReserved="false"
     />
     <EditTextPreference
       android:key="username"
+      android:defaultValue=""
       android:title="@string/username"
       android:dialogMessage="@string/username_description"
       app:iconSpaceReserved="false"
     />
     <EditTextPreference
       android:key="password"
+      android:defaultValue=""
       android:title="@string/password"
       android:dialogMessage="@string/password_description"
       app:iconSpaceReserved="false"
@@ -38,6 +41,7 @@
          rather than a float. -->
     <EditTextPreference
       android:key="pre_amp_gain"
+      android:defaultValue="0"
       android:title="@string/pre_amp_gain"
       android:dialogMessage="@string/pre_amp_gain_description"
       app:iconSpaceReserved="false"
@@ -47,6 +51,7 @@
   <PreferenceCategory android:title="Cache" app:iconSpaceReserved="false">
     <EditTextPreference
       android:key="cache_size"
+      android:defaultValue="512"
       android:title="@string/cache_size"
       android:dialogMessage="@string/cache_size_description"
       app:iconSpaceReserved="false"
@@ -61,12 +66,14 @@
     />
     <EditTextPreference
       android:key="songs_to_preload"
+      android:defaultValue="1"
       android:title="@string/songs_to_preload"
       android:dialogMessage="@string/songs_to_preload_description"
       app:iconSpaceReserved="false"
     />
     <EditTextPreference
       android:key="download_rate"
+      android:defaultValue="0"
       android:title="@string/download_rate"
       android:dialogMessage="@string/download_rate_description"
       app:iconSpaceReserved="false"
