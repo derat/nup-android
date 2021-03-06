@@ -157,7 +157,7 @@ open class CoverLoader(
     companion object {
         private const val TAG = "CoverLoader"
         private const val DIR_NAME = "covers"
-        private const val COVER_SIZE = 256
+        private const val COVER_SIZE = 512
     }
 
     init {
