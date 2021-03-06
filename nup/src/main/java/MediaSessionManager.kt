@@ -112,9 +112,10 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
         val queue: MutableList<QueueItem> = ArrayList()
         for (song in songs) {
             val desc = MediaDescriptionCompat.Builder()
-                .setMediaId(java.lang.Long.toString(song.id))
+                .setMediaId("${MediaBrowserHelper.SONG_ID_PREFIX}${song.id}")
                 .setTitle(song.title)
-                .setSubtitle(song.artist) // TODO: Set icon too, maybe.
+                .setSubtitle(song.artist)
+                .setIconBitmap(song.coverBitmap)
                 .build()
             queue.add(QueueItem(desc, song.id))
         }
@@ -132,11 +133,9 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
 
     init {
         session = MediaSessionCompat(context, "nup").apply {
-            // TODO: Call setFlags(MediaSessionCompat.FLAG_HANDLES_QUEUE_COMMANDS) after
-            // implementing onAddQueueItem() and friends from MediaSessionCompat.Callback in
-            // NupService.
             setRatingType(RatingCompat.RATING_5_STARS)
             setCallback(callback)
+            setFlags(MediaSessionCompat.FLAG_HANDLES_QUEUE_COMMANDS)
             setSessionActivity(
                 PendingIntent.getActivity(context, 0, Intent(context, NupActivity::class.java), 0)
             )

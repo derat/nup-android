@@ -112,6 +112,7 @@ class SongDatabase(
         title: String? = null,
         album: String? = null,
         albumId: String? = null,
+        songId: Long = -1,
         minRating: Double = -1.0,
         shuffle: Boolean = false,
         substring: Boolean = false,
@@ -146,9 +147,8 @@ class SongDatabase(
         builder.add("Title LIKE ?", title, substring)
         builder.add("Album LIKE ?", album, substring)
         builder.add("AlbumId = ?", albumId, false)
-        builder.add(
-            "Rating >= ?", if (minRating >= 0.0) minRating.toString() else null, false
-        )
+        builder.add("SongId = ?", if (songId >= 0) songId.toString() else null, false)
+        builder.add("Rating >= ?", if (minRating >= 0.0) minRating.toString() else null, false)
         val query = (
             "SELECT s.SongId, Artist, Title, Album, AlbumId, Filename, CoverFilename, Length, " +
                 "TrackNumber, DiscNumber, TrackGain, AlbumGain, PeakAmp, Rating " +

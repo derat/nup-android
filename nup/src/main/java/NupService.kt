@@ -22,6 +22,7 @@ import android.os.Bundle
 import android.os.IBinder
 import android.os.StrictMode
 import android.support.v4.media.MediaBrowserCompat.MediaItem
+import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
@@ -86,7 +87,6 @@ class NupService :
     private lateinit var coverLoader: CoverLoader
     private lateinit var playbackReporter: PlaybackReporter
     private lateinit var mediaSessionManager: MediaSessionManager
-    private lateinit var mediaSessionToken: MediaSessionCompat.Token
     private lateinit var mediaBrowserHelper: MediaBrowserHelper
     private lateinit var notificationManager: NotificationManager
     private lateinit var notificationCreator: NotificationCreator
@@ -296,26 +296,35 @@ class NupService :
         mediaSessionManager = MediaSessionManager(
             this,
             object : MediaSessionCompat.Callback() {
+                override fun onAddQueueItem(description: MediaDescriptionCompat) {
+                    getSongsForMediaId(description.getMediaId()) { appendSongsToPlaylist(it) }
+                }
+                override fun onAddQueueItem(description: MediaDescriptionCompat, index: Int) {
+                    getSongsForMediaId(description.getMediaId()) { insertSongs(it, index) }
+                }
                 override fun onPause() { player.pause() }
                 override fun onPlay() { player.unpause() }
                 override fun onPlayFromMediaId(mediaId: String, extras: Bundle) {
-                    scope.launch(Dispatchers.Main) {
-                        val songs = async(Dispatchers.IO) {
-                            mediaBrowserHelper.getSongsFromMediaId(mediaId)
-                        }.await()
-                        if (!songs.isEmpty()) {
-                            // TODO: Figure out how queue management should work here.
-                            clearPlaylist()
-                            addSongsToPlaylist(songs, false /* forcePlay */)
+                    // TODO: Figure out how queue management should work here.
+                    clearPlaylist()
+                    getSongsForMediaId(mediaId) { addSongsToPlaylist(it, false /* forcePlay */) }
+                }
+                override fun onRemoveQueueItem(description: MediaDescriptionCompat) {
+                    getSongsForMediaId(description.getMediaId()) {
+                        for (song in it) {
+                            val idx = getSongIndex(song.id)
+                            if (idx >= 0) removeFromPlaylist(idx)
                         }
                     }
                 }
+                override fun onRemoveQueueItemAt(index: Int) { removeFromPlaylist(index) }
                 override fun onSkipToNext() { playSongAtIndex(curSongIndex + 1) }
                 override fun onSkipToPrevious() { playSongAtIndex(curSongIndex - 1) }
                 override fun onSkipToQueueItem(id: Long) {
                     // TODO: The same song might be in the playlist multiple times.
-                    // I'm not sure how to tell which one the user selected.
-                    playSongWithId(id)
+                    // Maybe just use the playlist index instead of song ID here.
+                    val idx = getSongIndex(id)
+                    if (idx >= 0) playSongAtIndex(idx)
                 }
                 override fun onStop() { player.pause() }
             }
@@ -600,6 +609,25 @@ class NupService :
             Log.e(TAG, "Ignoring request to play song $id not in playlist")
         } else {
             playSongAtIndex(idx)
+        }
+    }
+
+    /** Get a song's index in the playlist, or -1 if it isn't present. */
+    fun getSongIndex(songId: Long) = songs.indexOfFirst { it.id == songId }
+
+    /** Asynchronously get songs for [id] and pass them to [fn]. */
+    fun getSongsForMediaId(id: String?, fn: (List<Song>) -> Unit) {
+        if (id == null) {
+            Log.e(TAG, "Can't get songs for null media ID")
+            return
+        }
+        scope.launch(Dispatchers.Main) {
+            val songs = async(Dispatchers.IO) { mediaBrowserHelper.getSongsForMediaId(id) }.await()
+            if (songs.isEmpty()) {
+                Log.e(TAG, "No songs found for media ID \"$id\"")
+            } else {
+                fn(songs)
+            }
         }
     }
 

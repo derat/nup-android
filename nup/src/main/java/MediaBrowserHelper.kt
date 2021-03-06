@@ -24,7 +24,7 @@ class MediaBrowserHelper(
         parentId: String,
         result: MediaBrowserServiceCompat.Result<MutableList<MediaItem>>
     ) {
-        Log.d(TAG, "Got request for children of $parentId")
+        Log.d(TAG, "Got request for children of \"$parentId\"")
         when {
             parentId == ROOT_ID -> {
                 // Per https://developer.android.com/training/cars/media#root-menu-structure, it's
@@ -94,7 +94,7 @@ class MediaBrowserHelper(
                 result.detach()
                 GlobalScope.launch(Dispatchers.IO) {
                     val items = mutableListOf<MediaItem>()
-                    for (song in getSongsFromMediaId(parentId)) {
+                    for (song in getSongsForMediaId(parentId)) {
                         val desc = MediaDescriptionCompat.Builder()
                             .setTitle(song.title)
                             .setSubtitle(song.artist)
@@ -148,13 +148,16 @@ class MediaBrowserHelper(
     }
 
     /** Query the database for songs identified by [id]. */
-    public suspend fun getSongsFromMediaId(id: String): List<Song> {
+    public suspend fun getSongsForMediaId(id: String): List<Song> {
         return when {
             id.startsWith(ALBUM_ID_PREFIX) -> {
                 db.query(albumId = id.substring(ALBUM_ID_PREFIX.length))
             }
             id.startsWith(CACHED_ALBUM_ID_PREFIX) -> {
                 db.query(albumId = id.substring(CACHED_ALBUM_ID_PREFIX.length), onlyCached = true)
+            }
+            id.startsWith(SONG_ID_PREFIX) -> {
+                db.query(songId = id.substring(SONG_ID_PREFIX.length).toLong())
             }
             else -> {
                 Log.e(TAG, "Don't know how to query for songs with media ID \"$id\"")
@@ -175,8 +178,9 @@ class MediaBrowserHelper(
 
         private const val ARTIST_ID_PREFIX = "artist_"
         private const val ALBUM_ID_PREFIX = "album_"
-        private const val SONG_ID_PREFIX = "song_"
         private const val CACHED_ARTIST_ID_PREFIX = "cached_artist_"
         private const val CACHED_ALBUM_ID_PREFIX = "cached_album_"
+
+        public const val SONG_ID_PREFIX = "song_"
     }
 }
