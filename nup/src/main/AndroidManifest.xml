@@ -1,12 +1,26 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android" package="org.erat.nup">
+<manifest
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:tools="http://schemas.android.com/tools"
+  package="org.erat.nup"
+>
   <application
     android:label="@string/app_name"
     android:icon="@drawable/launcher"
     android:hardwareAccelerated="true"
     android:debuggable="true"
   >
-    <service android:name=".NupService" android:exported="false" />
+    <service
+      android:name=".NupService"
+      android:enabled="true"
+      android:exported="true"
+      tools:ignore="ExportedService"
+    >
+      <intent-filter>
+        <action android:name="android.media.browse.MediaBrowserService" />
+        <action android:name="android.intent.action.MEDIA_BUTTON" />
+      </intent-filter>
+    </service>
 
     <activity
       android:name=".NupActivity"
@@ -34,9 +48,29 @@
     <activity android:name=".SearchFormActivity" android:theme="@style/AppTheme" />
     <activity android:name=".SettingsActivity" android:theme="@style/AppTheme" />
 
+    <receiver android:name="androidx.media.session.MediaButtonReceiver">
+      <intent-filter>
+        <action android:name="android.intent.action.MEDIA_BUTTON" />
+      </intent-filter>
+    </receiver>
+
     <meta-data
       android:name="android.app.default_searchable"
       android:value=".SearchResultsActivity"
+    />
+
+    <!-- To actually get the app to appear in Android Auto, one needs to also enable developer
+         mode in the app (go to "Settings" and tap "Version" 10 times) and then go to the new
+         "Developer settings" item hidden in the Settings activity's menu and enable "Unknown
+         sources". Note also that the AA app launches the most-recently-used activity by default;
+         there's a tiny arrow icon for switching. -->
+    <meta-data
+      android:name="com.google.android.gms.car.application"
+      android:resource="@xml/automotive_app_desc"
+    />
+    <meta-data
+      android:name="com.google.android.gms.car.notification.SmallIcon"
+      android:resource="@drawable/launcher"
     />
   </application>
 

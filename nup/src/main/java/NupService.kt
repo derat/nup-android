@@ -7,7 +7,6 @@ package org.erat.nup
 
 import android.app.NotificationManager
 import android.app.PendingIntent
-import android.app.Service
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -19,13 +18,17 @@ import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.net.Uri
 import android.os.Binder
+import android.os.Bundle
 import android.os.IBinder
 import android.os.StrictMode
+import android.support.v4.media.MediaBrowserCompat.MediaItem
 import android.support.v4.media.session.MediaSessionCompat
 import android.telephony.PhoneStateListener
 import android.telephony.TelephonyManager
 import android.util.Log
 import android.widget.Toast
+import androidx.media.MediaBrowserServiceCompat
+import androidx.media.session.MediaButtonReceiver
 import androidx.preference.PreferenceManager
 import java.io.File
 import java.util.Arrays
@@ -37,7 +40,7 @@ import kotlinx.coroutines.launch
 
 /** Foreground service that plays music, manages databases, etc. */
 class NupService :
-    Service(),
+    MediaBrowserServiceCompat(),
     Player.Listener,
     FileCache.Listener,
     SongDatabase.Listener {
@@ -84,6 +87,7 @@ class NupService :
     private lateinit var playbackReporter: PlaybackReporter
     private lateinit var mediaSessionManager: MediaSessionManager
     private lateinit var mediaSessionToken: MediaSessionCompat.Token
+    private lateinit var mediaBrowserHelper: MediaBrowserHelper
     private lateinit var notificationManager: NotificationManager
     private lateinit var notificationCreator: NotificationCreator
     private lateinit var audioManager: AudioManager
@@ -215,10 +219,11 @@ class NupService :
     private val fileCacheSizeChangeListeners = mutableSetOf<FileCacheSizeChangeListener>()
 
     override fun onCreate() {
+        super.onCreate()
         Log.d(TAG, "Service created")
 
         // It'd be nice to set this up before we do anything else, but getExternalFilesDir() blocks.
-        scope.async(Dispatchers.Main) {
+        scope.launch(Dispatchers.Main) {
             val dir = async(Dispatchers.IO) {
                 File(getExternalFilesDir(null), CRASH_DIR_NAME)
             }.await()
@@ -293,11 +298,31 @@ class NupService :
             object : MediaSessionCompat.Callback() {
                 override fun onPause() { player.pause() }
                 override fun onPlay() { player.unpause() }
+                override fun onPlayFromMediaId(mediaId: String, extras: Bundle) {
+                    scope.launch(Dispatchers.Main) {
+                        val songs = async(Dispatchers.IO) {
+                            mediaBrowserHelper.getSongsFromMediaId(mediaId)
+                        }.await()
+                        if (!songs.isEmpty()) {
+                            // TODO: Figure out how queue management should work here.
+                            clearPlaylist()
+                            addSongsToPlaylist(songs, false /* forcePlay */)
+                        }
+                    }
+                }
                 override fun onSkipToNext() { playSongAtIndex(curSongIndex + 1) }
                 override fun onSkipToPrevious() { playSongAtIndex(curSongIndex - 1) }
+                override fun onSkipToQueueItem(id: Long) {
+                    // TODO: The same song might be in the playlist multiple times.
+                    // I'm not sure how to tell which one the user selected.
+                    playSongWithId(id)
+                }
                 override fun onStop() { player.pause() }
             }
         )
+        sessionToken = mediaSessionManager.token
+
+        mediaBrowserHelper = MediaBrowserHelper(songDb, this.getResources())
 
         notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         notificationCreator = NotificationCreator(
@@ -327,7 +352,9 @@ class NupService :
     }
 
     override fun onDestroy() {
+        super.onDestroy()
         Log.d(TAG, "Service destroyed")
+
         audioManager.abandonAudioFocusRequest(audioFocusReq)
         if (this::prefs.isInitialized) {
             prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
@@ -343,15 +370,21 @@ class NupService :
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(TAG, "Received start ID $startId: $intent")
-        when (intent?.action) {
-            ACTION_TOGGLE_PAUSE -> togglePause()
-            ACTION_NEXT_TRACK -> playSongAtIndex(curSongIndex + 1)
-            ACTION_PREV_TRACK -> playSongAtIndex(curSongIndex - 1)
-        }
+        MediaButtonReceiver.handleIntent(mediaSessionManager.session, intent)
         return START_STICKY
     }
 
-    override fun onBind(intent: Intent): IBinder? { return binder }
+    override fun onBind(intent: Intent): IBinder? {
+        // We usually use our own binder, but MediaBrowserServiceCompat expects to use its own:
+        // https://stackoverflow.com/questions/38601271/android-auto-app-never-calls-ongetroot
+        // Without this, Android Audio just shows a spinner and errors like "oneway function results
+        // will be dropped but finished with status UNKNOWN_TRANSACTION and parcel size 0" get
+        // logged.
+        return when (intent.getAction()) {
+            MediaBrowserServiceCompat.SERVICE_INTERFACE -> super.onBind(intent)
+            else -> binder
+        }
+    }
 
     fun setSongListener(listener: SongListener?) { songListener = listener }
 
@@ -383,6 +416,22 @@ class NupService :
         val service: NupService
             get() = this@NupService
     }
+
+    override fun onGetRoot(
+        clientPackageName: String,
+        clientUid: Int,
+        rootHints: Bundle?
+    ): MediaBrowserServiceCompat.BrowserRoot {
+        // See https://developer.android.com/training/cars/media#tabs-opt-in.
+        val extras = Bundle()
+        extras.putBoolean("android.media.browse.AUTO_TABS_OPT_IN_HINT", true)
+        return MediaBrowserServiceCompat.BrowserRoot(MediaBrowserHelper.ROOT_ID, null)
+    }
+
+    override fun onLoadChildren(
+        parentId: String,
+        result: MediaBrowserServiceCompat.Result<MutableList<MediaItem>>
+    ) = mediaBrowserHelper.onLoadChildren(parentId, result)
 
     /** Read and apply [key]. */
     private suspend fun applyPref(key: String) {
@@ -544,6 +593,16 @@ class NupService :
         songListener?.onSongChange(song, curSongIndex)
     }
 
+    /** Play already-queued song [id]. */
+    fun playSongWithId(id: Long) {
+        val idx = songs.indexOfFirst { it.id == id }
+        if (idx == -1) {
+            Log.e(TAG, "Ignoring request to play song $id not in playlist")
+        } else {
+            playSongAtIndex(idx)
+        }
+    }
+
     /** Stop playing the current song, if any. */
     fun stopPlaying() {
         curFile = null
@@ -560,7 +619,7 @@ class NupService :
         }
 
         songCoverFetches.add(song)
-        scope.async(Dispatchers.Main) {
+        scope.launch(Dispatchers.Main) {
             val bitmap = async(Dispatchers.IO) { coverLoader.loadCover(song.coverFilename) }.await()
             storeCoverForSong(song, bitmap)
             songCoverFetches.remove(song)

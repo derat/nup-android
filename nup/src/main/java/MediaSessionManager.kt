@@ -5,7 +5,9 @@
 
 package org.erat.nup
 
+import android.app.PendingIntent
 import android.content.Context
+import android.content.Intent
 import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.RatingCompat
@@ -15,7 +17,7 @@ import android.support.v4.media.session.PlaybackStateCompat
 
 /** Updates [MediaSession] data for the current song. */
 class MediaSessionManager constructor(context: Context, callback: MediaSessionCompat.Callback) {
-    private val session: MediaSessionCompat
+    val session: MediaSessionCompat
 
     val token: MediaSessionCompat.Token
         get() = session.sessionToken
@@ -129,11 +131,17 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
     }
 
     init {
-        session = MediaSessionCompat(context, "nup")
-        session.setRatingType(RatingCompat.RATING_5_STARS)
-        session.setCallback(callback)
-        session.isActive = true
-
+        session = MediaSessionCompat(context, "nup").apply {
+            // TODO: Call setFlags(MediaSessionCompat.FLAG_HANDLES_QUEUE_COMMANDS) after
+            // implementing onAddQueueItem() and friends from MediaSessionCompat.Callback in
+            // NupService.
+            setRatingType(RatingCompat.RATING_5_STARS)
+            setCallback(callback)
+            setSessionActivity(
+                PendingIntent.getActivity(context, 0, Intent(context, NupActivity::class.java), 0)
+            )
+            setActive(true)
+        }
         updateSong(null)
     }
 }
