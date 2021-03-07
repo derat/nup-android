@@ -36,56 +36,25 @@ class SearchResultsActivity : AppCompatActivity() {
         setTitle(R.string.search_results)
         setContentView(R.layout.search_results)
 
-        class Query(
-            var artist: String?,
-            var title: String?,
-            var album: String?,
-            // TODO: Include albumId somehow.
-            var minRating: Double,
-            var shuffle: Boolean,
-            var substring: Boolean,
-            var onlyCached: Boolean,
-        )
-
-        val queries = mutableListOf<Query>()
-        if (intent.action == Intent.ACTION_SEARCH) {
-            // TODO: I think that this isn't actually used. If it were, we'd need
-            // to deduplicate the returned songs later
-            val queryString = intent.getStringExtra(SearchManager.QUERY)
-            queries.add(Query(queryString, null, null, -1.0, false, true, false))
-            queries.add(Query(null, null, queryString, -1.0, false, true, false))
-            queries.add(Query(null, queryString, null, -1.0, false, true, false))
-        } else {
-            queries.add(
-                Query(
-                    artist = intent.getStringExtra(BUNDLE_ARTIST),
-                    title = intent.getStringExtra(BUNDLE_TITLE),
-                    album = intent.getStringExtra(BUNDLE_ALBUM),
-                    minRating = intent.getDoubleExtra(BUNDLE_MIN_RATING, -1.0),
-                    shuffle = intent.getBooleanExtra(BUNDLE_SHUFFLE, false),
-                    substring = intent.getBooleanExtra(BUNDLE_SUBSTRING, false),
-                    onlyCached = intent.getBooleanExtra(BUNDLE_CACHED, false),
-                )
-            )
-        }
-
+        // Do the search async on the IO thread since it hits the disk.
         scope.async(Dispatchers.Main) {
             songs = async(Dispatchers.IO) {
-                val newSongs = mutableListOf<Song>()
-                for (query in queries) {
-                    newSongs.addAll(
-                        service.songDb.query(
-                            artist = query.artist,
-                            title = query.title,
-                            album = query.album,
-                            minRating = query.minRating,
-                            shuffle = query.shuffle,
-                            substring = query.substring,
-                            onlyCached = query.onlyCached,
-                        )
+                if (intent.action == Intent.ACTION_SEARCH) {
+                    // I'm not sure when/if this is actually used. Voice searches performed via
+                    // Android Auto go through onPlayFromSearch() and onSearch() in NupService.
+                    // Probably it's just used if other apps send it to us.
+                    searchForSongs(service.songDb, intent.getStringExtra(SearchManager.QUERY) ?: "")
+                } else {
+                    service.songDb.query(
+                        artist = intent.getStringExtra(BUNDLE_ARTIST),
+                        title = intent.getStringExtra(BUNDLE_TITLE),
+                        album = intent.getStringExtra(BUNDLE_ALBUM),
+                        minRating = intent.getDoubleExtra(BUNDLE_MIN_RATING, -1.0),
+                        shuffle = intent.getBooleanExtra(BUNDLE_SHUFFLE, false),
+                        substring = intent.getBooleanExtra(BUNDLE_SUBSTRING, false),
+                        onlyCached = intent.getBooleanExtra(BUNDLE_CACHED, false),
                     )
                 }
-                newSongs
             }.await()
 
             findViewById<View>(R.id.progress)!!.visibility = View.GONE

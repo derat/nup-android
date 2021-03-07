@@ -95,7 +95,7 @@ suspend fun searchForSongs(
     artist: String? = null,
     album: String? = null,
 ): List<Song> {
-    Log.d(TAG, "Using \"$query\" with title \"$title\", artist \"$artist\", album \"$album\"")
+    Log.d(TAG, "Query \"$query\" with title \"$title\", artist \"$artist\", album \"$album\"")
 
     if (title != null && artist != null) {
         // Try to find an exact or substring album match.
@@ -119,6 +119,9 @@ suspend fun searchForSongs(
             }
         }
     }
+
+    // If no query was supplied, just play good music.
+    if (query.isEmpty()) return db.query(minRating = EMPTY_MIN_RATING, shuffle = true)
 
     // Try to find an exact artist match.
     var songs = db.query(artist = query, minRating = ARTIST_MIN_RATING, shuffle = true)
@@ -153,5 +156,6 @@ private fun findAlbumsSubstring(rows: List<StatsRow>, album: String) =
 
 private const val TAG = "Search"
 
-// Minimum rating to return when we're shuffling an artist's songs.
+// Minimum ratings to use for different types of queries.
+private const val EMPTY_MIN_RATING = 1.0
 private const val ARTIST_MIN_RATING = 0.75
