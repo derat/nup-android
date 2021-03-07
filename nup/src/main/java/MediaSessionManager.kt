@@ -28,7 +28,7 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
     }
 
     /** Update the session for [song]. */
-    fun updateSong(song: Song?) {
+    fun updateSong(song: Song?, entry: FileCacheEntry?) {
         if (song == null) {
             session.setMetadata(null)
             return
@@ -63,6 +63,20 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
             builder.putBitmap(
                 MediaMetadataCompat.METADATA_KEY_ALBUM_ART,
                 bitmap.copy(bitmap.config, true)
+            )
+        }
+
+        // It seems completely bonkers that you can shove a field from MediaDescriptionCompat into
+        // MediaMetadataCompat, but see
+        // https://developer.android.com/training/cars/media#metadata-indicators.
+        if (entry != null) {
+            builder.putLong(
+                MediaDescriptionCompat.EXTRA_DOWNLOAD_STATUS,
+                when {
+                    entry.isFullyCached -> MediaDescriptionCompat.STATUS_DOWNLOADED
+                    entry.cachedBytes > 0 -> MediaDescriptionCompat.STATUS_DOWNLOADING
+                    else -> MediaDescriptionCompat.STATUS_NOT_DOWNLOADED
+                }
             )
         }
 
@@ -143,6 +157,6 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
             )
             setActive(true)
         }
-        updateSong(null)
+        updateSong(null, null)
     }
 }

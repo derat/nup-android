@@ -122,9 +122,10 @@ class NupService :
     private var reported = false // already reported playback of [curSong] to server
 
     private var songsToPreload = 0 // set from pref
-    private var downloadSongId: Long = -1 // ID of currently-downloading song
+    private var downloadSongId = -1L // ID of currently-downloading song
     private var downloadIndex = -1 // index into [songs] of currently-downloading song
     private var waitingForDownload = false // waiting for file to be download so we can play it
+    private var lastDownloadedBytes = 0L // last onCacheDownloadProgress() value for [curSong]
 
     /** Download all queued songs instead of honoring pref. */
     var shouldDownloadAll: Boolean = false
@@ -588,7 +589,7 @@ class NupService :
                 selectSongAtIndex(curSongIndex)
             } else {
                 curSongIndex = -1
-                mediaSessionManager.updateSong(null)
+                mediaSessionManager.updateSong(null, null)
                 updatePlaybackState()
             }
         }
@@ -619,6 +620,7 @@ class NupService :
         playedMs = 0
         reported = false
         playbackComplete = false
+        lastDownloadedBytes = 0L
         cache.clearPinnedSongIds()
 
         // If we've already downloaded the whole file, start playing it.
@@ -664,7 +666,7 @@ class NupService :
         cache.pinSongId(song.id)
         fetchCoverForSongIfMissing(song)
         updateNotification()
-        mediaSessionManager.updateSong(song)
+        mediaSessionManager.updateSong(song, cacheEntry)
         updatePlaybackState()
         songListener?.onSongChange(song, curSongIndex)
     }
@@ -713,7 +715,7 @@ class NupService :
                 songListener?.onSongCoverLoad(song)
                 if (song == curSong) {
                     updateNotification()
-                    mediaSessionManager.updateSong(song)
+                    mediaSessionManager.updateSong(song, cache.getEntry(song.id))
                 }
             }
         }
@@ -797,9 +799,12 @@ class NupService :
         song.updateBytes(entry)
         songDb.handleSongCached(song.id)
 
-        if (song == curSong && waitingForDownload) {
-            waitingForDownload = false
-            playCacheEntry(entry)
+        if (song == curSong) {
+            if (waitingForDownload) {
+                waitingForDownload = false
+                playCacheEntry(entry)
+            }
+            mediaSessionManager.updateSong(song, entry)
         } else if (song == nextSong) {
             player.queueFile(entry.file, entry.totalBytes, song.albumGain, song.peakAmp)
         }
@@ -831,6 +836,13 @@ class NupService :
                 waitingForDownload = false
                 playCacheEntry(entry)
             }
+
+            // The media session metadata only has downloading/downloaded/not-downloaded states,
+            // so just call this once after the download starts.
+            if (downloadedBytes > 0L && lastDownloadedBytes == 0L) {
+                mediaSessionManager.updateSong(song, entry)
+            }
+            lastDownloadedBytes = downloadedBytes
         }
         songListener?.onSongFileSizeChange(song)
     }
