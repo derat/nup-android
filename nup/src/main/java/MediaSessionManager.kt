@@ -94,7 +94,8 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
             positionMs, 1.0f
         )
 
-        var actions: Long = 0
+        var actions: Long = PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID or
+            PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH
         if (!playbackComplete) {
             actions = actions or PlaybackStateCompat.ACTION_PLAY_PAUSE
             if (paused) actions = actions or PlaybackStateCompat.ACTION_PLAY
@@ -102,6 +103,7 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
         }
         if (songIndex > 0) actions = actions or PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
         if (songIndex < numSongs - 1) actions = actions or PlaybackStateCompat.ACTION_SKIP_TO_NEXT
+        if (numSongs > 1) actions = actions or PlaybackStateCompat.ACTION_SKIP_TO_QUEUE_ITEM
         builder.setActions(actions)
 
         session.setPlaybackState(builder.build())

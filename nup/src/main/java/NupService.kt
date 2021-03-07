@@ -326,6 +326,11 @@ class NupService :
                     }
                 }
                 override fun onPlayFromSearch(query: String, extras: Bundle) {
+                    // For some reason, onPrepareFromSearch() never gets called when I do a voice
+                    // search from Android Auto, even after updating MediaSessionManager to include
+                    // ACTION_PREPARE_FROM_SEARCH in the action bitfield. onPlayFromSearch() only
+                    // gets called after the Assistant finishes saying "Okay, asking nup to play
+                    // ...", so I was hoping that I could get an early start on the query.
                     scope.launch(Dispatchers.Main) {
                         val songs = async(Dispatchers.IO) {
                             searchForSongs(
