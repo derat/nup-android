@@ -95,12 +95,7 @@ class MediaBrowserHelper(
                 GlobalScope.launch(Dispatchers.IO) {
                     val items = mutableListOf<MediaItem>()
                     for (song in getSongsForMediaId(parentId)) {
-                        val desc = MediaDescriptionCompat.Builder()
-                            .setTitle(song.title)
-                            .setSubtitle(song.artist)
-                            .setMediaId("${SONG_ID_PREFIX}${song.id}")
-                            .build()
-                        items.add(MediaItem(desc, MediaItem.FLAG_PLAYABLE))
+                        items.add(makeSongItem(song))
                     }
                     result.sendResult(items)
                 }
@@ -137,6 +132,11 @@ class MediaBrowserHelper(
         onlyCached: Boolean,
         includeArtist: Boolean
     ): MediaItem {
+        // This seems like it's close to an internal Android limit. When I call setExtras()
+        // to attach a Bundle with android.media.browse.CONTENT_STYLE_GROUP_TITLE_HINT, I'm unable
+        // to list albums and logcat shows a "JavaBinder: !!! FAILED BINDER TRANSACTION !!!  (parcel
+        // size = 676544)" error. That still doesn't make much sense to me, since the Android binder
+        // size limit is supposedly 1 MB.
         val pre = if (onlyCached) CACHED_ALBUM_ID_PREFIX else ALBUM_ID_PREFIX
         val builder = MediaDescriptionCompat.Builder()
             .setTitle(row.key.album)
@@ -144,7 +144,18 @@ class MediaBrowserHelper(
         if (includeArtist) builder.setSubtitle(row.key.artist)
 
         // TODO: Why isn't Android Audio displaying UI for browsing into albums?
+        // I asked at https://stackoverflow.com/q/66509112/6882947.
         return MediaItem(builder.build(), MediaItem.FLAG_BROWSABLE or MediaItem.FLAG_PLAYABLE)
+    }
+
+    /** Create a [MediaItem] for [song]. */
+    public fun makeSongItem(song: Song): MediaItem {
+        val desc = MediaDescriptionCompat.Builder()
+            .setTitle(song.title)
+            .setSubtitle(song.artist)
+            .setMediaId("${SONG_ID_PREFIX}${song.id}")
+            .build()
+        return MediaItem(desc, MediaItem.FLAG_PLAYABLE)
     }
 
     /** Query the database for songs identified by [id]. */

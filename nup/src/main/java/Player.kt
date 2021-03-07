@@ -185,7 +185,11 @@ class Player(
         executor.execute { resetCurrent() }
     }
 
-    /** Start playback of [file]. */
+    /**
+     * Set [file] as the currently-playing song.
+     *
+     * The play/pause state is not changed.
+     */
     fun playFile(file: File, totalBytes: Long, gain: Double, peakAmp: Double) {
         executor.execute {
             Log.d(TAG, "Playing $file")
@@ -246,8 +250,6 @@ class Player(
 
     private fun updatePauseState(type: PauseUpdateType) {
         executor.execute task@{
-            val player = currentPlayer ?: return@task
-
             val newPaused = when (type) {
                 PauseUpdateType.PAUSE -> true
                 PauseUpdateType.UNPAUSE -> false
@@ -256,23 +258,28 @@ class Player(
             if (newPaused == paused) return@task
 
             paused = newPaused
-            if (paused) {
-                player.mediaPlayer.pause()
-                stopPositionTimer()
-            } else {
-                // If the file is already fully loaded, play from it instead of a stream.
-                var switchedToFile = false
-                if (player.stream != null && player.fileBytes == player.totalBytes) {
-                    try {
-                        player.restartPlayback()
-                        switchedToFile = true
-                    } catch (e: IOException) {
-                        Log.e(TAG, "Got error switching to file on unpause: $e")
+
+            val player = currentPlayer
+            if (player != null) {
+                if (paused) {
+                    player.mediaPlayer.pause()
+                    stopPositionTimer()
+                } else {
+                    // If the file is already fully loaded, play from it instead of a stream.
+                    var switchedToFile = false
+                    if (player.stream != null && player.fileBytes == player.totalBytes) {
+                        try {
+                            player.restartPlayback()
+                            switchedToFile = true
+                        } catch (e: IOException) {
+                            Log.e(TAG, "Got error switching to file on unpause: $e")
+                        }
                     }
+                    if (!switchedToFile) player.mediaPlayer.start()
+                    startPositionTimer()
                 }
-                if (!switchedToFile) player.mediaPlayer.start()
-                startPositionTimer()
             }
+
             listenerExecutor.execute { listener.onPauseStateChange(paused) }
         }
     }

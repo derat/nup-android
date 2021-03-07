@@ -21,6 +21,7 @@ import android.os.Binder
 import android.os.Bundle
 import android.os.IBinder
 import android.os.StrictMode
+import android.provider.MediaStore
 import android.support.v4.media.MediaBrowserCompat.MediaItem
 import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.session.MediaSessionCompat
@@ -116,6 +117,7 @@ class NupService :
 
     var paused = false // playback currently paused
         private set
+    private var unpauseOnFocusGain = false // paused for transient focus loss
     private var playbackComplete = false // done playing [curSong]
     private var reported = false // already reported playback of [curSong] to server
 
@@ -195,9 +197,21 @@ class NupService :
             AudioManager.AUDIOFOCUS_GAIN -> {
                 Log.d(TAG, "Gained audio focus")
                 player.lowVolume = false
+                if (unpauseOnFocusGain) player.unpause()
             }
-            AudioManager.AUDIOFOCUS_LOSS -> Log.d(TAG, "Lost audio focus")
-            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> Log.d(TAG, "Transiently lost audio focus")
+            AudioManager.AUDIOFOCUS_LOSS -> {
+                Log.d(TAG, "Lost audio focus; pausing")
+                player.pause()
+                unpauseOnFocusGain = false
+            }
+            AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
+                // It's important that we pause here. Otherwise, the Assistant eventually calls
+                // onStop() to make us stop entirely, and doesn't seem to start us again.
+                // See https://developer.android.com/guide/topics/media-apps/audio-focus.
+                Log.d(TAG, "Transiently lost audio focus; pausing")
+                player.pause()
+                unpauseOnFocusGain = true
+            }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                 Log.d(TAG, "Transiently lost audio focus (but can duck)")
                 player.lowVolume = true
@@ -305,9 +319,28 @@ class NupService :
                 override fun onPause() { player.pause() }
                 override fun onPlay() { player.unpause() }
                 override fun onPlayFromMediaId(mediaId: String, extras: Bundle) {
-                    // TODO: Figure out how queue management should work here.
-                    clearPlaylist()
-                    getSongsForMediaId(mediaId) { addSongsToPlaylist(it, false /* forcePlay */) }
+                    getSongsForMediaId(mediaId) {
+                        // TODO: Figure out how queue management should work here.
+                        clearPlaylist()
+                        addSongsToPlaylist(it, true /* forcePlay */)
+                    }
+                }
+                override fun onPlayFromSearch(query: String, extras: Bundle) {
+                    scope.launch(Dispatchers.Main) {
+                        val songs = async(Dispatchers.IO) {
+                            searchForSongs(
+                                songDb,
+                                query,
+                                title = extras.getString(MediaStore.EXTRA_MEDIA_TITLE),
+                                artist = extras.getString(MediaStore.EXTRA_MEDIA_ARTIST),
+                                album = extras.getString(MediaStore.EXTRA_MEDIA_ALBUM),
+                            )
+                        }.await()
+                        if (!songs.isEmpty()) {
+                            clearPlaylist()
+                            addSongsToPlaylist(songs, true /* forcePlay */)
+                        }
+                    }
                 }
                 override fun onRemoveQueueItem(description: MediaDescriptionCompat) {
                     getSongsForMediaId(description.getMediaId()) {
@@ -318,13 +351,13 @@ class NupService :
                     }
                 }
                 override fun onRemoveQueueItemAt(index: Int) { removeFromPlaylist(index) }
-                override fun onSkipToNext() { playSongAtIndex(curSongIndex + 1) }
-                override fun onSkipToPrevious() { playSongAtIndex(curSongIndex - 1) }
+                override fun onSkipToNext() { selectSongAtIndex(curSongIndex + 1) }
+                override fun onSkipToPrevious() { selectSongAtIndex(curSongIndex - 1) }
                 override fun onSkipToQueueItem(id: Long) {
                     // TODO: The same song might be in the playlist multiple times.
                     // Maybe just use the playlist index instead of song ID here.
                     val idx = getSongIndex(id)
-                    if (idx >= 0) playSongAtIndex(idx)
+                    if (idx >= 0) selectSongAtIndex(idx)
                 }
                 override fun onStop() { player.pause() }
             }
@@ -431,16 +464,41 @@ class NupService :
         clientUid: Int,
         rootHints: Bundle?
     ): MediaBrowserServiceCompat.BrowserRoot {
-        // See https://developer.android.com/training/cars/media#tabs-opt-in.
         val extras = Bundle()
-        extras.putBoolean("android.media.browse.AUTO_TABS_OPT_IN_HINT", true)
-        return MediaBrowserServiceCompat.BrowserRoot(MediaBrowserHelper.ROOT_ID, null)
+        extras.putBoolean("android.media.browse.SEARCH_SUPPORTED", true)
+        return MediaBrowserServiceCompat.BrowserRoot(MediaBrowserHelper.ROOT_ID, extras)
     }
 
     override fun onLoadChildren(
         parentId: String,
         result: MediaBrowserServiceCompat.Result<MutableList<MediaItem>>
     ) = mediaBrowserHelper.onLoadChildren(parentId, result)
+
+    override fun onSearch(
+        query: String,
+        extras: Bundle,
+        result: MediaBrowserServiceCompat.Result<MutableList<MediaItem>>
+    ) {
+        // Spoken searches in Android Auto go to onPlayFromSearch(). After it returns results, the
+        // top-level browsing view contains a browsable item called "Search results" that calls this
+        // method when clicked. The args here seem to be similar to onPlayFromSearch(), except we
+        // need to return the songs as MediaItems instead of playing them.
+        result.detach()
+        scope.launch(Dispatchers.Main) {
+            val songs = async(Dispatchers.IO) {
+                searchForSongs(
+                    songDb,
+                    query,
+                    title = extras.getString(MediaStore.EXTRA_MEDIA_TITLE),
+                    artist = extras.getString(MediaStore.EXTRA_MEDIA_ARTIST),
+                    album = extras.getString(MediaStore.EXTRA_MEDIA_ALBUM),
+                )
+            }.await()
+            val items = mutableListOf<MediaItem>()
+            for (song in songs) items.add(mediaBrowserHelper.makeSongItem(song))
+            result.sendResult(items)
+        }
+    }
 
     /** Read and apply [key]. */
     private suspend fun applyPref(key: String) {
@@ -492,7 +550,7 @@ class NupService :
     fun addSongsToPlaylist(newSongs: List<Song>, forcePlay: Boolean) {
         val index = curSongIndex
         val alreadyPlayed = insertSongs(newSongs, if (index < 0) 0 else index + 1)
-        if (forcePlay && !alreadyPlayed) playSongAtIndex(if (index < 0) 0 else index + 1)
+        if (forcePlay && !alreadyPlayed) selectSongAtIndex(if (index < 0) 0 else index + 1)
     }
 
     fun removeFromPlaylist(index: Int) { removeRangeFromPlaylist(index, index) }
@@ -522,7 +580,7 @@ class NupService :
 
         if (removedPlaying) {
             if (!songs.isEmpty() && curSongIndex < songs.size) {
-                playSongAtIndex(curSongIndex)
+                selectSongAtIndex(curSongIndex)
             } else {
                 curSongIndex = -1
                 mediaSessionManager.updateSong(null)
@@ -540,8 +598,12 @@ class NupService :
         mediaSessionManager.updatePlaylist(songs)
     }
 
-    /** Play the song at [index] in [songs]. */
-    fun playSongAtIndex(index: Int) {
+    /**
+     * Select the song at [index] in [songs].
+     *
+     * The play/pause state is not changed.
+     */
+    fun selectSongAtIndex(index: Int) {
         if (index < 0 || index >= songs.size) return
 
         curSongIndex = index
@@ -600,16 +662,6 @@ class NupService :
         mediaSessionManager.updateSong(song)
         updatePlaybackState()
         songListener?.onSongChange(song, curSongIndex)
-    }
-
-    /** Play already-queued song [id]. */
-    fun playSongWithId(id: Long) {
-        val idx = songs.indexOfFirst { it.id == id }
-        if (idx == -1) {
-            Log.e(TAG, "Ignoring request to play song $id not in playlist")
-        } else {
-            playSongAtIndex(idx)
-        }
     }
 
     /** Get a song's index in the playlist, or -1 if it isn't present. */
@@ -671,7 +723,7 @@ class NupService :
         playbackComplete = true
         updateNotification()
         updatePlaybackState()
-        if (curSongIndex < songs.size - 1) playSongAtIndex(curSongIndex + 1)
+        if (curSongIndex < songs.size - 1) selectSongAtIndex(curSongIndex + 1)
     }
 
     override fun onPlaybackPositionChange(file: File, positionMs: Int, durationMs: Int) {
@@ -859,13 +911,13 @@ class NupService :
         when {
             // If we didn't have any songs, then start playing the first one we added.
             curSongIndex == -1 -> {
-                playSongAtIndex(0)
+                selectSongAtIndex(0)
                 played = true
             }
             // If we were previously done playing (because we reached the end of the playlist),
             // then start playing the first song we added.
             curSongIndex < songs.size - 1 && playbackComplete -> {
-                playSongAtIndex(curSongIndex + 1)
+                selectSongAtIndex(curSongIndex + 1)
                 played = true
             }
             // Otherwise, consider downloading the new songs if we're not already downloading

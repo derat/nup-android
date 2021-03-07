@@ -32,6 +32,14 @@
         <action android:name="android.intent.action.MAIN" />
         <category android:name="android.intent.category.LAUNCHER" />
       </intent-filter>
+
+      <!-- Per https://stackoverflow.com/a/31976075/6882947, this is needed to convince
+           Android Audio to send the search to the *service* via onPlayFromSearch().
+           Non-Auto things (Assistant?) apparently still call the activity, though. -->
+      <intent-filter>
+        <action android:name="android.media.action.MEDIA_PLAY_FROM_SEARCH" />
+        <category android:name="android.intent.category.DEFAULT" />
+      </intent-filter>
     </activity>
 
     <activity android:name=".SearchResultsActivity" android:theme="@style/AppTheme">
