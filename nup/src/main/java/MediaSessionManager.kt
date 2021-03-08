@@ -96,6 +96,21 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
         val builder = PlaybackStateCompat.Builder()
         if (song != null) builder.setActiveQueueItemId(song.id)
 
+        // I experimented with using STATE_ERROR and calling setErrorMessage(), but the UX in
+        // the Android Auto app seems pretty poor:
+        //
+        // - When I call setErrorMessage() to report a transient error (e.g. switching from stream
+        //   to file), I don't see anything show up onscreen. Maybe the message is being removed
+        //   immediately by the next call to this method.
+        // - When I additionally use STATE_ERROR to report a fatal error (e.g. can't download
+        //   because network is unavailable), Android Auto shows a fullscreen error and doesn't seem
+        //   to let me do anything apart from going back to the browse screen.
+        //
+        // Android Auto seems to still display toasts at the bottom of the screen, so I'm going to
+        // just let NupService continue reporting errors like that for now.
+        //
+        // More info:
+        // https://developer.android.com/guide/topics/media-apps/working-with-a-media-session#errors
         builder.setState(
             when {
                 numSongs == 0 -> PlaybackStateCompat.STATE_NONE

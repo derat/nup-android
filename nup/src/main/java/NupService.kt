@@ -1037,13 +1037,13 @@ class NupService :
     /** Notify [mediaSessionManager] about the current playback state. */
     private fun updatePlaybackState() {
         mediaSessionManager.updatePlaybackState(
-            curSong,
-            paused,
-            playbackComplete,
-            waitingForDownload,
-            lastPosMs.toLong(),
-            curSongIndex,
-            songs.size
+            song = curSong,
+            paused = paused,
+            playbackComplete = playbackComplete,
+            buffering = waitingForDownload,
+            positionMs = lastPosMs.toLong(),
+            songIndex = curSongIndex,
+            numSongs = songs.size,
         )
     }
 
