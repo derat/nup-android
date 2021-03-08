@@ -19,9 +19,6 @@ import android.support.v4.media.session.PlaybackStateCompat
 class MediaSessionManager constructor(context: Context, callback: MediaSessionCompat.Callback) {
     val session: MediaSessionCompat
 
-    val token: MediaSessionCompat.Token
-        get() = session.sessionToken
-
     /** Release the session. */
     fun release() {
         session.release()

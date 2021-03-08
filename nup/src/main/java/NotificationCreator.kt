@@ -8,24 +8,21 @@ package org.erat.nup
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.Context
 import android.os.Build
 import android.support.v4.media.session.MediaSessionCompat
+import android.support.v4.media.session.PlaybackStateCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.media.app.NotificationCompat.MediaStyle
+import androidx.media.session.MediaButtonReceiver
 
 /** Creates system notifications. */
 class NotificationCreator(
     private val context: Context,
-    manager: NotificationManager,
-    private val mediaSessionToken: MediaSessionCompat.Token,
-    private val launchActivityIntent: PendingIntent,
-    private val togglePauseIntent: PendingIntent,
-    private val prevTrackIntent: PendingIntent,
-    private val nextTrackIntent: PendingIntent
+    private val manager: NotificationManager,
+    private val mediaSession: MediaSessionCompat,
 ) {
     private var songId: Long = 0
     private var paused = false
@@ -52,6 +49,7 @@ class NotificationCreator(
         songIndex: Int,
         numSongs: Int
     ): Notification? {
+        // TODO: Update this to get all of its information from MediaControllerCompat someday.
         val showPlayPause = song != null && !playbackComplete
         val showPrev = songIndex in 1 until numSongs
         val showNext = songIndex in 0 until (numSongs - 1)
@@ -80,41 +78,36 @@ class NotificationCreator(
             .setSmallIcon(R.drawable.status)
             .setColor(ContextCompat.getColor(context, R.color.primary))
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setContentIntent(launchActivityIntent)
+            .setContentIntent(mediaSession.controller.sessionActivity)
             .setOngoing(true)
             .setWhen(System.currentTimeMillis())
             .setShowWhen(false)
 
-        if (song == null) return builder.build()
-
-        builder.setLargeIcon(song.coverBitmap)
+        if (song != null) builder.setLargeIcon(song.coverBitmap)
 
         val style = MediaStyle()
-        style.setMediaSession(mediaSessionToken)
+        style.setMediaSession(mediaSession.sessionToken)
         builder.setStyle(style)
-
-        val numActions = (if (showPlayPause) 1 else 0) +
-            (if (showPrev) 1 else 0) +
-            (if (showNext) 1 else 0)
-
-        val showLabels = numActions < 3
 
         if (showPrev) {
             builder.addAction(
                 NotificationCompat.Action.Builder(
                     R.drawable.skip_previous,
-                    if (showLabels) context.getString(R.string.prev) else "",
-                    prevTrackIntent,
+                    context.getString(R.string.prev),
+                    MediaButtonReceiver.buildMediaButtonPendingIntent(
+                        context, PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
+                    ),
                 ).build()
             )
         }
         if (showPlayPause) {
-            val label = if (paused) R.string.play else R.string.pause
             builder.addAction(
                 NotificationCompat.Action.Builder(
                     if (paused) R.drawable.play else R.drawable.pause,
-                    if (showLabels) context.getString(label) else "",
-                    togglePauseIntent,
+                    context.getString(if (paused) R.string.play else R.string.pause),
+                    MediaButtonReceiver.buildMediaButtonPendingIntent(
+                        context, PlaybackStateCompat.ACTION_PLAY_PAUSE
+                    ),
                 ).build()
             )
         }
@@ -122,21 +115,25 @@ class NotificationCreator(
             builder.addAction(
                 NotificationCompat.Action.Builder(
                     R.drawable.skip_next,
-                    if (showLabels) context.getString(R.string.next) else "",
-                    nextTrackIntent,
+                    context.getString(R.string.next),
+                    MediaButtonReceiver.buildMediaButtonPendingIntent(
+                        context, PlaybackStateCompat.ACTION_SKIP_TO_NEXT,
+                    ),
                 ).build()
             )
         }
 
+        // This is silly.
+        val numActions = (if (showPlayPause) 1 else 0) +
+            (if (showPrev) 1 else 0) +
+            (if (showNext) 1 else 0)
         if (numActions > 0) {
-            // This is silly.
             style.setShowActionsInCompactView(
                 *when {
                     numActions == 3 -> intArrayOf(0, 1, 2)
                     numActions == 2 -> intArrayOf(0, 1)
                     else -> intArrayOf(0)
                 }
-
             )
         }
 

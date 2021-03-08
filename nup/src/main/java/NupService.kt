@@ -6,7 +6,6 @@
 package org.erat.nup
 
 import android.app.NotificationManager
-import android.app.PendingIntent
 import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
@@ -16,7 +15,6 @@ import android.graphics.Bitmap
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
-import android.net.Uri
 import android.os.Binder
 import android.os.Bundle
 import android.os.IBinder
@@ -369,7 +367,7 @@ class NupService :
                 override fun onStop() { player.pause() }
             }
         )
-        sessionToken = mediaSessionManager.token
+        sessionToken = mediaSessionManager.session.sessionToken
 
         mediaBrowserHelper = MediaBrowserHelper(songDb, this.getResources())
 
@@ -377,17 +375,7 @@ class NupService :
         notificationCreator = NotificationCreator(
             this,
             notificationManager,
-            mediaSessionManager.token,
-            PendingIntent.getActivity(this, 0, Intent(this, NupActivity::class.java), 0),
-            PendingIntent.getService(
-                this, 0, Intent(ACTION_TOGGLE_PAUSE, Uri.EMPTY, this, NupService::class.java), 0
-            ),
-            PendingIntent.getService(
-                this, 0, Intent(ACTION_PREV_TRACK, Uri.EMPTY, this, NupService::class.java), 0
-            ),
-            PendingIntent.getService(
-                this, 0, Intent(ACTION_NEXT_TRACK, Uri.EMPTY, this, NupService::class.java), 0
-            )
+            mediaSessionManager.session,
         )
         val notification = notificationCreator.createNotification(
             false,
@@ -1059,11 +1047,5 @@ class NupService :
         private const val MAX_POSITION_REPORT_MS = 5 * 1000L // threshold for playback updates
         private const val REPORT_PLAYBACK_THRESHOLD_MS = 240 * 1000L // reporting threshold
         private const val IGNORE_NOISY_AUDIO_AFTER_USER_SWITCH_MS = 1000L
-
-        // Intent actions.
-        private const val ACTION_TOGGLE_PAUSE = "nup_toggle_pause"
-        private const val ACTION_NEXT_TRACK = "nup_next_track"
-        private const val ACTION_PREV_TRACK = "nup_prev_track"
-        private const val ACTION_MEDIA_BUTTON = "nup_media_button"
     }
 }
