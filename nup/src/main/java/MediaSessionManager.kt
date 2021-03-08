@@ -32,9 +32,13 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
         }
 
         val builder = MediaMetadataCompat.Builder()
-        setString(builder, MediaMetadataCompat.METADATA_KEY_ARTIST, song.artist)
-        setString(builder, MediaMetadataCompat.METADATA_KEY_TITLE, song.title)
-        setString(builder, MediaMetadataCompat.METADATA_KEY_ALBUM, song.album)
+        builder.putString(
+            MediaMetadataCompat.METADATA_KEY_MEDIA_ID,
+            MediaBrowserHelper.getSongMediaId(song.id)
+        )
+        builder.putString(MediaMetadataCompat.METADATA_KEY_ARTIST, song.artist)
+        builder.putString(MediaMetadataCompat.METADATA_KEY_TITLE, song.title)
+        builder.putString(MediaMetadataCompat.METADATA_KEY_ALBUM, song.album)
 
         if (song.rating >= 0.0) {
             builder.putRating(
@@ -91,7 +95,7 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
         numSongs: Int
     ) {
         val builder = PlaybackStateCompat.Builder()
-        if (song != null) builder.setActiveQueueItemId(song.id)
+        if (song != null) builder.setActiveQueueItemId(songIndex.toLong())
 
         // I experimented with using STATE_ERROR and calling setErrorMessage(), but the UX in
         // the Android Auto app seems pretty poor:
@@ -139,14 +143,14 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
     /** Update the session for the supplied playlist. */
     fun updatePlaylist(songs: List<Song>) {
         val queue: MutableList<QueueItem> = ArrayList()
-        for (song in songs) {
+        for ((idx, song) in songs.withIndex()) {
             val desc = MediaDescriptionCompat.Builder()
-                .setMediaId("${MediaBrowserHelper.SONG_ID_PREFIX}${song.id}")
+                .setMediaId(MediaBrowserHelper.getSongMediaId(song.id))
                 .setTitle(song.title)
                 .setSubtitle(song.artist)
                 .setIconBitmap(song.coverBitmap)
                 .build()
-            queue.add(QueueItem(desc, song.id))
+            queue.add(QueueItem(desc, idx.toLong()))
         }
         session.setQueue(queue)
     }

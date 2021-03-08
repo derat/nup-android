@@ -10,6 +10,7 @@ import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.content.Context
 import android.os.Build
+import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.core.app.NotificationCompat
@@ -24,9 +25,9 @@ class NotificationCreator(
     private val manager: NotificationManager,
     private val mediaSession: MediaSessionCompat,
 ) {
-    private var songId: Long = 0
-    private var paused = false
-    private var showingCoverBitmap = false
+    private var lastMediaId = ""
+    private var lastState = PlaybackStateCompat.STATE_NONE
+    private var showingCover = false
     private var showingPlayPause = false
     private var showingPrev = false
     private var showingNext = false
@@ -34,30 +35,28 @@ class NotificationCreator(
     /**
      * Create a new notification.
      *
-     * @param song currently-playing song
-     * @param paused current paused state
-     * @param playbackComplete true if the song has been played to completion
-     * @param songIndex index of currently-playing song
-     * @param numSongs total number of songs in playlist
+     * @param onlyIfChanged return null if the notification's content hasn't changed
      * @return new notification, or null if notification is unchanged
      */
-    fun createNotification(
-        onlyIfChanged: Boolean,
-        song: Song?,
-        paused: Boolean,
-        playbackComplete: Boolean,
-        songIndex: Int,
-        numSongs: Int
-    ): Notification? {
-        // TODO: Update this to get all of its information from MediaControllerCompat someday.
-        val showPlayPause = song != null && !playbackComplete
-        val showPrev = songIndex in 1 until numSongs
-        val showNext = songIndex in 0 until (numSongs - 1)
+    fun createNotification(onlyIfChanged: Boolean): Notification? {
+        // The Kotlin defs for many of the controller's getters seem to incorrectly say that their
+        // return values are non-nullable.
+        val controller = mediaSession.controller
+        val songIndex = controller.playbackState?.activeQueueItemId ?: -1
+        val state = controller.playbackState?.state ?: PlaybackStateCompat.STATE_NONE
+        val metadata = controller.metadata as MediaMetadataCompat?
+
+        val mediaId = metadata?.getString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID) ?: ""
+        val cover = metadata?.getBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART)
+        val showPlayPause = state == PlaybackStateCompat.STATE_PLAYING ||
+            state == PlaybackStateCompat.STATE_PAUSED
+        val showPrev = songIndex >= 1
+        val showNext = songIndex in 0 until ((controller.queue?.size ?: 0) - 1)
+
         if (onlyIfChanged &&
-            song != null &&
-            song.id == songId &&
-            paused == this.paused &&
-            (song.coverBitmap != null) == showingCoverBitmap &&
+            mediaId == lastMediaId &&
+            state == lastState &&
+            (cover != null) == showingCover &&
             showPlayPause == showingPlayPause &&
             showPrev == showingPrev &&
             showNext == showingNext
@@ -65,16 +64,19 @@ class NotificationCreator(
             return null
         }
 
-        songId = song?.id ?: 0
-        this.paused = paused
-        showingCoverBitmap = song != null && song.coverBitmap != null
+        lastMediaId = mediaId
+        lastState = state
+        showingCover = cover != null
         showingPlayPause = showPlayPause
         showingPrev = showPrev
         showingNext = showNext
 
+        val artist = metadata?.getString(MediaMetadataCompat.METADATA_KEY_ARTIST)
+        val title = metadata?.getString(MediaMetadataCompat.METADATA_KEY_TITLE)
+
         val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setContentTitle(song?.artist ?: context.getString(R.string.startup_message_title))
-            .setContentText(song?.title ?: context.getString(R.string.startup_message_text))
+            .setContentTitle(artist ?: context.getString(R.string.startup_message_title))
+            .setContentText(title ?: context.getString(R.string.startup_message_text))
             .setSmallIcon(R.drawable.status)
             .setColor(ContextCompat.getColor(context, R.color.primary))
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
@@ -83,7 +85,7 @@ class NotificationCreator(
             .setWhen(System.currentTimeMillis())
             .setShowWhen(false)
 
-        if (song != null) builder.setLargeIcon(song.coverBitmap)
+        if (!mediaId.isEmpty()) builder.setLargeIcon(cover)
 
         val style = MediaStyle()
         style.setMediaSession(mediaSession.sessionToken)
@@ -101,6 +103,7 @@ class NotificationCreator(
             )
         }
         if (showPlayPause) {
+            val paused = state == PlaybackStateCompat.STATE_PAUSED
             builder.addAction(
                 NotificationCompat.Action.Builder(
                     if (paused) R.drawable.play else R.drawable.pause,

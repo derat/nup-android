@@ -153,7 +153,7 @@ class MediaBrowserHelper(
         val desc = MediaDescriptionCompat.Builder()
             .setTitle(song.title)
             .setSubtitle(song.artist)
-            .setMediaId("${SONG_ID_PREFIX}${song.id}")
+            .setMediaId(getSongMediaId(song.id))
             .build()
         return MediaItem(desc, MediaItem.FLAG_PLAYABLE)
     }
@@ -191,7 +191,8 @@ class MediaBrowserHelper(
         private const val ALBUM_ID_PREFIX = "album_"
         private const val CACHED_ARTIST_ID_PREFIX = "cached_artist_"
         private const val CACHED_ALBUM_ID_PREFIX = "cached_album_"
+        private const val SONG_ID_PREFIX = "song_"
 
-        public const val SONG_ID_PREFIX = "song_"
+        public fun getSongMediaId(songId: Long) = "${SONG_ID_PREFIX}$songId"
     }
 }

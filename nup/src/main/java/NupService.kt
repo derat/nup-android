@@ -358,12 +358,7 @@ class NupService :
                 override fun onSeekTo(pos: Long) { player.seek(pos) }
                 override fun onSkipToNext() { selectSongAtIndex(curSongIndex + 1) }
                 override fun onSkipToPrevious() { selectSongAtIndex(curSongIndex - 1) }
-                override fun onSkipToQueueItem(id: Long) {
-                    // TODO: The same song might be in the playlist multiple times.
-                    // Maybe just use the playlist index instead of song ID here.
-                    val idx = getSongIndex(id)
-                    if (idx >= 0) selectSongAtIndex(idx)
-                }
+                override fun onSkipToQueueItem(id: Long) { selectSongAtIndex(id.toInt()) }
                 override fun onStop() { player.pause() }
             }
         )
@@ -377,15 +372,7 @@ class NupService :
             notificationManager,
             mediaSessionManager.session,
         )
-        val notification = notificationCreator.createNotification(
-            false,
-            curSong,
-            paused,
-            playbackComplete,
-            curSongIndex,
-            songs.size
-        )
-        startForeground(NOTIFICATION_ID, notification)
+        startForeground(NOTIFICATION_ID, notificationCreator.createNotification(false))
     }
 
     override fun onDestroy() {
@@ -520,14 +507,7 @@ class NupService :
 
     /** Updates the currently-displayed notification if needed.  */
     private fun updateNotification() {
-        val notification = notificationCreator.createNotification(
-            true,
-            curSong,
-            paused,
-            playbackComplete,
-            curSongIndex,
-            songs.size
-        )
+        val notification = notificationCreator.createNotification(true)
         if (notification != null) notificationManager.notify(NOTIFICATION_ID, notification)
     }
 
@@ -589,8 +569,8 @@ class NupService :
         }
 
         songListener?.onPlaylistChange(songs)
-        updateNotification()
         mediaSessionManager.updatePlaylist(songs)
+        updateNotification()
     }
 
     /**
@@ -654,9 +634,9 @@ class NupService :
         // Make sure that we won't drop the song that we're currently playing from the cache.
         cache.pinSongId(song.id)
         fetchCoverForSongIfMissing(song)
-        updateNotification()
         mediaSessionManager.updateSong(song, cacheEntry)
         updatePlaybackState()
+        updateNotification()
         songListener?.onSongChange(song, curSongIndex)
     }
 
@@ -703,8 +683,8 @@ class NupService :
             if (song.coverBitmap != null) {
                 songListener?.onSongCoverLoad(song)
                 if (song == curSong) {
-                    updateNotification()
                     mediaSessionManager.updateSong(song, cache.getEntry(song.id))
+                    updateNotification()
                 }
             }
         }
@@ -717,8 +697,8 @@ class NupService :
     override fun onPlaybackComplete() {
         assertOnMainThread()
         playbackComplete = true
-        updateNotification()
         updatePlaybackState()
+        updateNotification()
         if (curSongIndex < songs.size - 1) selectSongAtIndex(curSongIndex + 1)
     }
 
@@ -748,9 +728,9 @@ class NupService :
     override fun onPauseStateChange(paused: Boolean) {
         assertOnMainThread()
         this.paused = paused
-        updateNotification()
         songListener?.onPauseStateChange(this.paused)
         updatePlaybackState()
+        updateNotification()
     }
 
     override fun onPlaybackError(description: String) {
@@ -959,8 +939,8 @@ class NupService :
         player.playFile(entry.file, entry.totalBytes, song.albumGain, song.peakAmp)
         playStart = Date()
         cache.updateLastAccessTime(entry.songId)
-        updateNotification()
         updatePlaybackState()
+        updateNotification()
     }
 
     /** Try to download the next not-yet-downloaded song in the playlist. */
