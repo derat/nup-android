@@ -149,9 +149,10 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
 
     init {
         session = MediaSessionCompat(context, "nup").apply {
-            setRatingType(RatingCompat.RATING_5_STARS)
             setCallback(callback)
             setFlags(MediaSessionCompat.FLAG_HANDLES_QUEUE_COMMANDS)
+            setQueueTitle(context.getText(R.string.playlist))
+            setRatingType(RatingCompat.RATING_5_STARS)
             setSessionActivity(
                 PendingIntent.getActivity(context, 0, Intent(context, NupActivity::class.java), 0)
             )

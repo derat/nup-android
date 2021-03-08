@@ -56,6 +56,7 @@
   <string name="password_description">HTTP Basic Auth with server</string>
   <string name="pause">Pause</string>
   <string name="play">Play</string>
+  <string name="playlist">Playlist</string>
   <string name="prev">Prev</string>
   <string name="pre_amp_gain">Pre-amp gain</string>
   <string name="pre_amp_gain_description">Adjustment in dB</string>
