@@ -284,6 +284,14 @@ class Player(
         }
     }
 
+    /** Seek to the specified position. */
+    fun seek(posMs: Long) {
+        executor.execute {
+            Log.d(TAG, "Seeking to $posMs ms")
+            currentPlayer?.mediaPlayer?.seekTo(posMs.toInt())
+        }
+    }
+
     /** Reduce playback volume (e.g. during a phone call). */
     var lowVolume: Boolean = false
         set(value) {

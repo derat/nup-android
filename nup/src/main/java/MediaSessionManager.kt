@@ -130,6 +130,7 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
             if (paused) actions = actions or PlaybackStateCompat.ACTION_PLAY
             else actions = actions or PlaybackStateCompat.ACTION_PAUSE
         }
+        if (song != null) actions = actions or PlaybackStateCompat.ACTION_SEEK_TO
         if (songIndex > 0) actions = actions or PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS
         if (songIndex < numSongs - 1) actions = actions or PlaybackStateCompat.ACTION_SKIP_TO_NEXT
         if (numSongs > 1) actions = actions or PlaybackStateCompat.ACTION_SKIP_TO_QUEUE_ITEM

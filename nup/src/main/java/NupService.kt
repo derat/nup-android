@@ -357,6 +357,7 @@ class NupService :
                     }
                 }
                 override fun onRemoveQueueItemAt(index: Int) { removeFromPlaylist(index) }
+                override fun onSeekTo(pos: Long) { player.seek(pos) }
                 override fun onSkipToNext() { selectSongAtIndex(curSongIndex + 1) }
                 override fun onSkipToPrevious() { selectSongAtIndex(curSongIndex - 1) }
                 override fun onSkipToQueueItem(id: Long) {
