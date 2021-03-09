@@ -44,7 +44,7 @@ class NotificationCreator(
         val controller = mediaSession.controller
         val songIndex = controller.playbackState?.activeQueueItemId ?: -1
         val state = controller.playbackState?.state ?: PlaybackStateCompat.STATE_NONE
-        val metadata = controller.metadata as MediaMetadataCompat?
+        val metadata: MediaMetadataCompat? = controller.metadata
 
         val mediaId = metadata?.getString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID) ?: ""
         val cover = metadata?.getBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART)

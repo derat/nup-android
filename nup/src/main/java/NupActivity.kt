@@ -30,6 +30,8 @@ import android.widget.ListView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import com.google.android.gms.cast.framework.CastButtonFactory
+import com.google.android.gms.cast.framework.CastContext
 import com.google.android.material.button.MaterialButton
 
 /** Main activity showing current song and playlist. */
@@ -57,6 +59,8 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
     private lateinit var timeLabel: TextView
     private lateinit var downloadStatusLabel: TextView
     private lateinit var playlistView: ListView
+
+    private lateinit var castContext: CastContext
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         StrictMode.setThreadPolicy(
@@ -86,7 +90,13 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         super.onCreate(savedInstanceState)
         Log.d(TAG, "Activity created")
 
-        setContentView(R.layout.main)
+        // Thanks to Cast's MiniControllerFragment, inflating the main layout hits the disk.
+        val origPolicy = StrictMode.allowThreadDiskReads()
+        try {
+            setContentView(R.layout.main)
+        } finally {
+            StrictMode.setThreadPolicy(origPolicy)
+        }
 
         pauseButton = findViewById<MaterialButton>(R.id.pause_button)
         prevButton = findViewById<MaterialButton>(R.id.prev_button)
@@ -109,6 +119,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         bindService(serviceIntent, connection, 0)
 
         volumeControlStream = AudioManager.STREAM_MUSIC
+        castContext = getCastContext(this)
     }
 
     override fun onDestroy() {
@@ -262,7 +273,9 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
+        super.onCreateOptionsMenu(menu)
         menuInflater.inflate(R.menu.main_menu, menu)
+        CastButtonFactory.setUpMediaRouteButton(applicationContext, menu, R.id.cast_menu_item)
         return true
     }
 

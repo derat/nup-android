@@ -30,6 +30,9 @@ import android.widget.Toast
 import androidx.media.MediaBrowserServiceCompat
 import androidx.media.session.MediaButtonReceiver
 import androidx.preference.PreferenceManager
+import com.google.android.gms.cast.framework.CastContext
+import com.google.android.gms.cast.framework.CastSession
+import com.google.android.gms.cast.framework.SessionManagerListener
 import java.io.File
 import java.util.Arrays
 import java.util.Date
@@ -94,6 +97,30 @@ class NupService :
     private lateinit var audioFocusReq: AudioFocusRequest
     private lateinit var telephonyManager: TelephonyManager
     private lateinit var prefs: SharedPreferences
+
+    private lateinit var castContext: CastContext
+    private var castSession: CastSession? = null
+    private val castListener = object : SessionManagerListener<CastSession> {
+        override fun onSessionStarted(session: CastSession, sessionId: String) {
+            Log.d(TAG, "Cast session \"$sessionId\" started")
+        }
+        override fun onSessionResumed(session: CastSession, wasSuspended: Boolean) {
+            Log.d(TAG, "Cast session resumed")
+        }
+        override fun onSessionEnded(session: CastSession, error: Int) {
+            Log.d(TAG, "Cast session ended with error $error")
+        }
+        override fun onSessionResumeFailed(session: CastSession, error: Int) {
+            Log.e(TAG, "Cast session resume failed with error $error")
+        }
+        override fun onSessionStartFailed(session: CastSession, error: Int) {
+            Log.e(TAG, "Cast session start failed with error $error")
+        }
+        override fun onSessionStarting(session: CastSession) {}
+        override fun onSessionEnding(session: CastSession) {}
+        override fun onSessionResuming(session: CastSession, sessionId: String) {}
+        override fun onSessionSuspended(session: CastSession, reason: Int) {}
+    }
 
     private val songIdToSong = mutableMapOf<Long, Song>() // canonical [Song]s indexed by ID
     private val _songs = mutableListOf<Song>() // current playlist
@@ -373,6 +400,9 @@ class NupService :
             mediaSessionManager.session,
         )
         startForeground(NOTIFICATION_ID, notificationCreator.createNotification(false))
+
+        castContext = getCastContext(this)
+        castContext.sessionManager.addSessionManagerListener(castListener, CastSession::class.java)
     }
 
     override fun onDestroy() {

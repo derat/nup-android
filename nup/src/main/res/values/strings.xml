@@ -32,6 +32,7 @@
   <string name="cache_size_description">Local music cache in MB</string>
   <string name="cache_size_value">%d MB</string>
   <string name="cached">Cached</string>
+  <string name="cast">Cast</string>
   <string name="channel_name">nup</string>
   <string name="channel_description">Music playback status</string>
   <string name="clear_cache">Clear cache</string>

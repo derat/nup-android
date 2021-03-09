@@ -18,6 +18,13 @@
     app:showAsAction="always|withText"
   />
   <item
+    android:id="@+id/cast_menu_item"
+    android:title="@string/cast"
+    app:actionProviderClass="androidx.mediarouter.app.MediaRouteActionProvider"
+    app:iconTint="?android:attr/textColorPrimary"
+    app:showAsAction="always|withText"
+  />
+  <item
     android:id="@+id/pause_menu_item"
     android:icon="@drawable/pause"
     android:title="@string/pause"
