@@ -17,8 +17,8 @@ import java.util.concurrent.Executor
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
-import org.json.JSONArray
 import org.json.JSONException
+import org.json.JSONObject
 import org.json.JSONTokener
 
 /** Wraps a SQLite database containing information about all known songs. */
@@ -336,58 +336,63 @@ class SongDatabase(
         prevStartTimeNsec: Long,
         deleted: Boolean,
     ): Int {
-        var numUpdates = 0
-
         // The server breaks its results up into batches instead of sending us a bunch of songs
         // at once, so use the cursor that it returns to start in the correct place in the next
         // request.
         var serverCursor = ""
-        while (numUpdates == 0 || !serverCursor.isEmpty()) {
-            val path = String.format(
-                "/songs?minLastModifiedNsec=%d&deleted=%d&max=%d&cursor=%s",
-                prevStartTimeNsec,
-                if (deleted) 1 else 0,
-                SERVER_SONG_BATCH_SIZE,
-                serverCursor
-            )
+        var numUpdates = 0
+        fetch@ while (true) {
+            var path = "/export?type=song" +
+                "&omit=plays,sha1" +
+                "&minLastModifiedNsec=$prevStartTimeNsec" +
+                "&max=$SERVER_SONG_BATCH_SIZE"
+            if (!serverCursor.isEmpty()) path += "&cursor=$serverCursor"
+            if (deleted) path += "&deleted=1"
+
             val (response, error) = downloader.downloadString(path)
             response ?: throw ServerException(error!!)
-            serverCursor = ""
-            try {
-                val objects = JSONTokener(response).nextValue() as JSONArray
-                if (objects.length() == 0) break
-                for (i in 0 until objects.length()) {
-                    val jsonSong = objects.optJSONObject(i)
-                        ?: if (i == objects.length() - 1) {
-                            serverCursor = objects.getString(i)
-                            break
-                        } else {
-                            throw ServerException("Item $i from server isn't a JSON object")
-                        }
-                    val songId = jsonSong.getLong("songId")
 
-                    if (deleted) {
-                        Log.d(TAG, "Deleting song $songId")
-                        db.delete("Songs", "SongId = ?", arrayOf(songId.toString()))
-                    } else {
-                        val values = ContentValues(14)
-                        values.put("SongId", songId)
-                        values.put("Filename", jsonSong.getString("filename"))
-                        values.put("CoverFilename", jsonSong.optString("coverFilename"))
-                        values.put("Artist", jsonSong.getString("artist"))
-                        values.put("Title", jsonSong.getString("title"))
-                        values.put("Album", jsonSong.getString("album"))
-                        values.put("AlbumId", jsonSong.optString("albumId"))
-                        values.put("TrackNumber", jsonSong.getInt("track"))
-                        values.put("DiscNumber", jsonSong.getInt("disc"))
-                        values.put("Length", jsonSong.getDouble("length"))
-                        values.put("TrackGain", jsonSong.optDouble("trackGain", 0.0))
-                        values.put("AlbumGain", jsonSong.optDouble("albumGain", 0.0))
-                        values.put("PeakAmp", jsonSong.optDouble("peakAmp", 0.0))
-                        values.put("Rating", jsonSong.getDouble("rating"))
-                        db.replace("Songs", "", values)
+            try {
+                // The trim() is necessary here; more() returns true for trailing whitespace.
+                val tokener = JSONTokener(response.trim())
+                while (true) {
+                    // If we reached the end of the response without getting a cursor, we're done.
+                    if (!tokener.more()) break@fetch
+
+                    val item = tokener.nextValue()
+                    when {
+                        item is JSONObject -> {
+                            val songId = item.getLong("songId")
+                            if (deleted) {
+                                Log.d(TAG, "Deleting song $songId")
+                                db.delete("Songs", "SongId = ?", arrayOf(songId.toString()))
+                            } else {
+                                val values = ContentValues(14)
+                                values.put("SongId", songId)
+                                values.put("Filename", item.getString("filename"))
+                                values.put("CoverFilename", item.optString("coverFilename"))
+                                values.put("Artist", item.getString("artist"))
+                                values.put("Title", item.getString("title"))
+                                values.put("Album", item.getString("album"))
+                                values.put("AlbumId", item.optString("albumId"))
+                                values.put("TrackNumber", item.getInt("track"))
+                                values.put("DiscNumber", item.getInt("disc"))
+                                values.put("Length", item.getDouble("length"))
+                                values.put("TrackGain", item.optDouble("trackGain", 0.0))
+                                values.put("AlbumGain", item.optDouble("albumGain", 0.0))
+                                values.put("PeakAmp", item.optDouble("peakAmp", 0.0))
+                                values.put("Rating", item.getDouble("rating"))
+                                db.replace("Songs", "", values)
+                            }
+                            numUpdates++
+                        }
+                        item is String -> {
+                            serverCursor = item
+                            if (tokener.more()) throw ServerException("Trailing data after cursor")
+                            break
+                        }
+                        else -> throw ServerException("Got unexpected ${item.javaClass.name}")
                     }
-                    numUpdates++
                 }
             } catch (e: JSONException) {
                 throw ServerException("Couldn't parse response: $e")
