@@ -172,7 +172,7 @@ class PlaybackReporterTest {
 
     fun getReportPath(songId: Long, startDate: Date): String {
         val start = String.format("%.3f", startDate.time / 1000.0)
-        return "/report_played?songId=$songId&startTime=$start"
+        return "/played?songId=$songId&startTime=$start"
     }
 
     fun getReportUrl(reportPath: String) = URL("https", "www.example.com", reportPath)

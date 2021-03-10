@@ -45,7 +45,7 @@ class PlaybackReporter(
         var conn: HttpURLConnection? = null
         try {
             val start = String.format("%.3f", startDate.time / 1000.0)
-            val path = "/report_played?songId=$songId&startTime=$start"
+            val path = "/played?songId=$songId&startTime=$start"
             conn = downloader.download(
                 downloader.getServerUrl(path),
                 "POST",

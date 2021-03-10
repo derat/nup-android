@@ -152,7 +152,7 @@ class FileCache constructor(
         else db.updateLastAccessTime(song.id)
 
         val enc = URLEncoder.encode(song.filename, "UTF-8")
-        val url = downloader.getServerUrl("/song_data?filename=$enc")
+        val url = downloader.getServerUrl("/song?filename=$enc")
         Log.d(TAG, "Posting download of ${song.id} from $url to ${entry.file.path}")
         executor.execute(DownloadTask(entry, url))
         return entry

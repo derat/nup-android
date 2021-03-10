@@ -276,7 +276,7 @@ class SongDatabase(
             // Ask the server for the current time before we fetch anything.  We'll use this as the
             // starting point for the next sync, to handle the case where some songs in the server
             // are updated while we're doing this sync.
-            val (startStr, error) = downloader.downloadString("/now_nsec")
+            val (startStr, error) = downloader.downloadString("/now")
             startStr ?: return SyncSongsResult(false, 0, error!!)
             var startNs = startStr.toLong()
 
