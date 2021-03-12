@@ -160,32 +160,36 @@ class NupService :
     // Listen for miscellaneous broadcasts.
     private val broadcastReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            if (AudioManager.ACTION_AUDIO_BECOMING_NOISY == intent.action) {
-                Log.d(TAG, "Audio becoming noisy")
+            when (intent.action) {
+                AudioManager.ACTION_AUDIO_BECOMING_NOISY -> {
+                    Log.d(TAG, "Audio becoming noisy")
 
-                // Switching users apparently triggers an AUDIO_BECOMING_NOISY broadcast
-                // intent (which usually indicates that headphones have been disconnected).
-                // AudioManager.isWiredHeadsetOn() returns true when the notification is
-                // sent due to headphones being unplugged (why?), so that doesn't seem to
-                // help for ignoring this. Instead, ignore these intents for a brief period
-                // after user-switch broadcast intents.
-                val last = lastUserSwitch
-                val userSwitchedRecently = last == null ||
-                    Date().time - last.time <= IGNORE_NOISY_AUDIO_AFTER_USER_SWITCH_MS
-                if (curSongIndex >= 0 && !paused && !userSwitchedRecently) {
-                    player.pause()
-                    Toast.makeText(
-                        this@NupService,
-                        "Paused since unplugged",
-                        Toast.LENGTH_SHORT
-                    ).show()
+                    // Switching users apparently triggers an AUDIO_BECOMING_NOISY broadcast
+                    // intent (which usually indicates that headphones have been disconnected).
+                    // AudioManager.isWiredHeadsetOn() returns true when the notification is
+                    // sent due to headphones being unplugged (why?), so that doesn't seem to
+                    // help for ignoring this. Instead, ignore these intents for a brief period
+                    // after user-switch broadcast intents.
+                    val last = lastUserSwitch
+                    val userSwitchedRecently = last != null &&
+                        Date().time - last.time <= IGNORE_NOISY_AUDIO_AFTER_USER_SWITCH_MS
+                    if (curSongIndex >= 0 && !paused && !userSwitchedRecently) {
+                        player.pause()
+                        Toast.makeText(
+                            this@NupService,
+                            "Paused since unplugged",
+                            Toast.LENGTH_SHORT
+                        ).show()
+                    }
                 }
-            } else if (Intent.ACTION_USER_BACKGROUND == intent.action) {
-                Log.d(TAG, "User is backgrounded")
-                lastUserSwitch = Date()
-            } else if (Intent.ACTION_USER_FOREGROUND == intent.action) {
-                Log.d(TAG, "User is foregrounded")
-                lastUserSwitch = Date()
+                Intent.ACTION_USER_BACKGROUND -> {
+                    Log.d(TAG, "User is backgrounded")
+                    lastUserSwitch = Date()
+                }
+                Intent.ACTION_USER_FOREGROUND -> {
+                    Log.d(TAG, "User is foregrounded")
+                    lastUserSwitch = Date()
+                }
             }
         }
     }
