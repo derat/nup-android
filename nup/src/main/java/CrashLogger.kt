@@ -5,6 +5,7 @@
 
 package org.erat.nup
 
+import android.os.StrictMode
 import android.util.Log
 import java.io.File
 import java.io.FileNotFoundException
@@ -18,6 +19,7 @@ class CrashLogger private constructor(private val dir: File) : Thread.UncaughtEx
     private val dateFormat = SimpleDateFormat("yyyyMMdd-HHmmss")
 
     override fun uncaughtException(thread: Thread, error: Throwable) {
+        val origPolicy = StrictMode.allowThreadDiskWrites()
         try {
             dir.mkdirs()
             val file = File(dir, dateFormat.format(Date()) + ".txt")
@@ -35,6 +37,8 @@ class CrashLogger private constructor(private val dir: File) : Thread.UncaughtEx
             Log.e(TAG, "File not found: $e")
         } catch (e: IOException) {
             Log.e(TAG, "IO error: $e")
+        } finally {
+            StrictMode.setThreadPolicy(origPolicy)
         }
 
         defaultHandler?.uncaughtException(thread, error)
