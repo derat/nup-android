@@ -15,7 +15,7 @@ import java.util.Collections
 import java.util.Date
 import java.util.concurrent.Executor
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import org.json.JSONException
 import org.json.JSONObject
@@ -919,7 +919,7 @@ class SongDatabase(
         opener = DatabaseOpener(context, DATABASE_NAME, helper)
 
         // Get some info from the database in a background thread.
-        GlobalScope.launch(Dispatchers.IO) {
+        MainScope().launch(Dispatchers.IO) {
             loadAggregateData(false)
             val db = opener.getDb()
             db.beginTransaction()

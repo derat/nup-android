@@ -11,7 +11,7 @@ import android.support.v4.media.MediaDescriptionCompat
 import android.util.Log
 import androidx.media.MediaBrowserServiceCompat
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
 /** Provides functionality for implementing [MediaBrowserServiceCompat]. */
@@ -25,6 +25,7 @@ class MediaBrowserHelper(
         result: MediaBrowserServiceCompat.Result<MutableList<MediaItem>>
     ) {
         Log.d(TAG, "Got request for children of \"$parentId\"")
+        val scope = MainScope()
         when {
             parentId == ROOT_ID -> {
                 // Per https://developer.android.com/training/cars/media#root-menu-structure, it's
@@ -53,7 +54,7 @@ class MediaBrowserHelper(
             }
             parentId.startsWith(CACHED_ARTISTS_ID) -> {
                 result.detach()
-                GlobalScope.launch(Dispatchers.IO) {
+                scope.launch(Dispatchers.IO) {
                     val items = mutableListOf<MediaItem>()
                     for (row in db.cachedArtistsSortedAlphabetically()) {
                         items.add(makeArtistItem(row, onlyCached = true))
@@ -63,7 +64,7 @@ class MediaBrowserHelper(
             }
             parentId.startsWith(CACHED_ALBUMS_ID) -> {
                 result.detach()
-                GlobalScope.launch(Dispatchers.IO) {
+                scope.launch(Dispatchers.IO) {
                     val items = mutableListOf<MediaItem>()
                     for (row in db.cachedAlbumsSortedAlphabetically()) {
                         items.add(makeAlbumItem(row, onlyCached = true, includeArtist = true))
@@ -81,7 +82,7 @@ class MediaBrowserHelper(
             }
             parentId.startsWith(CACHED_ARTIST_ID_PREFIX) -> {
                 result.detach()
-                GlobalScope.launch(Dispatchers.IO) {
+                scope.launch(Dispatchers.IO) {
                     val artist = parentId.substring(CACHED_ARTIST_ID_PREFIX.length)
                     val items = mutableListOf<MediaItem>()
                     for (row in db.cachedAlbumsByArtist(artist)) {
@@ -92,7 +93,7 @@ class MediaBrowserHelper(
             }
             parentId.startsWith(ALBUM_ID_PREFIX) -> {
                 result.detach()
-                GlobalScope.launch(Dispatchers.IO) {
+                scope.launch(Dispatchers.IO) {
                     val items = mutableListOf<MediaItem>()
                     for (song in getSongsForMediaId(parentId)) {
                         items.add(makeSongItem(song))

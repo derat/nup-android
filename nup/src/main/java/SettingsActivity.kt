@@ -21,7 +21,7 @@ import androidx.preference.PreferenceFragmentCompat
 import java.text.SimpleDateFormat
 import java.util.Date
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import org.erat.nup.NupActivity.Companion.service
 
@@ -281,7 +281,7 @@ class YesNoPreferenceDialogFragment : PreferenceDialogFragmentCompat() {
         if (!positiveResult) return
         val key = getPreference().key
         when (key) {
-            NupPreferences.SYNC_SONG_LIST -> GlobalScope.launch(Dispatchers.IO) {
+            NupPreferences.SYNC_SONG_LIST -> MainScope().launch(Dispatchers.IO) {
                 service.songDb.syncWithServer()
             }
             NupPreferences.CLEAR_CACHE -> service.clearCache()

@@ -17,7 +17,7 @@ import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.GlobalScope
+import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
 /** CoverLoader loads and caches album art. */
@@ -162,7 +162,7 @@ open class CoverLoader(
 
     init {
         // [externalCacheDir] hits the disk, so do it in the background.
-        GlobalScope.launch(Dispatchers.IO) {
+        MainScope().launch(Dispatchers.IO) {
             coverDir = File(context.externalCacheDir, DIR_NAME)
             coverDir.mkdirs()
             readyLock.withLock {
