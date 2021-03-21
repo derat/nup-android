@@ -314,21 +314,34 @@ class NupService :
             this,
             object : MediaSessionCompat.Callback() {
                 override fun onAddQueueItem(description: MediaDescriptionCompat) {
-                    getSongsForMediaId(description.getMediaId()) { appendSongsToPlaylist(it) }
+                    val id = description.getMediaId()
+                    Log.d(TAG, "MediaSession request to add $id")
+                    getSongsForMediaId(id) { appendSongsToPlaylist(it) }
                 }
                 override fun onAddQueueItem(description: MediaDescriptionCompat, index: Int) {
-                    getSongsForMediaId(description.getMediaId()) { insertSongs(it, index) }
+                    val id = description.getMediaId()
+                    Log.d(TAG, "MediaSession request to add $id at $index")
+                    getSongsForMediaId(id) { insertSongs(it, index) }
                 }
-                override fun onPause() { player.pause() }
-                override fun onPlay() { player.unpause() }
+                override fun onPause() {
+                    Log.d(TAG, "MediaSession request to pause")
+                    player.pause()
+                }
+                override fun onPlay() {
+                    Log.d(TAG, "MediaSession request to play")
+                    player.unpause()
+                }
                 override fun onPlayFromMediaId(mediaId: String, extras: Bundle) {
+                    Log.d(TAG, "MediaSession request to play $mediaId")
                     getSongsForMediaId(mediaId) {
                         // TODO: Figure out how queue management should work here.
                         clearPlaylist()
                         addSongsToPlaylist(it, true /* forcePlay */)
+                        player.unpause()
                     }
                 }
                 override fun onPlayFromSearch(query: String, extras: Bundle) {
+                    Log.d(TAG, "MediaSession request to play from query \"$query\"")
                     // For some reason, onPrepareFromSearch() never gets called when I do a voice
                     // search from Android Auto, even after updating MediaSessionManager to include
                     // ACTION_PREPARE_FROM_SEARCH in the action bitfield. onPlayFromSearch() only
@@ -347,10 +360,12 @@ class NupService :
                         if (!songs.isEmpty()) {
                             clearPlaylist()
                             addSongsToPlaylist(songs, true /* forcePlay */)
+                            player.unpause()
                         }
                     }
                 }
                 override fun onRemoveQueueItem(description: MediaDescriptionCompat) {
+                    Log.d(TAG, "MediaSession request to remove ${description.getMediaId()}")
                     getSongsForMediaId(description.getMediaId()) {
                         for (song in it) {
                             val idx = getSongIndex(song.id)
@@ -358,12 +373,30 @@ class NupService :
                         }
                     }
                 }
-                override fun onRemoveQueueItemAt(index: Int) { removeFromPlaylist(index) }
-                override fun onSeekTo(pos: Long) { player.seek(pos) }
-                override fun onSkipToNext() { selectSongAtIndex(curSongIndex + 1) }
-                override fun onSkipToPrevious() { selectSongAtIndex(curSongIndex - 1) }
-                override fun onSkipToQueueItem(id: Long) { selectSongAtIndex(id.toInt()) }
-                override fun onStop() { player.pause() }
+                override fun onRemoveQueueItemAt(index: Int) {
+                    Log.d(TAG, "MediaSession request to remove item at $index")
+                    removeFromPlaylist(index)
+                }
+                override fun onSeekTo(pos: Long) {
+                    Log.d(TAG, "MediaSession request to seek to $pos")
+                    player.seek(pos)
+                }
+                override fun onSkipToNext() {
+                    Log.d(TAG, "MediaSession request to skip to next")
+                    selectSongAtIndex(curSongIndex + 1)
+                }
+                override fun onSkipToPrevious() {
+                    Log.d(TAG, "MediaSession request to skip to previous")
+                    selectSongAtIndex(curSongIndex - 1)
+                }
+                override fun onSkipToQueueItem(id: Long) {
+                    Log.d(TAG, "MediaSession request to skip to $id")
+                    selectSongAtIndex(id.toInt())
+                }
+                override fun onStop() {
+                    Log.d(TAG, "MediaSession request to stop")
+                    player.pause()
+                }
             }
         )
         sessionToken = mediaSessionManager.session.sessionToken
