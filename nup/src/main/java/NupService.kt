@@ -36,6 +36,7 @@ import java.util.Date
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.async
+import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 
 /** Foreground service that plays music, manages databases, etc. */
@@ -73,7 +74,7 @@ class NupService :
         fun onFileCacheSizeChange()
     }
 
-    private val scope = MainScope()
+    val scope = MainScope()
     private val binder: IBinder = LocalBinder()
 
     lateinit var songDb: SongDatabase
@@ -272,8 +273,8 @@ class NupService :
         downloader = Downloader()
         player = Player(this, this, mainExecutor, audioAttrs)
         cache = FileCache(this, this, mainExecutor, downloader, networkHelper)
-        songDb = SongDatabase(this, this, mainExecutor, cache, downloader, networkHelper)
-        coverLoader = CoverLoader(this, downloader, networkHelper)
+        songDb = SongDatabase(this, scope, this, mainExecutor, cache, downloader, networkHelper)
+        coverLoader = CoverLoader(this, scope, downloader, networkHelper)
         playbackReporter = PlaybackReporter(songDb, downloader, networkHelper)
 
         // Sigh. This hits the disk, but it crashes with "java.lang.RuntimeException: Can't create
@@ -401,7 +402,7 @@ class NupService :
         )
         sessionToken = mediaSessionManager.session.sessionToken
 
-        mediaBrowserHelper = MediaBrowserHelper(songDb, this.getResources())
+        mediaBrowserHelper = MediaBrowserHelper(songDb, scope, this.getResources())
 
         notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         notificationCreator = NotificationCreator(
@@ -415,6 +416,10 @@ class NupService :
     override fun onDestroy() {
         super.onDestroy()
         Log.d(TAG, "Service destroyed")
+
+        // Make sure that coroutines don't run after SongDatabase has been dismantled:
+        // https://github.com/derat/nup-android/issues/17
+        scope.cancel()
 
         audioManager.abandonAudioFocusRequest(audioFocusReq)
         if (this::prefs.isInitialized) {

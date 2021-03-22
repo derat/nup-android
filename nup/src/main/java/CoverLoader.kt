@@ -16,13 +16,14 @@ import java.net.URLEncoder
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
 /** CoverLoader loads and caches album art. */
 open class CoverLoader(
     context: Context,
+    scope: CoroutineScope,
     private val downloader: Downloader,
     private val networkHelper: NetworkHelper,
 ) {
@@ -162,7 +163,7 @@ open class CoverLoader(
 
     init {
         // [externalCacheDir] hits the disk, so do it in the background.
-        MainScope().launch(Dispatchers.IO) {
+        scope.launch(Dispatchers.IO) {
             coverDir = File(context.externalCacheDir, DIR_NAME)
             coverDir.mkdirs()
             readyLock.withLock {

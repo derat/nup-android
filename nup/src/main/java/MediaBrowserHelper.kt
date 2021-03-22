@@ -10,13 +10,14 @@ import android.support.v4.media.MediaBrowserCompat.MediaItem
 import android.support.v4.media.MediaDescriptionCompat
 import android.util.Log
 import androidx.media.MediaBrowserServiceCompat
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 
 /** Provides functionality for implementing [MediaBrowserServiceCompat]. */
 class MediaBrowserHelper(
     private val db: SongDatabase,
+    private val scope: CoroutineScope,
     private val res: Resources,
 ) {
     /** Implements [MediaBrowserServiceCompat.onLoadChildren]. */
@@ -25,7 +26,6 @@ class MediaBrowserHelper(
         result: MediaBrowserServiceCompat.Result<MutableList<MediaItem>>
     ) {
         Log.d(TAG, "Got request for children of \"$parentId\"")
-        val scope = MainScope()
         when {
             parentId == ROOT_ID -> {
                 // Per https://developer.android.com/training/cars/media#root-menu-structure, it's

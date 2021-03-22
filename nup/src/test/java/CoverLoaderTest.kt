@@ -15,6 +15,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.TestCoroutineScope
 import org.erat.nup.CoverLoader
 import org.erat.nup.Downloader
 import org.erat.nup.NetworkHelper
@@ -26,7 +27,9 @@ import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.MockitoAnnotations
 
+@OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class CoverLoaderTest {
+    val scope = TestCoroutineScope()
     lateinit var tempDir: File
     lateinit var coverLoader: CoverLoader
     lateinit var bitmapDataMap: HashMap<String, Bitmap>
@@ -43,7 +46,7 @@ class CoverLoaderTest {
         Mockito.`when`(context.externalCacheDir).thenReturn(tempDir)
 
         bitmapDataMap = HashMap()
-        coverLoader = object : CoverLoader(context, downloader, networkHelper) {
+        coverLoader = object : CoverLoader(context, scope, downloader, networkHelper) {
             override fun decodeFile(path: String): Bitmap? {
                 return try {
                     val fileData = File(path)

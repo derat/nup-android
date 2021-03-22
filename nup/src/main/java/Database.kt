@@ -26,9 +26,19 @@ class DatabaseOpener(
 ) {
     private var db: SQLiteDatabase? = null
 
-    // Opens and returns a database.  The caller shouldn't call close() on the object, since it's
-    // shared across multiple calls.
+    /** True after close() has been called. */
+    var closed = false
+        @Synchronized get
+        @Synchronized private set
+
+    /**
+     * Open and return a database.
+     *
+     * The caller shouldn't call close() on the object, since it's shared across multiple calls.
+     */
     @Synchronized fun getDb(): SQLiteDatabase {
+        if (closed) throw RuntimeException("Database already closed")
+
         if (db == null) {
             // Just use SQLiteOpenHelper to create and upgrade the database.
             // Trying to use it with multithreaded code seems to be a disaster.
@@ -56,10 +66,11 @@ class DatabaseOpener(
         return db!!
     }
 
-    /** Close the database, invalidating previously-returned object. */
+    /** Close the database, invalidating previously-returned objects. */
     @Synchronized fun close() {
         db?.close()
         db = null
+        closed = true
     }
 
     companion object {

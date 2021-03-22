@@ -8,6 +8,7 @@ package org.erat.nup
 import android.content.Intent
 import android.os.Bundle
 import android.view.ContextMenu
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 
@@ -47,7 +48,11 @@ class BrowseArtistsActivity : BrowseActivityBase() {
         }
     }
 
-    override fun getRows(db: SongDatabase, update: (rows: List<StatsRow>?) -> Unit) {
+    override fun getRows(
+        db: SongDatabase,
+        scope: CoroutineScope,
+        update: (rows: List<StatsRow>?) -> Unit
+    ) {
         when {
             // If the database isn't ready, display a loading message.
             !db.aggregateDataLoaded -> update(null)

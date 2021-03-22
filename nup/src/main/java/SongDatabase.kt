@@ -14,8 +14,8 @@ import android.util.Log
 import java.util.Collections
 import java.util.Date
 import java.util.concurrent.Executor
+import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.launch
 import org.json.JSONException
 import org.json.JSONObject
@@ -24,6 +24,7 @@ import org.json.JSONTokener
 /** Wraps a SQLite database containing information about all known songs. */
 class SongDatabase(
     private val context: Context,
+    private val scope: CoroutineScope,
     private val listener: Listener,
     private val listenerExecutor: Executor,
     private val cache: FileCache,
@@ -919,14 +920,19 @@ class SongDatabase(
         opener = DatabaseOpener(context, DATABASE_NAME, helper)
 
         // Get some info from the database in a background thread.
-        MainScope().launch(Dispatchers.IO) {
-            loadAggregateData(false)
-            val db = opener.getDb()
-            db.beginTransaction()
-            try {
-                updateCachedSongs(db)
-            } finally {
-                db.endTransaction()
+        scope.launch(Dispatchers.IO) {
+            synchronized(this) task@{
+                // Bail out if we were shut down during initialization.
+                if (opener.closed) return@task
+
+                loadAggregateData(false)
+                val db = opener.getDb()
+                db.beginTransaction()
+                try {
+                    updateCachedSongs(db)
+                } finally {
+                    db.endTransaction()
+                }
             }
         }
         updater = DatabaseUpdater(opener)

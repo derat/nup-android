@@ -20,13 +20,11 @@ import android.widget.SimpleAdapter
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.async
 import org.erat.nup.NupActivity.Companion.service
 
 /** Displays a list of songs from a search result. */
 class SearchResultsActivity : AppCompatActivity() {
-    private val scope = MainScope()
     private var songs = listOf<Song>()
 
     public override fun onCreate(savedInstanceState: Bundle?) {
@@ -37,7 +35,7 @@ class SearchResultsActivity : AppCompatActivity() {
         setContentView(R.layout.search_results)
 
         // Do the search async on the IO thread since it hits the disk.
-        scope.async(Dispatchers.Main) {
+        service.scope.async(Dispatchers.Main) {
             songs = async(Dispatchers.IO) {
                 if (intent.action == Intent.ACTION_SEARCH) {
                     // I'm not sure when/if this is actually used. Voice searches performed via

@@ -16,12 +16,11 @@ import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.ListView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.fragment.app.ListFragment
-import kotlinx.coroutines.MainScope
+import kotlinx.coroutines.CoroutineScope
 import org.erat.nup.NupActivity.Companion.service
 
 /** Base class for Browse*Activity that shows a scrollable list of items. */
 abstract class BrowseActivityBase : AppCompatActivity(), NupService.SongDatabaseUpdateListener {
-    protected val scope = MainScope()
     private val rows: MutableList<StatsRow> = ArrayList()
     private lateinit var adapter: StatsRowArrayAdapter
 
@@ -32,7 +31,11 @@ abstract class BrowseActivityBase : AppCompatActivity(), NupService.SongDatabase
     abstract fun onRowClick(row: StatsRow, pos: Int)
     abstract fun fillMenu(menu: ContextMenu, row: StatsRow)
     abstract fun onMenuClick(itemId: Int, row: StatsRow): Boolean
-    abstract fun getRows(db: SongDatabase, update: (rows: List<StatsRow>?) -> Unit)
+    abstract fun getRows(
+        db: SongDatabase,
+        scope: CoroutineScope,
+        update: (rows: List<StatsRow>?) -> Unit
+    )
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -95,6 +98,7 @@ abstract class BrowseActivityBase : AppCompatActivity(), NupService.SongDatabase
     override fun onSongDatabaseUpdate() {
         getRows(
             service.songDb,
+            service.scope,
             { newRows: List<StatsRow>? ->
                 rows.clear()
                 if (newRows != null) rows.addAll(newRows)

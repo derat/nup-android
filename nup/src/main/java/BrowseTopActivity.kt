@@ -8,6 +8,7 @@ package org.erat.nup
 import android.content.Intent
 import android.os.Bundle
 import android.view.ContextMenu
+import kotlinx.coroutines.CoroutineScope
 
 /** Displays top-level browsing actions. */
 class BrowseTopActivity : BrowseActivityBase() {
@@ -40,7 +41,11 @@ class BrowseTopActivity : BrowseActivityBase() {
     }
     override fun fillMenu(menu: ContextMenu, row: StatsRow) = Unit
     override fun onMenuClick(itemId: Int, row: StatsRow) = false
-    override fun getRows(db: SongDatabase, update: (rows: List<StatsRow>?) -> Unit) {
+    override fun getRows(
+        db: SongDatabase,
+        scope: CoroutineScope,
+        update: (rows: List<StatsRow>?) -> Unit
+    ) {
         update(
             arrayListOf(
                 StatsRow(getString(R.string.artists), "", "", -1),

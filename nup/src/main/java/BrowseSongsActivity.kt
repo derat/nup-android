@@ -21,7 +21,6 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import java.util.Collections
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.MainScope
 import kotlinx.coroutines.async
 import org.erat.nup.NupActivity.Companion.service
 
@@ -32,7 +31,6 @@ import org.erat.nup.NupActivity.Companion.service
  * and doesn't display aggregate song counts.
  */
 class BrowseSongsActivity : AppCompatActivity(), OnItemClickListener {
-    private val scope = MainScope()
     private var songs = listOf<Song>()
 
     // Passed-in criteria specifying which songs to display.
@@ -88,7 +86,7 @@ class BrowseSongsActivity : AppCompatActivity(), OnItemClickListener {
         }
 
         // Do the query for the songs in the background.
-        scope.async(Dispatchers.Main) {
+        service.scope.async(Dispatchers.Main) {
             val newSongs = async(Dispatchers.IO) {
                 service.songDb.query(
                     artist = artist,
