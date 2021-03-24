@@ -9,6 +9,9 @@ import android.content.Intent
 import android.os.Bundle
 import android.view.ContextMenu
 import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
+import org.erat.nup.NupActivity.Companion.service
 
 /** Displays top-level browsing actions. */
 class BrowseTopActivity : BrowseActivityBase() {
@@ -37,6 +40,19 @@ class BrowseTopActivity : BrowseActivityBase() {
                 intent.putExtra(BUNDLE_CACHED, true)
                 startActivityForResult(intent, BROWSE_ALBUMS_REQUEST_CODE)
             }
+            4 -> {
+                // TODO: If/when NupActivity and friends are using MediaBrowser, MediaController,
+                // and friends to talk to NupService, this can just send an empty search.
+                service.scope.async(Dispatchers.Main) {
+                    val songs = async(Dispatchers.IO) { searchForSongs(service.songDb, "") }.await()
+                    if (songs.size > 0) {
+                        service.clearPlaylist()
+                        service.addSongsToPlaylist(songs, true)
+                        setResult(RESULT_OK)
+                        finish()
+                    }
+                }
+            }
         }
     }
     override fun fillMenu(menu: ContextMenu, row: StatsRow) = Unit
@@ -52,6 +68,7 @@ class BrowseTopActivity : BrowseActivityBase() {
                 StatsRow(getString(R.string.albums), "", "", -1),
                 StatsRow(getString(R.string.artists_cached), "", "", -1),
                 StatsRow(getString(R.string.albums_cached), "", "", -1),
+                StatsRow(getString(R.string.shuffle), "", "", -1),
             )
         )
     }

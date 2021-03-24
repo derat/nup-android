@@ -36,6 +36,7 @@ class MediaBrowserHelper(
                 items.add(makeMenuItem(R.string.albums, ALBUMS_ID))
                 items.add(makeMenuItem(R.string.artists_cached, CACHED_ARTISTS_ID))
                 items.add(makeMenuItem(R.string.albums_cached, CACHED_ALBUMS_ID))
+                items.add(makeMenuItem(R.string.shuffle, SHUFFLE_ID, playable = true))
                 result.sendResult(items)
             }
             parentId == ARTISTS_ID -> {
@@ -109,12 +110,12 @@ class MediaBrowserHelper(
     }
 
     /** Create a [MediaItem] with the supplied string resource and media ID. */
-    private fun makeMenuItem(resId: Int, id: String): MediaItem {
+    private fun makeMenuItem(resId: Int, id: String, playable: Boolean = false): MediaItem {
         val desc = MediaDescriptionCompat.Builder()
             .setTitle(res.getText(resId))
             .setMediaId(id)
             .build()
-        return MediaItem(desc, MediaItem.FLAG_BROWSABLE)
+        return MediaItem(desc, if (playable) MediaItem.FLAG_PLAYABLE else MediaItem.FLAG_BROWSABLE)
     }
 
     /** Create a [MediaItem] for the artist described by [row]. */
@@ -162,15 +163,14 @@ class MediaBrowserHelper(
     /** Query the database for songs identified by [id]. */
     public suspend fun getSongsForMediaId(id: String): List<Song> {
         return when {
-            id.startsWith(ALBUM_ID_PREFIX) -> {
+            id == SHUFFLE_ID ->
+                searchForSongs(db, "")
+            id.startsWith(ALBUM_ID_PREFIX) ->
                 db.query(albumId = id.substring(ALBUM_ID_PREFIX.length))
-            }
-            id.startsWith(CACHED_ALBUM_ID_PREFIX) -> {
+            id.startsWith(CACHED_ALBUM_ID_PREFIX) ->
                 db.query(albumId = id.substring(CACHED_ALBUM_ID_PREFIX.length), onlyCached = true)
-            }
-            id.startsWith(SONG_ID_PREFIX) -> {
+            id.startsWith(SONG_ID_PREFIX) ->
                 db.query(songId = id.substring(SONG_ID_PREFIX.length).toLong())
-            }
             else -> {
                 Log.e(TAG, "Don't know how to query for songs with media ID \"$id\"")
                 listOf<Song>()
@@ -187,6 +187,7 @@ class MediaBrowserHelper(
         private const val ALBUMS_ID = "albums"
         private const val CACHED_ARTISTS_ID = "cached_artists"
         private const val CACHED_ALBUMS_ID = "cached_albums"
+        private const val SHUFFLE_ID = "shuffle"
 
         private const val ARTIST_ID_PREFIX = "artist_"
         private const val ALBUM_ID_PREFIX = "album_"
