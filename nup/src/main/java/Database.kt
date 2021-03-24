@@ -12,6 +12,9 @@ import android.database.sqlite.SQLiteOpenHelper
 import android.util.Log
 import java.util.concurrent.Executors
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.locks.ReentrantReadWriteLock
+import kotlin.concurrent.read
+import kotlin.concurrent.write
 
 // This is a simpler class that uses a passed-in SQLiteOpenHelper to create and/or upgrade a
 // database but then manages its own separate writable handle instead of using the helper's.
@@ -25,52 +28,56 @@ class DatabaseOpener(
     private val openHelper: SQLiteOpenHelper
 ) {
     private var db: SQLiteDatabase? = null
-
-    /** True after close() has been called. */
-    var closed = false
-        @Synchronized get
-        @Synchronized private set
+    private var closed = false
+    private val lock = ReentrantReadWriteLock()
 
     /**
-     * Open and return a database.
+     * Open the database if needed and pass it to the supplied closure.
      *
-     * The caller shouldn't call close() on the object, since it's shared across multiple calls.
+     * The caller shouldn't close the [SQLiteDatabase], since it's shared across multiple calls.
+     * The [SQLiteDatabase] is null if close() has already been called.
      */
-    @Synchronized fun getDb(): SQLiteDatabase {
-        if (closed) throw RuntimeException("Database already closed")
-
-        if (db == null) {
-            // Just use SQLiteOpenHelper to create and upgrade the database.
-            // Trying to use it with multithreaded code seems to be a disaster.
-            // We repeatedly try to open the database, since I see weird "database locked"
-            // errors when trying to open a database just after startup sometimes -- as
-            // far as I know, nobody should be using the database at that point.
-            while (true) {
-                try {
-                    openHelper.writableDatabase.close()
-                    break
-                } catch (e: SQLiteDatabaseLockedException) {
-                    Log.e(TAG, "Database $name locked while trying to create/upgrade it: $e")
+    fun getDb(action: (db: SQLiteDatabase?) -> Unit) {
+        // Hold the write lock to open the database.
+        lock.write {
+            // If the database hasn't been opened yet, open it.
+            if (db == null && !closed) {
+                // Just use SQLiteOpenHelper to create and upgrade the database.
+                // Trying to use it with multithreaded code seems to be a disaster.
+                // We repeatedly try to open the database, since I see weird "database locked"
+                // errors when trying to open a database just after startup sometimes -- as
+                // far as I know, nobody should be using the database at that point.
+                while (true) {
+                    try {
+                        openHelper.writableDatabase.close()
+                        break
+                    } catch (e: SQLiteDatabaseLockedException) {
+                        Log.e(TAG, "Database $name locked while trying to create/upgrade it: $e")
+                    }
                 }
-            }
 
-            while (true) {
-                try {
-                    db = context.openOrCreateDatabase(name, 0, null)
-                    break
-                } catch (e: SQLiteDatabaseLockedException) {
-                    Log.e(TAG, "Database $name locked while trying to open it: $e")
+                while (true) {
+                    try {
+                        db = context.openOrCreateDatabase(name, 0, null)
+                        break
+                    } catch (e: SQLiteDatabaseLockedException) {
+                        Log.e(TAG, "Database $name locked while trying to open it: $e")
+                    }
                 }
             }
         }
-        return db!!
+
+        // Hold the read lock for the duration of the action to ensure the database isn't closed.
+        lock.read { action(db) }
     }
 
     /** Close the database, invalidating previously-returned objects. */
-    @Synchronized fun close() {
-        db?.close()
-        db = null
-        closed = true
+    fun close() {
+        lock.write {
+            closed = true
+            db?.close()
+            db = null
+        }
     }
 
     companion object {
@@ -90,7 +97,9 @@ class DatabaseUpdater(private val opener: DatabaseOpener) {
 
     /** Run [sql] asynchronously. */
     fun postUpdate(sql: String, values: Array<Any>?) {
-        executor.execute { opener.getDb().execSQL(sql, values) }
+        executor.execute {
+            opener.getDb() { it?.execSQL(sql, values) }
+        }
     }
 
     companion object {

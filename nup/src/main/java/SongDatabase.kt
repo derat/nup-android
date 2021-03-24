@@ -101,7 +101,6 @@ class SongDatabase(
         )
     }
 
-    @Synchronized
     fun quit() {
         updater.quit()
         opener.close()
@@ -163,32 +162,38 @@ class SongDatabase(
                     ) +
                 "LIMIT " + MAX_QUERY_RESULTS
             )
-        Log.d(TAG, "Running \"$query\" with args ${TextUtils.join(", ", builder.selectionArgs)}")
-        val db = opener.getDb()
-        val cursor = db.rawQuery(query, builder.selectionArgs.toArray<String>(arrayOf<String>()))
-        val songs: MutableList<Song> = ArrayList()
-        cursor.moveToFirst()
-        while (!cursor.isAfterLast) {
-            val song = Song(
-                id = cursor.getLong(0),
-                artist = cursor.getString(1),
-                title = cursor.getString(2),
-                album = cursor.getString(3),
-                albumId = cursor.getString(4),
-                filename = cursor.getString(5),
-                coverFilename = cursor.getString(6),
-                lengthSec = cursor.getInt(7),
-                track = cursor.getInt(8),
-                disc = cursor.getInt(9),
-                trackGain = cursor.getFloat(10).toDouble(),
-                albumGain = cursor.getFloat(11).toDouble(),
-                peakAmp = cursor.getFloat(12).toDouble(),
-                rating = cursor.getFloat(13).toDouble(),
+
+        val songs = mutableListOf<Song>()
+        opener.getDb() task@{ db ->
+            if (db == null) return@task // quit() already called
+
+            Log.d(TAG, "Running \"$query\" with ${TextUtils.join(", ", builder.selectionArgs)}")
+            val cursor = db.rawQuery(
+                query, builder.selectionArgs.toArray<String>(arrayOf<String>())
             )
-            songs.add(song)
-            cursor.moveToNext()
+            cursor.moveToFirst()
+            while (!cursor.isAfterLast) {
+                val song = Song(
+                    id = cursor.getLong(0),
+                    artist = cursor.getString(1),
+                    title = cursor.getString(2),
+                    album = cursor.getString(3),
+                    albumId = cursor.getString(4),
+                    filename = cursor.getString(5),
+                    coverFilename = cursor.getString(6),
+                    lengthSec = cursor.getInt(7),
+                    track = cursor.getInt(8),
+                    disc = cursor.getInt(9),
+                    trackGain = cursor.getFloat(10).toDouble(),
+                    albumGain = cursor.getFloat(11).toDouble(),
+                    peakAmp = cursor.getFloat(12).toDouble(),
+                    rating = cursor.getFloat(13).toDouble(),
+                )
+                songs.add(song)
+                cursor.moveToNext()
+            }
+            cursor.close()
         }
-        cursor.close()
         return songs
     }
 
@@ -223,17 +228,20 @@ class SongDatabase(
 
     /** Get all pending playback reports from the PendingPlaybackReports table. */
     fun allPendingPlaybackReports(): List<PendingPlaybackReport> {
-        val db = opener.getDb()
-        val cursor = db.rawQuery("SELECT SongId, StartTime FROM PendingPlaybackReports", null)
-        cursor.moveToFirst()
-        val reports: MutableList<PendingPlaybackReport> = ArrayList()
-        while (!cursor.isAfterLast) {
-            reports.add(
-                PendingPlaybackReport(cursor.getLong(0), Date(cursor.getLong(1) * 1000))
-            )
-            cursor.moveToNext()
+        val reports = mutableListOf<PendingPlaybackReport>()
+        opener.getDb() task@{ db ->
+            if (db == null) return@task // quit() already called
+
+            val cursor = db.rawQuery("SELECT SongId, StartTime FROM PendingPlaybackReports", null)
+            cursor.moveToFirst()
+            while (!cursor.isAfterLast) {
+                reports.add(
+                    PendingPlaybackReport(cursor.getLong(0), Date(cursor.getLong(1) * 1000))
+                )
+                cursor.moveToNext()
+            }
+            cursor.close()
         }
-        cursor.close()
         return reports
     }
 
@@ -252,13 +260,19 @@ class SongDatabase(
                 notifySyncDone(false, context.getString(R.string.network_is_unavailable))
                 return
             }
-            val res = syncSongs()
-            if (!res.success) {
-                notifySyncDone(false, res.error!!)
-                return
+            opener.getDb() task@{ db ->
+                if (db == null) {
+                    notifySyncDone(false, "Database already closed")
+                    return@task
+                }
+                val res = syncSongs(db)
+                if (!res.success) {
+                    notifySyncDone(false, res.error!!)
+                    return@task
+                }
+                loadAggregateData(db, res.updatedSongs > 0)
+                notifySyncDone(true, context.getString(R.string.sync_complete))
             }
-            loadAggregateData(res.updatedSongs > 0)
-            notifySyncDone(true, context.getString(R.string.sync_complete))
         } finally {
             setSyncState(SyncState.IDLE, 0)
         }
@@ -268,10 +282,10 @@ class SongDatabase(
     data class SyncSongsResult(val success: Boolean, val updatedSongs: Int, val error: String?)
 
     /** Update local list of songs on behalf of [syncWithServer]. */
-    private suspend fun syncSongs(): SyncSongsResult {
+    private fun syncSongs(db: SQLiteDatabase): SyncSongsResult {
         var updatedSongs = 0
-        val db = opener.getDb()
 
+        if (db.inTransaction()) throw RuntimeException("Already in transaction")
         db.beginTransaction()
         try {
             // Ask the server for the current time before we fetch anything.  We'll use this as the
@@ -332,7 +346,7 @@ class SongDatabase(
      * @return number of updated songs
      */
     @Throws(ServerException::class)
-    private suspend fun queryServer(
+    private fun queryServer(
         db: SQLiteDatabase,
         prevStartTimeNsec: Long,
         deleted: Boolean,
@@ -473,8 +487,7 @@ class SongDatabase(
     }
 
     /** Update members containing aggregate data from the database. */
-    private fun loadAggregateData(songsUpdated: Boolean) {
-        val db = opener.getDb()
+    private fun loadAggregateData(db: SQLiteDatabase, songsUpdated: Boolean) {
         var cursor = db.rawQuery("SELECT LocalTimeNsec FROM LastUpdateTime", null)
         cursor.moveToFirst()
         val newSyncDate =
@@ -569,22 +582,22 @@ class SongDatabase(
         order: SongOrder,
     ): List<StatsRow> {
         val rows = mutableListOf<StatsRow>()
-        val db = opener.getDb()
-
-        val cursor = db.rawQuery(query, selectionArgs)
-        cursor.moveToFirst()
-        while (!cursor.isAfterLast) {
-            var artist = cursor.getString(0)
-            if (artist.isEmpty()) artist = UNSET_STRING
-            var album = cursor.getString(1)
-            if (album.isEmpty()) album = UNSET_STRING
-            val albumId = cursor.getString(2)
-            val count = cursor.getInt(3)
-            rows.add(StatsRow(artist, album, albumId, count))
-            cursor.moveToNext()
+        opener.getDb() task@{ db ->
+            if (db == null) return@task // quit() already called
+            val cursor = db.rawQuery(query, selectionArgs)
+            cursor.moveToFirst()
+            while (!cursor.isAfterLast) {
+                var artist = cursor.getString(0)
+                if (artist.isEmpty()) artist = UNSET_STRING
+                var album = cursor.getString(1)
+                if (album.isEmpty()) album = UNSET_STRING
+                val albumId = cursor.getString(2)
+                val count = cursor.getInt(3)
+                rows.add(StatsRow(artist, album, albumId, count))
+                cursor.moveToNext()
+            }
+            cursor.close()
         }
-        cursor.close()
-
         sortStatsRows(rows, order)
         return rows
     }
@@ -678,6 +691,7 @@ class SongDatabase(
 
                 override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
                     Log.d(TAG, "Upgrading from $oldVersion to $newVersion")
+                    if (db.inTransaction()) throw RuntimeException("Already in transaction")
                     db.beginTransaction()
                     try {
                         for (nextVersion in (oldVersion + 1)..newVersion) {
@@ -921,12 +935,12 @@ class SongDatabase(
 
         // Get some info from the database in a background thread.
         scope.launch(Dispatchers.IO) {
-            synchronized(this) task@{
-                // Bail out if we were shut down during initialization.
-                if (opener.closed) return@task
+            opener.getDb() task@{ db ->
+                if (db == null) return@task // quit() already called
 
-                loadAggregateData(false)
-                val db = opener.getDb()
+                loadAggregateData(db, false)
+
+                if (db.inTransaction()) throw RuntimeException("Already in transaction")
                 db.beginTransaction()
                 try {
                     updateCachedSongs(db)

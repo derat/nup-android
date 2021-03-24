@@ -21,22 +21,26 @@ class FileCacheDatabase(context: Context, private val musicDir: String) {
 
     /** Load data from SQLite. */
     @Synchronized private fun loadExistingEntries() {
-        Log.d(TAG, "Loading cache entries")
-        val cursor = opener.getDb()
-            .rawQuery("SELECT SongId, TotalBytes, LastAccessTime FROM CacheEntries", null)
-        cursor.moveToFirst()
-        while (!cursor.isAfterLast) {
-            val entry = FileCacheEntry(
-                musicDir = musicDir,
-                songId = cursor.getLong(0),
-                totalBytes = cursor.getLong(1),
-                lastAccessTime = cursor.getInt(2),
-            )
-            entries[entry.songId] = entry
-            cursor.moveToNext()
+        opener.getDb() task@{ db ->
+            if (db == null) return@task // quit() already called
+
+            Log.d(TAG, "Loading cache entries")
+            val cursor =
+                db.rawQuery("SELECT SongId, TotalBytes, LastAccessTime FROM CacheEntries", null)
+            cursor.moveToFirst()
+            while (!cursor.isAfterLast) {
+                val entry = FileCacheEntry(
+                    musicDir = musicDir,
+                    songId = cursor.getLong(0),
+                    totalBytes = cursor.getLong(1),
+                    lastAccessTime = cursor.getInt(2),
+                )
+                entries[entry.songId] = entry
+                cursor.moveToNext()
+            }
+            Log.d(TAG, "Finished loading ${entries.size} cache entries")
+            cursor.close()
         }
-        Log.d(TAG, "Finished loading ${entries.size} cache entries")
-        cursor.close()
     }
 
     @Synchronized fun quit() {
