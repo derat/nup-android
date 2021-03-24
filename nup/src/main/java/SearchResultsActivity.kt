@@ -19,6 +19,7 @@ import android.widget.ListView
 import android.widget.SimpleAdapter
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
+import java.io.Serializable
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import org.erat.nup.NupActivity.Companion.service
@@ -33,6 +34,17 @@ class SearchResultsActivity : AppCompatActivity() {
 
         setTitle(R.string.search_results)
         setContentView(R.layout.search_results)
+
+        // If we're being restored e.g. after an orientation change, restore the saved results.
+        // The cast here is pretty convoluted: https://stackoverflow.com/a/36570969
+        if (savedInstanceState != null) {
+            val serialized = savedInstanceState.getSerializable(BUNDLE_SONGS)
+            if (serialized is List<*>) {
+                songs = serialized.filterIsInstance<Song>()
+                displaySongs()
+                return
+            }
+        }
 
         // Do the search async on the IO thread since it hits the disk.
         service.scope.async(Dispatchers.Main) {
@@ -55,30 +67,7 @@ class SearchResultsActivity : AppCompatActivity() {
                 }
             }.await()
 
-            findViewById<View>(R.id.progress)!!.visibility = View.GONE
-
-            if (!songs.isEmpty()) {
-                val artistKey = "artist"
-                val titleKey = "title"
-                val data = mutableListOf<Map<String, String>>()
-                for (song in songs) {
-                    data.add(mapOf(artistKey to song.artist, titleKey to song.title))
-                }
-
-                val view = findViewById<ListView>(R.id.results)
-                view.adapter = SimpleAdapter(
-                    this@SearchResultsActivity,
-                    data,
-                    R.layout.search_results_row,
-                    arrayOf(artistKey, titleKey),
-                    intArrayOf(R.id.artist, R.id.title)
-                )
-                registerForContextMenu(view)
-
-                findViewById<Button>(R.id.append_button)!!.isEnabled = true
-                findViewById<Button>(R.id.insert_button)!!.isEnabled = true
-                findViewById<Button>(R.id.replace_button)!!.isEnabled = true
-            }
+            displaySongs()
 
             Toast.makeText(
                 this@SearchResultsActivity,
@@ -101,6 +90,13 @@ class SearchResultsActivity : AppCompatActivity() {
     override fun onDestroy() {
         Log.d(TAG, "Activity destroyed")
         super.onDestroy()
+    }
+
+    override fun onSaveInstanceState(outState: Bundle) {
+        // Standard list implementations are apparently serializable:
+        // https://stackoverflow.com/a/1387966
+        outState.putSerializable(BUNDLE_SONGS, songs as Serializable)
+        super.onSaveInstanceState(outState)
     }
 
     override fun onCreateContextMenu(
@@ -142,6 +138,32 @@ class SearchResultsActivity : AppCompatActivity() {
         }
     }
 
+    // Update the activity to display [songs].
+    private fun displaySongs() {
+        findViewById<View>(R.id.progress)!!.visibility = View.GONE
+
+        if (songs.isEmpty()) return
+
+        val artistKey = "artist"
+        val titleKey = "title"
+        val data = mutableListOf<Map<String, String>>()
+        for (song in songs) data.add(mapOf(artistKey to song.artist, titleKey to song.title))
+
+        val view = findViewById<ListView>(R.id.results)
+        view.adapter = SimpleAdapter(
+            this,
+            data,
+            R.layout.search_results_row,
+            arrayOf(artistKey, titleKey),
+            intArrayOf(R.id.artist, R.id.title)
+        )
+        registerForContextMenu(view)
+
+        findViewById<Button>(R.id.append_button)!!.isEnabled = true
+        findViewById<Button>(R.id.insert_button)!!.isEnabled = true
+        findViewById<Button>(R.id.replace_button)!!.isEnabled = true
+    }
+
     fun onAppendButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
         service.appendSongsToPlaylist(songs)
         setResult(RESULT_OK)
@@ -164,7 +186,7 @@ class SearchResultsActivity : AppCompatActivity() {
     companion object {
         private const val TAG = "SearchResultsActivity"
 
-        // Key for the objects in the bundle that's passed to us by SearchFormActivity.
+        // Keys for objects in intent bundle that's passed to us by SearchFormActivity.
         const val BUNDLE_ARTIST = "artist"
         const val BUNDLE_TITLE = "title"
         const val BUNDLE_ALBUM = "album"
@@ -172,6 +194,9 @@ class SearchResultsActivity : AppCompatActivity() {
         const val BUNDLE_SHUFFLE = "shuffle"
         const val BUNDLE_SUBSTRING = "substring"
         const val BUNDLE_CACHED = "cached"
+
+        // Keys for saved instance state bundle.
+        private const val BUNDLE_SONGS = "songs"
 
         // IDs for items in our context menus.
         private const val MENU_ITEM_PLAY = 1
