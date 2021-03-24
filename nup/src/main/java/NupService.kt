@@ -950,9 +950,24 @@ class NupService :
                 selectSongAtIndex(curSongIndex + 1)
                 played = true
             }
-            // Otherwise, consider downloading the new songs if we're not already downloading
-            // something.
-            downloadSongId == -1L -> maybeDownloadAnotherSong(index)
+            else -> {
+                // Consider downloading the new songs if we're not already downloading something.
+                if (downloadSongId == -1L) maybeDownloadAnotherSong(index)
+
+                // If we just inserted the song to play next, queue it.
+                val song = nextSong
+                if (index == curSongIndex + 1 && song != null) {
+                    val nextEntry = cache.getEntry(song.id)
+                    if (nextEntry != null && nextEntry.isFullyCached) {
+                        player.queueFile(
+                            nextEntry.file,
+                            nextEntry.totalBytes,
+                            song.albumGain,
+                            song.peakAmp,
+                        )
+                    }
+                }
+            }
         }
         updateNotification()
         return played
