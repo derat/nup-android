@@ -55,8 +55,20 @@ class Player(
         val mediaPlayer = MediaPlayer()
         lateinit var loudnessEnhancer: LoudnessEnhancer
 
-        // Used only if we haven't downloaded the complete file, since MediaPlayer
-        // skips all the time when playing from a stream.
+        // If we have the entire file downloaded, then we play it directly. If we only have part of
+        // it, we play from a stream so we can check the current byte position in onCompletion() to
+        // detect buffer underruns.
+        //
+        // We unfortunately can't always play from streams due to MediaPlayer apparently having
+        // broken buffering code that skips incessantly from streams (but oddly not from files). We
+        // can't always play from files since we don't have any way to detect buffer underruns in
+        // onCompletion(). If we start playing from an incomplete file, MediaPlayer seems to only
+        // play to the end of the original file length even if it grows while playing. I tried using
+        // the duration to detect underruns, but it also seems to be wrong in some cases (likely
+        // when playing files that don't have XING headers).
+        //
+        // TODO: Consider removing this code since we hopefully rarely/never start playing
+        // incomplete files now: https://github.com/derat/nup-android/issues/18
         var stream: FileInputStream? = null
             private set
 
@@ -80,11 +92,6 @@ class Player(
                 mediaPlayer.setOnCompletionListener(this@Player)
                 mediaPlayer.setOnErrorListener(this@Player)
 
-                // TODO: Passing MediaPlayer a path rather than an FD seems to maybe make it finally
-                // stop skipping. Investigate whether it's possible to also pass a path even when
-                // the file isn't fully downloaded yet. I think I tried this before and it made it
-                // stop when it got to the initial end of the file, even if more had been downloaded
-                // by then, though.
                 if (curBytes == totalBytes) {
                     mediaPlayer.setDataSource(file.path)
                 } else {
@@ -350,15 +357,11 @@ class Player(
 
             val filePlayer = currentPlayer!!
             try {
-                // TODO: Any way to get the current position when we're playing a path
-                // rather than an FD? May be unnecessary if playing a path actually
-                // doesn't have buffer underruns that result in premature end of
-                // playback being reported.
                 val streamPos =
                     if (filePlayer.stream != null) filePlayer.stream!!.channel.position()
                     else filePlayer.totalBytes
                 val totalBytes = filePlayer.totalBytes
-                Log.d(TAG, "$player completed playback at $streamPos of $totalBytes")
+                Log.d(TAG, "$player completed playback at $streamPos of $totalBytes bytes")
                 if (streamPos < totalBytes && filePlayer.stream != null) {
                     val switchedToFile = filePlayer.restartPlayback()
                     listenerExecutor.execute {

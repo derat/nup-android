@@ -841,9 +841,11 @@ class NupService :
         val song = songIdToSong[entry.songId] ?: return
         song.updateBytes(entry)
         if (song == curSong) {
-            if (waitingForDownload &&
-                canPlaySong(entry, downloadedBytes, elapsedMs, song.lengthSec)
-            ) {
+            // This code used to start playing if it we were downloading the file fast enough that
+            // we were likely to finish before the end of playback, but that would often result in
+            // skipping. Downloads are fast enough now that it seems best to always wait for the
+            // whole file before playing: https://github.com/derat/nup-android/issues/18
+            if (waitingForDownload && entry.isFullyCached) {
                 waitingForDownload = false
                 playCacheEntry(entry)
             }
@@ -954,20 +956,6 @@ class NupService :
         }
         updateNotification()
         return played
-    }
-
-    /** Estimate if we're downloading [entry] fast enough to play it uninterrupted. */
-    private fun canPlaySong(
-        entry: FileCacheEntry,
-        downloadedBytes: Long,
-        elapsedMs: Long,
-        songLengthSec: Int
-    ): Boolean {
-        if (entry.isFullyCached) return true
-        val bytesPerMs = downloadedBytes.toDouble() / elapsedMs
-        val remainingMs = ((entry.totalBytes - entry.cachedBytes) / bytesPerMs).toLong()
-        return entry.cachedBytes >= MIN_BYTES_BEFORE_PLAYING &&
-            remainingMs + EXTRA_BUFFER_MS <= songLengthSec * 1000
     }
 
     /** Play [entry] . */
