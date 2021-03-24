@@ -22,7 +22,7 @@ import org.erat.nup.NupActivity.Companion.service
 /** Base class for Browse*Activity that shows a scrollable list of items. */
 abstract class BrowseActivityBase : AppCompatActivity(), NupService.SongDatabaseUpdateListener {
     private val rows: MutableList<StatsRow> = ArrayList()
-    private lateinit var adapter: StatsRowArrayAdapter
+    lateinit var adapter: StatsRowArrayAdapter
 
     protected lateinit var onlyArtist: String // artist passed in intent (may be null)
     protected var onlyCached: Boolean = false // displaying only cached songs
@@ -44,10 +44,20 @@ abstract class BrowseActivityBase : AppCompatActivity(), NupService.SongDatabase
         onlyCached = intent.getBooleanExtra(BUNDLE_CACHED, false)
 
         adapter = StatsRowArrayAdapter(this, R.layout.browse_row, rows, display)
-        supportFragmentManager
-            .beginTransaction()
-            .replace(android.R.id.content, BrowseListFragment(adapter))
-            .commit()
+
+        // Only create the fragment the first time the activity is created, so we'll retain e.g. the
+        // scroll position after an orientation change. The fragment's onViewCreated() method still
+        // gets called, so we apparently don't need to worry about using a stale adapter.
+        // setRetainInstance() is deprecated, but things still seem to work without calling it.
+        //
+        // https://stackoverflow.com/a/10463715
+        // https://stackoverflow.com/a/28270104
+        if (savedInstanceState == null) {
+            supportFragmentManager
+                .beginTransaction()
+                .replace(android.R.id.content, BrowseListFragment())
+                .commit()
+        }
 
         service.addSongDatabaseUpdateListener(this)
         onSongDatabaseUpdate()
@@ -138,17 +148,22 @@ abstract class BrowseActivityBase : AppCompatActivity(), NupService.SongDatabase
 }
 
 /** Displays a list on behalf of [BrowseActivityBase]. */
-class BrowseListFragment(val adapter: StatsRowArrayAdapter) : ListFragment() {
+class BrowseListFragment : ListFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        listAdapter = adapter
+        // I originally passed the StatsRowArrayAdapter as a constructor argument, but there's a
+        // crash on screen rotation if this fragment doesn't have a no-args c'tor:
+        // https://github.com/derat/nup-android/issues/13
+        val browseActivity = (activity as BrowseActivityBase)
+        listAdapter = browseActivity.adapter
         listView.isFastScrollEnabled = true
         setEmptyText(getString(R.string.loading))
-        (activity as BrowseActivityBase).registerForContextMenu(listView)
+        browseActivity.registerForContextMenu(listView)
     }
 
     override fun onListItemClick(listView: ListView, view: View, position: Int, id: Long) {
-        (activity as BrowseActivityBase).onRowClick(adapter.rows[position], position)
+        (activity as BrowseActivityBase)
+            .onRowClick((listAdapter as StatsRowArrayAdapter).rows[position], position)
     }
 }
