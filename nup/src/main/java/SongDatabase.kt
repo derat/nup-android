@@ -211,7 +211,7 @@ class SongDatabase(
     fun addPendingPlaybackReport(songId: Long, startDate: Date) {
         updater.postUpdate(
             "REPLACE INTO PendingPlaybackReports (SongId, StartTime) VALUES(?, ?)",
-            arrayOf(songId, startDate.time / 1000)
+            arrayOf(songId, startDate.time)
         )
     }
 
@@ -219,7 +219,7 @@ class SongDatabase(
     fun removePendingPlaybackReport(songId: Long, startDate: Date) {
         updater.postUpdate(
             "DELETE FROM PendingPlaybackReports WHERE SongId = ? AND StartTime = ?",
-            arrayOf(songId, startDate.time / 1000)
+            arrayOf(songId, startDate.time)
         )
     }
 
@@ -236,7 +236,7 @@ class SongDatabase(
             cursor.moveToFirst()
             while (!cursor.isAfterLast) {
                 reports.add(
-                    PendingPlaybackReport(cursor.getLong(0), Date(cursor.getLong(1) * 1000))
+                    PendingPlaybackReport(cursor.getLong(0), Date(cursor.getLong(1)))
                 )
                 cursor.moveToNext()
             }
