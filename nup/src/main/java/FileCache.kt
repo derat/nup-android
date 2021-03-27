@@ -250,11 +250,15 @@ class FileCache constructor(
                         }
                     }
 
-                    handleSuccess()
-                    return
+                    // If the file is completely downloaded now, we'll report success on the next
+                    // iteration through the loop. Otherwise (in the case of a file that's larger
+                    // than App Engine's max response size of 32 MB), we'll kick off another
+                    // download.
                 } finally {
                     conn?.disconnect()
+                    conn = null
                     outputStream?.close()
+                    outputStream = null
                 }
             }
         }
@@ -269,6 +273,9 @@ class FileCache constructor(
                     Log.d(TAG, "Resuming download at byte ${entry.cachedBytes}")
                     headers["Range"] = String.format("bytes=%d-", entry.cachedBytes)
                 }
+                // TODO: We ought to do something (look at the ETag header?) to make sure that we
+                // don't end up with garbage if we resume the download of a file that's changed on
+                // the server in the meantime.
                 conn = downloader.download(url, "GET", Downloader.AuthType.SERVER, headers)
                 val status = conn!!.getResponseCode()
                 Log.d(TAG, "Got $status from server")
@@ -400,9 +407,6 @@ class FileCache constructor(
 
         private fun handleSuccess() {
             threadChecker.assertThread()
-            // TODO: If we didn't get the whole file (because it's huge and the server
-            // just gave us a partial reply), post another download task instead of reporting
-            // that we're done.
             synchronized(inProgressSongIds) { inProgressSongIds.remove(entry.songId) }
             listenerExecutor.execute { listener.onCacheDownloadComplete(entry) }
         }
