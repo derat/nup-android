@@ -17,6 +17,7 @@ import kotlinx.coroutines.launch
 /** Provides functionality for implementing [MediaBrowserServiceCompat]. */
 class MediaBrowserHelper(
     private val db: SongDatabase,
+    private val networkHelper: NetworkHelper,
     private val scope: CoroutineScope,
     private val res: Resources,
 ) {
@@ -164,7 +165,7 @@ class MediaBrowserHelper(
     public suspend fun getSongsForMediaId(id: String): List<Song> {
         return when {
             id == SHUFFLE_ID ->
-                searchForSongs(db, "")
+                searchForSongs(db, "", online = networkHelper.isNetworkAvailable)
             id.startsWith(ALBUM_ID_PREFIX) ->
                 db.query(albumId = id.substring(ALBUM_ID_PREFIX.length))
             id.startsWith(CACHED_ALBUM_ID_PREFIX) ->

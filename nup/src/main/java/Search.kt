@@ -87,6 +87,8 @@ import android.util.Log
  * Search for songs matched by the supplied query.
  *
  * See [MediaSessionCompat.Callback]'s [onPlayFromSearch] method.
+ * If [query] is empty, shuffled songs with [EMPTY_MIN_RATING] are returned.
+ * If [online] is false, only already-cached songs are returned for empty queries.
  */
 suspend fun searchForSongs(
     db: SongDatabase,
@@ -94,6 +96,7 @@ suspend fun searchForSongs(
     title: String? = null,
     artist: String? = null,
     album: String? = null,
+    online: Boolean = true,
 ): List<Song> {
     Log.d(TAG, "Query \"$query\" with title \"$title\", artist \"$artist\", album \"$album\"")
 
@@ -121,7 +124,9 @@ suspend fun searchForSongs(
     }
 
     // If no query was supplied, just play good music.
-    if (query.isEmpty()) return db.query(minRating = EMPTY_MIN_RATING, shuffle = true)
+    if (query.isEmpty()) {
+        return db.query(minRating = EMPTY_MIN_RATING, shuffle = true, onlyCached = !online)
+    }
 
     // Try to find an exact artist match.
     var songs = db.query(artist = query, minRating = ARTIST_MIN_RATING, shuffle = true)

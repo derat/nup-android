@@ -79,8 +79,9 @@ class NupService :
 
     lateinit var songDb: SongDatabase
         private set
+    lateinit var networkHelper: NetworkHelper
+        private set
 
-    private lateinit var networkHelper: NetworkHelper
     private lateinit var downloader: Downloader
     private lateinit var player: Player
     private lateinit var cache: FileCache
@@ -356,6 +357,7 @@ class NupService :
                                 title = extras.getString(MediaStore.EXTRA_MEDIA_TITLE),
                                 artist = extras.getString(MediaStore.EXTRA_MEDIA_ARTIST),
                                 album = extras.getString(MediaStore.EXTRA_MEDIA_ALBUM),
+                                online = networkHelper.isNetworkAvailable,
                             )
                         }.await()
                         if (!songs.isEmpty()) {
@@ -402,7 +404,7 @@ class NupService :
         )
         sessionToken = mediaSessionManager.session.sessionToken
 
-        mediaBrowserHelper = MediaBrowserHelper(songDb, scope, this.getResources())
+        mediaBrowserHelper = MediaBrowserHelper(songDb, networkHelper, scope, getResources())
 
         notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         notificationCreator = NotificationCreator(
@@ -516,6 +518,7 @@ class NupService :
                     title = extras.getString(MediaStore.EXTRA_MEDIA_TITLE),
                     artist = extras.getString(MediaStore.EXTRA_MEDIA_ARTIST),
                     album = extras.getString(MediaStore.EXTRA_MEDIA_ALBUM),
+                    online = networkHelper.isNetworkAvailable,
                 )
             }.await()
             val items = mutableListOf<MediaItem>()

@@ -44,7 +44,13 @@ class BrowseTopActivity : BrowseActivityBase() {
                 // TODO: If/when NupActivity and friends are using MediaBrowser, MediaController,
                 // and friends to talk to NupService, this can just send an empty search.
                 service.scope.async(Dispatchers.Main) {
-                    val songs = async(Dispatchers.IO) { searchForSongs(service.songDb, "") }.await()
+                    val songs = async(Dispatchers.IO) {
+                        searchForSongs(
+                            service.songDb,
+                            "" /* query */,
+                            online = service.networkHelper.isNetworkAvailable
+                        )
+                    }.await()
                     if (songs.size > 0) {
                         service.clearPlaylist()
                         service.addSongsToPlaylist(songs, true)

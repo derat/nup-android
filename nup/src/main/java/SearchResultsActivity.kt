@@ -53,7 +53,11 @@ class SearchResultsActivity : AppCompatActivity() {
                     // I'm not sure when/if this is actually used. Voice searches performed via
                     // Android Auto go through onPlayFromSearch() and onSearch() in NupService.
                     // Probably it's just used if other apps send it to us.
-                    searchForSongs(service.songDb, intent.getStringExtra(SearchManager.QUERY) ?: "")
+                    searchForSongs(
+                        service.songDb,
+                        intent.getStringExtra(SearchManager.QUERY) ?: "",
+                        online = service.networkHelper.isNetworkAvailable,
+                    )
                 } else {
                     service.songDb.query(
                         artist = intent.getStringExtra(BUNDLE_ARTIST),
