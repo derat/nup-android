@@ -177,9 +177,12 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
                 if (song != curSong) return@task
                 val sec = positionMs / 1000
                 if (sec == lastPosSec) return@task
-                // MediaPlayer appears to get confused sometimes and report things like 0:01.
-                // TODO: Is this still the case?
-                val durationSec = Math.max(durationMs / 1000, song.lengthSec)
+
+                // If we've already downloaded the whole song, use the duration computed by
+                // MediaPlayer in case it's different from the length in the database.
+                val durationSec =
+                    if (song.availableBytes == song.totalBytes) durationMs / 1000
+                    else song.lengthSec
                 timeLabel.text = formatDurationProgress(sec, durationSec)
                 lastPosSec = sec
             }

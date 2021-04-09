@@ -371,6 +371,14 @@ class Player(
                         )
                     }
                 } else {
+                    // Call onPlaybackPositionChange() one final time to say that we're at the end.
+                    // Otherwise, we may show a not-quite-complete position at the end of the final
+                    // track: https://github.com/derat/nup-android/issues/20
+                    val file = filePlayer.file
+                    val durationMs = filePlayer.mediaPlayer.duration
+                    listenerExecutor.execute {
+                        listener.onPlaybackPositionChange(file, durationMs, durationMs)
+                    }
                     resetCurrent()
                     listenerExecutor.execute { listener.onPlaybackComplete() }
                 }
