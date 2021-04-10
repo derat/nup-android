@@ -133,7 +133,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
             onPauseStateChange(service.paused)
             val song = curSong
             if (song != null && song == service.curSong) {
-                onSongPositionChange(song, service.lastPosMs, 0)
+                onSongPositionChange(song, service.lastPosMs, -1)
                 playlistView.smoothScrollToPosition(curSongIndex)
             }
 
@@ -180,8 +180,9 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
                 // If we've already downloaded the whole song, use the duration computed by
                 // MediaPlayer in case it's different from the length in the database.
+                val downloaded = song.availableBytes == song.totalBytes
                 val durationSec =
-                    if (song.availableBytes == song.totalBytes) durationMs / 1000
+                    if (downloaded && durationMs >= 0) durationMs / 1000
                     else song.lengthSec
                 timeLabel.text = formatDurationProgress(sec, durationSec)
                 lastPosSec = sec
