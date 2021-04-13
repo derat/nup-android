@@ -76,9 +76,15 @@
       android:name="com.google.android.gms.car.application"
       android:resource="@xml/automotive_app_desc"
     />
+    <!-- I don't know what this icon is used for.
+         https://developer.android.com/training/cars/media#manifest-icon claims that it's "used by
+         Android Auto" while the <application>'s android:icon is "used by Android Automotive OS",
+         but as far as I can tell, the Android Auto app is just using android:icon. I also don't
+         see any guidance about this icon beyond "The icon you provide should have transparency
+         enabled, so the icon's background gets filled in with the app's primary color." -->
     <meta-data
       android:name="com.google.android.gms.car.notification.SmallIcon"
-      android:resource="@drawable/launcher"
+      android:resource="@mipmap/launcher"
     />
   </application>
 
