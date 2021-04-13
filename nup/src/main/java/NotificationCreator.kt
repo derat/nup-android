@@ -15,7 +15,6 @@ import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.PlaybackStateCompat
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
-import androidx.core.content.ContextCompat
 import androidx.media.app.NotificationCompat.MediaStyle
 import androidx.media.session.MediaButtonReceiver
 
@@ -78,7 +77,6 @@ class NotificationCreator(
             .setContentTitle(artist ?: context.getString(R.string.startup_message_title))
             .setContentText(title ?: context.getString(R.string.startup_message_text))
             .setSmallIcon(R.drawable.status)
-            .setColor(ContextCompat.getColor(context, R.color.primary))
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setContentIntent(mediaSession.controller.sessionActivity)
             .setOngoing(true)
