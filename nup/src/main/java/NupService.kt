@@ -146,10 +146,9 @@ class NupService :
     // Pause when phone calls arrive.
     private val phoneStateListener: PhoneStateListener = object : PhoneStateListener() {
         override fun onCallStateChanged(state: Int, incomingNumber: String) {
-            // I don't want to know who's calling.  Why isn't there a more-limited
-            // permission?
+            // I don't want to know who's calling. Why isn't there a more-limited permission?
             if (state == TelephonyManager.CALL_STATE_RINGING) {
-                player.pause()
+                pause()
                 Toast.makeText(
                     this@NupService,
                     "Paused for incoming call",
@@ -176,7 +175,7 @@ class NupService :
                     val userSwitchedRecently = last != null &&
                         Date().time - last.time <= IGNORE_NOISY_AUDIO_AFTER_USER_SWITCH_MS
                     if (curSongIndex >= 0 && !paused && !userSwitchedRecently) {
-                        player.pause()
+                        pause()
                         Toast.makeText(
                             this@NupService,
                             "Paused since unplugged",
@@ -202,20 +201,18 @@ class NupService :
             AudioManager.AUDIOFOCUS_GAIN -> {
                 Log.d(TAG, "Gained audio focus")
                 player.lowVolume = false
-                if (unpauseOnFocusGain) player.unpause()
+                if (unpauseOnFocusGain) unpause()
             }
             AudioManager.AUDIOFOCUS_LOSS -> {
                 Log.d(TAG, "Lost audio focus; pausing")
-                player.pause()
-                unpauseOnFocusGain = false
+                pause()
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
                 // It's important that we pause here. Otherwise, the Assistant eventually calls
                 // onStop() to make us stop entirely, and doesn't seem to start us again.
                 // See https://developer.android.com/guide/topics/media-apps/audio-focus.
                 Log.d(TAG, "Transiently lost audio focus; pausing")
-                player.pause()
-                unpauseOnFocusGain = true
+                pause(true)
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                 Log.d(TAG, "Transiently lost audio focus (but can duck)")
@@ -327,11 +324,11 @@ class NupService :
                 }
                 override fun onPause() {
                     Log.d(TAG, "MediaSession request to pause")
-                    player.pause()
+                    pause()
                 }
                 override fun onPlay() {
                     Log.d(TAG, "MediaSession request to play")
-                    player.unpause()
+                    unpause()
                 }
                 override fun onPlayFromMediaId(mediaId: String, extras: Bundle) {
                     Log.d(TAG, "MediaSession request to play $mediaId")
@@ -339,7 +336,7 @@ class NupService :
                         // TODO: Figure out how queue management should work here.
                         clearPlaylist()
                         addSongsToPlaylist(it, true /* forcePlay */)
-                        player.unpause()
+                        unpause()
                     }
                 }
                 override fun onPlayFromSearch(query: String, extras: Bundle) {
@@ -363,7 +360,7 @@ class NupService :
                         if (!songs.isEmpty()) {
                             clearPlaylist()
                             addSongsToPlaylist(songs, true /* forcePlay */)
-                            player.unpause()
+                            unpause()
                         }
                     }
                 }
@@ -398,7 +395,7 @@ class NupService :
                 }
                 override fun onStop() {
                     Log.d(TAG, "MediaSession request to stop")
-                    player.pause()
+                    pause()
                 }
             }
         )
@@ -556,8 +553,18 @@ class NupService :
         if (notification != null) notificationManager.notify(NOTIFICATION_ID, notification)
     }
 
-    fun togglePause() { player.togglePause() }
-    fun pause() { player.pause() }
+    fun pause(forTransientFocusLoss: Boolean = false) {
+        unpauseOnFocusGain = forTransientFocusLoss && !paused
+        player.pause()
+    }
+    fun unpause() {
+        unpauseOnFocusGain = false
+        player.unpause()
+    }
+    fun togglePause() {
+        unpauseOnFocusGain = false
+        player.togglePause()
+    }
 
     fun clearPlaylist() { removeRangeFromPlaylist(0, songs.size - 1) }
 
