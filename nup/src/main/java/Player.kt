@@ -296,6 +296,7 @@ class Player(
         executor.execute {
             Log.d(TAG, "Seeking to $posMs ms")
             currentPlayer?.mediaPlayer?.seekTo(posMs.toInt())
+            positionTask()
         }
     }
 

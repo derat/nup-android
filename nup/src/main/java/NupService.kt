@@ -126,6 +126,8 @@ class NupService :
     private var downloadIndex = -1 // index into [songs] of currently-downloading song
     private var waitingForDownload = false // waiting for file to be download so we can play it
     private var lastDownloadedBytes = 0L // last onCacheDownloadProgress() value for [curSong]
+    private var loadedPlaybackState = false // restorePlaybackState() loaded state
+    private var gotPlayRequest = false // received a play media session request
 
     /** Download all queued songs instead of honoring pref. */
     var shouldDownloadAll: Boolean = false
@@ -303,6 +305,9 @@ class NupService :
             applyPref(NupPreferences.SERVER_URL)
             applyPref(NupPreferences.SONGS_TO_PRELOAD)
 
+            restorePlaybackState()
+            loadedPlaybackState = true
+
             if (networkHelper.isNetworkAvailable) {
                 launch(Dispatchers.IO) { playbackReporter.reportPending() }
                 // TODO: Listen for the network coming up and send pending reports then too?
@@ -328,6 +333,7 @@ class NupService :
                 }
                 override fun onPlay() {
                     Log.d(TAG, "MediaSession request to play")
+                    gotPlayRequest = true
                     unpause()
                 }
                 override fun onPlayFromMediaId(mediaId: String, extras: Bundle) {
@@ -416,14 +422,19 @@ class NupService :
         super.onDestroy()
         Log.d(TAG, "Service destroyed")
 
+        audioManager.abandonAudioFocusRequest(audioFocusReq)
+
+        if (this::prefs.isInitialized) {
+            prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
+            // Android Auto seems to love starting and then killing us immediately.
+            // Avoid overwriting the saved state if we didn't get a chance to load it.
+            if (loadedPlaybackState) savePlaybackState()
+        }
+
         // Make sure that coroutines don't run after SongDatabase has been dismantled:
         // https://github.com/derat/nup-android/issues/17
         scope.cancel()
 
-        audioManager.abandonAudioFocusRequest(audioFocusReq)
-        if (this::prefs.isInitialized) {
-            prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
-        }
         telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE)
         unregisterReceiver(broadcastReceiver)
         mediaSessionManager.release()
@@ -487,6 +498,10 @@ class NupService :
         clientUid: Int,
         rootHints: Bundle?
     ): MediaBrowserServiceCompat.BrowserRoot {
+        // Android Auto appears to pass a rootHints with android.service.media.extra.RECENT set to
+        // true, but seemingly only *after* sending a MediaSession play request. This seems to be at
+        // odds with the suggestions at
+        // https://android-developers.googleblog.com/2020/08/playing-nicely-with-media-controls.html
         val extras = Bundle()
         extras.putBoolean("android.media.browse.SEARCH_SUPPORTED", true)
         return MediaBrowserServiceCompat.BrowserRoot(MediaBrowserHelper.ROOT_ID, extras)
@@ -547,6 +562,55 @@ class NupService :
     private suspend fun readPref(key: String) =
         scope.async(Dispatchers.IO) { prefs.getString(key, null)!! }.await()
 
+    /** Save playback state so it can be restored the next time the service starts. */
+    private fun savePlaybackState() {
+        val origPolicy = StrictMode.allowThreadDiskWrites()
+        try {
+            Log.d(TAG, "Saving playlist with ${songs.size} song(s)")
+            val editor = prefs.edit()
+            editor.putString(
+                NupPreferences.PREV_PLAYLIST_SONG_IDS,
+                songs.map { s -> s.id }.joinToString(",")
+            )
+            editor.putInt(NupPreferences.PREV_PLAYLIST_INDEX, curSongIndex)
+            editor.putInt(NupPreferences.PREV_POSITION_MS, lastPosMs)
+            editor.putLong(NupPreferences.PREV_EXIT_MS, Date().getTime())
+            editor.commit()
+        } finally {
+            StrictMode.setThreadPolicy(origPolicy)
+        }
+    }
+
+    /** Restore the previously-saved playback state (maybe). */
+    private suspend fun restorePlaybackState() {
+        var oldSongs = listOf<Song>()
+        var oldIndex = -1
+        var oldPosMs = 0
+        var oldExitMs = 0L
+
+        scope.async(Dispatchers.IO) {
+            val ids = prefs.getString(NupPreferences.PREV_PLAYLIST_SONG_IDS, "")!!
+            if (ids != "") {
+                oldSongs = ids.split(",").map { songDb.query(songId = it.toLong()) }.flatten()
+            }
+            oldIndex = prefs.getInt(NupPreferences.PREV_PLAYLIST_INDEX, -1)
+            oldPosMs = prefs.getInt(NupPreferences.PREV_POSITION_MS, 0)
+            oldExitMs = prefs.getLong(NupPreferences.PREV_EXIT_MS, 0)
+        }.await()
+
+        val elapsedMs = Date().getTime() - oldExitMs
+        if (elapsedMs > MAX_RESTORE_AGE_MS || oldSongs.size == 0) return
+
+        // This is hacky. By default, auto-pausing before restoring the previous state to make sure
+        // that we don't abruptly start playing as soon as we're launched. Note that Android Auto
+        // can still send a play request at startup if it's been configured to do so. That request
+        // can arrive before this method runs, so if we saw it already, start playing here.
+        if (!gotPlayRequest) pause()
+        Log.d(TAG, "Restoring playlist with ${oldSongs.size} song(s)")
+        addSongsToPlaylist(oldSongs, false /* forcePlay */, oldIndex)
+        player.seek(oldPosMs.toLong())
+    }
+
     /** Updates the currently-displayed notification if needed.  */
     private fun updateNotification() {
         val notification = notificationCreator.createNotification(true)
@@ -574,10 +638,12 @@ class NupService :
     fun addSongToPlaylist(song: Song, play: Boolean) {
         addSongsToPlaylist(ArrayList(Arrays.asList(song)), play)
     }
-    fun addSongsToPlaylist(newSongs: List<Song>, forcePlay: Boolean) {
-        val index = curSongIndex
-        val alreadyPlayed = insertSongs(newSongs, if (index < 0) 0 else index + 1)
-        if (forcePlay && !alreadyPlayed) selectSongAtIndex(if (index < 0) 0 else index + 1)
+    fun addSongsToPlaylist(newSongs: List<Song>, forcePlay: Boolean, playIndex: Int = -1) {
+        val index = if (curSongIndex < 0) 0 else curSongIndex + 1
+        val alreadyPlayed = insertSongs(newSongs, index, playIndex)
+        if (forcePlay && !alreadyPlayed && playIndex < 0) {
+            selectSongAtIndex(if (index < 0) 0 else index + 1)
+        }
     }
 
     fun removeFromPlaylist(index: Int) { removeRangeFromPlaylist(index, index) }
@@ -907,11 +973,12 @@ class NupService :
      * Insert a list of songs into the playlist at a particular position.
      *
      * Plays the first one, if no song is already playing or if we were previously at the end of the
-     * playlist and we've appended to it.
+     * playlist and we've appended to it. If playIndex is non-negative, plays the song at that index
+     * in the new playlist.
      *
      * @return true if playback started
      */
-    private fun insertSongs(insSongs: List<Song>, index: Int): Boolean {
+    private fun insertSongs(insSongs: List<Song>, index: Int, playIndex: Int = -1): Boolean {
         if (index < 0 || index > songs.size) {
             Log.e(TAG, "Ignoring request to insert ${insSongs.size} song(s) at index $index")
             return false
@@ -949,6 +1016,11 @@ class NupService :
         }
         var played = false
         when {
+            // If a particular song was requested, play it.
+            playIndex >= 0 -> {
+                selectSongAtIndex(playIndex)
+                played = true
+            }
             // If we didn't have any songs, then start playing the first one we added.
             curSongIndex == -1 -> {
                 selectSongAtIndex(0)
@@ -1082,5 +1154,6 @@ class NupService :
         private const val MAX_POSITION_REPORT_MS = 5 * 1000L // threshold for playback updates
         private const val REPORT_PLAYBACK_THRESHOLD_MS = 240 * 1000L // reporting threshold
         private const val IGNORE_NOISY_AUDIO_AFTER_USER_SWITCH_MS = 1000L
+        private const val MAX_RESTORE_AGE_MS = 12 * 3600 * 1000L // max age for restoring state
     }
 }
