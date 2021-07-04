@@ -117,7 +117,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         _service?.unregisterListener(this)
 
         // Shut down the service as well if the playlist is empty.
-        val stopService = _service?.songs?.isEmpty() ?: false
+        val stopService = _service?.playlist?.isEmpty() ?: false
         unbindService(connection)
         if (stopService) stopService(Intent(this, NupService::class.java))
     }
@@ -129,7 +129,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
             service.setSongListener(this@NupActivity)
 
             // Get current state from service.
-            onPlaylistChange(service.songs)
+            onPlaylistChange(service.playlist)
             onPauseStateChange(service.paused)
             val song = curSong
             if (song != null && song == service.curSong) {

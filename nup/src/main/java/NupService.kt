@@ -100,18 +100,18 @@ class NupService :
     private lateinit var prefs: SharedPreferences
 
     private val songIdToSong = mutableMapOf<Long, Song>() // canonical [Song]s indexed by ID
-    private val _songs = mutableListOf<Song>() // current playlist
-    public val songs: List<Song> get() = _songs
+    private val _playlist = mutableListOf<Song>()
+    public val playlist: List<Song> get() = _playlist
 
-    var curSongIndex = -1 // index into [_songs]
+    var curSongIndex = -1 // index into [_playlist]
         private set
     var lastPosMs = 0 // last playback position for current song
         private set
 
     val curSong: Song?
-        get() = if (curSongIndex in 0..(songs.size - 1)) songs[curSongIndex] else null
+        get() = if (curSongIndex in 0..(playlist.size - 1)) playlist[curSongIndex] else null
     val nextSong: Song?
-        get() = if (curSongIndex in 0..(songs.size - 2)) songs[curSongIndex + 1] else null
+        get() = if (curSongIndex in 0..(playlist.size - 2)) playlist[curSongIndex + 1] else null
 
     private var curFile: File? = null // local path of [curSong]
     private var playStart: Date? = null // time at which [curSong] was started
@@ -125,7 +125,7 @@ class NupService :
 
     private var songsToPreload = 0 // set from pref
     private var downloadSongId = -1L // ID of currently-downloading song
-    private var downloadIndex = -1 // index into [songs] of currently-downloading song
+    private var downloadIndex = -1 // index into [playlist] of currently-downloading song
     private var waitingForDownload = false // waiting for file to be download so we can play it
     private var lastDownloadedBytes = 0L // last onCacheDownloadProgress() value for [curSong]
     private var gotPlayRequest = false // received a play media session request
@@ -138,7 +138,7 @@ class NupService :
         set(value) {
             if (value != shouldDownloadAll) {
                 field = value
-                if (!songs.isEmpty() && shouldDownloadAll && downloadSongId == -1L) {
+                if (!playlist.isEmpty() && shouldDownloadAll && downloadSongId == -1L) {
                     maybeDownloadAnotherSong(if (curSongIndex >= 0) curSongIndex else 0)
                 }
             }
@@ -571,11 +571,11 @@ class NupService :
     private fun savePlaylist() {
         val origPolicy = StrictMode.allowThreadDiskWrites()
         try {
-            Log.d(TAG, "Saving playlist with ${songs.size} song(s)")
+            Log.d(TAG, "Saving playlist with ${playlist.size} song(s)")
             val editor = prefs.edit()
             editor.putString(
                 NupPreferences.PREV_PLAYLIST_SONG_IDS,
-                songs.map { s -> s.id }.joinToString(",")
+                playlist.map { s -> s.id }.joinToString(",")
             )
             editor.putInt(NupPreferences.PREV_PLAYLIST_INDEX, curSongIndex)
             editor.putInt(NupPreferences.PREV_POSITION_MS, lastPosMs)
@@ -642,17 +642,17 @@ class NupService :
         player.togglePause()
     }
 
-    fun clearPlaylist() { removeRangeFromPlaylist(0, songs.size - 1) }
+    fun clearPlaylist() { removeRangeFromPlaylist(0, playlist.size - 1) }
 
     fun appendSongToPlaylist(song: Song) { appendSongsToPlaylist(ArrayList(Arrays.asList(song))) }
-    fun appendSongsToPlaylist(newSongs: List<Song>) { insertSongs(newSongs, songs.size) }
+    fun appendSongsToPlaylist(songs: List<Song>) { insertSongs(songs, playlist.size) }
 
     fun addSongToPlaylist(song: Song, play: Boolean) {
         addSongsToPlaylist(ArrayList(Arrays.asList(song)), play)
     }
-    fun addSongsToPlaylist(newSongs: List<Song>, forcePlay: Boolean, playIndex: Int = -1) {
+    fun addSongsToPlaylist(songs: List<Song>, forcePlay: Boolean, playIndex: Int = -1) {
         val index = if (curSongIndex < 0) 0 else curSongIndex + 1
-        val alreadyPlayed = insertSongs(newSongs, index, playIndex)
+        val alreadyPlayed = insertSongs(songs, index, playIndex)
         if (forcePlay && !alreadyPlayed && playIndex < 0) {
             selectSongAtIndex(if (index < 0) 0 else index + 1)
         }
@@ -663,11 +663,11 @@ class NupService :
     /** Remove a range of songs from the playlist. */
     fun removeRangeFromPlaylist(firstIndex: Int, lastIndex: Int) {
         val first = Math.max(firstIndex, 0)
-        val last = Math.min(lastIndex, songs.size - 1)
+        val last = Math.min(lastIndex, playlist.size - 1)
 
         var removedPlaying = false
         for (numToRemove in (last - first + 1) downTo 1) {
-            _songs.removeAt(first)
+            _playlist.removeAt(first)
             if (curSongIndex == first) {
                 removedPlaying = true
                 stopPlaying()
@@ -684,7 +684,7 @@ class NupService :
         }
 
         if (removedPlaying) {
-            if (!songs.isEmpty() && curSongIndex < songs.size) {
+            if (!playlist.isEmpty() && curSongIndex < playlist.size) {
                 selectSongAtIndex(curSongIndex)
             } else {
                 curSongIndex = -1
@@ -694,22 +694,22 @@ class NupService :
         }
 
         // Maybe the e.g. now-next-to-be-played song isn't downloaded yet.
-        if (downloadSongId == -1L && !songs.isEmpty() && curSongIndex < songs.size - 1) {
+        if (downloadSongId == -1L && !playlist.isEmpty() && curSongIndex < playlist.size - 1) {
             maybeDownloadAnotherSong(curSongIndex + 1)
         }
 
-        songListener?.onPlaylistChange(songs)
-        mediaSessionManager.updatePlaylist(songs)
+        songListener?.onPlaylistChange(playlist)
+        mediaSessionManager.updatePlaylist(playlist)
         updateNotification()
     }
 
     /**
-     * Select the song at [index] in [songs].
+     * Select the song at [index] in [playlist].
      *
      * The play/pause state is not changed.
      */
     fun selectSongAtIndex(index: Int) {
-        if (index < 0 || index >= songs.size) return
+        if (index < 0 || index >= playlist.size) return
 
         curSongIndex = index
         val song = curSong!!
@@ -771,7 +771,7 @@ class NupService :
     }
 
     /** Get a song's index in the playlist, or -1 if it isn't present. */
-    fun getSongIndex(songId: Long) = songs.indexOfFirst { it.id == songId }
+    fun getSongIndex(songId: Long) = playlist.indexOfFirst { it.id == songId }
 
     /** Asynchronously get songs for [id] and pass them to [fn]. */
     fun getSongsForMediaId(id: String?, fn: (List<Song>) -> Unit) {
@@ -829,7 +829,7 @@ class NupService :
         playbackComplete = true
         updatePlaybackState()
         updateNotification()
-        if (curSongIndex < songs.size - 1) selectSongAtIndex(curSongIndex + 1)
+        if (curSongIndex < playlist.size - 1) selectSongAtIndex(curSongIndex + 1)
     }
 
     override fun onPlaybackPositionChange(file: File, positionMs: Int, durationMs: Int) {
@@ -991,7 +991,7 @@ class NupService :
      * @return true if playback started
      */
     private fun insertSongs(insSongs: List<Song>, index: Int, playIndex: Int = -1): Boolean {
-        if (index < 0 || index > songs.size) {
+        if (index < 0 || index > playlist.size) {
             Log.e(TAG, "Ignoring request to insert ${insSongs.size} song(s) at index $index")
             return false
         }
@@ -1012,12 +1012,12 @@ class NupService :
             }
         }
 
-        _songs.addAll(index, resSongs)
+        _playlist.addAll(index, resSongs)
         if (curSongIndex >= 0 && index <= curSongIndex) curSongIndex += resSongs.size
         if (downloadIndex >= 0 && index <= downloadIndex) downloadIndex += resSongs.size
 
-        songListener?.onPlaylistChange(songs)
-        mediaSessionManager.updatePlaylist(songs)
+        songListener?.onPlaylistChange(playlist)
+        mediaSessionManager.updatePlaylist(playlist)
         for (song in newSongs) {
             songIdToSong[song.id] = song
             val entry = cache.getEntry(song.id)
@@ -1040,7 +1040,7 @@ class NupService :
             }
             // If we were previously done playing (because we reached the end of the playlist),
             // then start playing the first song we added.
-            curSongIndex < songs.size - 1 && playbackComplete -> {
+            curSongIndex < playlist.size - 1 && playbackComplete -> {
                 selectSongAtIndex(curSongIndex + 1)
                 played = true
             }
@@ -1091,10 +1091,10 @@ class NupService :
             return
         }
         var index = startIndex
-        while (index < songs.size &&
+        while (index < playlist.size &&
             (shouldDownloadAll || index - curSongIndex <= songsToPreload)
         ) {
-            val song = songs[index]
+            val song = playlist[index]
             var entry = cache.getEntry(song.id)
             if (entry != null && entry.isFullyCached) {
                 // We already have this one. Pin it to make sure that it
@@ -1151,7 +1151,7 @@ class NupService :
             buffering = waitingForDownload,
             positionMs = lastPosMs.toLong(),
             songIndex = curSongIndex,
-            numSongs = songs.size,
+            numSongs = playlist.size,
         )
     }
 
