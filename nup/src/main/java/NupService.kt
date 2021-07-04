@@ -583,28 +583,35 @@ class NupService :
 
     /** Restore the previously-saved playback state (maybe). */
     private suspend fun restorePlaybackState() {
-        var oldSongs = listOf<Song>()
+        var oldSongs = mutableListOf<Song>()
         var oldIndex = -1
         var oldPosMs = 0
         var oldExitMs = 0L
 
         scope.async(Dispatchers.IO) {
-            val ids = prefs.getString(NupPreferences.PREV_PLAYLIST_SONG_IDS, "")!!
-            if (ids != "") {
-                oldSongs = ids.split(",").map { songDb.query(songId = it.toLong()) }.flatten()
-            }
             oldIndex = prefs.getInt(NupPreferences.PREV_PLAYLIST_INDEX, -1)
             oldPosMs = prefs.getInt(NupPreferences.PREV_POSITION_MS, 0)
             oldExitMs = prefs.getLong(NupPreferences.PREV_EXIT_MS, 0)
+
+            val idsPref = prefs.getString(NupPreferences.PREV_PLAYLIST_SONG_IDS, "")!!
+            if (idsPref != "") {
+                val ids = idsPref.split(",").map { it.toLong() }
+                val songs = songDb.query(songIds = ids).map { it.id to it }.toMap()
+                ids.forEachIndexed { idx, id ->
+                    val song = songs.get(id)
+                    if (song != null) oldSongs.add(song)
+                    else if (oldIndex > 0 && idx < oldIndex) oldIndex--
+                }
+            }
         }.await()
 
         val elapsedMs = Date().getTime() - oldExitMs
         if (elapsedMs > MAX_RESTORE_AGE_MS || oldSongs.size == 0) return
 
-        // This is hacky. By default, auto-pausing before restoring the previous state to make sure
-        // that we don't abruptly start playing as soon as we're launched. Note that Android Auto
-        // can still send a play request at startup if it's been configured to do so. That request
-        // can arrive before this method runs, so if we saw it already, start playing here.
+        // This is hacky. By default, auto-pause before restoring the previous state to make sure
+        // that we don't abruptly start playing as soon as we're launched. Android Auto can still
+        // send a play request at startup if it's been configured to do so. That request can arrive
+        // before this method runs, so if we saw it already, start playing here.
         if (!gotPlayRequest) pause()
         Log.d(TAG, "Restoring playlist with ${oldSongs.size} song(s)")
         addSongsToPlaylist(oldSongs, false /* forcePlay */, oldIndex)

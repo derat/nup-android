@@ -106,13 +106,18 @@ class SongDatabase(
         opener.close()
     }
 
-    /** Get songs matching the supplied criteria. */
+    /**
+     * Get songs matching the supplied criteria.
+     *
+     * @return matched songs, either grouped by album or shuffled
+     */
     suspend fun query(
         artist: String? = null,
         title: String? = null,
         album: String? = null,
         albumId: String? = null,
         songId: Long = -1,
+        songIds: List<Long>? = null,
         minRating: Double = -1.0,
         shuffle: Boolean = false,
         substring: Boolean = false,
@@ -121,6 +126,7 @@ class SongDatabase(
         class QueryBuilder {
             var selections = ArrayList<String>()
             var selectionArgs = ArrayList<String>()
+
             fun add(clause: String, selectionArg: String?, substring: Boolean) {
                 if (selectionArg == null || selectionArg.isEmpty()) return
 
@@ -131,6 +137,8 @@ class SongDatabase(
                     selectionArgs.add(if (substring) "%$selectionArg%" else selectionArg)
                 }
             }
+
+            fun addLiteral(clause: String) = selections.add(clause)
 
             // Get a WHERE clause (plus trailing space) if |selections| is non-empty, or just an
             // empty string otherwise.
@@ -149,6 +157,9 @@ class SongDatabase(
         builder.add("AlbumId = ?", albumId, false)
         builder.add("SongId = ?", if (songId >= 0) songId.toString() else null, false)
         builder.add("Rating >= ?", if (minRating >= 0.0) minRating.toString() else null, false)
+        if (songIds != null && songIds.size > 0) {
+            builder.addLiteral("SongId IN (" + songIds.joinToString(",") + ")")
+        }
         val query = (
             "SELECT s.SongId, Artist, Title, Album, AlbumId, Filename, CoverFilename, Length, " +
                 "TrackNumber, DiscNumber, TrackGain, AlbumGain, PeakAmp, Rating " +
