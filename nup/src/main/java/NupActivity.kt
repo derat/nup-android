@@ -138,9 +138,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
             }
 
             // TODO: Go to prefs page if server is unset.
-            if (songs.isEmpty()) {
-                startActivity(Intent(this@NupActivity, BrowseTopActivity::class.java))
-            }
+            if (service.playlistRestored && songs.isEmpty()) launchBrowser()
         }
 
         override fun onServiceDisconnected(className: ComponentName) {
@@ -166,6 +164,8 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         setCurrentSong(curSongIndex + 1)
         schedulePlaySong(SONG_CHANGE_DELAY_MS)
     }
+
+    override fun onPlaylistRestore() { if (songs.isEmpty()) launchBrowser() }
 
     override fun onSongChange(song: Song, index: Int) {
         runOnUiThread { setCurrentSong(index) }
@@ -414,6 +414,9 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         nextButton.isEnabled = !songs.isEmpty() && curSongIndex < songs.size - 1
         pauseButton.isEnabled = !songs.isEmpty()
     }
+
+    private fun launchBrowser() =
+        startActivity(Intent(this@NupActivity, BrowseTopActivity::class.java))
 
     /** Schedule playing the current song in [delayMs]. */
     private fun schedulePlaySong(delayMs: Long) {

@@ -47,6 +47,8 @@ class NupService :
     SongDatabase.Listener {
     /** Listener for changes to song- and playlist-related state. */
     interface SongListener {
+        /** Called after the previous playlist has (maybe) been restored. */
+        fun onPlaylistRestore()
         /** Called when switching to a new track in the playlist. */
         fun onSongChange(song: Song, index: Int)
         /** Called when the playback position in the current song changes. */
@@ -126,8 +128,10 @@ class NupService :
     private var downloadIndex = -1 // index into [songs] of currently-downloading song
     private var waitingForDownload = false // waiting for file to be download so we can play it
     private var lastDownloadedBytes = 0L // last onCacheDownloadProgress() value for [curSong]
-    private var loadedPlaybackState = false // restorePlaybackState() loaded state
     private var gotPlayRequest = false // received a play media session request
+
+    var playlistRestored = false // restorePlaylist() (maybe) loaded previous playlist
+        private set
 
     /** Download all queued songs instead of honoring pref. */
     var shouldDownloadAll: Boolean = false
@@ -305,8 +309,9 @@ class NupService :
             applyPref(NupPreferences.SERVER_URL)
             applyPref(NupPreferences.SONGS_TO_PRELOAD)
 
-            restorePlaybackState()
-            loadedPlaybackState = true
+            restorePlaylist()
+            playlistRestored = true
+            songListener?.onPlaylistRestore()
 
             if (networkHelper.isNetworkAvailable) {
                 launch(Dispatchers.IO) { playbackReporter.reportPending() }
@@ -426,9 +431,9 @@ class NupService :
 
         if (this::prefs.isInitialized) {
             prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
-            // Android Auto seems to love starting and then killing us immediately.
-            // Avoid overwriting the saved state if we didn't get a chance to load it.
-            if (loadedPlaybackState) savePlaybackState()
+            // Android Auto likes starting us and then killing us immediately.
+            // Avoid overwriting the saved playlist if we didn't get a chance to load it.
+            if (playlistRestored) savePlaylist()
         }
 
         // Make sure that coroutines don't run after SongDatabase has been dismantled:
@@ -562,8 +567,8 @@ class NupService :
     private suspend fun readPref(key: String) =
         scope.async(Dispatchers.IO) { prefs.getString(key, null)!! }.await()
 
-    /** Save playback state so it can be restored the next time the service starts. */
-    private fun savePlaybackState() {
+    /** Save playlist so it can be restored the next time the service starts. */
+    private fun savePlaylist() {
         val origPolicy = StrictMode.allowThreadDiskWrites()
         try {
             Log.d(TAG, "Saving playlist with ${songs.size} song(s)")
@@ -581,8 +586,8 @@ class NupService :
         }
     }
 
-    /** Restore the previously-saved playback state (maybe). */
-    private suspend fun restorePlaybackState() {
+    /** Restore the previously-saved playlist (maybe). */
+    private suspend fun restorePlaylist() {
         var oldSongs = mutableListOf<Song>()
         var oldIndex = -1
         var oldPosMs = 0
