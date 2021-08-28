@@ -571,6 +571,7 @@ class NupService :
     private fun savePlaylist() {
         val origPolicy = StrictMode.allowThreadDiskWrites()
         try {
+            // TODO: If we're at the end of the last song, save an empty playlist.
             Log.d(TAG, "Saving playlist with ${playlist.size} song(s)")
             val editor = prefs.edit()
             editor.putString(
@@ -588,7 +589,7 @@ class NupService :
 
     /** Restore the previously-saved playlist (maybe). */
     private suspend fun restorePlaylist() {
-        var oldSongs = mutableListOf<Song>()
+        var oldSongs = listOf<Song>()
         var oldIndex = -1
         var oldPosMs = 0
         var oldExitMs = 0L
@@ -601,11 +602,9 @@ class NupService :
             val idsPref = prefs.getString(NupPreferences.PREV_PLAYLIST_SONG_IDS, "")!!
             if (idsPref != "") {
                 val ids = idsPref.split(",").map { it.toLong() }
-                val songs = songDb.query(songIds = ids).map { it.id to it }.toMap()
-                ids.forEachIndexed { idx, id ->
-                    val song = songs.get(id)
-                    if (song != null) oldSongs.add(song)
-                    else if (oldIndex > 0 && idx < oldIndex) oldIndex--
+                songDb.getSongs(ids, index = oldIndex).let {
+                    oldSongs = it.first
+                    oldIndex = it.second
                 }
             }
         }.await()

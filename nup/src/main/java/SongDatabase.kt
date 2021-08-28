@@ -208,6 +208,26 @@ class SongDatabase(
         return songs
     }
 
+    /** Return songs corresponding to the supplied IDs.
+     *
+     * The order of the requested songs is preserved. If an index is supplied, it is adjusted
+     * to point at the same song (if possible) if one or more songs were missing from the database.
+     *
+     * @return requested songs and a possibly-updated index
+     */
+    suspend fun getSongs(songIds: List<Long>, origIndex: Int = -1, onlyCached: Boolean = false):
+        Pair<List<Song>, Int> {
+        val songMap = query(songIds = songIds, onlyCached = onlyCached).map { it.id to it }.toMap()
+        val songs = mutableListOf<Song>()
+        var index = origIndex // sigh
+        songIds.forEachIndexed { idx, id ->
+            val song = songMap.get(id)
+            if (song != null) songs.add(song)
+            else if (index > 0 && idx < index) index--
+        }
+        return Pair(songs, index)
+    }
+
     /** Record the fact that a song has been successfully cached. */
     fun handleSongCached(songId: Long) {
         updater.postUpdate("REPLACE INTO CachedSongs (SongId) VALUES(?)", arrayOf(songId))
