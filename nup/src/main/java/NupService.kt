@@ -571,15 +571,21 @@ class NupService :
     private fun savePlaylist() {
         val origPolicy = StrictMode.allowThreadDiskWrites()
         try {
-            // TODO: If we're at the end of the last song, save an empty playlist.
-            Log.d(TAG, "Saving playlist with ${playlist.size} song(s)")
             val editor = prefs.edit()
-            editor.putString(
-                NupPreferences.PREV_PLAYLIST_SONG_IDS,
-                playlist.map { s -> s.id }.joinToString(",")
-            )
-            editor.putInt(NupPreferences.PREV_PLAYLIST_INDEX, curSongIndex)
-            editor.putInt(NupPreferences.PREV_POSITION_MS, lastPosMs)
+            if (playlist.isEmpty() || (curSongIndex == playlist.size - 1 && playbackComplete)) {
+                Log.d(TAG, "Saving empty playlist")
+                editor.putString(NupPreferences.PREV_PLAYLIST_SONG_IDS, "")
+                editor.putInt(NupPreferences.PREV_PLAYLIST_INDEX, -1)
+                editor.putInt(NupPreferences.PREV_POSITION_MS, 0)
+            } else {
+                Log.d(TAG, "Saving playlist with ${playlist.size} song(s)")
+                editor.putString(
+                    NupPreferences.PREV_PLAYLIST_SONG_IDS,
+                    playlist.map { s -> s.id }.joinToString(",")
+                )
+                editor.putInt(NupPreferences.PREV_PLAYLIST_INDEX, curSongIndex)
+                editor.putInt(NupPreferences.PREV_POSITION_MS, lastPosMs)
+            }
             editor.putLong(NupPreferences.PREV_EXIT_MS, Date().getTime())
             editor.commit()
         } finally {
@@ -610,7 +616,7 @@ class NupService :
         }.await()
 
         val elapsedMs = Date().getTime() - oldExitMs
-        if (elapsedMs > MAX_RESTORE_AGE_MS || oldSongs.size == 0) return
+        if (elapsedMs > MAX_RESTORE_AGE_MS || oldSongs.isEmpty()) return
 
         // This is hacky. By default, auto-pause before restoring the previous state to make sure
         // that we don't abruptly start playing as soon as we're launched. Android Auto can still
