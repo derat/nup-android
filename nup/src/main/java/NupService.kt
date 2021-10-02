@@ -608,7 +608,7 @@ class NupService :
             val idsPref = prefs.getString(NupPreferences.PREV_PLAYLIST_SONG_IDS, "")!!
             if (idsPref != "") {
                 val ids = idsPref.split(",").map { it.toLong() }
-                songDb.getSongs(ids, index = oldIndex).let {
+                songDb.getSongs(ids, origIndex = oldIndex).let {
                     oldSongs = it.first
                     oldIndex = it.second
                 }
