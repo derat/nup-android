@@ -47,7 +47,6 @@
   <string name="loading">Loading...</string>
   <string name="loading_stats">Loading stats...</string>
   <string name="minimum_rating">Minimum rating</string>
-  <string name="minimum_rating_label">Minimum rating:</string>
   <string name="network_is_unavailable">Network is unavailable.</string>
   <string name="next">Next</string>
   <string name="never_synced">Never synced</string>
@@ -94,7 +93,9 @@
   <string name="username">Username</string>
   <string name="username_description">HTTP basic auth with server</string>
 
+  <!-- SearchFormActivity depends on these strings' lengths. -->
   <string-array name="min_rating_array">
+    <item />
     <item>★</item>
     <item>★★</item>
     <item>★★★</item>

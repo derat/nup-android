@@ -20,78 +20,71 @@
       android:paddingTop="@dimen/vertical_padding"
       android:paddingBottom="@dimen/vertical_padding"
     >
-      <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/artist"
-      />
-      <AutoCompleteTextView
-        android:id="@+id/artist_edit_text"
-        style="@style/SearchTextField"
-        android:completionThreshold="1"
-      />
-      <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/title"
-      />
-      <EditText android:id="@+id/title_edit_text" style="@style/SearchTextField" />
-      <TextView
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="@string/album"
-      />
-      <AutoCompleteTextView
-        android:id="@+id/album_edit_text"
-        style="@style/SearchTextField"
-        android:completionThreshold="1"
-      />
+      <com.google.android.material.textfield.TextInputLayout
+        android:hint="@string/artist"
+        style="@style/SearchAutocompleteLayout"
+      >
+        <com.google.android.material.textfield.MaterialAutoCompleteTextView
+          android:id="@+id/artist_edit_text"
+          android:completionThreshold="1"
+          style="@style/SearchTextField"
+        />
+      </com.google.android.material.textfield.TextInputLayout>
+
+      <com.google.android.material.textfield.TextInputLayout
+        android:hint="@string/title"
+        style="@style/SearchTextLayout"
+      >
+        <com.google.android.material.textfield.TextInputEditText
+          android:id="@+id/title_edit_text"
+          style="@style/SearchTextField"
+        />
+      </com.google.android.material.textfield.TextInputLayout>
+
+      <com.google.android.material.textfield.TextInputLayout
+        android:hint="@string/album"
+        style="@style/SearchAutocompleteLayout"
+      >
+        <com.google.android.material.textfield.MaterialAutoCompleteTextView
+          android:id="@+id/album_edit_text"
+          android:completionThreshold="1"
+          style="@style/SearchTextField"
+        />
+      </com.google.android.material.textfield.TextInputLayout>
 
       <LinearLayout
         android:orientation="horizontal"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
       >
-        <CheckBox
+        <com.google.android.material.checkbox.MaterialCheckBox
           android:id="@+id/substring_checkbox"
           style="@style/SearchCheckbox"
           android:checked="true"
           android:text="@string/substring"
         />
-        <CheckBox
+        <com.google.android.material.checkbox.MaterialCheckBox
           android:id="@+id/shuffle_checkbox"
           style="@style/SearchCheckbox"
           android:text="@string/shuffle"
         />
-        <CheckBox
+        <com.google.android.material.checkbox.MaterialCheckBox
           android:id="@+id/cached_checkbox"
           style="@style/SearchCheckbox"
           android:text="@string/cached"
         />
       </LinearLayout>
 
-      <RelativeLayout
-        android:orientation="horizontal"
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:paddingTop="@dimen/vertical_padding"
+      <com.google.android.material.textfield.TextInputLayout
+        android:hint="@string/minimum_rating"
+        style="@style/SearchAutocompleteLayout"
       >
-        <TextView
-          android:layout_width="wrap_content"
-          android:layout_height="wrap_content"
-          android:layout_toLeftOf="@+id/min_rating_spinner"
-          android:layout_centerVertical="true"
-          android:paddingRight="4dp"
-          android:text="@string/minimum_rating_label"
-        />
-        <Spinner
+        <com.google.android.material.textfield.MaterialAutoCompleteTextView
           android:id="@+id/min_rating_spinner"
-          android:layout_width="wrap_content"
-          android:layout_height="wrap_content"
-          android:layout_alignParentRight="true"
-          android:prompt="@string/minimum_rating"
+          style="@style/SearchTextField"
+          android:inputType="none"
         />
-      </RelativeLayout>
+      </com.google.android.material.textfield.TextInputLayout>
     </LinearLayout>
   </ScrollView>
 

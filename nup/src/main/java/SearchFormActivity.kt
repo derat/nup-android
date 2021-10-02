@@ -14,7 +14,6 @@ import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
 import android.widget.CheckBox
 import android.widget.EditText
-import android.widget.Spinner
 import androidx.appcompat.app.AppCompatActivity
 import org.erat.nup.NupActivity.Companion.service
 import org.erat.nup.NupService.SongDatabaseUpdateListener
@@ -27,7 +26,7 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
     private lateinit var shuffleCheckbox: CheckBox
     private lateinit var substringCheckbox: CheckBox
     private lateinit var cachedCheckbox: CheckBox
-    private lateinit var minRatingSpinner: Spinner
+    private lateinit var minRatingSpinner: AutoCompleteTextView
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         Log.d(TAG, "Activity created")
@@ -62,12 +61,14 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
             }
         }
 
-        minRatingSpinner = findViewById<Spinner>(R.id.min_rating_spinner)
-        val adapter = ArrayAdapter.createFromResource(
-            this, R.array.min_rating_array, android.R.layout.simple_spinner_item
+        minRatingSpinner = findViewById<AutoCompleteTextView>(R.id.min_rating_spinner)
+        minRatingSpinner.setAdapter(
+            ArrayAdapter(
+                this@SearchFormActivity,
+                android.R.layout.simple_spinner_dropdown_item,
+                getResources().getStringArray(R.array.min_rating_array)
+            )
         )
-        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item)
-        minRatingSpinner.adapter = adapter
 
         shuffleCheckbox = findViewById<CheckBox>(R.id.shuffle_checkbox)
         substringCheckbox = findViewById<CheckBox>(R.id.substring_checkbox)
@@ -92,10 +93,13 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
         intent.putExtra(SearchResultsActivity.BUNDLE_ARTIST, artistEdit.text.toString().trim())
         intent.putExtra(SearchResultsActivity.BUNDLE_TITLE, titleEdit.text.toString().trim())
         intent.putExtra(SearchResultsActivity.BUNDLE_ALBUM, albumEdit.text.toString().trim())
-        intent.putExtra(
-            SearchResultsActivity.BUNDLE_MIN_RATING,
-            minRatingSpinner.selectedItemPosition / 4.0
-        )
+
+        // This is a hack, but Android doesn't supply a Material spinner, and the only way to
+        // determine the index of an AutoCompleteTextView's selected item is apparently by listening
+        // for clicks.
+        val stars = minRatingSpinner.text.toString().length
+        if (stars > 0) intent.putExtra(SearchResultsActivity.BUNDLE_MIN_RATING, (stars - 1) / 4.0)
+
         intent.putExtra(SearchResultsActivity.BUNDLE_SHUFFLE, shuffleCheckbox.isChecked)
         intent.putExtra(SearchResultsActivity.BUNDLE_SUBSTRING, substringCheckbox.isChecked)
         intent.putExtra(SearchResultsActivity.BUNDLE_CACHED, cachedCheckbox.isChecked)
@@ -109,7 +113,7 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
         shuffleCheckbox.isChecked = false
         substringCheckbox.isChecked = true
         cachedCheckbox.isChecked = false
-        minRatingSpinner.setSelection(0, true)
+        minRatingSpinner.setText("")
     }
 
     override fun onSongDatabaseSyncChange(state: SongDatabase.SyncState, updatedSongs: Int) {}
