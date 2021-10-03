@@ -45,7 +45,10 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
     // Context.mainExecutor is annoyingly an Executor rather than a ScheduledExecutorService,
     // so it seems like we need a Handler instead to be able post delayed tasks.
     private val handler = Handler(Looper.getMainLooper())
-    private val playSongTask = Runnable { _service?.selectSongAtIndex(curSongIndex) }
+    private val playSongTask = Runnable {
+        _service?.selectSongAtIndex(curSongIndex)
+        _service?.unpause()
+    }
 
     private lateinit var pauseButton: MaterialButton
     private lateinit var prevButton: MaterialButton

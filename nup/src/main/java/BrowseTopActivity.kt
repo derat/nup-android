@@ -53,7 +53,7 @@ class BrowseTopActivity : BrowseActivityBase() {
                     }.await()
                     if (songs.size > 0) {
                         service.clearPlaylist()
-                        service.addSongsToPlaylist(songs, true)
+                        service.appendSongsToPlaylist(songs)
                         setResult(RESULT_OK)
                         finish()
                     }

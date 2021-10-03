@@ -165,11 +165,12 @@ class BrowseSongsActivity : AppCompatActivity(), OnItemClickListener {
         val song = songs[info.position]
         return when (item.itemId) {
             MENU_ITEM_PLAY -> {
-                service.addSongToPlaylist(song, true)
+                service.addSongToPlaylist(song, forceSelect = true)
+                service.unpause()
                 true
             }
             MENU_ITEM_INSERT -> {
-                service.addSongToPlaylist(song, false)
+                service.addSongToPlaylist(song)
                 true
             }
             MENU_ITEM_APPEND -> {
@@ -200,7 +201,7 @@ class BrowseSongsActivity : AppCompatActivity(), OnItemClickListener {
 
     fun onInsertButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
         if (songs.isEmpty()) return
-        service.addSongsToPlaylist(songs, false)
+        service.addSongsToPlaylist(songs)
         setResult(RESULT_OK)
         finish()
     }

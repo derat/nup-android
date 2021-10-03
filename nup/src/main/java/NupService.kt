@@ -347,7 +347,7 @@ class NupService :
                     getSongsForMediaId(mediaId) {
                         // TODO: Figure out how queue management should work here.
                         clearPlaylist()
-                        addSongsToPlaylist(it, true /* forcePlay */)
+                        appendSongsToPlaylist(it)
                         unpause()
                     }
                 }
@@ -371,7 +371,7 @@ class NupService :
                         }.await()
                         if (!songs.isEmpty()) {
                             clearPlaylist()
-                            addSongsToPlaylist(songs, true /* forcePlay */)
+                            appendSongsToPlaylist(songs)
                             unpause()
                         }
                     }
@@ -625,7 +625,8 @@ class NupService :
         // before this method runs, so if we saw it already, start playing here.
         if (!gotPlayRequest) pause()
         Log.d(TAG, "Restoring playlist with ${oldSongs.size} song(s)")
-        addSongsToPlaylist(oldSongs, false /* forcePlay */, oldIndex)
+        clearPlaylist()
+        addSongsToPlaylist(oldSongs, selectIndex = oldIndex)
         player.seek(oldPosMs.toLong())
     }
 
@@ -648,23 +649,30 @@ class NupService :
         player.togglePause()
     }
 
-    fun clearPlaylist() { removeRangeFromPlaylist(0, playlist.size - 1) }
-
-    fun appendSongToPlaylist(song: Song) { appendSongsToPlaylist(ArrayList(Arrays.asList(song))) }
     fun appendSongsToPlaylist(songs: List<Song>) { insertSongs(songs, playlist.size) }
+    fun appendSongToPlaylist(song: Song) = appendSongsToPlaylist(ArrayList(Arrays.asList(song)))
 
-    fun addSongToPlaylist(song: Song, play: Boolean) {
-        addSongsToPlaylist(ArrayList(Arrays.asList(song)), play)
-    }
-    fun addSongsToPlaylist(songs: List<Song>, forcePlay: Boolean, playIndex: Int = -1) {
-        val index = if (curSongIndex < 0) 0 else curSongIndex + 1
-        val alreadyPlayed = insertSongs(songs, index, playIndex)
-        if (forcePlay && !alreadyPlayed && playIndex < 0) {
-            selectSongAtIndex(if (index < 0) 0 else index + 1)
-        }
-    }
+    /**
+     * Add [songs] to the playlist after the current song (if any).
+     *
+     * @param selectIndex passed to [insertSongs] to override selection logic
+     */
+    fun addSongsToPlaylist(songs: List<Song>, selectIndex: Int = -1) =
+        insertSongs(
+            songs,
+            if (curSongIndex < 0) 0 else curSongIndex + 1,
+            selectIndex = selectIndex
+        )
 
-    fun removeFromPlaylist(index: Int) { removeRangeFromPlaylist(index, index) }
+    /** Add [song] to the playlist after the current song (if any).
+     *
+     * @param forceSelect force selecting [song]
+     */
+    fun addSongToPlaylist(song: Song, forceSelect: Boolean = false) =
+        addSongsToPlaylist(
+            ArrayList(Arrays.asList(song)),
+            selectIndex = if (forceSelect && curSongIndex >= 0) curSongIndex + 1 else -1
+        )
 
     /** Remove a range of songs from the playlist. */
     fun removeRangeFromPlaylist(firstIndex: Int, lastIndex: Int) {
@@ -708,6 +716,10 @@ class NupService :
         mediaSessionManager.updatePlaylist(playlist)
         updateNotification()
     }
+    /** Convenience wrapper around [removeRangeFromPlaylist]. */
+    fun removeFromPlaylist(index: Int) = removeRangeFromPlaylist(index, index)
+    /** Convenience wrapper around [removeRangeFromPlaylist]. */
+    fun clearPlaylist() = removeRangeFromPlaylist(0, playlist.size - 1)
 
     /**
      * Select the song at [index] in [playlist].
@@ -988,27 +1000,29 @@ class NupService :
     }
 
     /**
-     * Insert a list of songs into the playlist at a particular position.
+     * Insert [songs] into the playlist at [index].
      *
-     * Plays the first one, if no song is already playing or if we were previously at the end of the
-     * playlist and we've appended to it. If playIndex is non-negative, plays the song at that index
-     * in the new playlist.
+     * By default, also selects the first inserted song if no song was already selected or if we
+     * were previously at the end of the playlist and we've appended to it. [selectIndex] can be
+     * passed to override this behavior.
      *
-     * @return true if playback started
+     * @param songs songs to insert
+     * @param index index at which the songs should be inserted
+     * @param selectIndex index in updated playlist to select if >= 0
      */
-    private fun insertSongs(insSongs: List<Song>, index: Int, playIndex: Int = -1): Boolean {
+    private fun insertSongs(songs: List<Song>, index: Int, selectIndex: Int = -1) {
         if (index < 0 || index > playlist.size) {
-            Log.e(TAG, "Ignoring request to insert ${insSongs.size} song(s) at index $index")
-            return false
+            Log.e(TAG, "Ignoring request to insert ${songs.size} song(s) at index $index")
+            return
         }
 
         // Songs that we didn't already have. We track these so we can check
         // the cache for them later.
         val newSongs = ArrayList<Song>()
 
-        // Use our own version of each song if we have it already.
+        // Use the existing version of each song if we have it already.
         val resSongs = ArrayList<Song>()
-        for (song in insSongs) {
+        for (song in songs) {
             val ourSong = songIdToSong[song.id]
             if (ourSong != null) {
                 resSongs.add(ourSong)
@@ -1032,24 +1046,16 @@ class NupService :
                 songListener?.onSongFileSizeChange(song)
             }
         }
-        var played = false
+
         when {
             // If a particular song was requested, play it.
-            playIndex >= 0 -> {
-                selectSongAtIndex(playIndex)
-                played = true
-            }
+            selectIndex >= 0 -> selectSongAtIndex(selectIndex)
             // If we didn't have any songs, then start playing the first one we added.
-            curSongIndex == -1 -> {
-                selectSongAtIndex(0)
-                played = true
-            }
+            curSongIndex == -1 -> selectSongAtIndex(0)
             // If we were previously done playing (because we reached the end of the playlist),
             // then start playing the first song we added.
-            curSongIndex < playlist.size - 1 && playbackComplete -> {
+            curSongIndex < playlist.size - 1 && playbackComplete ->
                 selectSongAtIndex(curSongIndex + 1)
-                played = true
-            }
             else -> {
                 // Consider downloading the new songs if we're not already downloading something.
                 if (downloadSongId == -1L) maybeDownloadAnotherSong(index)
@@ -1070,7 +1076,6 @@ class NupService :
             }
         }
         updateNotification()
-        return played
     }
 
     /** Play [entry] . */
