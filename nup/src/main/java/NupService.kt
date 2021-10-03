@@ -83,8 +83,9 @@ class NupService :
         private set
     lateinit var networkHelper: NetworkHelper
         private set
+    lateinit var downloader: Downloader
+        private set
 
-    private lateinit var downloader: Downloader
     private lateinit var player: Player
     private lateinit var cache: FileCache
     private lateinit var coverLoader: CoverLoader

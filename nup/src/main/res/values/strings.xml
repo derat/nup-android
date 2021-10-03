@@ -2,6 +2,7 @@
 <resources>
   <string name="app_name">nup</string>
 
+  <string name="advanced">Advanced (requires network)</string>
   <string name="album">Album</string>
   <string name="album_colon">Album:</string>
   <string name="albums">Albums</string>
@@ -43,6 +44,7 @@
   <string name="download_rate_value">%d KB/sec</string>
   <string name="exit">Exit</string>
   <string name="insert">Insert</string>
+  <string name="keywords">Keywords</string>
   <string name="length_colon">Length:</string>
   <string name="loading">Loading...</string>
   <string name="loading_stats">Loading stats...</string>
@@ -85,6 +87,7 @@
   <string name="sync_song_list">Sync song list</string>
   <string name="sync_song_list_message">Sync local song list from the server?</string>
   <string name="substring">Substring</string>
+  <string name="tags">Tags</string>
   <string name="title">Title</string>
   <string name="title_colon">Title:</string>
   <string name="track_colon">Track:</string>

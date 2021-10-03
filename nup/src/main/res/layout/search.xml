@@ -85,6 +85,39 @@
           android:inputType="none"
         />
       </com.google.android.material.textfield.TextInputLayout>
+
+      <TextView
+        android:text="@string/advanced"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:fontWeight="700"
+        android:paddingTop="16dp"
+        android:paddingBottom="8dp"
+        android:paddingLeft="4dp"
+        android:paddingRight="4dp"
+        android:textColor="?android:attr/textColorPrimary"
+        android:textSize="17sp"
+      />
+
+      <com.google.android.material.textfield.TextInputLayout
+        android:hint="@string/keywords"
+        style="@style/SearchTextLayout"
+      >
+        <com.google.android.material.textfield.TextInputEditText
+          android:id="@+id/keywords_edit_text"
+          style="@style/SearchTextField"
+        />
+      </com.google.android.material.textfield.TextInputLayout>
+
+      <com.google.android.material.textfield.TextInputLayout
+        android:hint="@string/tags"
+        style="@style/SearchTextLayout"
+      >
+        <com.google.android.material.textfield.TextInputEditText
+          android:id="@+id/tags_edit_text"
+          style="@style/SearchTextField"
+        />
+      </com.google.android.material.textfield.TextInputLayout>
     </LinearLayout>
   </ScrollView>
 

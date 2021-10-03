@@ -10,6 +10,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.View
 import android.view.View.OnFocusChangeListener
+import android.view.WindowManager
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
 import android.widget.CheckBox
@@ -27,10 +28,20 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
     private lateinit var substringCheckbox: CheckBox
     private lateinit var cachedCheckbox: CheckBox
     private lateinit var minRatingSpinner: AutoCompleteTextView
+    private lateinit var keywordsEdit: EditText
+    private lateinit var tagsEdit: EditText
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         Log.d(TAG, "Activity created")
         super.onCreate(savedInstanceState)
+
+        // When the keyboard is shown, pan the window instead of resizing it. Otherwise, the buttons
+        // at the bottom get pushed up and can obscure the focused text field.
+        // TODO: Find a way to keep the buttons onscreen while also not obscuring the text field.
+        getWindow().setSoftInputMode(
+            WindowManager.LayoutParams.SOFT_INPUT_STATE_VISIBLE or
+                WindowManager.LayoutParams.SOFT_INPUT_ADJUST_PAN
+        )
 
         setTitle(R.string.search)
         setContentView(R.layout.search)
@@ -73,6 +84,8 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
         shuffleCheckbox = findViewById<CheckBox>(R.id.shuffle_checkbox)
         substringCheckbox = findViewById<CheckBox>(R.id.substring_checkbox)
         cachedCheckbox = findViewById<CheckBox>(R.id.cached_checkbox)
+        keywordsEdit = findViewById<EditText>(R.id.keywords_edit_text)
+        tagsEdit = findViewById<EditText>(R.id.tags_edit_text)
 
         service.addSongDatabaseUpdateListener(this)
         onSongDatabaseUpdate()
@@ -93,6 +106,9 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
         intent.putExtra(SearchResultsActivity.BUNDLE_ARTIST, artistEdit.text.toString().trim())
         intent.putExtra(SearchResultsActivity.BUNDLE_TITLE, titleEdit.text.toString().trim())
         intent.putExtra(SearchResultsActivity.BUNDLE_ALBUM, albumEdit.text.toString().trim())
+        intent.putExtra(SearchResultsActivity.BUNDLE_SHUFFLE, shuffleCheckbox.isChecked)
+        intent.putExtra(SearchResultsActivity.BUNDLE_SUBSTRING, substringCheckbox.isChecked)
+        intent.putExtra(SearchResultsActivity.BUNDLE_CACHED, cachedCheckbox.isChecked)
 
         // This is a hack, but Android doesn't supply a Material spinner, and the only way to
         // determine the index of an AutoCompleteTextView's selected item is apparently by listening
@@ -100,9 +116,8 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
         val stars = minRatingSpinner.text.toString().length
         if (stars > 0) intent.putExtra(SearchResultsActivity.BUNDLE_MIN_RATING, (stars - 1) / 4.0)
 
-        intent.putExtra(SearchResultsActivity.BUNDLE_SHUFFLE, shuffleCheckbox.isChecked)
-        intent.putExtra(SearchResultsActivity.BUNDLE_SUBSTRING, substringCheckbox.isChecked)
-        intent.putExtra(SearchResultsActivity.BUNDLE_CACHED, cachedCheckbox.isChecked)
+        intent.putExtra(SearchResultsActivity.BUNDLE_KEYWORDS, keywordsEdit.text.toString().trim())
+        intent.putExtra(SearchResultsActivity.BUNDLE_TAGS, tagsEdit.text.toString().trim())
         startActivityForResult(intent, RESULTS_REQUEST_CODE)
     }
 
@@ -114,6 +129,8 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
         substringCheckbox.isChecked = true
         cachedCheckbox.isChecked = false
         minRatingSpinner.setText("")
+        keywordsEdit.setText("")
+        tagsEdit.setText("")
     }
 
     override fun onSongDatabaseSyncChange(state: SongDatabase.SyncState, updatedSongs: Int) {}

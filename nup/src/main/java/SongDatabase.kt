@@ -155,10 +155,10 @@ class SongDatabase(
         builder.add("Title LIKE ?", title, substring)
         builder.add("Album LIKE ?", album, substring)
         builder.add("AlbumId = ?", albumId, false)
-        builder.add("SongId = ?", if (songId >= 0) songId.toString() else null, false)
+        builder.add("s.SongId = ?", if (songId >= 0) songId.toString() else null, false)
         builder.add("Rating >= ?", if (minRating >= 0.0) minRating.toString() else null, false)
         if (songIds != null && songIds.size > 0) {
-            builder.addLiteral("SongId IN (" + songIds.joinToString(",") + ")")
+            builder.addLiteral("s.SongId IN (" + songIds.joinToString(",") + ")")
         }
         val query = (
             "SELECT s.SongId, Artist, Title, Album, AlbumId, Filename, CoverFilename, Length, " +
@@ -215,8 +215,11 @@ class SongDatabase(
      *
      * @return requested songs and a possibly-updated index
      */
-    suspend fun getSongs(songIds: List<Long>, origIndex: Int = -1, onlyCached: Boolean = false):
-        Pair<List<Song>, Int> {
+    suspend fun getSongs(
+        songIds: List<Long>,
+        origIndex: Int = -1,
+        onlyCached: Boolean = false
+    ): Pair<List<Song>, Int> {
         val songMap = query(songIds = songIds, onlyCached = onlyCached).map { it.id to it }.toMap()
         val songs = mutableListOf<Song>()
         var index = origIndex // sigh

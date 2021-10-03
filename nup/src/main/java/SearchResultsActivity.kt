@@ -20,9 +20,14 @@ import android.widget.SimpleAdapter
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import java.io.Serializable
+import java.net.URLEncoder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import org.erat.nup.NupActivity.Companion.service
+import org.json.JSONArray
+import org.json.JSONException
+import org.json.JSONObject
+import org.json.JSONTokener
 
 /** Displays a list of songs from a search result. */
 class SearchResultsActivity : AppCompatActivity() {
@@ -46,44 +51,44 @@ class SearchResultsActivity : AppCompatActivity() {
             }
         }
 
-        // Do the search async on the IO thread since it hits the disk.
+        // Do the search async on the IO thread since it hits the disk or network.
         service.scope.async(Dispatchers.Main) {
+            var err: SearchException? = null
             songs = async(Dispatchers.IO) {
-                if (intent.action == Intent.ACTION_SEARCH) {
-                    // I'm not sure when/if this is actually used. Voice searches performed via
-                    // Android Auto go through onPlayFromSearch() and onSearch() in NupService.
-                    // Probably it's just used if other apps send it to us.
-                    searchForSongs(
-                        service.songDb,
-                        intent.getStringExtra(SearchManager.QUERY) ?: "",
-                        online = service.networkHelper.isNetworkAvailable,
-                    )
-                } else {
-                    service.songDb.query(
-                        artist = intent.getStringExtra(BUNDLE_ARTIST),
-                        title = intent.getStringExtra(BUNDLE_TITLE),
-                        album = intent.getStringExtra(BUNDLE_ALBUM),
-                        minRating = intent.getDoubleExtra(BUNDLE_MIN_RATING, -1.0),
-                        shuffle = intent.getBooleanExtra(BUNDLE_SHUFFLE, false),
-                        substring = intent.getBooleanExtra(BUNDLE_SUBSTRING, false),
-                        onlyCached = intent.getBooleanExtra(BUNDLE_CACHED, false),
-                    )
+                try {
+                    if (intent.action == Intent.ACTION_SEARCH) {
+                        // I'm not sure when/if this is actually used. Voice searches performed via
+                        // Android Auto go through onPlayFromSearch() and onSearch() in NupService.
+                        // Probably it's just used if other apps send it to us.
+                        searchForSongs(
+                            service.songDb,
+                            intent.getStringExtra(SearchManager.QUERY) ?: "",
+                            online = service.networkHelper.isNetworkAvailable,
+                        )
+                    } else if (needsNetworkSearch()) {
+                        doNetworkSearch()
+                    } else {
+                        doLocalSearch()
+                    }
+                } catch (e: SearchException) {
+                    err = e
+                    listOf<Song>()
                 }
             }.await()
 
+            Log.d(TAG, "Got ${songs.size} song(s)")
             displaySongs()
 
             Toast.makeText(
                 this@SearchResultsActivity,
-                if (!songs.isEmpty()) {
-                    resources.getQuantityString(
-                        R.plurals.search_found_songs_fmt,
-                        songs.size,
-                        songs.size,
-                    )
-                } else {
-                    getString(R.string.no_results)
-                },
+                // https://stackoverflow.com/a/56116264/6882947
+                if (err != null) err?.let { it.message!! }
+                else if (songs.isEmpty()) getString(R.string.no_results)
+                else resources.getQuantityString(
+                    R.plurals.search_found_songs_fmt,
+                    songs.size,
+                    songs.size,
+                ),
                 Toast.LENGTH_SHORT
             ).show()
 
@@ -142,7 +147,79 @@ class SearchResultsActivity : AppCompatActivity() {
         }
     }
 
-    // Update the activity to display [songs].
+    /** Thrown if an error is encountered while searching. */
+    class SearchException(reason: String) : Exception(reason)
+
+    /** Perform the search specified in [intent] using [SongDatabase]. */
+    private suspend fun doLocalSearch(): List<Song> =
+        service.songDb.query(
+            artist = intent.getStringExtra(BUNDLE_ARTIST),
+            title = intent.getStringExtra(BUNDLE_TITLE),
+            album = intent.getStringExtra(BUNDLE_ALBUM),
+            minRating = intent.getDoubleExtra(BUNDLE_MIN_RATING, -1.0),
+            shuffle = intent.getBooleanExtra(BUNDLE_SHUFFLE, false),
+            substring = intent.getBooleanExtra(BUNDLE_SUBSTRING, false),
+            onlyCached = intent.getBooleanExtra(BUNDLE_CACHED, false),
+        )
+
+    /**
+     * Return true if the search request from [intent] contains "advanced" fields and needs to be
+     * performed by sending a query to the server rather than via [SongDatabase].
+     */
+    private fun needsNetworkSearch(): Boolean {
+        return !intent.getStringExtra(BUNDLE_KEYWORDS).isNullOrEmpty() ||
+            !intent.getStringExtra(BUNDLE_TAGS).isNullOrEmpty()
+    }
+
+    /** Perform the search specified in [intent] over the network. */
+    @Throws(SearchException::class)
+    private suspend fun doNetworkSearch(): List<Song> {
+        var params = ""
+        val add = fun(k: String, v: String?) {
+            if (v.isNullOrEmpty()) return
+            if (!params.isEmpty()) params += "&"
+            params += "$k=${URLEncoder.encode(v, "utf-8")}"
+        }
+
+        add("artist", intent.getStringExtra(BUNDLE_ARTIST))
+        add("title", intent.getStringExtra(BUNDLE_TITLE))
+        add("album", intent.getStringExtra(BUNDLE_ALBUM))
+        add("shuffle", if (intent.getBooleanExtra(BUNDLE_SHUFFLE, false)) "1" else "")
+        add("keywords", intent.getStringExtra(BUNDLE_KEYWORDS))
+        add("tags", intent.getStringExtra(BUNDLE_TAGS))
+
+        val rating = intent.getDoubleExtra(BUNDLE_MIN_RATING, -1.0)
+        add("minRating", if (rating >= 0) "%.2f".format(rating) else "")
+
+        val (response, error) = service.downloader.downloadString("/query?$params")
+        response ?: throw SearchException(error!!)
+
+        // Make JSONArray iterable: https://stackoverflow.com/a/36188796/6882947
+        @Suppress("UNCHECKED_CAST")
+        operator fun <T> JSONArray.iterator(): Iterator<T> =
+            (0 until length()).asSequence().map { get(it) as T }.iterator()
+        val songIds = try {
+            JSONArray(JSONTokener(response)).iterator<JSONObject>().asSequence().toList().map {
+                o ->
+                o.getLong("songId")
+            }
+        } catch (e: JSONException) {
+            throw SearchException("Couldn't parse response: $e")
+        }
+        Log.d(TAG, "Server returned ${songIds.size} song(s)")
+
+        // Get the actual songs from SongDatabase.
+        // TODO: Using BUNDLE_CACHED doesn't work well in cases where the server returns a subset of
+        // all matching songs, since we may not have some of the subset locally. I'm not sure how to
+        // fix this without either making the server return all matching songs (yikes) or sending
+        // the cached songs to the server (also yikes).
+        return service.songDb.getSongs(
+            songIds,
+            onlyCached = intent.getBooleanExtra(BUNDLE_CACHED, false)
+        ).first
+    }
+
+    /** Update the activity to display [songs]. */
     private fun displaySongs() {
         findViewById<View>(R.id.progress)!!.visibility = View.GONE
 
@@ -198,6 +275,8 @@ class SearchResultsActivity : AppCompatActivity() {
         const val BUNDLE_SHUFFLE = "shuffle"
         const val BUNDLE_SUBSTRING = "substring"
         const val BUNDLE_CACHED = "cached"
+        const val BUNDLE_KEYWORDS = "keywords"
+        const val BUNDLE_TAGS = "tags"
 
         // Keys for saved instance state bundle.
         private const val BUNDLE_SONGS = "songs"
