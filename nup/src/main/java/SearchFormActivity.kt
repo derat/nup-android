@@ -9,13 +9,13 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.View
-import android.view.View.OnFocusChangeListener
 import android.view.WindowManager
 import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
 import android.widget.CheckBox
 import android.widget.EditText
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.widget.doAfterTextChanged
 import org.erat.nup.NupActivity.Companion.service
 import org.erat.nup.NupService.SongDatabaseUpdateListener
 
@@ -31,6 +31,9 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
     private lateinit var keywordsEdit: EditText
     private lateinit var tagsEdit: EditText
 
+    private lateinit var artistEditAdapter: ArrayAdapter<String>
+    private lateinit var albumEditAdapter: ArrayAdapter<String>
+
     public override fun onCreate(savedInstanceState: Bundle?) {
         Log.d(TAG, "Activity created")
         super.onCreate(savedInstanceState)
@@ -45,32 +48,24 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
 
         setTitle(R.string.search)
         setContentView(R.layout.search)
+
         artistEdit = findViewById<AutoCompleteTextView>(R.id.artist_edit_text)
+        artistEditAdapter = ArrayAdapter(
+            this@SearchFormActivity,
+            android.R.layout.simple_dropdown_item_1line
+        )
+        artistEdit.setAdapter(artistEditAdapter)
+
         titleEdit = findViewById<EditText>(R.id.title_edit_text)
 
-        // When the album field gets the focus, set its suggestions based on the currently-entered
-        // artist.
+        // When the artist is changed, update the album field's suggestions.
         albumEdit = findViewById<AutoCompleteTextView>(R.id.album_edit_text)
-        albumEdit.onFocusChangeListener = OnFocusChangeListener { _, hasFocus ->
-            if (hasFocus) {
-                val artist = artistEdit.text.toString()
-                val albums = mutableListOf<String>()
-                val albumsWithCounts = if (artist.trim().isEmpty()) {
-                    service.songDb.albumsSortedAlphabetically
-                } else {
-                    service.songDb.albumsByArtist(artist)
-                }
-                for (stats in albumsWithCounts) albums.add(stats.key.album)
-
-                albumEdit.setAdapter(
-                    ArrayAdapter(
-                        this@SearchFormActivity,
-                        android.R.layout.simple_dropdown_item_1line,
-                        albums
-                    )
-                )
-            }
-        }
+        albumEditAdapter = ArrayAdapter(
+            this@SearchFormActivity,
+            android.R.layout.simple_dropdown_item_1line
+        )
+        albumEdit.setAdapter(albumEditAdapter)
+        artistEdit.doAfterTextChanged { _ -> updateAlbumSuggestions() }
 
         minRatingSpinner = findViewById<AutoCompleteTextView>(R.id.min_rating_spinner)
         minRatingSpinner.setAdapter(
@@ -99,6 +94,17 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == RESULTS_REQUEST_CODE && resultCode == RESULT_OK) finish()
+    }
+
+    private fun updateAlbumSuggestions() {
+        val artist = artistEdit.text.toString().trim()
+        val albums =
+            if (artist.isEmpty()) service.songDb.albumsSortedAlphabetically
+            else service.songDb.albumsByArtist(artist)
+
+        albumEditAdapter.clear()
+        albumEditAdapter.addAll(albums.map { it.key.album }.toMutableList())
+        albumEditAdapter.notifyDataSetChanged()
     }
 
     fun onSearchButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
@@ -136,16 +142,13 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
     override fun onSongDatabaseSyncChange(state: SongDatabase.SyncState, updatedSongs: Int) {}
 
     override fun onSongDatabaseUpdate() {
-        val artists = mutableListOf<String>()
-        val artistsWithCounts = service.songDb.artistsSortedByNumSongs
-        for (stats in artistsWithCounts) artists.add(stats.key.artist)
-        artistEdit.setAdapter(
-            ArrayAdapter(
-                this@SearchFormActivity,
-                android.R.layout.simple_dropdown_item_1line,
-                artists
-            )
+        artistEditAdapter.clear()
+        artistEditAdapter.addAll(
+            service.songDb.artistsSortedByNumSongs.map { it.key.artist }.toMutableList()
         )
+        artistEditAdapter.notifyDataSetChanged()
+
+        updateAlbumSuggestions()
     }
 
     companion object {

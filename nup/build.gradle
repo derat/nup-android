@@ -41,6 +41,12 @@ android {
     // Avoid a build warning about PlaybackReporterTest's use of
     // @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class).
     freeCompilerArgs += "-Xopt-in=kotlin.RequiresOptIn"
+
+    // Avoid the following error from doAfterTextChanged in SearchFormActivity:
+    //   Cannot inline bytecode built with JVM target 1.8 into bytecode that is being built with JVM
+    //   target 1.6. Please specify proper '-jvm-target' option
+    // https://stackoverflow.com/a/56996020/6882947
+    jvmTarget = JavaVersion.VERSION_1_8.toString()
   }
 
   testOptions {
