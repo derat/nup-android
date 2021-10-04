@@ -14,10 +14,16 @@ import android.widget.ArrayAdapter
 import android.widget.AutoCompleteTextView
 import android.widget.CheckBox
 import android.widget.EditText
+import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.widget.doAfterTextChanged
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import org.erat.nup.NupActivity.Companion.service
 import org.erat.nup.NupService.SongDatabaseUpdateListener
+import org.json.JSONArray
+import org.json.JSONException
+import org.json.JSONTokener
 
 /** Displays a form for searching for songs. */
 class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
@@ -29,10 +35,14 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
     private lateinit var cachedCheckbox: CheckBox
     private lateinit var minRatingSpinner: AutoCompleteTextView
     private lateinit var keywordsEdit: EditText
-    private lateinit var tagsEdit: EditText
+    private lateinit var tagsEdit: AutoCompleteTextView
 
     private lateinit var artistEditAdapter: ArrayAdapter<String>
     private lateinit var albumEditAdapter: ArrayAdapter<String>
+    private lateinit var tagsEditAdapter: ArrayAdapter<String>
+
+    private var tags = listOf<String>() // server-supplied tags
+    private var tagsPrefix = "" // current already-typed text for tag autocomplete suggestions
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         Log.d(TAG, "Activity created")
@@ -80,7 +90,16 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
         substringCheckbox = findViewById<CheckBox>(R.id.substring_checkbox)
         cachedCheckbox = findViewById<CheckBox>(R.id.cached_checkbox)
         keywordsEdit = findViewById<EditText>(R.id.keywords_edit_text)
-        tagsEdit = findViewById<EditText>(R.id.tags_edit_text)
+
+        tagsEdit = findViewById<AutoCompleteTextView>(R.id.tags_edit_text)
+        tagsEditAdapter = ArrayAdapter(
+            this@SearchFormActivity,
+            android.R.layout.simple_dropdown_item_1line
+        )
+        tagsEdit.setAdapter(tagsEditAdapter)
+        tagsEdit.doAfterTextChanged { _ -> updateTagsSuggestions() }
+
+        if (service.networkHelper.isNetworkAvailable) fetchTags()
 
         service.addSongDatabaseUpdateListener(this)
         onSongDatabaseUpdate()
@@ -96,6 +115,30 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
         if (requestCode == RESULTS_REQUEST_CODE && resultCode == RESULT_OK) finish()
     }
 
+    /** Thrown if an error is encountered while fetching tags. */
+    class FetchTagsException(reason: String) : Exception(reason)
+
+    /** Asynchronously fetch tags from the server and update [tags]. */
+    private fun fetchTags() {
+        service.scope.async(Dispatchers.Main) {
+            try {
+                tags = async(Dispatchers.IO) {
+                    val (response, error) = service.downloader.downloadString("/tags")
+                    response ?: throw FetchTagsException(error!!)
+                    try {
+                        JSONArray(JSONTokener(response)).iterator<String>().asSequence().toList()
+                    } catch (e: JSONException) {
+                        throw FetchTagsException("Couldn't parse tags: $e")
+                    }
+                }.await()
+                updateTagsSuggestions()
+            } catch (e: FetchTagsException) {
+                Toast.makeText(this@SearchFormActivity, e.message!!, Toast.LENGTH_SHORT).show()
+            }
+        }
+    }
+
+    /** Update the autocomplete suggestions shown for the album field. */
     private fun updateAlbumSuggestions() {
         val artist = artistEdit.text.toString().trim()
         val albums =
@@ -105,6 +148,27 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
         albumEditAdapter.clear()
         albumEditAdapter.addAll(albums.map { it.key.album }.toMutableList())
         albumEditAdapter.notifyDataSetChanged()
+    }
+
+    /** Update the autocomplete suggestions shown for the tags field. */
+    private fun updateTagsSuggestions() {
+        // Chop off the last word (if any), as long as it doesn't have trailing space.
+        val pre = tagsEdit.text.toString().replace("(^|\\s)\\S+$".toRegex(), "$1")
+
+        // Bail out if we're already showing the correct suggestions.
+        if (pre == tagsPrefix && tagsEditAdapter.getCount() > 0) return
+
+        // Find all the tags that have been used already.
+        val seen = pre.trim().split("\\s+".toRegex()).map { it.removePrefix("-") }.toSet()
+
+        // Append all not-yet-used tags in both positive and negative form.
+        tagsEditAdapter.clear()
+        tags.filter { !seen.contains(it) }.forEach { tag ->
+            tagsEditAdapter.add("$pre$tag ")
+            tagsEditAdapter.add("$pre-$tag ")
+        }
+        tagsEditAdapter.notifyDataSetChanged()
+        tagsPrefix = pre
     }
 
     fun onSearchButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {

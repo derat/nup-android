@@ -111,10 +111,11 @@
 
       <com.google.android.material.textfield.TextInputLayout
         android:hint="@string/tags"
-        style="@style/SearchTextLayout"
+        style="@style/SearchAutocompleteLayout"
       >
-        <com.google.android.material.textfield.TextInputEditText
+        <com.google.android.material.textfield.MaterialAutoCompleteTextView
           android:id="@+id/tags_edit_text"
+          android:completionThreshold="0"
           style="@style/SearchTextField"
         />
       </com.google.android.material.textfield.TextInputLayout>

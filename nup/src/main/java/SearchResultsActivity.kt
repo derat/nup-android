@@ -195,10 +195,6 @@ class SearchResultsActivity : AppCompatActivity() {
         val (response, error) = service.downloader.downloadString("/query?$params")
         response ?: throw SearchException(error!!)
 
-        // Make JSONArray iterable: https://stackoverflow.com/a/36188796/6882947
-        @Suppress("UNCHECKED_CAST")
-        operator fun <T> JSONArray.iterator(): Iterator<T> =
-            (0 until length()).asSequence().map { get(it) as T }.iterator()
         val songIds = try {
             JSONArray(JSONTokener(response)).iterator<JSONObject>().asSequence().toList().map {
                 o ->
