@@ -195,9 +195,9 @@ class Player(
     /**
      * Set [file] as the currently-playing song.
      *
-     * The play/pause state is not changed.
+     * The play/pause state is not changed. If we're not paused, the song will start playing.
      */
-    fun playFile(file: File, totalBytes: Long, gain: Double, peakAmp: Double) {
+    fun loadFile(file: File, totalBytes: Long, gain: Double, peakAmp: Double) {
         executor.execute {
             Log.d(TAG, "Playing $file")
             resetCurrent()

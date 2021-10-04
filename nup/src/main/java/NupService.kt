@@ -1078,7 +1078,7 @@ class NupService :
         updateNotification()
     }
 
-    /** Play [entry] . */
+    /** Play [entry] (if we aren't paused). */
     private fun playCacheEntry(entry: FileCacheEntry) {
         val song = curSong ?: return
         if (song.id != entry.songId) {
@@ -1086,7 +1086,7 @@ class NupService :
             return
         }
         curFile = entry.file
-        player.playFile(entry.file, entry.totalBytes, song.albumGain, song.peakAmp)
+        player.loadFile(entry.file, entry.totalBytes, song.albumGain, song.peakAmp)
         playStart = Date()
         cache.updateLastAccessTime(entry.songId)
         updatePlaybackState()
