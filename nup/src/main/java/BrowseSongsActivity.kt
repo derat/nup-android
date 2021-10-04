@@ -210,6 +210,7 @@ class BrowseSongsActivity : AppCompatActivity(), OnItemClickListener {
         if (songs.isEmpty()) return
         service.clearPlaylist()
         service.appendSongsToPlaylist(songs)
+        service.unpause() // https://github.com/derat/nup-android/issues/23
         setResult(RESULT_OK)
         finish()
     }

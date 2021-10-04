@@ -261,6 +261,7 @@ class SearchResultsActivity : AppCompatActivity() {
     fun onReplaceButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
         service.clearPlaylist()
         service.appendSongsToPlaylist(songs)
+        service.unpause() // https://github.com/derat/nup-android/issues/23
         setResult(RESULT_OK)
         finish()
     }
