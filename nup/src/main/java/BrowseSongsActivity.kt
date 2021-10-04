@@ -208,9 +208,10 @@ class BrowseSongsActivity : AppCompatActivity(), OnItemClickListener {
 
     fun onReplaceButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
         if (songs.isEmpty()) return
+        val wasEmpty = service.playlist.isEmpty()
         service.clearPlaylist()
         service.appendSongsToPlaylist(songs)
-        service.unpause() // https://github.com/derat/nup-android/issues/23
+        if (!wasEmpty) service.unpause() // https://github.com/derat/nup-android/issues/23
         setResult(RESULT_OK)
         finish()
     }

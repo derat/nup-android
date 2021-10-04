@@ -259,9 +259,10 @@ class SearchResultsActivity : AppCompatActivity() {
     }
 
     fun onReplaceButtonClicked(@Suppress("UNUSED_PARAMETER") view: View?) {
+        val wasEmpty = service.playlist.isEmpty()
         service.clearPlaylist()
         service.appendSongsToPlaylist(songs)
-        service.unpause() // https://github.com/derat/nup-android/issues/23
+        if (!wasEmpty) service.unpause() // https://github.com/derat/nup-android/issues/23
         setResult(RESULT_OK)
         finish()
     }
