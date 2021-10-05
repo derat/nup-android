@@ -107,25 +107,33 @@
   >
     <item name="android:layout_width">match_parent</item>
     <item name="android:layout_height">wrap_content</item>
+    <item name="endIconMode">clear_text</item>
+    <item name="prefixTextColor">?android:attr/textColorSecondary</item>
+    <item name="suffixTextColor">?android:attr/textColorSecondary</item>
   </style>
+
   <style
     name="SearchAutocompleteLayout"
     parent="@style/Widget.MaterialComponents.TextInputLayout.FilledBox.ExposedDropdownMenu"
   >
+    <!-- Setting endIconMode to "clear_text" seems to break
+         android:completionThreshold="0". -->
     <item name="android:layout_width">match_parent</item>
     <item name="android:layout_height">wrap_content</item>
   </style>
+
   <style name="SearchTextField">
     <item name="android:layout_width">match_parent</item>
     <item name="android:layout_height">match_parent</item>
     <item name="android:singleLine">true</item>
     <item name="android:inputType">textNoSuggestions</item>
   </style>
+
   <style name="SearchCheckbox">
     <item name="android:layout_width">wrap_content</item>
     <item name="android:layout_height">wrap_content</item>
     <item name="android:layout_weight">1</item>
-    <item name="android:textSize">@dimen/search_checkbox_text</item>
+    <item name="android:textSize">@dimen/search_label_text</item>
   </style>
 
   <style name="Progress">

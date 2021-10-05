@@ -15,5 +15,6 @@
   <dimen name="song_list_text">15sp</dimen>
   <dimen name="song_list_percent">13sp</dimen>
   <dimen name="song_details_text">15sp</dimen>
-  <dimen name="search_checkbox_text">14sp</dimen>
+  <dimen name="search_heading_text">17sp</dimen>
+  <dimen name="search_label_text">16sp</dimen>
 </resources>

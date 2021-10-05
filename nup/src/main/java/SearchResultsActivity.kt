@@ -169,7 +169,8 @@ class SearchResultsActivity : AppCompatActivity() {
      */
     private fun needsNetworkSearch(): Boolean {
         return !intent.getStringExtra(BUNDLE_KEYWORDS).isNullOrEmpty() ||
-            !intent.getStringExtra(BUNDLE_TAGS).isNullOrEmpty()
+            !intent.getStringExtra(BUNDLE_TAGS).isNullOrEmpty() ||
+            intent.getIntExtra(BUNDLE_MAX_PLAYS, -1) >= 0
     }
 
     /** Perform the search specified in [intent] over the network. */
@@ -191,6 +192,9 @@ class SearchResultsActivity : AppCompatActivity() {
 
         val rating = intent.getDoubleExtra(BUNDLE_MIN_RATING, -1.0)
         add("minRating", if (rating >= 0) "%.2f".format(rating) else "")
+
+        val maxPlays = intent.getIntExtra(BUNDLE_MAX_PLAYS, -1)
+        add("maxPlays", if (maxPlays >= 0) maxPlays.toString() else "")
 
         val (response, error) = service.downloader.downloadString("/query?$params")
         response ?: throw SearchException(error!!)
@@ -276,6 +280,7 @@ class SearchResultsActivity : AppCompatActivity() {
         const val BUNDLE_CACHED = "cached"
         const val BUNDLE_KEYWORDS = "keywords"
         const val BUNDLE_TAGS = "tags"
+        const val BUNDLE_MAX_PLAYS = "max_plays"
 
         // Keys for saved instance state bundle.
         private const val BUNDLE_SONGS = "songs"

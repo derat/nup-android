@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <RelativeLayout
   xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:app="http://schemas.android.com/apk/res-auto"
   android:orientation="vertical"
   android:layout_width="fill_parent"
   android:layout_height="fill_parent"
@@ -47,7 +48,7 @@
       >
         <com.google.android.material.textfield.MaterialAutoCompleteTextView
           android:id="@+id/album_edit_text"
-          android:completionThreshold="1"
+          android:completionThreshold="0"
           style="@style/SearchTextField"
         />
       </com.google.android.material.textfield.TextInputLayout>
@@ -96,7 +97,7 @@
         android:paddingLeft="4dp"
         android:paddingRight="4dp"
         android:textColor="?android:attr/textColorPrimary"
-        android:textSize="17sp"
+        android:textSize="@dimen/search_heading_text"
       />
 
       <com.google.android.material.textfield.TextInputLayout
@@ -117,6 +118,24 @@
           android:id="@+id/tags_edit_text"
           android:completionThreshold="0"
           style="@style/SearchTextField"
+        />
+      </com.google.android.material.textfield.TextInputLayout>
+
+      <!-- TODO: Find some way to make this look better: the user's input ends
+           up too close to the prefix text but the suffix is right-aligned. I
+           spent way too long failing to get baseline alignment working between
+           two TextViews and an EditText before giving up and switching to
+           prefixText/suffixText. :-( -->
+      <com.google.android.material.textfield.TextInputLayout
+        style="@style/SearchTextLayout"
+        android:hint="@string/max_plays"
+        app:prefixText="@string/max_plays_prefix"
+        app:suffixText="@string/max_plays_suffix"
+      >
+        <com.google.android.material.textfield.TextInputEditText
+          android:id="@+id/max_plays_edit_text"
+          style="@style/SearchTextField"
+          android:inputType="numberSigned"
         />
       </com.google.android.material.textfield.TextInputLayout>
     </LinearLayout>

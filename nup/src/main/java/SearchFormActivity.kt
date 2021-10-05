@@ -36,6 +36,7 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
     private lateinit var minRatingSpinner: AutoCompleteTextView
     private lateinit var keywordsEdit: EditText
     private lateinit var tagsEdit: AutoCompleteTextView
+    private lateinit var maxPlaysEdit: EditText
 
     private lateinit var artistEditAdapter: ArrayAdapter<String>
     private lateinit var albumEditAdapter: ArrayAdapter<String>
@@ -98,6 +99,8 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
         )
         tagsEdit.setAdapter(tagsEditAdapter)
         tagsEdit.doAfterTextChanged { _ -> updateTagsSuggestions() }
+
+        maxPlaysEdit = findViewById<EditText>(R.id.max_plays_edit_text)
 
         if (service.networkHelper.isNetworkAvailable) fetchTags()
 
@@ -188,6 +191,12 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
 
         intent.putExtra(SearchResultsActivity.BUNDLE_KEYWORDS, keywordsEdit.text.toString().trim())
         intent.putExtra(SearchResultsActivity.BUNDLE_TAGS, tagsEdit.text.toString().trim())
+
+        val maxPlays = maxPlaysEdit.text.toString().trim()
+        if (!maxPlays.isEmpty()) {
+            intent.putExtra(SearchResultsActivity.BUNDLE_MAX_PLAYS, maxPlays.toInt())
+        }
+
         startActivityForResult(intent, RESULTS_REQUEST_CODE)
     }
 
