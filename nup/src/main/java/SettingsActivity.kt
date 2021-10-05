@@ -11,6 +11,8 @@ import android.os.Bundle
 import android.os.StrictMode
 import android.text.InputType
 import android.util.AttributeSet
+import android.view.Menu
+import android.view.MenuItem
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.DialogPreference
 import androidx.preference.EditTextPreference
@@ -40,6 +42,11 @@ class SettingsActivity : AppCompatActivity() {
         super.onDestroy()
         singleton = null
     }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean = createCommonOptionsMenu(menu)
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean =
+        handleCommonOptionsItemSelected(item)
 
     companion object {
         // Huge hack to give YesNoPreferenceDialogFragment a context

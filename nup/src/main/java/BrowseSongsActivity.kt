@@ -124,25 +124,10 @@ class BrowseSongsActivity : AppCompatActivity(), OnItemClickListener {
         }
     }
 
-    override fun onCreateOptionsMenu(menu: Menu): Boolean {
-        menuInflater.inflate(R.menu.browse_menu, menu)
-        return true
-    }
+    override fun onCreateOptionsMenu(menu: Menu): Boolean = createCommonOptionsMenu(menu)
 
-    override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when (item.itemId) {
-            R.id.browse_pause_menu_item -> {
-                service.pause()
-                true
-            }
-            R.id.browse_return_menu_item -> {
-                setResult(RESULT_OK)
-                finish()
-                true
-            }
-            else -> false
-        }
-    }
+    override fun onOptionsItemSelected(item: MenuItem): Boolean =
+        handleCommonOptionsItemSelected(item)
 
     override fun onCreateContextMenu(
         menu: ContextMenu,

@@ -11,6 +11,7 @@ import android.os.Bundle
 import android.util.Log
 import android.view.ContextMenu
 import android.view.ContextMenu.ContextMenuInfo
+import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.widget.AdapterView.AdapterContextMenuInfo
@@ -147,6 +148,11 @@ class SearchResultsActivity : AppCompatActivity() {
             else -> false
         }
     }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean = createCommonOptionsMenu(menu)
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean =
+        handleCommonOptionsItemSelected(item)
 
     /** Thrown if an error is encountered while searching. */
     class SearchException(reason: String) : Exception(reason)

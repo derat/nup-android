@@ -8,6 +8,8 @@ package org.erat.nup
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.view.Menu
+import android.view.MenuItem
 import android.view.View
 import android.view.WindowManager
 import android.widget.ArrayAdapter
@@ -113,6 +115,11 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
         super.onDestroy()
         service.removeSongDatabaseUpdateListener(this)
     }
+
+    override fun onCreateOptionsMenu(menu: Menu): Boolean = createCommonOptionsMenu(menu)
+
+    override fun onOptionsItemSelected(item: MenuItem): Boolean =
+        handleCommonOptionsItemSelected(item)
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == RESULTS_REQUEST_CODE && resultCode == RESULT_OK) finish()
