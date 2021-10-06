@@ -39,6 +39,8 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
     private lateinit var keywordsEdit: EditText
     private lateinit var tagsEdit: AutoCompleteTextView
     private lateinit var maxPlaysEdit: EditText
+    private lateinit var firstPlayedSpinner: AutoCompleteTextView
+    private lateinit var lastPlayedSpinner: AutoCompleteTextView
 
     private lateinit var artistEditAdapter: ArrayAdapter<String>
     private lateinit var albumEditAdapter: ArrayAdapter<String>
@@ -63,46 +65,28 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
         setContentView(R.layout.search)
 
         artistEdit = findViewById<AutoCompleteTextView>(R.id.artist_edit_text)
-        artistEditAdapter = ArrayAdapter(
-            this@SearchFormActivity,
-            android.R.layout.simple_dropdown_item_1line
-        )
-        artistEdit.setAdapter(artistEditAdapter)
+        artistEditAdapter = createAutocompleteAdapter(artistEdit)
 
         titleEdit = findViewById<EditText>(R.id.title_edit_text)
 
         // When the artist is changed, update the album field's suggestions.
         albumEdit = findViewById<AutoCompleteTextView>(R.id.album_edit_text)
-        albumEditAdapter = ArrayAdapter(
-            this@SearchFormActivity,
-            android.R.layout.simple_dropdown_item_1line
-        )
-        albumEdit.setAdapter(albumEditAdapter)
+        albumEditAdapter = createAutocompleteAdapter(albumEdit)
         artistEdit.doAfterTextChanged { _ -> updateAlbumSuggestions() }
 
-        minRatingSpinner = findViewById<AutoCompleteTextView>(R.id.min_rating_spinner)
-        minRatingSpinner.setAdapter(
-            ArrayAdapter(
-                this@SearchFormActivity,
-                android.R.layout.simple_spinner_dropdown_item,
-                getResources().getStringArray(R.array.min_rating_array)
-            )
-        )
-
+        minRatingSpinner = configureSpinner(R.id.min_rating_spinner, R.array.min_ratings)
         shuffleCheckbox = findViewById<CheckBox>(R.id.shuffle_checkbox)
         substringCheckbox = findViewById<CheckBox>(R.id.substring_checkbox)
         cachedCheckbox = findViewById<CheckBox>(R.id.cached_checkbox)
         keywordsEdit = findViewById<EditText>(R.id.keywords_edit_text)
 
         tagsEdit = findViewById<AutoCompleteTextView>(R.id.tags_edit_text)
-        tagsEditAdapter = ArrayAdapter(
-            this@SearchFormActivity,
-            android.R.layout.simple_dropdown_item_1line
-        )
-        tagsEdit.setAdapter(tagsEditAdapter)
+        tagsEditAdapter = createAutocompleteAdapter(tagsEdit)
         tagsEdit.doAfterTextChanged { _ -> updateTagsSuggestions() }
 
         maxPlaysEdit = findViewById<EditText>(R.id.max_plays_edit_text)
+        firstPlayedSpinner = configureSpinner(R.id.first_played_spinner, R.array.played_times)
+        lastPlayedSpinner = configureSpinner(R.id.last_played_spinner, R.array.played_times)
 
         if (service.networkHelper.isNetworkAvailable) fetchTags()
 
@@ -123,6 +107,29 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
 
     override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
         if (requestCode == RESULTS_REQUEST_CODE && resultCode == RESULT_OK) finish()
+    }
+
+    /** Create an [ArrayAdapter] for [view]. */
+    private fun createAutocompleteAdapter(view: AutoCompleteTextView): ArrayAdapter<String> {
+        val adapter = ArrayAdapter<String>(
+            this@SearchFormActivity,
+            android.R.layout.simple_dropdown_item_1line
+        )
+        view.setAdapter(adapter)
+        return adapter
+    }
+
+    /** Configure AutoCompleteTextView [viewId] to use string array [valuesId]. */
+    private fun configureSpinner(viewId: Int, valuesId: Int): AutoCompleteTextView {
+        val spinner = findViewById<AutoCompleteTextView>(viewId)
+        spinner.setAdapter(
+            ArrayAdapter(
+                this@SearchFormActivity,
+                android.R.layout.simple_spinner_dropdown_item,
+                getResources().getStringArray(valuesId)
+            )
+        )
+        return spinner
     }
 
     /** Thrown if an error is encountered while fetching tags. */
@@ -204,6 +211,13 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
             intent.putExtra(SearchResultsActivity.BUNDLE_MAX_PLAYS, maxPlays.toInt())
         }
 
+        val playedStr = getResources().getStringArray(R.array.played_times)
+        val playedSec = getResources().getStringArray(R.array.played_times_sec).map { it.toInt() }
+        val firstPlayed = playedSec[playedStr.indexOf(firstPlayedSpinner.text.toString())]
+        if (firstPlayed > 0) intent.putExtra(SearchResultsActivity.BUNDLE_FIRST_PLAYED, firstPlayed)
+        val lastPlayed = playedSec[playedStr.indexOf(lastPlayedSpinner.text.toString())]
+        if (lastPlayed > 0) intent.putExtra(SearchResultsActivity.BUNDLE_LAST_PLAYED, lastPlayed)
+
         startActivityForResult(intent, RESULTS_REQUEST_CODE)
     }
 
@@ -217,6 +231,9 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
         minRatingSpinner.setText("")
         keywordsEdit.setText("")
         tagsEdit.setText("")
+        maxPlaysEdit.setText("")
+        firstPlayedSpinner.setText("")
+        lastPlayedSpinner.setText("")
     }
 
     override fun onSongDatabaseSyncChange(state: SongDatabase.SyncState, updatedSongs: Int) {}

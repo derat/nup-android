@@ -43,13 +43,16 @@
   <string name="download_rate_description">Limit in KB/sec (0 is unlimited)</string>
   <string name="download_rate_value">%d KB/sec</string>
   <string name="exit">Exit</string>
+  <string name="first_played">First played</string>
+  <string name="first_played_suffix"> or less ago</string>
   <string name="insert">Insert</string>
   <string name="keywords">Keywords</string>
+  <string name="last_played">Last played</string>
+  <string name="last_played_suffix"> or longer ago</string>
   <string name="length_colon">Length:</string>
   <string name="loading">Loading...</string>
   <string name="loading_stats">Loading stats...</string>
   <string name="max_plays">Maximum plays</string>
-  <string name="max_plays_prefix">Played </string>
   <string name="max_plays_suffix"> or fewer times</string>
   <string name="minimum_rating">Minimum rating</string>
   <string name="network_is_unavailable">Network is unavailable.</string>
@@ -100,12 +103,34 @@
   <string name="username_description">HTTP basic auth with server</string>
 
   <!-- SearchFormActivity depends on these strings' lengths. -->
-  <string-array name="min_rating_array">
+  <string-array name="min_ratings">
     <item />
     <item>★</item>
     <item>★★</item>
     <item>★★★</item>
     <item>★★★★</item>
     <item>★★★★★</item>
+  </string-array>
+
+  <!-- These two arrays must be kept in sync. -->
+  <string-array name="played_times">
+    <item />
+    <item>one day</item>
+    <item>one week</item>
+    <item>one month</item>
+    <item>three months</item>
+    <item>six months</item>
+    <item>one year</item>
+    <item>three years</item>
+  </string-array>
+  <string-array name="played_times_sec">
+    <item>0</item>
+    <item>86400</item>
+    <item>604800</item>
+    <item>2592000</item>
+    <item>7776000</item>
+    <item>15552000</item>
+    <item>31536000</item>
+    <item>94608000</item>
   </string-array>
 </resources>

@@ -22,6 +22,7 @@ import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import java.io.Serializable
 import java.net.URLEncoder
+import java.util.Date
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import org.erat.nup.NupActivity.Companion.service
@@ -176,7 +177,9 @@ class SearchResultsActivity : AppCompatActivity() {
     private fun needsNetworkSearch(): Boolean {
         return !intent.getStringExtra(BUNDLE_KEYWORDS).isNullOrEmpty() ||
             !intent.getStringExtra(BUNDLE_TAGS).isNullOrEmpty() ||
-            intent.getIntExtra(BUNDLE_MAX_PLAYS, -1) >= 0
+            intent.getIntExtra(BUNDLE_MAX_PLAYS, -1) >= 0 ||
+            intent.getIntExtra(BUNDLE_FIRST_PLAYED, 0) > 0 ||
+            intent.getIntExtra(BUNDLE_LAST_PLAYED, 0) > 0
     }
 
     /** Perform the search specified in [intent] over the network. */
@@ -201,6 +204,14 @@ class SearchResultsActivity : AppCompatActivity() {
 
         val maxPlays = intent.getIntExtra(BUNDLE_MAX_PLAYS, -1)
         add("maxPlays", if (maxPlays >= 0) maxPlays.toString() else "")
+
+        // We get numbers of seconds before the current time from SearchFormActivity, but the server
+        // wants timestamps as seconds since the epoch.
+        val now = Date().getTime() / 1000
+        val firstPlayed = intent.getIntExtra(BUNDLE_FIRST_PLAYED, 0)
+        if (firstPlayed > 0) add("minFirstPlayed", (now - firstPlayed).toString())
+        val lastPlayed = intent.getIntExtra(BUNDLE_LAST_PLAYED, 0)
+        if (lastPlayed > 0) add("maxLastPlayed", (now - lastPlayed).toString())
 
         val (response, error) = service.downloader.downloadString("/query?$params")
         response ?: throw SearchException(error!!)
@@ -287,6 +298,8 @@ class SearchResultsActivity : AppCompatActivity() {
         const val BUNDLE_KEYWORDS = "keywords"
         const val BUNDLE_TAGS = "tags"
         const val BUNDLE_MAX_PLAYS = "max_plays"
+        const val BUNDLE_FIRST_PLAYED = "first_played"
+        const val BUNDLE_LAST_PLAYED = "last_played"
 
         // Keys for saved instance state bundle.
         private const val BUNDLE_SONGS = "songs"
