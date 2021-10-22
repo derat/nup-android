@@ -308,7 +308,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
             }
             R.id.exit_menu_item -> {
                 stopService(Intent(this, NupService::class.java))
-                finish()
+                finishAndRemoveTask()
                 true
             }
             else -> super.onOptionsItemSelected(item)
