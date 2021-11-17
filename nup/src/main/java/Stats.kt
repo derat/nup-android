@@ -15,7 +15,7 @@ import android.widget.TextView
 import java.util.Collections
 
 /** Key for song counts. Fields may be empty. */
-data class StatsKey(val artist: String, val album: String, val albumId: String)
+data class StatsKey(var artist: String, val album: String, val albumId: String)
 
 /** Song count for a specific [StatsKey]. */
 class StatsRow(val key: StatsKey, var count: Int) {

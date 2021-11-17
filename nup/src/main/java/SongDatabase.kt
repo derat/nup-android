@@ -7,6 +7,7 @@ package org.erat.nup
 
 import android.content.ContentValues
 import android.content.Context
+import android.database.Cursor
 import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.text.TextUtils
@@ -73,33 +74,31 @@ class SongDatabase(
             "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
             "GROUP BY LOWER(TRIM(s.Artist))",
         null,
+        false /* aggregateAlbums */,
         SongOrder.ARTIST,
     )
 
-    // TODO: It'd be better to use most-frequent-artist logic here similar
-    // to what [loadAggregateData] does for [albumsSortedAlphabetically].
-    // I haven't figured out how to do that solely with SQL, though, and
-    // I'd rather not write one-off code here.
     suspend fun cachedAlbumsSortedAlphabetically(): List<StatsRow> = getSortedRows(
-        "SELECT MIN(s.Artist), s.Album, s.AlbumId, COUNT(*) " +
+        "SELECT s.Artist, s.Album, s.AlbumId, COUNT(*) " +
             "FROM Songs s " +
             "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
-            "GROUP BY LOWER(TRIM(s.Album)), s.AlbumId",
+            "GROUP BY LOWER(TRIM(s.Artist)), LOWER(TRIM(s.Album)), s.AlbumId " +
+            "ORDER BY LOWER(TRIM(s.Album)) ASC, s.AlbumId ASC, 4 DESC",
         null,
+        true /* aggregateAlbums */,
         SongOrder.ALBUM,
     )
 
-    suspend fun cachedAlbumsByArtist(artist: String): List<StatsRow> {
-        return getSortedRows(
-            "SELECT '' AS Artist, s.Album, s.AlbumId, COUNT(*) " +
-                "FROM Songs s " +
-                "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
-                "WHERE LOWER(s.Artist) = LOWER(?) " +
-                "GROUP BY LOWER(TRIM(s.Album)), s.AlbumId",
-            arrayOf(artist),
-            SongOrder.ALBUM,
-        )
-    }
+    suspend fun cachedAlbumsByArtist(artist: String): List<StatsRow> = getSortedRows(
+        "SELECT ? AS Artist, s.Album, s.AlbumId, COUNT(*) " +
+            "FROM Songs s " +
+            "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
+            "WHERE LOWER(s.Artist) = LOWER(?) " +
+            "GROUP BY LOWER(TRIM(s.Album)), s.AlbumId",
+        arrayOf(artist, artist),
+        false /* aggregateAlbums */,
+        SongOrder.ALBUM,
+    )
 
     fun quit() {
         updater.quit()
@@ -559,8 +558,6 @@ class SongDatabase(
         }
         cursor.close()
 
-        // Aggregate by (album, albumId) while storing the most-frequent artist for each album.
-        var lastRow: StatsRow? = null // last row added to |albumsSortedAlphabetically|
         cursor = db.rawQuery(
             "SELECT Artist, Album, AlbumId, SUM(NumSongs) " +
                 "FROM ArtistAlbumStats " +
@@ -569,30 +566,7 @@ class SongDatabase(
             null
         )
         cursor.moveToFirst()
-        while (!cursor.isAfterLast) {
-            val artist = cursor.getString(0)
-            val album = cursor.getString(1)
-            val albumId = cursor.getString(2)
-            val count = cursor.getInt(3)
-            cursor.moveToNext()
-
-            if (lastRow != null &&
-                lastRow.key.albumId == albumId &&
-                lastRow.key.album.trim().toLowerCase() == album.trim().toLowerCase()
-            ) {
-                lastRow.count += count
-            } else {
-                newAlbumsAlpha.add(StatsRow(artist, album, albumId, count))
-                lastRow = newAlbumsAlpha.last()
-            }
-
-            // TODO: Consider aggregating by album ID so that we have the full count from
-            // each album rather than just songs exactly matching the artist. This will
-            // affect the count displayed when navigating from BrowseArtistsActivity to
-            // BrowseAlbumsActivity.
-            newArtistAlbums.getOrPut(artist.toLowerCase(), { mutableListOf() })
-                .add(StatsRow(artist, album, albumId, count))
-        }
+        readAlbumRows(cursor, newAlbumsAlpha, true /* aggregateAlbums */, newArtistAlbums)
         cursor.close()
 
         newArtistsNumSongs.addAll(newArtistsAlpha)
@@ -609,10 +583,17 @@ class SongDatabase(
         listenerExecutor.execute { listener.onAggregateDataUpdate() }
     }
 
-    /** Get sorted results from a query returning artist, album, album ID, and num songs. */
+    /** Get sorted results from the supplied query.
+     *
+     * @param query SQL query returning rows of (artist, album, album ID, num songs)
+     * @param selectionArgs positional parameters for [query]
+     * @param aggregateAlbums group rows by (album, album ID)
+     * @param order sort order for rows
+     */
     private suspend fun getSortedRows(
         query: String,
         selectionArgs: Array<String>?,
+        aggregateAlbums: Boolean,
         order: SongOrder,
     ): List<StatsRow> {
         val rows = mutableListOf<StatsRow>()
@@ -620,20 +601,65 @@ class SongDatabase(
             if (db == null) return@task // quit() already called
             val cursor = db.rawQuery(query, selectionArgs)
             cursor.moveToFirst()
-            while (!cursor.isAfterLast) {
-                var artist = cursor.getString(0)
-                if (artist.isEmpty()) artist = UNSET_STRING
-                var album = cursor.getString(1)
-                if (album.isEmpty()) album = UNSET_STRING
-                val albumId = cursor.getString(2)
-                val count = cursor.getInt(3)
-                rows.add(StatsRow(artist, album, albumId, count))
-                cursor.moveToNext()
-            }
+            readAlbumRows(cursor, rows, aggregateAlbums, null)
             cursor.close()
         }
         sortStatsRows(rows, order)
         return rows
+    }
+
+    /** Iterate over [cursor] and get per-album stats.
+     *
+     * The caller is responsible for performing the query and positioning and closing [cursor].
+     *
+     * If [aggregateAlbums] is true, rows should ordered by ascending album and descending count
+     * (so that the most-represented artist can be identified for each album).
+     *
+     * @param cursor cursor for reading rows of (artist, album, album ID, count)
+     * @param albums destination for per-album stats
+     * @param aggregateAlbums group rows by (album, album ID)
+     * @param artistAlbums optional destination for per-artist, per-album stats
+     */
+    private fun readAlbumRows(
+        cursor: Cursor,
+        albums: MutableList<StatsRow>,
+        aggregateAlbums: Boolean,
+        artistAlbums: MutableMap<String, MutableList<StatsRow>>?
+    ) {
+        var lastAlbum: StatsRow? = null // last row added to |albums|
+
+        while (!cursor.isAfterLast) {
+            var artist = cursor.getString(0)
+            if (artist.isEmpty()) artist = UNSET_STRING
+            var album = cursor.getString(1)
+            if (album.isEmpty()) album = UNSET_STRING
+            val albumId = cursor.getString(2)
+            val count = cursor.getInt(3)
+
+            // TODO: Decide if we should special-case songs with missing albums here. Right now they
+            // all get lumped together, but that's arguably better than creating a separate row for
+            // each artist.
+            if (aggregateAlbums &&
+                lastAlbum != null &&
+                lastAlbum.key.albumId == albumId &&
+                lastAlbum.key.album.trim().toLowerCase() == album.trim().toLowerCase()
+            ) {
+                lastAlbum.count += count
+                lastAlbum.key.artist += ", " + artist
+            } else {
+                albums.add(StatsRow(artist, album, albumId, count))
+                lastAlbum = albums.last()
+            }
+
+            // TODO: Consider aggregating by album ID so that we have the full count from
+            // each album rather than just songs exactly matching the artist. This will
+            // affect the count displayed when navigating from BrowseArtistsActivity to
+            // BrowseAlbumsActivity.
+            artistAlbums?.getOrPut(artist.toLowerCase(), { mutableListOf() })
+                ?.add(StatsRow(artist, album, albumId, count))
+
+            cursor.moveToNext()
+        }
     }
 
     companion object {
