@@ -6,28 +6,28 @@ Android client for streaming music from [nup].
 
 ## Compiling
 
-```
-$ gradle assembleDebug
+```sh
+gradle assembleDebug
 ```
 
 ## Installing
 
-```
-$ adb install -r /path/to/nup-android/nup/build/outputs/apk/debug/nup-debug.apk
+```sh
+adb install -r /path/to/nup-android/nup/build/outputs/apk/debug/nup-debug.apk
 ```
 
 ## Debugging
 
 Watch logs:
 
-```
-$ adb logcat --pid=$(adb shell pidof -s org.erat.nup)
+```sh
+adb logcat --pid=$(adb shell pidof -s org.erat.nup)
 ```
 
 Copy database off device:
 
-```
-$ adb shell "run-as org.erat.nup cat databases/NupSongs" >NupSongs
+```sh
+adb shell "run-as org.erat.nup cat databases/NupSongs" >NupSongs
 ```
 
 (Sigh: `sqlite3` isn't installed on production devices, the normal `adb shell`
@@ -38,6 +38,6 @@ user doesn't have permission to read the `org.erat.nup` data, and the
 
 Run unit tests:
 
-```
-$ gradle test
+```sh
+gradle test
 ```
