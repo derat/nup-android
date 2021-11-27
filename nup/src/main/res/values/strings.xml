@@ -122,6 +122,7 @@
     <item>six months</item>
     <item>one year</item>
     <item>three years</item>
+    <item>five years</item>
   </string-array>
   <string-array name="played_times_sec">
     <item>0</item>
@@ -132,5 +133,6 @@
     <item>15552000</item>
     <item>31536000</item>
     <item>94608000</item>
+    <item>157680000</item>
   </string-array>
 </resources>
