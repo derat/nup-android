@@ -16,6 +16,7 @@ import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
 import android.os.Binder
+import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.os.StrictMode
@@ -120,6 +121,7 @@ class NupService :
 
     var paused = false // playback currently paused
         private set
+    private var haveFocus = false // currently have audio focus
     private var unpauseOnFocusGain = false // paused for transient focus loss
     private var playbackComplete = false // done playing [curSong]
     private var reported = false // already reported playback of [curSong] to server
@@ -207,11 +209,13 @@ class NupService :
         when (focusChange) {
             AudioManager.AUDIOFOCUS_GAIN -> {
                 Log.d(TAG, "Gained audio focus")
-                player.lowVolume = false
+                haveFocus = true
+                if (Build.VERSION.SDK_INT < 26) player.lowVolume = false
                 if (unpauseOnFocusGain) unpause()
             }
             AudioManager.AUDIOFOCUS_LOSS -> {
                 Log.d(TAG, "Lost audio focus; pausing")
+                haveFocus = false
                 pause()
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT -> {
@@ -219,11 +223,16 @@ class NupService :
                 // onStop() to make us stop entirely, and doesn't seem to start us again.
                 // See https://developer.android.com/guide/topics/media-apps/audio-focus.
                 Log.d(TAG, "Transiently lost audio focus; pausing")
+                haveFocus = false
                 pause(true)
             }
             AudioManager.AUDIOFOCUS_LOSS_TRANSIENT_CAN_DUCK -> {
                 Log.d(TAG, "Transiently lost audio focus (but can duck)")
-                player.lowVolume = true
+                // https://developer.android.com/guide/topics/media-apps/audio-focus#audio-focus-12:
+                // "Automatic ducking (temporarily reducing the audio level of one app so that
+                // another can be heard clearly) was introduced in Android 8.0 (API level 26)."
+                // I think that we actually don't even receive this anymore, though.
+                if (Build.VERSION.SDK_INT < 26) player.lowVolume = true
             }
             else -> Log.d(TAG, "Unhandled audio focus change $focusChange")
         }
@@ -258,12 +267,13 @@ class NupService :
             .setUsage(AudioAttributes.USAGE_MEDIA)
             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
             .build()
+        // TODO: Consider calling setAcceptsDelayedFocusGain(true) and then handling
+        // AUDIOFOCUS_REQUEST_DELAYED in getAudioFocus(). I'm not sure how often requests actually
+        // get rejected such that this would help.
         audioFocusReq = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
             .setOnAudioFocusChangeListener(audioFocusListener)
             .setAudioAttributes(audioAttrs)
             .build()
-        val result = audioManager.requestAudioFocus(audioFocusReq)
-        Log.d(TAG, "Requested audio focus; got $result")
 
         telephonyManager = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
         telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_CALL_STATE)
@@ -641,12 +651,35 @@ class NupService :
         player.pause()
     }
     fun unpause() {
+        if (!getAudioFocus()) Log.w(TAG, "Couldn't get focus to unpause")
         unpauseOnFocusGain = false
         player.unpause()
     }
     fun togglePause() {
+        // Our paused state can be stale, but this is hopefully better than nothing.
+        if (paused && !getAudioFocus()) Log.w(TAG, "Couldn't get focus to toggle pause")
         unpauseOnFocusGain = false
         player.togglePause()
+    }
+
+    /**
+     * Request the audio focus if it isn't already held.
+     *
+     * More information about this mess:
+     * https://developer.android.com/guide/topics/media-apps/audio-focus
+     * https://developer.android.com/reference/android/media/AudioFocusRequest
+     *
+     * See also library/core/src/main/java/com/google/android/exoplayer2/AudioFocusManager.java
+     * in https://github.com/google/ExoPlayer.
+     *
+     * @return true if the audio focus is now held
+     */
+    private fun getAudioFocus(): Boolean {
+        if (haveFocus) return true
+        val res = audioManager.requestAudioFocus(audioFocusReq)
+        Log.d(TAG, "Requested audio focus; got $res")
+        haveFocus = res == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
+        return haveFocus
     }
 
     fun appendSongsToPlaylist(songs: List<Song>) { insertSongs(songs, playlist.size) }
@@ -1085,6 +1118,7 @@ class NupService :
             Log.e(TAG, "Cache entry ${entry.songId} doesn't match current song ${song.id}")
             return
         }
+        if (!paused && !getAudioFocus()) Log.w(TAG, "Couldn't get focus to play ${entry.songId}")
         curFile = entry.file
         player.loadFile(entry.file, entry.totalBytes, song.albumGain, song.peakAmp)
         playStart = Date()
