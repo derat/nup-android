@@ -1,5 +1,7 @@
 # nup-android
 
+[![Build Status](https://storage.googleapis.com/derat-build-badges/bb278d31-46f9-4f06-8065-215d47c0878f.svg)](https://storage.googleapis.com/derat-build-badges/bb278d31-46f9-4f06-8065-215d47c0878f.html)
+
 Android client for streaming music from [nup].
 
 [nup]: http://github.com/derat/nup
