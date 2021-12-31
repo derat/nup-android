@@ -11,7 +11,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
-import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
@@ -412,16 +411,6 @@ class NupService :
             mediaSessionManager.session,
         )
         startForeground(NOTIFICATION_ID, notificationCreator.createNotification(false))
-
-        // Check which runtime permissions we have already and enable related features.
-        // Permissions can't be requested from services, so NupActivity will request any that are
-        // missing and call handlePermissions if they're granted.
-        val pman = getPackageManager()
-        val pkg = getPackageName()
-        PERMISSIONS.filter {
-            pman.checkPermission(it, pkg) ==
-                PackageManager.PERMISSION_GRANTED
-        }.forEach { handlePermission(it) }
     }
 
     override fun onDestroy() {
@@ -447,13 +436,6 @@ class NupService :
         player.quit()
         cache.quit()
         CrashLogger.unregister()
-    }
-
-    /** Handles the specified runtime permission being granted. */
-    public fun handlePermission(perm: String) {
-        when (perm) {
-            // Not currently requesting any dangerous permissions.
-        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -1198,12 +1180,6 @@ class NupService :
 
     companion object {
         private const val TAG = "NupService"
-
-        // "Dangerous" permissions that need to be both requested at runtime in addition to being listed
-        // in the manifest. None of these are needed right now (I was using READ_PHONE_STATE to
-        // pause for incoming calls, but AUDIOFOCUS_LOSS_TRANSIENT seems to happen now), but this
-        // code was tedious to write so I'm going to commit it first and then remove it.
-        public val PERMISSIONS = arrayOf<String>()
 
         private const val NOTIFICATION_ID = 1 // "currently playing" notification (can't be 0)
         private const val MIN_BYTES_BEFORE_PLAYING = 128 * 1024L // bytes needed before playing
