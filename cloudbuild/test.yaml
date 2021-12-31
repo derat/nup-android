@@ -1,18 +1,31 @@
 steps:
+  # Restore the cached .gradle/ directory from GCS.
+  - id: load_gradle_cache
+    name: google/cloud-sdk:slim
+    entrypoint: bash
+    args: ["-e", "--", "cloudbuild/gradle_cache.sh", "--load"]
+
   # I initially thought it might be better to create a Docker container with
   # dependencies pre-installed so that 'gradle test' and 'gradle assembleDebug'
   # stages could run in parallel, but I've seen install_dep.sh only take about
   # 1.5 minutes, and pulling big Docker containers from GCR is slow, and running
   # everything in a single step probably saves time by reusing the
   # already-running Gradle daemon.
-  - name: $_CONT
+  - id: test_and_build
+    name: marketplace.gcr.io/google/debian11
     entrypoint: bash
     args: ["-e", "--", "cloudbuild/test.sh"]
+
+  # Save the .gradle/ directory to GCS so the next build can use it.
+  - id: save_gradle_cache
+    name: google/cloud-sdk:slim
+    entrypoint: bash
+    args: ["-e", "--", "cloudbuild/gradle_cache.sh", "--save"]
 
 options:
   env:
     - ANDROID_HOME=/workspace/android
     - GRADLE_HOME=/workspace/gradle
-
-substitutions:
-  _CONT: marketplace.gcr.io/google/debian11
+    - GRADLE_USER_HOME=/workspace/.gradle
+    - PROJECT_ID=$PROJECT_ID # used by gradle_cache.sh
+    - TERM=dumb # tell Gradle not to spam us
