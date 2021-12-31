@@ -11,6 +11,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
@@ -24,8 +25,6 @@ import android.provider.MediaStore
 import android.support.v4.media.MediaBrowserCompat.MediaItem
 import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.session.MediaSessionCompat
-import android.telephony.PhoneStateListener
-import android.telephony.TelephonyManager
 import android.util.Log
 import android.widget.Toast
 import androidx.media.MediaBrowserServiceCompat
@@ -98,7 +97,6 @@ class NupService :
     private lateinit var audioManager: AudioManager
     private lateinit var audioAttrs: AudioAttributes
     private lateinit var audioFocusReq: AudioFocusRequest
-    private lateinit var telephonyManager: TelephonyManager
     private lateinit var prefs: SharedPreferences
 
     private val songIdToSong = mutableMapOf<Long, Song>() // canonical [Song]s indexed by ID
@@ -151,21 +149,6 @@ class NupService :
     private val songsWithCovers = mutableListOf<Song>() // songs whose covers are in-memory
 
     private var lastUserSwitch: Date? = null // time when user was last fore/backgrounded
-
-    // Pause when phone calls arrive.
-    private val phoneStateListener: PhoneStateListener = object : PhoneStateListener() {
-        override fun onCallStateChanged(state: Int, incomingNumber: String) {
-            // I don't want to know who's calling. Why isn't there a more-limited permission?
-            if (state == TelephonyManager.CALL_STATE_RINGING) {
-                pause()
-                Toast.makeText(
-                    this@NupService,
-                    "Paused for incoming call",
-                    Toast.LENGTH_SHORT
-                ).show()
-            }
-        }
-    }
 
     // Listen for miscellaneous broadcasts.
     private val broadcastReceiver: BroadcastReceiver = object : BroadcastReceiver() {
@@ -274,9 +257,6 @@ class NupService :
             .setOnAudioFocusChangeListener(audioFocusListener)
             .setAudioAttributes(audioAttrs)
             .build()
-
-        telephonyManager = getSystemService(TELEPHONY_SERVICE) as TelephonyManager
-        telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_CALL_STATE)
 
         val filter = IntentFilter()
         filter.addAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
@@ -432,6 +412,16 @@ class NupService :
             mediaSessionManager.session,
         )
         startForeground(NOTIFICATION_ID, notificationCreator.createNotification(false))
+
+        // Check which runtime permissions we have already and enable related features.
+        // Permissions can't be requested from services, so NupActivity will request any that are
+        // missing and call handlePermissions if they're granted.
+        val pman = getPackageManager()
+        val pkg = getPackageName()
+        PERMISSIONS.filter {
+            pman.checkPermission(it, pkg) ==
+                PackageManager.PERMISSION_GRANTED
+        }.forEach { handlePermission(it) }
     }
 
     override fun onDestroy() {
@@ -451,13 +441,19 @@ class NupService :
         // https://github.com/derat/nup-android/issues/17
         scope.cancel()
 
-        telephonyManager.listen(phoneStateListener, PhoneStateListener.LISTEN_NONE)
         unregisterReceiver(broadcastReceiver)
         mediaSessionManager.release()
         songDb.quit()
         player.quit()
         cache.quit()
         CrashLogger.unregister()
+    }
+
+    /** Handles the specified runtime permission being granted. */
+    public fun handlePermission(perm: String) {
+        when (perm) {
+            // Not currently requesting any dangerous permissions.
+        }
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -1202,6 +1198,12 @@ class NupService :
 
     companion object {
         private const val TAG = "NupService"
+
+        // "Dangerous" permissions that need to be both requested at runtime in addition to being listed
+        // in the manifest. None of these are needed right now (I was using READ_PHONE_STATE to
+        // pause for incoming calls, but AUDIOFOCUS_LOSS_TRANSIENT seems to happen now), but this
+        // code was tedious to write so I'm going to commit it first and then remove it.
+        public val PERMISSIONS = arrayOf<String>()
 
         private const val NOTIFICATION_ID = 1 // "currently playing" notification (can't be 0)
         private const val MIN_BYTES_BEFORE_PLAYING = 128 * 1024L // bytes needed before playing

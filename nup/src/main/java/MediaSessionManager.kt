@@ -171,7 +171,10 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
             setQueueTitle(context.getText(R.string.playlist))
             setRatingType(RatingCompat.RATING_5_STARS)
             setSessionActivity(
-                PendingIntent.getActivity(context, 0, Intent(context, NupActivity::class.java), 0)
+                PendingIntent.getActivity(
+                    context, 0, Intent(context, NupActivity::class.java),
+                    PendingIntent.FLAG_IMMUTABLE
+                )
             )
             setActive(true)
         }

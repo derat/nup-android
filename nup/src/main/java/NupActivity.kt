@@ -8,6 +8,7 @@ package org.erat.nup
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
 import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
@@ -29,6 +30,7 @@ import android.widget.ImageView
 import android.widget.ListView
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
 import com.google.android.material.button.MaterialButton
 
@@ -142,11 +144,34 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
             // TODO: Go to prefs page if server is unset.
             if (service.playlistRestored && songs.isEmpty()) launchBrowser()
+
+            // Request any missing permissions on behalf of the service.
+            // onRequestPermissionsResult will be invoked with the result.
+            // The request code is arbitrary.
+            val missing = NupService.PERMISSIONS.filter {
+                ActivityCompat.checkSelfPermission(this@NupActivity, it) !=
+                    PackageManager.PERMISSION_GRANTED
+            }.toTypedArray()
+            if (!missing.isEmpty()) ActivityCompat.requestPermissions(this@NupActivity, missing, 1)
         }
 
         override fun onServiceDisconnected(className: ComponentName) {
             Log.d(TAG, "Disconnected from service")
             _service = null
+        }
+    }
+
+    override fun onRequestPermissionsResult(
+        requestCode: Int,
+        permissions: Array<String>,
+        grantResults: IntArray
+    ) {
+        grantResults.zip(permissions) { res, perm ->
+            when (res) {
+                PackageManager.PERMISSION_GRANTED -> service.handlePermission(perm)
+                PackageManager.PERMISSION_DENIED -> Log.w(TAG, "$perm denied")
+                else -> Log.w(TAG, "$perm got unknown result $res")
+            }
         }
     }
 
