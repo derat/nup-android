@@ -1008,6 +1008,7 @@ class NupService :
         assertOnMainThread()
         Log.d(TAG, "Aggregate data updated")
         for (listener in songDatabaseUpdateListeners) listener.onSongDatabaseUpdate()
+        mediaBrowserHelper.notifyForSongDatabaseUpdate()
     }
 
     /**

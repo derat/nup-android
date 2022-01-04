@@ -27,12 +27,43 @@ class MediaBrowserHelper(
         service.notifyChildrenChanged(ROOT_ID)
     }
 
+    /** Notifies clients in response to the song database being updated. */
+    fun notifyForSongDatabaseUpdate() {
+        if (!pendingLoads.isEmpty() && db.aggregateDataLoaded) {
+            pendingLoads.forEach { onLoadChildren(it.first, it.second, true) }
+            pendingLoads.clear()
+        }
+
+        Log.d(TAG, "Notifying about changes for song database update")
+        service.notifyChildrenChanged(ARTISTS_ID)
+        service.notifyChildrenChanged(ALBUMS_ID)
+        service.notifyChildrenChanged(CACHED_ARTISTS_ID)
+        service.notifyChildrenChanged(CACHED_ALBUMS_ID)
+    }
+
+    // Pending onLoadChildren requests received before SongDatabase was ready.
+    val pendingLoads = mutableListOf<Pair<String,
+            MediaBrowserServiceCompat.Result<MutableList<MediaItem>>>>()
+
     /** Implements [MediaBrowserServiceCompat.onLoadChildren]. */
     fun onLoadChildren(
         parentId: String,
-        result: MediaBrowserServiceCompat.Result<MutableList<MediaItem>>
+        result: MediaBrowserServiceCompat.Result<MutableList<MediaItem>>,
+        deferred: Boolean = false,
     ) {
-        Log.d(TAG, "Got request for children of \"$parentId\"")
+        Log.d(
+            TAG,
+            if (deferred) "Handling deferred request for children of \"$parentId\""
+            else "Got request for children of \"$parentId\""
+        )
+
+        if (!db.aggregateDataLoaded && !deferred) {
+            Log.d(TAG, "Song database not ready; deferring request")
+            result.detach()
+            pendingLoads.add(Pair(parentId, result))
+            return
+        }
+
         when {
             parentId == ROOT_ID -> {
                 // Per https://developer.android.com/training/cars/media#root-menu-structure, it's
@@ -65,7 +96,7 @@ class MediaBrowserHelper(
                 result.sendResult(items)
             }
             parentId.startsWith(CACHED_ARTISTS_ID) -> {
-                result.detach()
+                if (!deferred) result.detach()
                 scope.launch(Dispatchers.IO) {
                     val items = mutableListOf<MediaItem>()
                     for (row in db.cachedArtistsSortedAlphabetically()) {
@@ -75,7 +106,7 @@ class MediaBrowserHelper(
                 }
             }
             parentId.startsWith(CACHED_ALBUMS_ID) -> {
-                result.detach()
+                if (!deferred) result.detach()
                 scope.launch(Dispatchers.IO) {
                     val items = mutableListOf<MediaItem>()
                     for (row in db.cachedAlbumsSortedAlphabetically()) {
@@ -93,7 +124,7 @@ class MediaBrowserHelper(
                 result.sendResult(items)
             }
             parentId.startsWith(CACHED_ARTIST_ID_PREFIX) -> {
-                result.detach()
+                if (!deferred) result.detach()
                 scope.launch(Dispatchers.IO) {
                     val artist = parentId.substring(CACHED_ARTIST_ID_PREFIX.length)
                     val items = mutableListOf<MediaItem>()
@@ -104,7 +135,7 @@ class MediaBrowserHelper(
                 }
             }
             parentId.startsWith(ALBUM_ID_PREFIX) -> {
-                result.detach()
+                if (!deferred) result.detach()
                 scope.launch(Dispatchers.IO) {
                     val items = mutableListOf<MediaItem>()
                     for (song in getSongsForMediaId(parentId)) {
