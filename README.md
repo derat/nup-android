@@ -49,6 +49,20 @@ adb shell "run-as org.erat.nup cat databases/NupSongs" >NupSongs
 user doesn't have permission to read the `org.erat.nup` data, and the
 `org.erat.nup` user doesn't have permission to write to `/sdcard`.)
 
+### Android Auto
+
+[Android Auto] support can be tested using the [Desktop Head Unit]. Once the DHU
+is installed, select `Start head unit server` in the Android Auto app and run
+the following from the `extras/google/auto` directory in the SDK:
+
+```sh
+adb forward tcp:5277 tcp:5277
+./desktop-head-unit
+```
+
+[Android Auto]: https://www.android.com/auto/
+[Desktop Head Unit]: https://developer.android.com/training/cars/testing#test-auto
+
 ## Testing
 
 Run unit tests:
