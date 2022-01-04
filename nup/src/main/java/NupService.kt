@@ -402,7 +402,7 @@ class NupService :
         )
         sessionToken = mediaSessionManager.session.sessionToken
 
-        mediaBrowserHelper = MediaBrowserHelper(songDb, networkHelper, scope, getResources())
+        mediaBrowserHelper = MediaBrowserHelper(this, songDb, networkHelper, scope, getResources())
 
         notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         notificationCreator = NotificationCreator(

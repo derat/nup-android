@@ -16,11 +16,17 @@ import kotlinx.coroutines.launch
 
 /** Provides functionality for implementing [MediaBrowserServiceCompat]. */
 class MediaBrowserHelper(
+    private val service: MediaBrowserServiceCompat,
     private val db: SongDatabase,
     private val networkHelper: NetworkHelper,
     private val scope: CoroutineScope,
     private val res: Resources,
-) {
+) : NetworkHelper.Listener {
+    override fun onNetworkAvailabilityChange(available: Boolean) {
+        Log.d(TAG, "Notifying about root change for network change")
+        service.notifyChildrenChanged(ROOT_ID)
+    }
+
     /** Implements [MediaBrowserServiceCompat.onLoadChildren]. */
     fun onLoadChildren(
         parentId: String,
@@ -33,10 +39,14 @@ class MediaBrowserHelper(
                 // usually the case that the root can have up to 4 children, all of which can only
                 // be browsable.
                 val items = mutableListOf<MediaItem>()
-                items.add(makeMenuItem(R.string.artists, ARTISTS_ID))
-                items.add(makeMenuItem(R.string.albums, ALBUMS_ID))
-                items.add(makeMenuItem(R.string.artists_cached, CACHED_ARTISTS_ID))
-                items.add(makeMenuItem(R.string.albums_cached, CACHED_ALBUMS_ID))
+                if (networkHelper.isNetworkAvailable) {
+                    items.add(makeMenuItem(R.string.artists, ARTISTS_ID))
+                    items.add(makeMenuItem(R.string.albums, ALBUMS_ID))
+                } else {
+                    // The full "Artists (cached)" string is too long for Android Auto's tabs.
+                    items.add(makeMenuItem(R.string.artists_star, CACHED_ARTISTS_ID))
+                    items.add(makeMenuItem(R.string.albums_star, CACHED_ALBUMS_ID))
+                }
                 items.add(makeMenuItem(R.string.shuffle, SHUFFLE_ID, playable = true))
                 result.sendResult(items)
             }
@@ -197,5 +207,9 @@ class MediaBrowserHelper(
         private const val SONG_ID_PREFIX = "song_"
 
         public fun getSongMediaId(songId: Long) = "${SONG_ID_PREFIX}$songId"
+    }
+
+    init {
+        networkHelper.addListener(this)
     }
 }

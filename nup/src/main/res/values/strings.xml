@@ -7,12 +7,14 @@
   <string name="album_colon">Album:</string>
   <string name="albums">Albums</string>
   <string name="albums_cached">Albums (cached)</string>
+  <string name="albums_star">Albums *</string>
   <string name="append">Append</string>
   <string name="appended_song_fmt">Appended \"%s\" to playlist.</string>
   <string name="artist">Artist</string>
   <string name="artist_colon">Artist:</string>
   <string name="artists">Artists</string>
   <string name="artists_cached">Artists (cached)</string>
+  <string name="artists_star">Artists *</string>
   <string name="browse">Browse</string>
   <string name="browse_albums">Browse albums</string>
   <string name="browse_albums_fmt">Browse %s albums</string>
