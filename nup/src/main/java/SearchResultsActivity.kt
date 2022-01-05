@@ -21,15 +21,9 @@ import android.widget.SimpleAdapter
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import java.io.Serializable
-import java.net.URLEncoder
-import java.util.Date
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import org.erat.nup.NupActivity.Companion.service
-import org.json.JSONArray
-import org.json.JSONException
-import org.json.JSONObject
-import org.json.JSONTokener
 
 /** Displays a list of songs from a search result. */
 class SearchResultsActivity : AppCompatActivity() {
@@ -155,9 +149,6 @@ class SearchResultsActivity : AppCompatActivity() {
     override fun onOptionsItemSelected(item: MenuItem): Boolean =
         handleCommonOptionsItemSelected(item)
 
-    /** Thrown if an error is encountered while searching. */
-    class SearchException(reason: String) : Exception(reason)
-
     /** Perform the search specified in [intent] using [SongDatabase]. */
     private suspend fun doLocalSearch(): List<Song> =
         service.songDb.query(
@@ -184,58 +175,20 @@ class SearchResultsActivity : AppCompatActivity() {
 
     /** Perform the search specified in [intent] over the network. */
     @Throws(SearchException::class)
-    private suspend fun doNetworkSearch(): List<Song> {
-        var params = ""
-        val add = fun(k: String, v: String?) {
-            if (v.isNullOrEmpty()) return
-            if (!params.isEmpty()) params += "&"
-            params += "$k=${URLEncoder.encode(v, "utf-8")}"
-        }
-
-        add("artist", intent.getStringExtra(BUNDLE_ARTIST))
-        add("title", intent.getStringExtra(BUNDLE_TITLE))
-        add("album", intent.getStringExtra(BUNDLE_ALBUM))
-        add("shuffle", if (intent.getBooleanExtra(BUNDLE_SHUFFLE, false)) "1" else "")
-        add("keywords", intent.getStringExtra(BUNDLE_KEYWORDS))
-        add("tags", intent.getStringExtra(BUNDLE_TAGS))
-
-        val rating = intent.getDoubleExtra(BUNDLE_MIN_RATING, -1.0)
-        add("minRating", if (rating >= 0) "%.2f".format(rating) else "")
-
-        val maxPlays = intent.getIntExtra(BUNDLE_MAX_PLAYS, -1)
-        add("maxPlays", if (maxPlays >= 0) maxPlays.toString() else "")
-
-        // We get numbers of seconds before the current time from SearchFormActivity, but the server
-        // wants timestamps as seconds since the epoch.
-        val now = Date().getTime() / 1000
-        val firstPlayed = intent.getIntExtra(BUNDLE_FIRST_PLAYED, 0)
-        if (firstPlayed > 0) add("minFirstPlayed", (now - firstPlayed).toString())
-        val lastPlayed = intent.getIntExtra(BUNDLE_LAST_PLAYED, 0)
-        if (lastPlayed > 0) add("maxLastPlayed", (now - lastPlayed).toString())
-
-        val (response, error) = service.downloader.downloadString("/query?$params")
-        response ?: throw SearchException(error!!)
-
-        val songIds = try {
-            JSONArray(JSONTokener(response)).iterator<JSONObject>().asSequence().toList().map {
-                o ->
-                o.getLong("songId")
-            }
-        } catch (e: JSONException) {
-            throw SearchException("Couldn't parse response: $e")
-        }
-        Log.d(TAG, "Server returned ${songIds.size} song(s)")
-
-        // Get the actual songs from SongDatabase.
-        // TODO: Using BUNDLE_CACHED doesn't work well in cases where the server returns a subset of
-        // all matching songs, since we may not have some of the subset locally. I'm not sure how to
-        // fix this without either making the server return all matching songs (yikes) or sending
-        // the cached songs to the server (also yikes).
-        return service.songDb.getSongs(
-            songIds,
-            onlyCached = intent.getBooleanExtra(BUNDLE_CACHED, false)
-        ).first
-    }
+    private suspend fun doNetworkSearch() = searchForSongsUsingNetwork(
+        service.songDb,
+        service.downloader,
+        artist = intent.getStringExtra(BUNDLE_ARTIST),
+        title = intent.getStringExtra(BUNDLE_TITLE),
+        album = intent.getStringExtra(BUNDLE_ALBUM),
+        shuffle = intent.getBooleanExtra(BUNDLE_SHUFFLE, false),
+        keywords = intent.getStringExtra(BUNDLE_KEYWORDS),
+        tags = intent.getStringExtra(BUNDLE_TAGS),
+        minRating = intent.getDoubleExtra(BUNDLE_MIN_RATING, -1.0),
+        maxPlays = intent.getIntExtra(BUNDLE_MAX_PLAYS, -1),
+        firstPlayed = intent.getIntExtra(BUNDLE_FIRST_PLAYED, 0),
+        lastPlayed = intent.getIntExtra(BUNDLE_LAST_PLAYED, 0)
+    )
 
     /** Update the activity to display [songs]. */
     private fun displaySongs() {

@@ -250,6 +250,8 @@ private fun getSyncSummary(
         }
         SongDatabase.SyncState.STARTING ->
             res.getString(R.string.sync_progress_starting)
+        SongDatabase.SyncState.UPDATING_PRESETS ->
+            res.getString(R.string.sync_progress_updating_presets)
         SongDatabase.SyncState.UPDATING_SONGS ->
             res.getQuantityString(R.plurals.sync_update_fmt, updatedSongs, updatedSongs)
         SongDatabase.SyncState.DELETING_SONGS ->

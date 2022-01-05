@@ -70,6 +70,7 @@
   <string name="pre_amp_gain">Pre-amp gain</string>
   <string name="pre_amp_gain_description">Adjustment in dB</string>
   <string name="pre_amp_gain_value">%+.1f dB</string>
+  <string name="presets">Presets</string>
   <string name="rating_colon">Rating:</string>
   <string name="reset">Reset</string>
   <string name="remove_from_list">Remove from list</string>
@@ -92,6 +93,7 @@
   <string name="sync_complete">Synchronization complete</string>
   <string name="sync_progress_rebuilding_stats_tables">Rebuilding stats tables...</string>
   <string name="sync_progress_starting">Starting sync...</string>
+  <string name="sync_progress_updating_presets">Updating presets...</string>
   <string name="sync_song_list">Sync song list</string>
   <string name="sync_song_list_message">Sync local song list from the server?</string>
   <string name="substring">Substring</string>

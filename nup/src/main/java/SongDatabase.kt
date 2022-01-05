@@ -18,6 +18,7 @@ import java.util.concurrent.Executor
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import org.json.JSONArray
 import org.json.JSONException
 import org.json.JSONObject
 import org.json.JSONTokener
@@ -56,7 +57,17 @@ class SongDatabase(
     fun albumsByArtist(artist: String): List<StatsRow> =
         _artistAlbums[artist.toLowerCase()] ?: listOf()
 
-    enum class SyncState { IDLE, STARTING, UPDATING_SONGS, DELETING_SONGS, UPDATING_STATS }
+    private var _searchPresets = mutableListOf<SearchPreset>()
+    val searchPresets: List<SearchPreset> get() = _searchPresets
+
+    enum class SyncState {
+        IDLE,
+        STARTING,
+        UPDATING_PRESETS,
+        UPDATING_SONGS,
+        DELETING_SONGS,
+        UPDATING_STATS,
+    }
 
     /** Notified about changes to the database. */
     interface Listener {
@@ -298,12 +309,20 @@ class SongDatabase(
                     notifySyncDone(false, "Database already closed")
                     return@task
                 }
-                val res = syncSongs(db)
-                if (!res.success) {
-                    notifySyncDone(false, res.error!!)
+
+                val presetsRes = syncSearchPresets(db)
+                if (!presetsRes.success) {
+                    notifySyncDone(false, presetsRes.error!!)
                     return@task
                 }
-                loadAggregateData(db, res.updatedSongs > 0)
+                loadSearchPresets(db)
+
+                val songsRes = syncSongs(db)
+                if (!songsRes.success) {
+                    notifySyncDone(false, songsRes.error!!)
+                    return@task
+                }
+                loadAggregateData(db, songsRes.updatedItems > 0)
                 notifySyncDone(true, context.getString(R.string.sync_complete))
             }
         } finally {
@@ -311,11 +330,11 @@ class SongDatabase(
         }
     }
 
-    /** Result of a call to [syncSongs]. */
-    data class SyncSongsResult(val success: Boolean, val updatedSongs: Int, val error: String?)
+    /** Result of a call to [syncSongs] or [syncSearchPresets]. */
+    data class SyncResult(val success: Boolean, val updatedItems: Int, val error: String?)
 
     /** Update local list of songs on behalf of [syncWithServer]. */
-    private fun syncSongs(db: SQLiteDatabase): SyncSongsResult {
+    private fun syncSongs(db: SQLiteDatabase): SyncResult {
         var updatedSongs = 0
 
         if (db.inTransaction()) throw RuntimeException("Already in transaction")
@@ -325,7 +344,7 @@ class SongDatabase(
             // starting point for the next sync, to handle the case where some songs in the server
             // are updated while we're doing this sync.
             val (startStr, error) = downloader.downloadString("/now")
-            startStr ?: return SyncSongsResult(false, 0, error!!)
+            startStr ?: return SyncResult(false, 0, error!!)
             var startNs = startStr.toLong()
 
             // Start where we left off last time.
@@ -339,7 +358,7 @@ class SongDatabase(
                 updatedSongs += queryServer(db, prevStartNs, true)
             } catch (e: ServerException) {
                 Log.e(TAG, e.message!!)
-                return SyncSongsResult(false, updatedSongs, e.message)
+                return SyncResult(false, updatedSongs, e.message)
             }
 
             val values = ContentValues(2)
@@ -356,7 +375,7 @@ class SongDatabase(
         } finally {
             db.endTransaction()
         }
-        return SyncSongsResult(true, updatedSongs, null)
+        return SyncResult(true, updatedSongs, null)
     }
 
     /** Update [syncState] and notify [listener]. */
@@ -370,7 +389,7 @@ class SongDatabase(
         listenerExecutor.execute { listener.onSyncDone(success, message) }
     }
 
-    /** Thrown by [queryServer] if an error is encountered. */
+    /** Thrown by [queryServer] and [syncSearchPresets] if an error is encountered. */
     class ServerException(reason: String) : Exception(reason)
 
     /**
@@ -455,6 +474,65 @@ class SongDatabase(
         return numUpdates
     }
 
+    /** Fetch and save all search presets from the server. */
+    private fun syncSearchPresets(db: SQLiteDatabase): SyncResult {
+        setSyncState(SyncState.UPDATING_PRESETS, 0)
+        val (response, error) = downloader.downloadString("/presets")
+        response ?: return SyncResult(false, 0, error!!)
+
+        if (db.inTransaction()) throw RuntimeException("Already in transaction")
+        db.beginTransaction()
+        try {
+            db.delete("SearchPresets", null, null)
+
+            val timeEnumToSec = { v: Int ->
+                when (v) {
+                    0 -> 0 // unset
+                    1 -> 86400 // one day
+                    2 -> 604800 // one week
+                    3 -> 2592000 // one month
+                    4 -> 7776000 // three months
+                    5 -> 15552000 // six months
+                    6 -> 31536000 // one year
+                    7 -> 94608000 // three years
+                    8 -> 157680000 // five years
+                    else -> throw ServerException("Invalid time enum value $v")
+                }
+            }
+
+            var numPresets = 0
+            for (
+                o in JSONArray(JSONTokener(response)).iterator<JSONObject>()
+                    .asSequence().toList()
+            ) {
+                val values = ContentValues(10)
+                values.put("SortKey", numPresets)
+                values.put("Name", o.getString("name"))
+                values.put("Tags", o.optString("tags"))
+                values.put(
+                    "MinRating",
+                    // Convert number of stars in [1, 5] to rating in [0.0, 1.0].
+                    if (o.has("minRating")) (o.getInt("minRating").coerceIn(1, 5) - 1) / 4.0
+                    else -1.0
+                )
+                values.put("Unrated", o.optBoolean("unrated"))
+                values.put("FirstPlayed", timeEnumToSec(o.optInt("firstPlayed")))
+                values.put("LastPlayed", timeEnumToSec(o.optInt("lastPlayed")))
+                values.put("FirstTrack", o.optBoolean("firstTrack"))
+                values.put("Shuffle", o.optBoolean("shuffle"))
+                values.put("Play", o.optBoolean("play"))
+                db.replace("SearchPresets", "", values)
+                numPresets++
+            }
+            db.setTransactionSuccessful()
+            return SyncResult(true, numPresets, null)
+        } catch (e: JSONException) {
+            return SyncResult(false, 0, "Couldn't parse response: $e")
+        } finally {
+            db.endTransaction()
+        }
+    }
+
     /** Rebuild the artistAlbumStats table from the Songs table. */
     private fun updateArtistAlbumStats(db: SQLiteDatabase) {
         // Lowercased artist name to the first row that we saw in its original case.
@@ -465,8 +543,8 @@ class SongDatabase(
 
         val cursor = db.rawQuery(
             "SELECT Artist, Album, AlbumId, COUNT(*) " +
-                "  FROM Songs " +
-                "  GROUP BY Artist, Album, AlbumId",
+                "FROM Songs " +
+                "GROUP BY Artist, Album, AlbumId",
             null
         )
         cursor.moveToFirst()
@@ -583,6 +661,37 @@ class SongDatabase(
         listenerExecutor.execute { listener.onAggregateDataUpdate() }
     }
 
+    /* Loads search presets that were previously synced from the server. */
+    private fun loadSearchPresets(db: SQLiteDatabase) {
+        val presets = mutableListOf<SearchPreset>()
+
+        val cursor = db.rawQuery(
+            "SELECT Name, Tags, MinRating, Unrated, FirstPlayed, LastPlayed, " +
+                "FirstTrack, Shuffle, Play FROM SearchPresets ORDER By SortKey ASC",
+            null
+        )
+        cursor.moveToFirst()
+        while (!cursor.isAfterLast) {
+            presets.add(
+                SearchPreset(
+                    name = cursor.getString(0),
+                    tags = cursor.getString(1),
+                    minRating = cursor.getFloat(2).toDouble(),
+                    unrated = cursor.getInt(3) != 0,
+                    firstPlayed = cursor.getInt(4),
+                    lastPlayed = cursor.getInt(5),
+                    firstTrack = cursor.getInt(6) != 0,
+                    shuffle = cursor.getInt(7) != 0,
+                    play = cursor.getInt(8) != 0,
+                )
+            )
+            cursor.moveToNext()
+        }
+        cursor.close()
+
+        _searchPresets = presets
+    }
+
     /** Get sorted results from the supplied query.
      *
      * @param query SQL query returning rows of (artist, album, album ID, num songs)
@@ -672,12 +781,12 @@ class SongDatabase(
 
         private const val DATABASE_NAME = "NupSongs"
         private const val MAX_QUERY_RESULTS = 250
-        private const val DATABASE_VERSION = 16
+        private const val DATABASE_VERSION = 17
         private const val SERVER_SONG_BATCH_SIZE = 100
 
         // IMPORTANT NOTE: When updating any of these, you must replace all previous references in
         // upgradeFromPreviousVersion() with the hardcoded older version of the string.
-        private const val CREATE_SONGS_SQL = (
+        private const val CREATE_SONGS_SQL =
             "CREATE TABLE Songs (" +
                 "SongId INTEGER PRIMARY KEY NOT NULL, " +
                 "Filename VARCHAR(256) NOT NULL, " +
@@ -693,13 +802,12 @@ class SongDatabase(
                 "AlbumGain FLOAT NOT NULL, " +
                 "PeakAmp FLOAT NOT NULL, " +
                 "Rating FLOAT NOT NULL)"
-            )
         private const val CREATE_SONGS_ARTIST_INDEX_SQL = "CREATE INDEX Artist ON Songs (Artist)"
         private const val CREATE_SONGS_ALBUM_INDEX_SQL = "CREATE INDEX Album ON Songs (Album)"
         private const val CREATE_SONGS_ALBUM_ID_INDEX_SQL =
             "CREATE INDEX AlbumId ON Songs (AlbumId)"
 
-        private const val CREATE_ARTIST_ALBUM_STATS_SQL = (
+        private const val CREATE_ARTIST_ALBUM_STATS_SQL =
             "CREATE TABLE ArtistAlbumStats (" +
                 "Artist VARCHAR(256) NOT NULL, " +
                 "Album VARCHAR(256) NOT NULL, " +
@@ -707,7 +815,6 @@ class SongDatabase(
                 "NumSongs INTEGER NOT NULL, " +
                 "ArtistSortKey VARCHAR(256) NOT NULL, " +
                 "AlbumSortKey VARCHAR(256) NOT NULL)"
-            )
         private const val CREATE_ARTIST_ALBUM_STATS_ARTIST_SORT_KEY_INDEX_SQL =
             "CREATE INDEX ArtistSortKey ON ArtistAlbumStats (ArtistSortKey)"
         private const val CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL =
@@ -724,12 +831,24 @@ class SongDatabase(
         private const val CREATE_CACHED_SONGS_SQL =
             "CREATE TABLE CachedSongs (SongId INTEGER PRIMARY KEY NOT NULL)"
 
-        private const val CREATE_PENDING_PLAYBACK_REPORTS_SQL = (
+        private const val CREATE_PENDING_PLAYBACK_REPORTS_SQL =
             "CREATE TABLE PendingPlaybackReports (" +
                 "SongId INTEGER NOT NULL, " +
                 "StartTime INTEGER NOT NULL, " +
                 "PRIMARY KEY (SongId, StartTime))"
-            )
+
+        private const val CREATE_SEARCH_PRESETS_SQL =
+            "CREATE TABLE SearchPresets (" +
+                "SortKey INTEGER NOT NULL, " + // 0-based index in array from server
+                "Name VARCHAR(256) NOT NULL, " +
+                "Tags VARCHAR(256) NOT NULL, " +
+                "MinRating FLOAT NOT NULL, " + // [0.0, 1.0], -1 for unset
+                "Unrated BOOLEAN NOT NULL, " +
+                "FirstPlayed INTEGER NOT NULL, " + // seconds before now, 0 for unset
+                "LastPlayed INTEGER NOT NULL, " + // seconds before now, 0 for unset
+                "FirstTrack BOOLEAN NOT NULL, " +
+                "Shuffle BOOLEAN NOT NULL, " +
+                "Play BOOLEAN NOT NULL)"
     }
 
     init {
@@ -747,19 +866,18 @@ class SongDatabase(
                     db.execSQL(INSERT_LAST_UPDATE_TIME_SQL)
                     db.execSQL(CREATE_CACHED_SONGS_SQL)
                     db.execSQL(CREATE_PENDING_PLAYBACK_REPORTS_SQL)
+                    db.execSQL(CREATE_SEARCH_PRESETS_SQL)
                 }
 
                 override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
                     Log.d(TAG, "Upgrading from $oldVersion to $newVersion")
-                    if (db.inTransaction()) throw RuntimeException("Already in transaction")
-                    db.beginTransaction()
-                    try {
-                        for (nextVersion in (oldVersion + 1)..newVersion) {
-                            upgradeFromPreviousVersion(db, nextVersion)
-                        }
-                        db.setTransactionSuccessful()
-                    } finally {
-                        db.endTransaction()
+                    // Per https://developer.android.com/reference/kotlin/android/database/sqlite/SQLiteOpenHelper,
+                    // "[onUpgrade] executes within a transaction. If an exception is thrown, all
+                    // changes will automatically be rolled back." This function previously started
+                    // its own transaction and threw if db.inTransaction() was initially true, so
+                    // presumably something must've changed at some point.
+                    for (nextVersion in (oldVersion + 1)..newVersion) {
+                        upgradeFromPreviousVersion(db, nextVersion)
                     }
                 }
 
@@ -984,6 +1102,9 @@ class SongDatabase(
                         db.execSQL(
                             "UPDATE LastUpdateTime SET LocalTimeNsec = 0, ServerTimeNsec = 0"
                         )
+                    } else if (newVersion == 17) {
+                        // Version 17: Add SearchPresets table.
+                        db.execSQL(CREATE_SEARCH_PRESETS_SQL)
                     } else {
                         throw RuntimeException(
                             "Got request to upgrade database to unknown version $newVersion"
@@ -998,6 +1119,7 @@ class SongDatabase(
             opener.getDb() task@{ db ->
                 if (db == null) return@task // quit() already called
 
+                loadSearchPresets(db)
                 loadAggregateData(db, false)
 
                 if (db.inTransaction()) throw RuntimeException("Already in transaction")
@@ -1012,3 +1134,16 @@ class SongDatabase(
         updater = DatabaseUpdater(opener)
     }
 }
+
+/** Predefined search specified in the server's configuration. */
+data class SearchPreset(
+    val name: String,
+    val tags: String, // comma-separated list, empty for unset
+    val minRating: Double, // [0.0, 1.0] or -1 for no minimum (i.e. includes unrated)
+    val unrated: Boolean,
+    val firstPlayed: Int, // seconds before now, 0 for unset
+    val lastPlayed: Int, // seconds before now, 0 for unset
+    val firstTrack: Boolean,
+    val shuffle: Boolean,
+    val play: Boolean,
+)

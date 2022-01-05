@@ -6,6 +6,12 @@
 package org.erat.nup
 
 import android.util.Log
+import java.net.URLEncoder
+import java.util.Date
+import org.json.JSONArray
+import org.json.JSONException
+import org.json.JSONObject
+import org.json.JSONTokener
 
 // https://developer.android.com/guide/topics/media-apps/interacting-with-assistant
 //
@@ -148,6 +154,72 @@ suspend fun searchForSongs(
     // Fall back to a substring album match.
     return db.query(album = query, substring = true)
 }
+
+@Throws(SearchException::class)
+suspend fun searchForSongsUsingNetwork(
+    db: SongDatabase,
+    downloader: Downloader,
+    artist: String? = null,
+    title: String? = null,
+    album: String? = null,
+    shuffle: Boolean = false,
+    keywords: String? = null,
+    tags: String? = null,
+    minRating: Double = -1.0,
+    unrated: Boolean = false,
+    maxPlays: Int = -1,
+    firstPlayed: Int = 0,
+    lastPlayed: Int = 0,
+    firstTrack: Boolean = false,
+    onlyCached: Boolean = false,
+): List<Song> {
+    var params = ""
+    val add = fun(k: String, v: String?) {
+        if (v.isNullOrEmpty()) return
+        if (!params.isEmpty()) params += "&"
+        params += "$k=${URLEncoder.encode(v, "utf-8")}"
+    }
+
+    add("artist", artist)
+    add("title", title)
+    add("album", album)
+    add("shuffle", if (shuffle) "1" else "")
+    add("keywords", keywords)
+    add("tags", tags)
+    add("minRating", if (minRating >= 0) "%.2f".format(minRating) else "")
+    add("unrated", if (unrated) "1" else "")
+    add("maxPlays", if (maxPlays >= 0) maxPlays.toString() else "")
+    add("firstTrack", if (firstTrack) "1" else "")
+
+    // We get numbers of seconds before the current time, but the server
+    // wants timestamps as seconds since the epoch.
+    val now = Date().getTime() / 1000
+    if (firstPlayed > 0) add("minFirstPlayed", (now - firstPlayed).toString())
+    if (lastPlayed > 0) add("maxLastPlayed", (now - lastPlayed).toString())
+
+    val (response, error) = downloader.downloadString("/query?$params")
+    response ?: throw SearchException(error!!)
+
+    val songIds = try {
+        JSONArray(JSONTokener(response)).iterator<JSONObject>().asSequence().toList().map {
+            o ->
+            o.getLong("songId")
+        }
+    } catch (e: JSONException) {
+        throw SearchException("Couldn't parse response: $e")
+    }
+    Log.d(TAG, "Server returned ${songIds.size} song(s)")
+
+    // Get the actual songs from SongDatabase.
+    // TODO: Using onlyCached doesn't work well in cases where the server returns a subset of all
+    // matching songs, since we may not have some of the subset locally. I'm not sure how to fix
+    // this without either making the server return all matching songs (yikes) or sending the cached
+    // songs to the server (also yikes).
+    return db.getSongs(songIds, onlyCached = onlyCached).first
+}
+
+/** Thrown if an error is encountered while searching. */
+class SearchException(reason: String) : Exception(reason)
 
 private fun findArtistExact(rows: List<StatsRow>, artist: String) =
     rows.find { it.key.artist.equals(artist, ignoreCase = true) }
