@@ -22,6 +22,12 @@ steps:
     entrypoint: bash
     args: ["-e", "--", "cloudbuild/gradle_cache.sh", "--save"]
 
+# This is a bummer, but the build is currently perilously close to the default
+# 10-minute timeout. The test_and_build step usually takes a bit over a minute
+# to install dependencies, but then 4+ minutes to run unit tests and another few
+# minutes to build the APK.
+timeout: 15m
+
 options:
   env:
     - ANDROID_HOME=/workspace/android
