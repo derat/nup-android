@@ -11,13 +11,13 @@ Android client for streaming music from [nup].
 **Phone**
 <p float="left">
   <img src="https://user-images.githubusercontent.com/40385/142279227-ec2f79b4-829b-4bbe-99ef-c2f72fdc5670.jpg"
-       width="24%" alt="light mode screenshot">
+       width="23.5%" alt="light mode screenshot">
   <img src="https://user-images.githubusercontent.com/40385/142279268-0f2cb56e-9897-48e0-a4ab-5f385509bc0b.jpg"
-       width="24%" alt="dark mode screenshot">
+       width="23.5%" alt="dark mode screenshot">
   <img src="https://user-images.githubusercontent.com/40385/142279250-ceeeb873-7c4b-4a4b-8c6a-57b48c0008a3.jpg"
-       width="24%" alt="browse screenshot">
+       width="23.5%" alt="browse screenshot">
   <img src="https://user-images.githubusercontent.com/40385/142279281-be37d66d-ef63-4b33-911f-58d032dbc05a.jpg"
-       width="24%" alt="search screenshot">
+       width="23.5%" alt="search screenshot">
 </p>
 
 **Android Auto**
