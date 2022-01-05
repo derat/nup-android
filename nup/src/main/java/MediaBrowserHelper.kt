@@ -33,6 +33,14 @@ class MediaBrowserHelper(
     private val res: Resources,
 ) : NetworkHelper.Listener {
     private val iconBitmaps = mutableMapOf<Int, Bitmap>() // keyed by resource ID
+    private val presetResIds = listOf(
+        R.drawable.preset1,
+        R.drawable.preset2,
+        R.drawable.preset3,
+        R.drawable.preset4,
+        R.drawable.preset5,
+        R.drawable.preset6,
+    )
 
     override fun onNetworkAvailabilityChange(available: Boolean) {
         Log.d(TAG, "Notifying about root change for network change")
@@ -109,8 +117,11 @@ class MediaBrowserHelper(
             }
             parentId == PRESETS_ID -> {
                 result.sendResult(
-                    db.searchPresets.filter { it.play }.map { p ->
-                        makeMenuItem(p.name, PRESET_PREFIX + p.name, playable = true)
+                    db.searchPresets.filter { it.play }.mapIndexed { i, p ->
+                        makeMenuItem(
+                            p.name, PRESET_PREFIX + p.name, playable = true,
+                            imgResId = presetResIds[i % presetResIds.size]
+                        )
                     }.toMutableList()
                 )
             }
@@ -189,6 +200,7 @@ class MediaBrowserHelper(
         title: CharSequence,
         id: String,
         iconResId: Int = 0,
+        imgResId: Int = 0,
         extras: Bundle? = null,
         playable: Boolean = false,
     ): MediaItem {
@@ -211,6 +223,8 @@ class MediaBrowserHelper(
                     { createIconBitmap(res, iconResId, Color.WHITE) }
                 )
             )
+        } else if (imgResId > 0) {
+            builder.setIconUri(getResourceUri(res, imgResId))
         }
 
         if (extras != null) builder.setExtras(extras)
@@ -321,7 +335,7 @@ class MediaBrowserHelper(
 private fun createIconBitmap(res: Resources, resId: Int, color: Int): Bitmap {
     // https://stackoverflow.com/a/6337089
     val drawable = res.getDrawable(resId, null)
-    drawable.setColorFilter(PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN))
+    if (color != 0) drawable.setColorFilter(PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN))
     val bitmap = Bitmap.createBitmap(
         // TODO: Vector drawables from materialdesignicons.com all seem to be 24x24.
         // I'm not sure if this is appropriate for Android Auto or if it'd be better to
