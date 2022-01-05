@@ -56,13 +56,13 @@ class SearchResultsActivity : AppCompatActivity() {
                         // I'm not sure when/if this is actually used. Voice searches performed via
                         // Android Auto go through onPlayFromSearch() and onSearch() in NupService.
                         // Probably it's just used if other apps send it to us.
-                        searchForSongs(
+                        searchLocal(
                             service.songDb,
                             intent.getStringExtra(SearchManager.QUERY) ?: "",
                             online = service.networkHelper.isNetworkAvailable,
                         )
-                    } else if (needsNetworkSearch()) {
-                        doNetworkSearch()
+                    } else if (needsServerSearch()) {
+                        doServerSearch()
                     } else {
                         doLocalSearch()
                     }
@@ -165,7 +165,7 @@ class SearchResultsActivity : AppCompatActivity() {
      * Return true if the search request from [intent] contains "advanced" fields and needs to be
      * performed by sending a query to the server rather than via [SongDatabase].
      */
-    private fun needsNetworkSearch(): Boolean {
+    private fun needsServerSearch(): Boolean {
         return !intent.getStringExtra(BUNDLE_KEYWORDS).isNullOrEmpty() ||
             !intent.getStringExtra(BUNDLE_TAGS).isNullOrEmpty() ||
             intent.getIntExtra(BUNDLE_MAX_PLAYS, -1) >= 0 ||
@@ -175,7 +175,7 @@ class SearchResultsActivity : AppCompatActivity() {
 
     /** Perform the search specified in [intent] over the network. */
     @Throws(SearchException::class)
-    private suspend fun doNetworkSearch() = searchForSongsUsingNetwork(
+    private suspend fun doServerSearch() = searchServer(
         service.songDb,
         service.downloader,
         artist = intent.getStringExtra(BUNDLE_ARTIST),

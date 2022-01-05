@@ -90,13 +90,13 @@ import org.json.JSONTokener
 // When we find an artist, shuffle highly-rated songs.
 
 /**
- * Search for songs matched by the supplied query.
+ * Search for songs matched by the supplied query using [SongDatabase].
  *
  * See [MediaSessionCompat.Callback]'s [onPlayFromSearch] method.
  * If [query] is empty, shuffled songs with [EMPTY_MIN_RATING] are returned.
  * If [online] is false, only already-cached songs are returned for empty queries.
  */
-suspend fun searchForSongs(
+suspend fun searchLocal(
     db: SongDatabase,
     query: String,
     title: String? = null,
@@ -118,7 +118,7 @@ suspend fun searchForSongs(
             // the Mohicans] to title "The Last Of The Mohicans (Original Motion Picture Score)" and
             // artist "Randy Edelman, Trevor Jones"), then just perform a search using the original
             // query.
-            0 -> searchForSongs(db, query)
+            0 -> searchLocal(db, query)
             1 -> db.query(albumId = albumRows[0].key.albumId)
             else -> {
                 // When there are multiple matching albums, try to disambiguate by artist.
@@ -155,8 +155,9 @@ suspend fun searchForSongs(
     return db.query(album = query, substring = true)
 }
 
+/** Search the server for songs. */
 @Throws(SearchException::class)
-suspend fun searchForSongsUsingNetwork(
+suspend fun searchServer(
     db: SongDatabase,
     downloader: Downloader,
     artist: String? = null,
@@ -218,11 +219,12 @@ suspend fun searchForSongsUsingNetwork(
     return db.getSongs(songIds, onlyCached = onlyCached).first
 }
 
-suspend fun presetSearchUsingNetwork(
+/** Search the server for songs using [preset]. */
+suspend fun searchServerPreset(
     db: SongDatabase,
     downloader: Downloader,
     preset: SearchPreset
-) = searchForSongsUsingNetwork(
+) = searchServer(
     db,
     downloader,
     tags = if (preset.tags != "") preset.tags else null,
@@ -232,6 +234,19 @@ suspend fun presetSearchUsingNetwork(
     lastPlayed = preset.lastPlayed,
     firstTrack = preset.firstTrack,
     shuffle = preset.shuffle
+)
+
+/** Predefined search specified in the server's configuration. */
+data class SearchPreset(
+    val name: String, // preset name displayed to user, e.g. 'Favorites' or 'Instrumental'
+    val tags: String, // comma-separated list, empty for unset
+    val minRating: Double, // [0.0, 1.0] or -1 for no minimum (i.e. includes unrated)
+    val unrated: Boolean,
+    val firstPlayed: Int, // seconds before now, 0 for unset
+    val lastPlayed: Int, // seconds before now, 0 for unset
+    val firstTrack: Boolean,
+    val shuffle: Boolean,
+    val play: Boolean, // automatically play results
 )
 
 /** Thrown if an error is encountered while searching. */

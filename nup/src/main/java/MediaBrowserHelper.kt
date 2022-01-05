@@ -288,7 +288,7 @@ class MediaBrowserHelper(
             Log.e(TAG, "Unknown search preset \"$name\"")
             return listOf<Song>()
         }
-        return presetSearchUsingNetwork(db, downloader, preset)
+        return searchServerPreset(db, downloader, preset)
     }
 
     companion object {
@@ -320,7 +320,7 @@ class MediaBrowserHelper(
 /** Converts the vector drawable [resId] to a [Bitmap] filtered to [color]. */
 private fun createIconBitmap(res: Resources, resId: Int, color: Int): Bitmap {
     // https://stackoverflow.com/a/6337089
-    val drawable = res.getDrawable(resId)
+    val drawable = res.getDrawable(resId, null)
     drawable.setColorFilter(PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN))
     val bitmap = Bitmap.createBitmap(
         // TODO: Vector drawables from materialdesignicons.com all seem to be 24x24.

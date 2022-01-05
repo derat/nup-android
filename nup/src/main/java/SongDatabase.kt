@@ -1134,16 +1134,3 @@ class SongDatabase(
         updater = DatabaseUpdater(opener)
     }
 }
-
-/** Predefined search specified in the server's configuration. */
-data class SearchPreset(
-    val name: String,
-    val tags: String, // comma-separated list, empty for unset
-    val minRating: Double, // [0.0, 1.0] or -1 for no minimum (i.e. includes unrated)
-    val unrated: Boolean,
-    val firstPlayed: Int, // seconds before now, 0 for unset
-    val lastPlayed: Int, // seconds before now, 0 for unset
-    val firstTrack: Boolean,
-    val shuffle: Boolean,
-    val play: Boolean,
-)

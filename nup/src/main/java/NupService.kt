@@ -349,7 +349,7 @@ class NupService :
                     // ...", so I was hoping that I could get an early start on the query.
                     scope.launch(Dispatchers.Main) {
                         val songs = async(Dispatchers.IO) {
-                            searchForSongs(
+                            searchLocal(
                                 songDb,
                                 query,
                                 title = extras.getString(MediaStore.EXTRA_MEDIA_TITLE),
@@ -520,7 +520,7 @@ class NupService :
         result.detach()
         scope.launch(Dispatchers.Main) {
             val songs = async(Dispatchers.IO) {
-                searchForSongs(
+                searchLocal(
                     songDb,
                     query,
                     title = extras.getString(MediaStore.EXTRA_MEDIA_TITLE),
