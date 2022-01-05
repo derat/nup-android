@@ -40,16 +40,14 @@ class BrowseTopActivity : BrowseActivityBase() {
                 intent.putExtra(BUNDLE_CACHED, true)
                 startActivityForResult(intent, BROWSE_ALBUMS_REQUEST_CODE)
             }
-            4 -> {
-                // TODO: If/when NupActivity and friends are using MediaBrowser, MediaController,
-                // and friends to talk to NupService, this can just send an empty search.
+            else -> {
+                val idx = pos - 4
+                val presets = service.songDb.searchPresets
+                if (idx >= presets.size) return
+                val preset = presets[idx]
                 service.scope.async(Dispatchers.Main) {
                     val songs = async(Dispatchers.IO) {
-                        searchForSongs(
-                            service.songDb,
-                            "" /* query */,
-                            online = service.networkHelper.isNetworkAvailable
-                        )
+                        presetSearchUsingNetwork(service.songDb, service.downloader, preset)
                     }.await()
                     if (songs.size > 0) {
                         service.clearPlaylist()
@@ -68,14 +66,13 @@ class BrowseTopActivity : BrowseActivityBase() {
         scope: CoroutineScope,
         update: (rows: List<StatsRow>?) -> Unit
     ) {
-        update(
-            arrayListOf(
-                StatsRow(getString(R.string.artists), "", "", -1),
-                StatsRow(getString(R.string.albums), "", "", -1),
-                StatsRow(getString(R.string.artists_cached), "", "", -1),
-                StatsRow(getString(R.string.albums_cached), "", "", -1),
-                StatsRow(getString(R.string.shuffle), "", "", -1),
-            )
+        val rows = mutableListOf(
+            StatsRow(getString(R.string.artists), "", "", -1),
+            StatsRow(getString(R.string.albums), "", "", -1),
+            StatsRow(getString(R.string.artists_cached), "", "", -1),
+            StatsRow(getString(R.string.albums_cached), "", "", -1),
         )
+        rows.addAll(db.searchPresets.filter { it.play }.map { StatsRow(it.name, "", "", -1) })
+        update(rows)
     }
 }

@@ -247,22 +247,12 @@ class MediaBrowserHelper(
     }
 
     private suspend fun doPresetSearch(name: String): List<Song> {
-        val p = db.searchPresets.find { it.name == name }
-        if (p == null) {
+        val preset = db.searchPresets.find { it.name == name }
+        if (preset == null) {
             Log.e(TAG, "Unknown search preset \"$name\"")
             return listOf<Song>()
         }
-        return searchForSongsUsingNetwork(
-            db,
-            downloader,
-            tags = if (p.tags != "") p.tags else null,
-            minRating = p.minRating,
-            unrated = p.unrated,
-            firstPlayed = p.firstPlayed,
-            lastPlayed = p.lastPlayed,
-            firstTrack = p.firstTrack,
-            shuffle = p.shuffle
-        )
+        return presetSearchUsingNetwork(db, downloader, preset)
     }
 
     companion object {

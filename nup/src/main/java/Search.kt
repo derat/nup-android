@@ -218,6 +218,22 @@ suspend fun searchForSongsUsingNetwork(
     return db.getSongs(songIds, onlyCached = onlyCached).first
 }
 
+suspend fun presetSearchUsingNetwork(
+    db: SongDatabase,
+    downloader: Downloader,
+    preset: SearchPreset
+) = searchForSongsUsingNetwork(
+    db,
+    downloader,
+    tags = if (preset.tags != "") preset.tags else null,
+    minRating = preset.minRating,
+    unrated = preset.unrated,
+    firstPlayed = preset.firstPlayed,
+    lastPlayed = preset.lastPlayed,
+    firstTrack = preset.firstTrack,
+    shuffle = preset.shuffle
+)
+
 /** Thrown if an error is encountered while searching. */
 class SearchException(reason: String) : Exception(reason)
 
