@@ -8,6 +8,7 @@ Android client for streaming music from [nup].
 
 ## Overview
 
+**Phone**
 <p float="left">
   <img src="https://user-images.githubusercontent.com/40385/142279227-ec2f79b4-829b-4bbe-99ef-c2f72fdc5670.jpg"
        width="24%" alt="light mode screenshot">
@@ -17,6 +18,14 @@ Android client for streaming music from [nup].
        width="24%" alt="browse screenshot">
   <img src="https://user-images.githubusercontent.com/40385/142279281-be37d66d-ef63-4b33-911f-58d032dbc05a.jpg"
        width="24%" alt="search screenshot">
+</p>
+
+**Android Auto**
+<p float="left">
+  <img src="https://user-images.githubusercontent.com/40385/148253193-585ee203-0fef-4858-b125-67f9f852c426.png"
+       width="48%" alt="Android Auto playback screenshot">
+  <img src="https://user-images.githubusercontent.com/40385/148253213-3a166711-273a-4268-b362-b54321bec12d.png"
+       width="48%" alt="Android Auto presets screenshot">
 </p>
 
 ## Compiling

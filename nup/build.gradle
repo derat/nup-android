@@ -40,7 +40,7 @@ android {
   kotlinOptions {
     // Avoid a build warning about PlaybackReporterTest's use of
     // @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class).
-    freeCompilerArgs += "-Xopt-in=kotlin.RequiresOptIn"
+    freeCompilerArgs += '-Xopt-in=kotlin.RequiresOptIn'
 
     // Avoid the following error from doAfterTextChanged in SearchFormActivity:
     //   Cannot inline bytecode built with JVM target 1.8 into bytecode that is being built with JVM
@@ -74,8 +74,32 @@ dependencies {
   implementation "org.jetbrains.kotlinx:kotlinx-coroutines-core:$kotlin_coroutines_version"
 
   testImplementation 'com.google.guava:guava:23.0'
-  testImplementation "com.google.truth:truth:1.1.2"
+  testImplementation 'com.google.truth:truth:1.1.2'
   testImplementation 'junit:junit:4.12'
   testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:$kotlin_coroutines_version"
   testImplementation 'org.mockito:mockito-inline:2.23.4'
 }
+
+// Generate gen_preset*.xml drawables with different gradient colors.
+// Based on https://stackoverflow.com/a/34888938.
+task presetDrawables {
+  [
+    ['#ff00cc', '#333399'],
+    ['#4ecdc4', '#556270'],
+    ['#fcb045', '#833ab4'],
+    ['#fdb99b', '#a770ef'],
+    ['#89253e', '#3a6186'],
+    ['#ffff1c', '#00c3ff'],
+  ].eachWithIndex { colors, i ->
+    copy {
+      def dest = "gen_preset${i+1}.xml"
+      println("Generating ${dest}")
+      from 'src/main/res/raw'
+      into 'src/main/res/drawable'
+      include 'preset_template.xml'
+      rename('preset_template.xml', dest)
+      expand(color1: "${colors[0]}", color2: "${colors[1]}")
+    }
+  }
+}
+preBuild.dependsOn presetDrawables

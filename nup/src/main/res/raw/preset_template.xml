@@ -12,9 +12,20 @@
           android:centerY="0"
           android:gradientRadius="34"
           android:type="radial">
-        <item android:offset="0.0" android:color="#89253e"/>
-        <item android:offset="1.0" android:color="#3a6186"/>
+        <item android:offset="0.0" android:color="${color1}"/>
+        <item android:offset="1.0" android:color="${color2}"/>
       </gradient>
     </aapt:attr>
   </path>
+  <group
+      android:pivotX="12"
+      android:pivotY="12"
+      android:scaleX="0.6"
+      android:scaleY="0.6">
+    <!-- star.xml -->
+    <path
+        android:fillAlpha="0.2"
+        android:fillColor="#fff"
+        android:pathData="M12,17.27L18.18,21L16.54,13.97L22,9.24L14.81,8.62L12,2L9.19,8.62L2,9.24L7.45,13.97L5.82,21L12,17.27Z"/>
+  </group>
 </vector>

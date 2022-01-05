@@ -34,12 +34,12 @@ class MediaBrowserHelper(
 ) : NetworkHelper.Listener {
     private val iconBitmaps = mutableMapOf<Int, Bitmap>() // keyed by resource ID
     private val presetResIds = listOf(
-        R.drawable.preset1,
-        R.drawable.preset2,
-        R.drawable.preset3,
-        R.drawable.preset4,
-        R.drawable.preset5,
-        R.drawable.preset6,
+        R.drawable.gen_preset1,
+        R.drawable.gen_preset2,
+        R.drawable.gen_preset3,
+        R.drawable.gen_preset4,
+        R.drawable.gen_preset5,
+        R.drawable.gen_preset6,
     )
 
     override fun onNetworkAvailabilityChange(available: Boolean) {

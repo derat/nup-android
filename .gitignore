@@ -1,4 +1,5 @@
 /.gradle/
 /.idea/
 /local.properties
+/nup/src/main/res/drawable/gen_*.xml
 build/
