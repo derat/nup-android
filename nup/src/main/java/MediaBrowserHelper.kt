@@ -5,7 +5,14 @@
 
 package org.erat.nup
 
+import android.content.ContentResolver
 import android.content.res.Resources
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffColorFilter
+import android.net.Uri
 import android.os.Bundle
 import android.support.v4.media.MediaBrowserCompat.MediaItem
 import android.support.v4.media.MediaDescriptionCompat
@@ -25,6 +32,8 @@ class MediaBrowserHelper(
     private val scope: CoroutineScope,
     private val res: Resources,
 ) : NetworkHelper.Listener {
+    private val iconBitmaps = mutableMapOf<Int, Bitmap>() // keyed by resource ID
+
     override fun onNetworkAvailabilityChange(available: Boolean) {
         Log.d(TAG, "Notifying about root change for network change")
         service.notifyChildrenChanged(ROOT_ID)
@@ -70,26 +79,32 @@ class MediaBrowserHelper(
 
         when {
             parentId == ROOT_ID -> {
-                // Per https://developer.android.com/training/cars/media#root-menu-structure, it's
-                // usually the case that the root can have up to 4 children, all of which can only
-                // be browsable.
-                val items = mutableListOf<MediaItem>()
-
-                val extras = Bundle()
-                extras.putInt(
+                val online = networkHelper.isNetworkAvailable
+                val presetsExtras = Bundle()
+                presetsExtras.putInt(
                     MediaConstants.DESCRIPTION_EXTRAS_KEY_CONTENT_STYLE_PLAYABLE,
                     MediaConstants.DESCRIPTION_EXTRAS_VALUE_CONTENT_STYLE_GRID_ITEM
                 )
-                items.add(makeMenuItem(res.getText(R.string.presets), PRESETS_ID, extras = extras))
-
-                if (networkHelper.isNetworkAvailable) {
-                    items.add(makeMenuItem(res.getText(R.string.artists), ARTISTS_ID))
-                    items.add(makeMenuItem(res.getText(R.string.albums), ALBUMS_ID))
-                } else {
-                    // The full "Artists (cached)" string is too long for Android Auto's tabs.
-                    items.add(makeMenuItem(res.getText(R.string.artists_star), CACHED_ARTISTS_ID))
-                    items.add(makeMenuItem(res.getText(R.string.albums_star), CACHED_ALBUMS_ID))
-                }
+                // Per https://developer.android.com/training/cars/media#root-menu-structure, it's
+                // usually the case that the root can have up to 4 children, all of which can only
+                // be browsable.
+                val items = mutableListOf<MediaItem>(
+                    makeMenuItem(
+                        res.getText(R.string.presets), PRESETS_ID,
+                        iconResId = R.drawable.star, extras = presetsExtras
+                    ),
+                    makeMenuItem(
+                        // The full "Artists (cached)" string is too long for Android Auto's tabs.
+                        res.getText(if (online) R.string.artists else R.string.artists_star),
+                        if (online) ARTISTS_ID else CACHED_ARTISTS_ID,
+                        iconResId = R.drawable.account_music
+                    ),
+                    makeMenuItem(
+                        res.getText(if (online) R.string.albums else R.string.albums_star),
+                        if (online) ALBUMS_ID else CACHED_ALBUMS_ID,
+                        iconResId = R.drawable.disc
+                    )
+                )
                 result.sendResult(items)
             }
             parentId == PRESETS_ID -> {
@@ -173,13 +188,33 @@ class MediaBrowserHelper(
     private fun makeMenuItem(
         title: CharSequence,
         id: String,
+        iconResId: Int = 0,
         extras: Bundle? = null,
         playable: Boolean = false,
     ): MediaItem {
         val builder = MediaDescriptionCompat.Builder()
             .setTitle(title)
             .setMediaId(id)
+
+        if (iconResId > 0) {
+            // https://developer.android.com/training/cars/media says "Supply monochrome (preferably
+            // white) icons for each tab item," and also "For MediaDescription objects representing
+            // items in the content hierarchy, pass the URI through setIconUri()." However, when I
+            // use getResourceUri() to pass a vector drawable, the colors are messed up, even if
+            // they're set to #fff in the XML file -- the first icon seems to be dark purple (?) and
+            // the other ones are black. Calling setIconBitmap() with a white icon seems to work.
+            // It's possible that this is just a bug in Desktop Head Unit 1.1; I haven't tried
+            // passing vector drawables to a real Android Auto device.
+            builder.setIconBitmap(
+                iconBitmaps.getOrPut(
+                    iconResId,
+                    { createIconBitmap(res, iconResId, Color.WHITE) }
+                )
+            )
+        }
+
         if (extras != null) builder.setExtras(extras)
+
         return MediaItem(
             builder.build(),
             if (playable) MediaItem.FLAG_PLAYABLE else MediaItem.FLAG_BROWSABLE
@@ -246,6 +281,7 @@ class MediaBrowserHelper(
         }
     }
 
+    /** Performs a network search using the preset named [name]. */
     private suspend fun doPresetSearch(name: String): List<Song> {
         val preset = db.searchPresets.find { it.name == name }
         if (preset == null) {
@@ -279,4 +315,34 @@ class MediaBrowserHelper(
     init {
         networkHelper.addListener(this)
     }
+}
+
+/** Converts the vector drawable [resId] to a [Bitmap] filtered to [color]. */
+private fun createIconBitmap(res: Resources, resId: Int, color: Int): Bitmap {
+    // https://stackoverflow.com/a/6337089
+    val drawable = res.getDrawable(resId)
+    drawable.setColorFilter(PorterDuffColorFilter(color, PorterDuff.Mode.SRC_IN))
+    val bitmap = Bitmap.createBitmap(
+        // TODO: Vector drawables from materialdesignicons.com all seem to be 24x24.
+        // I'm not sure if this is appropriate for Android Auto or if it'd be better to
+        // create larger bitmaps.
+        drawable.getIntrinsicWidth(),
+        drawable.getIntrinsicHeight(),
+        Bitmap.Config.ARGB_8888
+    )
+    val canvas = Canvas(bitmap)
+    drawable.setBounds(0, 0, canvas.getWidth(), canvas.getHeight())
+    drawable.draw(canvas)
+    return bitmap
+}
+
+/** Construct a URI like "android.resource://package.example.com/drawable/image_name". */
+private fun getResourceUri(res: Resources, resId: Int): Uri {
+    // https://stackoverflow.com/a/36062748
+    return Uri.parse(
+        ContentResolver.SCHEME_ANDROID_RESOURCE + "://" +
+            res.getResourcePackageName(resId) + "/" +
+            res.getResourceTypeName(resId) + "/" +
+            res.getResourceEntryName(resId)
+    )
 }
