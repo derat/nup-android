@@ -5,7 +5,7 @@ echo $(date -u) "Installing build dependencies..."
 PATH="${PATH}:${GRADLE_HOME}/bin"
 
 echo $(date -u) "Running unit tests..."
-gradle test
+gradle testDebugUnitTest
 
 echo $(date -u) "Building debug APK..."
 gradle assembleDebug

@@ -17,6 +17,7 @@ import org.erat.nup.FileCache
 import org.erat.nup.NetworkHelper
 import org.erat.nup.Song
 import org.erat.nup.SongDatabase
+import org.erat.nup.StatsRow
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert
@@ -135,10 +136,10 @@ class SongDatabaseTest {
     }
 
     @Test fun basicSyncAndQuery() {
-        val s1 = makeSong("Artist A", "Track 1", "Album 1", 1, rating = 0.75)
-        val s2 = makeSong("Artist A", "Track 2", "Album 1", 2, rating = 0.25)
-        val s3 = makeSong("Artist B feat. C", "Track 3", "Album 1", 3, rating = 1.0)
-        val s4 = makeSong("Artist B", "Track 1", "Album 2", 1, rating = -1.0)
+        val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 0.75)
+        val s2 = makeSong("A", "Track 2", "Album 1", 2, rating = 0.25)
+        val s3 = makeSong("B feat. C", "Track 3", "Album 1", 3, rating = 1.0)
+        val s4 = makeSong("B", "Track 1", "Album 2", 1, rating = -1.0)
         serverSongs.addAll(listOf(SongInfo(s1), SongInfo(s2), SongInfo(s3), SongInfo(s4)))
 
         runBlocking { db.syncWithServer() }
@@ -149,9 +150,9 @@ class SongDatabaseTest {
         Assert.assertEquals(4, db.numSongs)
 
         Assert.assertEquals(listOf(s1, s2, s3, s4), runBlocking { db.query() })
-        Assert.assertEquals(listOf(s1, s2), runBlocking { db.query(artist = "Artist A") })
-        Assert.assertEquals(listOf(s4), runBlocking { db.query(artist = "Artist B") })
-        Assert.assertEquals(listOf(s3, s4), runBlocking { db.query(artistPrefix = "Artist B") })
+        Assert.assertEquals(listOf(s1, s2), runBlocking { db.query(artist = "A") })
+        Assert.assertEquals(listOf(s4), runBlocking { db.query(artist = "B") })
+        Assert.assertEquals(listOf(s3, s4), runBlocking { db.query(artistPrefix = "B") })
         Assert.assertEquals(listOf(s1, s4), runBlocking { db.query(title = "Track 1") })
         Assert.assertEquals(listOf(s1, s2, s3), runBlocking { db.query(album = "Album 1") })
         Assert.assertEquals(listOf(s2), runBlocking { db.query(songId = s2.id) })
@@ -166,12 +167,18 @@ class SongDatabaseTest {
             runBlocking { db.query(artist = "B", substring = true) }
         )
         Assert.assertEquals(listOf<Song>(), runBlocking { db.query(artist = "Somebody Else") })
+
+        runBlocking {
+            val (songs, idx) = db.getSongs(listOf(s1.id, s4.id, 500L, s3.id, s2.id), origIndex = 3)
+            Assert.assertEquals(listOf(s1, s4, s3, s2), songs)
+            Assert.assertEquals(2, idx)
+        }
     }
 
     @Test fun syncUpdates() {
         // Add some songs at time 0 and sync at time 1.
-        val s1 = makeSong("Artist A", "Track 1", "Album 1", 1, rating = 0.75)
-        val s2 = makeSong("Artist A", "Track 2", "Album 1", 2, rating = 0.25)
+        val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 0.75)
+        val s2 = makeSong("A", "Track 2", "Album 1", 2, rating = 0.25)
         serverSongs.addAll(listOf(SongInfo(s1), SongInfo(s2)))
         serverNowNs++
         runBlocking { db.syncWithServer() }
@@ -183,10 +190,10 @@ class SongDatabaseTest {
 
         // At time 1, update the first song, delete the second song, and add a third song.
         serverNowNs++
-        val s1u = makeSong("Artist A", "Track 1", "Album 1", 1, rating = 0.5)
+        val s1u = makeSong("A", "Track 1", "Album 1", 1, rating = 0.5)
         serverSongs[0] = SongInfo(s1u, serverNowNs)
         serverDelSongs.add(SongInfo(s2, serverNowNs))
-        val s3 = makeSong("Artist A", "Track 3", "Album 1", 3, rating = 1.0)
+        val s3 = makeSong("A", "Track 3", "Album 1", 3, rating = 1.0)
         serverSongs.add(SongInfo(s3, serverNowNs))
         runBlocking { db.syncWithServer() }
         Assert.assertTrue(lastSyncSuccess)
@@ -196,8 +203,69 @@ class SongDatabaseTest {
         Assert.assertEquals(listOf(s1u, s3), runBlocking { db.query() })
     }
 
-    // TODO: Add test for aggregate data.
-    // TODO: Add test for presets.
+    @Test fun aggregateData() {
+        val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 0.75)
+        val s2 = makeSong("B", "Track 2", "Album 1", 2, rating = 0.25)
+        val s3 = makeSong("B feat. C", "Track 3", "Album 1", 3, rating = 1.0)
+        val s4 = makeSong("B", "Track 4", "Album 1", 4, rating = -1.0)
+        val s5 = makeSong("B", "Track 1", "Album 2", 1, rating = 0.5)
+        val s6 = makeSong("A", "Track 2", "Album 2", 2, rating = 1.0)
+        serverSongs.addAll(
+            listOf(
+                SongInfo(s1), SongInfo(s2), SongInfo(s3), SongInfo(s4), SongInfo(s5),
+                SongInfo(s6)
+            ),
+        )
+        runBlocking { db.syncWithServer() }
+        Assert.assertTrue(lastSyncSuccess)
+
+        Assert.assertEquals(
+            listOf(
+                StatsRow("A", "", "", 2),
+                StatsRow("B", "", "", 3),
+                StatsRow("B feat. C", "", "", 1),
+            ),
+            db.artistsSortedAlphabetically
+        )
+        Assert.assertEquals(
+            listOf(
+                StatsRow("B", "", "", 3),
+                StatsRow("A", "", "", 2),
+                StatsRow("B feat. C", "", "", 1),
+            ),
+            db.artistsSortedByNumSongs
+        )
+        Assert.assertEquals(
+            listOf(
+                StatsRow("B, A, B feat. C", "Album 1", s1.albumId, 4),
+                StatsRow("A, B", "Album 2", s5.albumId, 2),
+            ),
+            db.albumsSortedAlphabetically
+        )
+        Assert.assertEquals(
+            listOf(
+                StatsRow("A", "Album 1", s1.albumId, 1),
+                StatsRow("A", "Album 2", s5.albumId, 1),
+            ),
+            db.albumsByArtist("A")
+        )
+        Assert.assertEquals(
+            listOf(
+                StatsRow("B", "Album 1", s1.albumId, 2),
+                StatsRow("B", "Album 2", s5.albumId, 1),
+            ),
+            db.albumsByArtist("B")
+        )
+        Assert.assertEquals(
+            listOf(
+                StatsRow("B feat. C", "Album 1", s1.albumId, 1),
+            ),
+            db.albumsByArtist("B feat. C")
+        )
+    }
+
+    // TODO: Add test for search presets.
+    // TODO: Add test for cached songs.
 
     @Test fun playbackReports() {
         val r1 = SongDatabase.PendingPlaybackReport(1, Date(1))

@@ -18,7 +18,7 @@ import java.util.Collections
 data class StatsKey(var artist: String, val album: String, val albumId: String)
 
 /** Song count for a specific [StatsKey]. */
-class StatsRow(val key: StatsKey, var count: Int) {
+data class StatsRow(val key: StatsKey, var count: Int) {
     constructor(artist: String, album: String, albumId: String, count: Int) :
         this(StatsKey(artist, album, albumId), count) {}
 }
