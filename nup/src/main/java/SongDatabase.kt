@@ -123,6 +123,7 @@ class SongDatabase(
      */
     suspend fun query(
         artist: String? = null,
+        artistPrefix: String? = null,
         title: String? = null,
         album: String? = null,
         albumId: String? = null,
@@ -138,7 +139,7 @@ class SongDatabase(
             var selectionArgs = ArrayList<String>()
 
             fun add(clause: String, selectionArg: String?, substring: Boolean) {
-                if (selectionArg == null || selectionArg.isEmpty()) return
+                if (selectionArg.isNullOrEmpty()) return
 
                 selections.add(clause)
                 if (selectionArg == UNSET_STRING) {
@@ -146,6 +147,11 @@ class SongDatabase(
                 } else {
                     selectionArgs.add(if (substring) "%$selectionArg%" else selectionArg)
                 }
+            }
+
+            fun addMulti(clause: String, args: List<String>) {
+                selections.add(clause)
+                selectionArgs.addAll(args)
             }
 
             fun addLiteral(clause: String) = selections.add(clause)
@@ -169,6 +175,12 @@ class SongDatabase(
         builder.add("Rating >= ?", if (minRating >= 0.0) minRating.toString() else null, false)
         if (songIds != null && songIds.size > 0) {
             builder.addLiteral("s.SongId IN (" + songIds.joinToString(",") + ")")
+        }
+        if (artistPrefix != null) {
+            builder.addMulti(
+                "(Artist = ? OR Artist LIKE ?)",
+                listOf(artistPrefix, "$artistPrefix %")
+            )
         }
         val query = (
             "SELECT s.SongId, Artist, Title, Album, AlbumId, Filename, CoverFilename, Length, " +
@@ -354,8 +366,8 @@ class SongDatabase(
             dbCursor.close()
 
             try {
-                updatedSongs += queryServer(db, prevStartNs, false)
-                updatedSongs += queryServer(db, prevStartNs, true)
+                updatedSongs += syncSongUpdates(db, prevStartNs, false)
+                updatedSongs += syncSongUpdates(db, prevStartNs, true)
             } catch (e: ServerException) {
                 Log.e(TAG, e.message!!)
                 return SyncResult(false, updatedSongs, e.message)
@@ -389,7 +401,7 @@ class SongDatabase(
         listenerExecutor.execute { listener.onSyncDone(success, message) }
     }
 
-    /** Thrown by [queryServer] and [syncSearchPresets] if an error is encountered. */
+    /** Thrown by [syncSongUpdates] and [syncSearchPresets] if an error is encountered. */
     class ServerException(reason: String) : Exception(reason)
 
     /**
@@ -398,7 +410,7 @@ class SongDatabase(
      * @return number of updated songs
      */
     @Throws(ServerException::class)
-    private fun queryServer(
+    private fun syncSongUpdates(
         db: SQLiteDatabase,
         prevStartTimeNsec: Long,
         deleted: Boolean,
@@ -797,7 +809,7 @@ class SongDatabase(
                 "AlbumId VARCHAR(256) NOT NULL, " +
                 "TrackNumber INTEGER NOT NULL, " +
                 "DiscNumber INTEGER NOT NULL, " +
-                "Length INTEGER NOT NULL, " +
+                "Length INTEGER NOT NULL, " + // TODO: Why is this an int?
                 "TrackGain FLOAT NOT NULL, " +
                 "AlbumGain FLOAT NOT NULL, " +
                 "PeakAmp FLOAT NOT NULL, " +

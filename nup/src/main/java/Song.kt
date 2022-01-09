@@ -8,7 +8,7 @@ package org.erat.nup
 import android.graphics.Bitmap
 import java.io.Serializable
 
-class Song(
+data class Song(
     val id: Long,
     val artist: String,
     val title: String,
@@ -16,7 +16,7 @@ class Song(
     val albumId: String,
     val filename: String,
     val coverFilename: String,
-    val lengthSec: Int,
+    val lengthSec: Int, // TODO: Why is this an int?
     val track: Int,
     val disc: Int,
     val trackGain: Double,

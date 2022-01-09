@@ -134,8 +134,9 @@ suspend fun searchLocal(
         return db.query(minRating = EMPTY_MIN_RATING, shuffle = true, onlyCached = !online)
     }
 
-    // Try to find an exact artist match.
-    var songs = db.query(artist = query, minRating = ARTIST_MIN_RATING, shuffle = true)
+    // Try to find an artist match. Use a prefix query so that we'll also match songs
+    // featuring additional artists (e.g. "Foo feat. Bar").
+    var songs = db.query(artistPrefix = query, minRating = ARTIST_MIN_RATING, shuffle = true)
     if (!songs.isEmpty()) return songs
 
     // Try to find an exact album match.
