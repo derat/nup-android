@@ -17,6 +17,7 @@ import java.util.Date
 import java.util.concurrent.Executor
 import java.util.concurrent.ExecutorService
 import java.util.concurrent.Executors
+import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -34,7 +35,8 @@ class SongDatabase(
     private val cache: FileCache,
     private val downloader: Downloader,
     private val networkHelper: NetworkHelper,
-    updateExecutor: ExecutorService? = null,
+    initDispatcher: CoroutineDispatcher = Dispatchers.IO, // for tests
+    updateExecutor: ExecutorService = Executors.newSingleThreadExecutor(), // for tests
 ) {
     private val opener: DatabaseOpener
     private val updater: DatabaseUpdater
@@ -1134,7 +1136,7 @@ class SongDatabase(
         opener = DatabaseOpener(context, DATABASE_NAME, helper)
 
         // Get some info from the database in a background thread.
-        scope.launch(Dispatchers.IO) {
+        scope.launch(initDispatcher) {
             opener.getDb() task@{ db ->
                 if (db == null) return@task // quit() already called
 
@@ -1150,6 +1152,6 @@ class SongDatabase(
                 }
             }
         }
-        updater = DatabaseUpdater(opener, updateExecutor ?: Executors.newSingleThreadExecutor())
+        updater = DatabaseUpdater(opener, updateExecutor)
     }
 }
