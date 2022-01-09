@@ -16,8 +16,6 @@ buildscript {
 
   repositories {
     google()
-    // Both (?) seem to be needed for org.jetbrains.trove4j:trove4j:20160824.
-    jcenter()
     mavenCentral()
   }
 }
@@ -26,7 +24,6 @@ allprojects {
   // Apparently all the above repos need to be repeated here. :-/
   repositories {
     google()
-    jcenter()
     mavenCentral()
   }
 }
