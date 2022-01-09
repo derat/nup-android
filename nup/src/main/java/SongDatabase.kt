@@ -15,6 +15,8 @@ import android.util.Log
 import java.util.Collections
 import java.util.Date
 import java.util.concurrent.Executor
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
@@ -31,7 +33,8 @@ class SongDatabase(
     private val listenerExecutor: Executor,
     private val cache: FileCache,
     private val downloader: Downloader,
-    private val networkHelper: NetworkHelper
+    private val networkHelper: NetworkHelper,
+    updateExecutor: ExecutorService? = null,
 ) {
     private val opener: DatabaseOpener
     private val updater: DatabaseUpdater
@@ -280,7 +283,7 @@ class SongDatabase(
     }
 
     /** Queued report of a song being played. */
-    class PendingPlaybackReport(var songId: Long, var startDate: Date)
+    data class PendingPlaybackReport(var songId: Long, var startDate: Date)
 
     /** Get all pending playback reports from the PendingPlaybackReports table. */
     fun allPendingPlaybackReports(): List<PendingPlaybackReport> {
@@ -483,6 +486,10 @@ class SongDatabase(
             )
         }
 
+        setSyncState(
+            if (deleted) SyncState.DELETING_SONGS else SyncState.UPDATING_SONGS,
+            numUpdates,
+        )
         return numUpdates
     }
 
@@ -1143,6 +1150,6 @@ class SongDatabase(
                 }
             }
         }
-        updater = DatabaseUpdater(opener)
+        updater = DatabaseUpdater(opener, updateExecutor ?: Executors.newSingleThreadExecutor())
     }
 }

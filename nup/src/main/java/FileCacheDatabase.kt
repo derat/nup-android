@@ -11,9 +11,15 @@ import android.database.sqlite.SQLiteOpenHelper
 import android.util.Log
 import java.io.File
 import java.util.Date
+import java.util.concurrent.ExecutorService
+import java.util.concurrent.Executors
 
 /** Persistent data store for [FileCache]. */
-class FileCacheDatabase(context: Context, private val musicDir: String) {
+class FileCacheDatabase(
+    context: Context,
+    private val musicDir: String,
+    updateExecutor: ExecutorService? = null
+) {
     private val opener: DatabaseOpener
     private val updater: DatabaseUpdater
 
@@ -203,6 +209,6 @@ class FileCacheDatabase(context: Context, private val musicDir: String) {
 
         // Block until we've loaded everything into memory.
         loadExistingEntries()
-        updater = DatabaseUpdater(opener)
+        updater = DatabaseUpdater(opener, updateExecutor ?: Executors.newSingleThreadExecutor())
     }
 }

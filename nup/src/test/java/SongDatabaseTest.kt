@@ -7,8 +7,9 @@ package org.erat.nup.test
 
 import android.os.Build
 import androidx.test.core.app.ApplicationProvider
+import com.google.common.util.concurrent.MoreExecutors
+import java.util.Date
 import java.util.UUID
-import java.util.concurrent.Executors
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestCoroutineScope
 import org.erat.nup.Downloader
@@ -48,16 +49,24 @@ class SongDatabaseTest {
 
     // Listens for updates from [db].
     val listener = object : SongDatabase.Listener {
-        override fun onSyncChange(state: SongDatabase.SyncState, updatedSongs: Int) {}
+        override fun onSyncChange(state: SongDatabase.SyncState, updatedSongs: Int) {
+            when (state) {
+                SongDatabase.SyncState.UPDATING_SONGS -> lastSyncUpdatedSongs = updatedSongs
+                SongDatabase.SyncState.DELETING_SONGS -> lastSyncDeletedSongs = updatedSongs
+                else -> {}
+            }
+        }
         override fun onSyncDone(success: Boolean, message: String) { lastSyncSuccess = success }
         override fun onAggregateDataUpdate() { numAggregateDataUpdates++ }
     }
+    var lastSyncUpdatedSongs = 0
+    var lastSyncDeletedSongs = 0
     var lastSyncSuccess = false
     var numAggregateDataUpdates = 0
 
     // Server info returned by [downloader].
     var serverNowNs = 0L
-    data class SongInfo(var song: Song, var lastMod: Long = 1L)
+    data class SongInfo(var song: Song, var lastMod: Long = 0L)
     val serverSongs = mutableListOf<SongInfo>()
     val serverDelSongs = mutableListOf<SongInfo>()
 
@@ -96,6 +105,8 @@ class SongDatabaseTest {
         )
 
         // Reset [listener] data.
+        lastSyncUpdatedSongs = 0
+        lastSyncDeletedSongs = 0
         lastSyncSuccess = false
         numAggregateDataUpdates = 0
 
@@ -104,16 +115,17 @@ class SongDatabaseTest {
         serverSongs.clear()
         serverDelSongs.clear()
 
-        // TODO: Wait for aggregate data to be loaded?
+        // TODO: Wait for aggregate data to be loaded? Maybe inject a Dispatcher into SongDatabase
+        // to use instead of Dispatchers.IO: https://stackoverflow.com/a/59637704
         db = SongDatabase(
             ApplicationProvider.getApplicationContext(),
             scope,
             listener,
-            // TODO: Do we need to pass a (custom?) synchronous executor instead?
-            Executors.newSingleThreadScheduledExecutor(),
+            MoreExecutors.directExecutor(),
             cache,
             downloader,
             networkHelper,
+            updateExecutor = MoreExecutors.newDirectExecutorService(),
         )
     }
 
@@ -132,6 +144,7 @@ class SongDatabaseTest {
         runBlocking { db.syncWithServer() }
         Assert.assertEquals(SongDatabase.SyncState.IDLE, db.syncState)
         Assert.assertTrue(lastSyncSuccess)
+        Assert.assertEquals(4, lastSyncUpdatedSongs)
         Assert.assertTrue(db.aggregateDataLoaded)
         Assert.assertEquals(4, db.numSongs)
 
@@ -153,6 +166,51 @@ class SongDatabaseTest {
             runBlocking { db.query(artist = "B", substring = true) }
         )
         Assert.assertEquals(listOf<Song>(), runBlocking { db.query(artist = "Somebody Else") })
+    }
+
+    @Test fun syncUpdates() {
+        // Add some songs at time 0 and sync at time 1.
+        val s1 = makeSong("Artist A", "Track 1", "Album 1", 1, rating = 0.75)
+        val s2 = makeSong("Artist A", "Track 2", "Album 1", 2, rating = 0.25)
+        serverSongs.addAll(listOf(SongInfo(s1), SongInfo(s2)))
+        serverNowNs++
+        runBlocking { db.syncWithServer() }
+        Assert.assertTrue(lastSyncSuccess)
+        Assert.assertEquals(2, lastSyncUpdatedSongs)
+        Assert.assertEquals(0, lastSyncDeletedSongs)
+        Assert.assertEquals(2, db.numSongs)
+        Assert.assertEquals(listOf(s1, s2), runBlocking { db.query() })
+
+        // At time 1, update the first song, delete the second song, and add a third song.
+        serverNowNs++
+        val s1u = makeSong("Artist A", "Track 1", "Album 1", 1, rating = 0.5)
+        serverSongs[0] = SongInfo(s1u, serverNowNs)
+        serverDelSongs.add(SongInfo(s2, serverNowNs))
+        val s3 = makeSong("Artist A", "Track 3", "Album 1", 3, rating = 1.0)
+        serverSongs.add(SongInfo(s3, serverNowNs))
+        runBlocking { db.syncWithServer() }
+        Assert.assertTrue(lastSyncSuccess)
+        Assert.assertEquals(2, lastSyncUpdatedSongs)
+        Assert.assertEquals(1, lastSyncDeletedSongs)
+        Assert.assertEquals(2, db.numSongs)
+        Assert.assertEquals(listOf(s1u, s3), runBlocking { db.query() })
+    }
+
+    // TODO: Add test for aggregate data.
+    // TODO: Add test for presets.
+
+    @Test fun playbackReports() {
+        val r1 = SongDatabase.PendingPlaybackReport(1, Date(1))
+        val r2 = SongDatabase.PendingPlaybackReport(2, Date(2))
+        db.addPendingPlaybackReport(r1.songId, r1.startDate)
+        db.addPendingPlaybackReport(r2.songId, r2.startDate)
+        Assert.assertEquals(listOf(r1, r2), db.allPendingPlaybackReports())
+
+        db.removePendingPlaybackReport(r1.songId, r1.startDate)
+        Assert.assertEquals(listOf(r2), db.allPendingPlaybackReports())
+
+        db.removePendingPlaybackReport(r2.songId, r2.startDate)
+        Assert.assertTrue(db.allPendingPlaybackReports().isEmpty())
     }
 }
 

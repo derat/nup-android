@@ -10,7 +10,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteDatabaseLockedException
 import android.database.sqlite.SQLiteOpenHelper
 import android.util.Log
-import java.util.concurrent.Executors
+import java.util.concurrent.ExecutorService
 import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.ReentrantReadWriteLock
 import kotlin.concurrent.read
@@ -86,9 +86,10 @@ class DatabaseOpener(
 }
 
 /** Runs queries asynchronously (but in-order) against a database. */
-class DatabaseUpdater(private val opener: DatabaseOpener) {
-    private val executor = Executors.newSingleThreadScheduledExecutor()
-
+class DatabaseUpdater(
+    private val opener: DatabaseOpener,
+    private val executor: ExecutorService
+) {
     /** Shut down the updater. */
     fun quit() {
         executor.shutdown()
