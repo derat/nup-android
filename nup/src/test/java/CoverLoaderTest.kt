@@ -34,12 +34,13 @@ class CoverLoaderTest {
     lateinit var coverLoader: CoverLoader
     lateinit var bitmapDataMap: HashMap<String, Bitmap>
 
+    lateinit var openMocks: AutoCloseable
     @Mock lateinit var context: MockContext
     @Mock lateinit var downloader: Downloader
     @Mock lateinit var networkHelper: NetworkHelper
 
     @Before fun setUp() {
-        MockitoAnnotations.initMocks(this)
+        openMocks = MockitoAnnotations.openMocks(this)
 
         tempDir = Files.createTempDirectory(null).toFile()
         tempDir.deleteOnExit()
@@ -61,6 +62,7 @@ class CoverLoaderTest {
 
     @After fun tearDown() {
         tempDir.delete()
+        openMocks.close()
     }
 
     @Test fun downloadAndCacheCovers() {
@@ -100,7 +102,7 @@ class CoverLoaderTest {
         val file = "cover.jpg"
         Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(false)
         Assert.assertNull(load(file))
-        Mockito.verifyZeroInteractions(downloader)
+        Mockito.verifyNoMoreInteractions(downloader)
     }
 
     @Test fun returnNullForMissingFile() {

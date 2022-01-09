@@ -16,6 +16,7 @@ import org.erat.nup.NetworkHelper
 import org.erat.nup.PlaybackReporter
 import org.erat.nup.SongDatabase
 import org.erat.nup.SongDatabase.PendingPlaybackReport
+import org.junit.After
 import org.junit.Before
 import org.junit.Test
 import org.mockito.Mock
@@ -29,6 +30,7 @@ class PlaybackReporterTest {
 
     val scope = TestCoroutineScope()
 
+    lateinit var openMocks: AutoCloseable
     @Mock lateinit var songDb: SongDatabase
     @Mock lateinit var downloader: Downloader
     @Mock lateinit var networkHelper: NetworkHelper
@@ -38,7 +40,7 @@ class PlaybackReporterTest {
     lateinit var reportUrl: URL
 
     @Before fun setUp() {
-        MockitoAnnotations.initMocks(this)
+        openMocks = MockitoAnnotations.openMocks(this)
         Mockito.`when`(successConn.responseCode).thenReturn(200)
         Mockito.`when`(serverErrorConn.responseCode).thenReturn(500)
         val reportPath = getReportPath(SONG_ID, START_DATE)
@@ -46,6 +48,10 @@ class PlaybackReporterTest {
         Mockito.`when`(downloader.getServerUrl(reportPath)).thenReturn(reportUrl)
         Mockito.`when`(songDb.allPendingPlaybackReports())
             .thenReturn(ArrayList())
+    }
+
+    @After fun tearDown() {
+        openMocks.close()
     }
 
     @Test fun immediateSuccessfulReport() {

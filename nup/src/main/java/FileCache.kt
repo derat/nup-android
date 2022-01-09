@@ -483,7 +483,7 @@ class FileCache constructor(
     /** Parses [conn]'s Content-Range header (if present). */
     private fun getRangeInfo(conn: HttpURLConnection): RangeInfo? {
         val vals = conn.getHeaderFields()["Content-Range"]
-        if (vals == null || vals.isEmpty()) return null
+        if (vals.isNullOrEmpty()) return null
 
         var match = fullRangeRegexp.find(vals[0])
         if (match != null) {
