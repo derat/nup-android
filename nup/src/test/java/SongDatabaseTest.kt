@@ -16,9 +16,11 @@ import kotlinx.coroutines.test.runBlockingTest
 import org.erat.nup.Downloader
 import org.erat.nup.FileCache
 import org.erat.nup.NetworkHelper
+import org.erat.nup.SearchPreset
 import org.erat.nup.Song
 import org.erat.nup.SongDatabase
 import org.erat.nup.StatsRow
+import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
 import org.junit.Assert
@@ -72,6 +74,7 @@ class SongDatabaseTest {
     data class SongInfo(var song: Song, var lastMod: Long = 0L)
     val serverSongs = mutableListOf<SongInfo>()
     val serverDelSongs = mutableListOf<SongInfo>()
+    val serverSearchPresets = mutableListOf<SearchPreset>()
 
     // Matches HTTP request paths from [SongDatabase.syncSongUpdates].
     val exportRegex = Regex(
@@ -90,7 +93,11 @@ class SongDatabaseTest {
                     return when {
                         (path == "/now") ->
                             Downloader.DownloadStringResult(serverNowNs.toString(), null)
-                        (path == "/presets") -> Downloader.DownloadStringResult("[]", null)
+                        (path == "/presets") -> Downloader.DownloadStringResult(
+                            JSONArray(serverSearchPresets.map { searchPresetToJson(it) })
+                                .toString(),
+                            null
+                        )
                         exportRegex.matches(path) -> {
                             val match = exportRegex.find(path)!!
                             val lastMod = match.groupValues[1].toLong()
@@ -117,6 +124,7 @@ class SongDatabaseTest {
         serverNowNs = 0L
         serverSongs.clear()
         serverDelSongs.clear()
+        serverSearchPresets.clear()
 
         db = SongDatabase(
             ApplicationProvider.getApplicationContext(),
@@ -136,7 +144,7 @@ class SongDatabaseTest {
         openMocks.close()
     }
 
-    @Test fun basicSyncAndQuery() = runBlockingTest {
+    @Test fun syncAndQuery() = runBlockingTest {
         val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 0.75)
         val s2 = makeSong("A", "Track 2", "Album 1", 2, rating = 0.25)
         val s3 = makeSong("B feat. C", "Track 3", "Album 1", 3, rating = 1.0)
@@ -163,9 +171,10 @@ class SongDatabaseTest {
         Assert.assertEquals(listOf(s3, s4), db.query(artist = "B", substring = true))
         Assert.assertEquals(listOf<Song>(), db.query(artist = "Somebody Else"))
 
-        val (songs, idx) = db.getSongs(listOf(s1.id, s4.id, 500L, s3.id, s2.id), origIndex = 3)
-        Assert.assertEquals(listOf(s1, s4, s3, s2), songs)
-        Assert.assertEquals(2, idx)
+        Assert.assertEquals(
+            Pair(listOf(s1, s4, s3, s2), 2),
+            db.getSongs(listOf(s1.id, s4.id, 500L, s3.id, s2.id), origIndex = 3)
+        )
     }
 
     @Test fun syncUpdates() = runBlockingTest {
@@ -206,10 +215,11 @@ class SongDatabaseTest {
         val s4 = makeSong("B", "Track 4", "Album 1", 4, rating = -1.0)
         val s5 = makeSong("B", "Track 1", "Album 2", 1, rating = 0.5)
         val s6 = makeSong("A", "Track 2", "Album 2", 2, rating = 1.0)
+        val s7 = makeSong("B", "Track 1", "", 1, rating = 0.25)
         serverSongs.addAll(
             listOf(
                 SongInfo(s1), SongInfo(s2), SongInfo(s3), SongInfo(s4), SongInfo(s5),
-                SongInfo(s6)
+                SongInfo(s6), SongInfo(s7)
             ),
         )
         db.syncWithServer()
@@ -219,14 +229,14 @@ class SongDatabaseTest {
         Assert.assertEquals(
             listOf(
                 StatsRow("A", "", "", 2),
-                StatsRow("B", "", "", 3),
+                StatsRow("B", "", "", 4),
                 StatsRow("B feat. C", "", "", 1),
             ),
             db.artistsSortedAlphabetically
         )
         Assert.assertEquals(
             listOf(
-                StatsRow("B", "", "", 3),
+                StatsRow("B", "", "", 4),
                 StatsRow("A", "", "", 2),
                 StatsRow("B feat. C", "", "", 1),
             ),
@@ -234,6 +244,7 @@ class SongDatabaseTest {
         )
         Assert.assertEquals(
             listOf(
+                StatsRow("B", SongDatabase.UNSET_STRING, "", 1),
                 StatsRow("B, A, B feat. C", "Album 1", s1.albumId, 4),
                 StatsRow("A, B", "Album 2", s5.albumId, 2),
             ),
@@ -248,6 +259,7 @@ class SongDatabaseTest {
         )
         Assert.assertEquals(
             listOf(
+                StatsRow("B", SongDatabase.UNSET_STRING, "", 1),
                 StatsRow("B", "Album 1", s1.albumId, 2),
                 StatsRow("B", "Album 2", s5.albumId, 1),
             ),
@@ -261,8 +273,95 @@ class SongDatabaseTest {
         )
     }
 
-    // TODO: Add test for search presets.
-    // TODO: Add test for cached songs.
+    @Test fun cachedSongs() = runBlockingTest {
+        val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 0.75)
+        val s2 = makeSong("A", "Track 2", "Album 1", 2, rating = 0.25)
+        val s3 = makeSong("B", "Track 3", "Album 1", 3, rating = 1.0)
+        val s4 = makeSong("B", "Track 1", "Album 2", 1, rating = -1.0)
+        val s5 = makeSong("B", "Track 1", "", 1, rating = 0.5)
+        serverSongs.addAll(
+            listOf(SongInfo(s1), SongInfo(s2), SongInfo(s3), SongInfo(s4), SongInfo(s5))
+        )
+
+        db.syncWithServer()
+        Assert.assertEquals(5, db.numSongs)
+        Assert.assertEquals(listOf<StatsRow>(), db.cachedArtistsSortedAlphabetically())
+        Assert.assertEquals(listOf<StatsRow>(), db.cachedAlbumsSortedAlphabetically())
+        Assert.assertEquals(listOf<StatsRow>(), db.cachedAlbumsByArtist("A"))
+        Assert.assertEquals(listOf<StatsRow>(), db.cachedAlbumsByArtist("B"))
+
+        db.handleSongCached(s1.id)
+        db.handleSongCached(s3.id)
+        db.handleSongCached(s5.id)
+        Assert.assertEquals(
+            listOf(StatsRow("A", "", "", 1), StatsRow("B", "", "", 2)),
+            db.cachedArtistsSortedAlphabetically()
+        )
+        Assert.assertEquals(
+            listOf(
+                StatsRow("B", SongDatabase.UNSET_STRING, "", 1),
+                StatsRow("A, B", "Album 1", s1.albumId, 2),
+            ),
+            db.cachedAlbumsSortedAlphabetically()
+        )
+        Assert.assertEquals(
+            listOf(StatsRow("A", "Album 1", s1.albumId, 1)),
+            db.cachedAlbumsByArtist("A")
+        )
+        Assert.assertEquals(
+            listOf(
+                StatsRow("B", SongDatabase.UNSET_STRING, "", 1),
+                StatsRow("B", "Album 1", s3.albumId, 1),
+            ),
+            db.cachedAlbumsByArtist("B")
+        )
+        Assert.assertEquals(listOf(s5, s1, s3), db.query(onlyCached = true))
+        Assert.assertEquals(listOf(s1), db.query(artist = "A", onlyCached = true))
+        Assert.assertEquals(listOf(s5, s3), db.query(artist = "B", onlyCached = true))
+        Assert.assertEquals(
+            Pair(listOf(s1, s3, s5), -1),
+            db.getSongs(listOf(s1.id, s2.id, s3.id, s4.id, s5.id), onlyCached = true)
+        )
+
+        db.handleSongEvicted(s1.id)
+        Assert.assertEquals(
+            listOf(StatsRow("B", "", "", 2)),
+            db.cachedArtistsSortedAlphabetically()
+        )
+        Assert.assertEquals(
+            listOf(
+                StatsRow("B", SongDatabase.UNSET_STRING, "", 1),
+                StatsRow("B", "Album 1", s3.albumId, 1),
+            ),
+            db.cachedAlbumsSortedAlphabetically()
+        )
+        Assert.assertEquals(listOf<StatsRow>(), db.cachedAlbumsByArtist("A"))
+        Assert.assertEquals(
+            listOf(
+                StatsRow("B", SongDatabase.UNSET_STRING, "", 1),
+                StatsRow("B", "Album 1", s3.albumId, 1),
+            ),
+            db.cachedAlbumsByArtist("B")
+        )
+    }
+
+    @Test fun syncSearchPresets() = runBlockingTest {
+        serverSearchPresets.add(
+            SearchPreset(
+                name = "Favorites",
+                tags = "upbeat",
+                minRating = 0.75,
+                unrated = false,
+                firstPlayed = 31536000,
+                lastPlayed = 2592000,
+                firstTrack = false,
+                shuffle = true,
+                play = true,
+            )
+        )
+        db.syncWithServer()
+        Assert.assertEquals(serverSearchPresets, db.searchPresets)
+    }
 
     @Test fun playbackReports() {
         val r1 = SongDatabase.PendingPlaybackReport(1, Date(1))
@@ -277,6 +376,8 @@ class SongDatabaseTest {
         db.removePendingPlaybackReport(r2.songId, r2.startDate)
         Assert.assertTrue(db.allPendingPlaybackReports().isEmpty())
     }
+
+    // TODO: Add test for reloading data instead of just syncing.
 }
 
 /** Construct a [Song] based on the supplied information. */
@@ -288,7 +389,9 @@ private fun makeSong(
     disc: Int = 1,
     rating: Double? = null,
 ): Song {
-    val albumId = UUID.nameUUIDFromBytes(album.toByteArray()).toString()
+    val albumId =
+        if (!album.isEmpty()) UUID.nameUUIDFromBytes(album.toByteArray()).toString()
+        else ""
     val size = artist.length + title.length + album.length
     return Song(
         // [SongDatabase.query] expects this to be positive.
@@ -302,15 +405,15 @@ private fun makeSong(
         lengthSec = 4 * size,
         track = track,
         disc = disc,
-        trackGain = 6.5,
-        albumGain = 7.5,
+        trackGain = -6.5,
+        albumGain = -7.5,
         peakAmp = 1.0,
         rating = if (rating != null) rating else (size % 5) / 4.0,
     )
 }
 
-/** Convert a [Song] into a JSON string as expected by [SongDatabase.syncSongUpdates]. */
-private fun songToJson(s: Song): String {
+/** Convert a [Song] into a [JSONObject] as expected by [SongDatabase.syncSongUpdates]. */
+private fun songToJson(s: Song): JSONObject {
     val o = JSONObject()
     o.put("songId", s.id)
     o.put("filename", s.filename)
@@ -326,5 +429,35 @@ private fun songToJson(s: Song): String {
     o.put("albumGain", s.albumGain)
     o.put("peakAmp", s.peakAmp)
     o.put("rating", s.rating)
-    return o.toString()
+    return o
+}
+
+/** Convert a [SearchPreset] into a JSON string as expected by [SongDatabase.syncSearchPresets]. */
+private fun searchPresetToJson(p: SearchPreset): JSONObject {
+    val secToTimeEnum = { v: Int ->
+        when (v) {
+            0 -> 0 // unset
+            86400 -> 1 // one day
+            604800 -> 2 // one week
+            2592000 -> 3 // one month
+            7776000 -> 4 // three months
+            15552000 -> 5 // six months
+            31536000 -> 6 // one year
+            94608000 -> 7 // three years
+            157680000 -> 8 // five years
+            else -> throw RuntimeException("Invalid seconds $v")
+        }
+    }
+
+    val o = JSONObject()
+    o.put("name", p.name)
+    o.put("tags", p.tags)
+    if (p.minRating >= 0) o.put("minRating", (1 + p.minRating * 4).toInt())
+    o.put("unrated", p.unrated)
+    if (p.firstPlayed > 0) o.put("firstPlayed", secToTimeEnum(p.firstPlayed))
+    if (p.lastPlayed > 0) o.put("lastPlayed", secToTimeEnum(p.lastPlayed))
+    o.put("firstTrack", p.firstTrack)
+    o.put("shuffle", p.shuffle)
+    o.put("play", p.play)
+    return o
 }

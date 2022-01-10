@@ -92,6 +92,7 @@ class SongDatabase(
         null,
         false /* aggregateAlbums */,
         SongOrder.ARTIST,
+        unsetAlbum = "",
     )
 
     suspend fun cachedAlbumsSortedAlphabetically(): List<StatsRow> = getSortedRows(
@@ -719,19 +720,23 @@ class SongDatabase(
      * @param selectionArgs positional parameters for [query]
      * @param aggregateAlbums group rows by (album, album ID)
      * @param order sort order for rows
+     * @param unsetArtist string to use in place of empty artist values
+     * @param unsetAlbum string to use in place of empty album values
      */
     private suspend fun getSortedRows(
         query: String,
         selectionArgs: Array<String>?,
         aggregateAlbums: Boolean,
         order: SongOrder,
+        unsetArtist: String = UNSET_STRING,
+        unsetAlbum: String = UNSET_STRING,
     ): List<StatsRow> {
         val rows = mutableListOf<StatsRow>()
         opener.getDb() task@{ db ->
             if (db == null) return@task // quit() already called
             val cursor = db.rawQuery(query, selectionArgs)
             cursor.moveToFirst()
-            readAlbumRows(cursor, rows, aggregateAlbums, null)
+            readAlbumRows(cursor, rows, aggregateAlbums, null, unsetArtist, unsetAlbum)
             cursor.close()
         }
         sortStatsRows(rows, order)
@@ -749,20 +754,24 @@ class SongDatabase(
      * @param albums destination for per-album stats
      * @param aggregateAlbums group rows by (album, album ID)
      * @param artistAlbums optional destination for per-artist, per-album stats
+     * @param unsetArtist string to use in place of empty artist values
+     * @param unsetAlbum string to use in place of empty album values
      */
     private fun readAlbumRows(
         cursor: Cursor,
         albums: MutableList<StatsRow>,
         aggregateAlbums: Boolean,
-        artistAlbums: MutableMap<String, MutableList<StatsRow>>?
+        artistAlbums: MutableMap<String, MutableList<StatsRow>>?,
+        unsetArtist: String = UNSET_STRING,
+        unsetAlbum: String = UNSET_STRING,
     ) {
         var lastAlbum: StatsRow? = null // last row added to |albums|
 
         while (!cursor.isAfterLast) {
             var artist = cursor.getString(0)
-            if (artist.isEmpty()) artist = UNSET_STRING
+            if (artist.isEmpty()) artist = unsetArtist
             var album = cursor.getString(1)
-            if (album.isEmpty()) album = UNSET_STRING
+            if (album.isEmpty()) album = unsetAlbum
             val albumId = cursor.getString(2)
             val count = cursor.getInt(3)
 
@@ -798,7 +807,7 @@ class SongDatabase(
         // Special user-visible string that we use to represent a blank field.
         // It should be something that doesn't legitimately appear in any fields,
         // so "[unknown]" is out (MusicBrainz uses it for unknown artists).
-        private const val UNSET_STRING = "[unset]"
+        public const val UNSET_STRING = "[unset]"
 
         private const val DATABASE_NAME = "NupSongs"
         private const val MAX_QUERY_RESULTS = 250
