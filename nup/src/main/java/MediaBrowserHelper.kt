@@ -119,7 +119,7 @@ class MediaBrowserHelper(
                 result.sendResult(
                     db.searchPresetsAutoplay.mapIndexed { i, p ->
                         makeMenuItem(
-                            p.name, "${PRESET_PREFIX}_$i", playable = true,
+                            p.name, "$PRESET_PREFIX$i", playable = true,
                             imgResId = presetResIds[i % presetResIds.size]
                         )
                     }.toMutableList()
@@ -255,7 +255,8 @@ class MediaBrowserHelper(
         // to attach a Bundle with android.media.browse.CONTENT_STYLE_GROUP_TITLE_HINT, I'm unable
         // to list albums and logcat shows a "JavaBinder: !!! FAILED BINDER TRANSACTION !!!  (parcel
         // size = 676544)" error. That still doesn't make much sense to me, since the Android binder
-        // size limit is supposedly 1 MB.
+        // size limit is supposedly 1 MB. This is discussed at https://stackoverflow.com/q/66920487
+        // without any solution other than splitting the list into smaller lists.
         val pre = if (onlyCached) CACHED_ALBUM_ID_PREFIX else ALBUM_ID_PREFIX
         val builder = MediaDescriptionCompat.Builder()
             .setTitle(row.key.album)
