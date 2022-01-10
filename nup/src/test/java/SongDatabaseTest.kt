@@ -128,6 +128,15 @@ class SongDatabaseTest {
         serverDelSongs.clear()
         serverSearchPresets.clear()
 
+        initDb()
+    }
+
+    @After fun tearDown() {
+        db.quit()
+        openMocks.close()
+    }
+
+    private fun initDb() {
         db = SongDatabase(
             ApplicationProvider.getApplicationContext(),
             scope,
@@ -138,11 +147,6 @@ class SongDatabaseTest {
             networkHelper,
             initDispatcher = dispatcher,
         )
-    }
-
-    @After fun tearDown() {
-        db.quit()
-        openMocks.close()
     }
 
     @Test fun syncAndQuery() = runBlockingTest {
@@ -176,6 +180,13 @@ class SongDatabaseTest {
             Pair(listOf(s1, s4, s3, s2), 2),
             db.getSongs(listOf(s1.id, s4.id, 500L, s3.id, s2.id), origIndex = 3)
         )
+
+        // Data should be reloaded after recreating SongDatabase.
+        db.quit()
+        initDb()
+        assertEquals(4, db.numSongs)
+        assertEquals(4, db.numSongs)
+        assertEquals(listOf(s1, s2, s3, s4), db.query())
     }
 
     @Test fun syncUpdates() = runBlockingTest {
@@ -272,6 +283,19 @@ class SongDatabaseTest {
             ),
             db.albumsByArtist("B feat. C")
         )
+
+        // Data should be reloaded after recreating SongDatabase.
+        db.quit()
+        initDb()
+        assertTrue(db.aggregateDataLoaded)
+        assertEquals(
+            listOf(
+                StatsRow("A", "", "", 2),
+                StatsRow("B", "", "", 4),
+                StatsRow("B feat. C", "", "", 1),
+            ),
+            db.artistsSortedAlphabetically
+        )
     }
 
     @Test fun cachedSongs() = runBlockingTest {
@@ -359,6 +383,11 @@ class SongDatabaseTest {
         )
         db.syncWithServer()
         assertEquals(serverSearchPresets, db.searchPresets)
+
+        // Data should be reloaded after recreating SongDatabase.
+        db.quit()
+        initDb()
+        assertEquals(serverSearchPresets, db.searchPresets)
     }
 
     // This tests a function from Search.kt, but it depends heavily on [SongDatabase].
@@ -393,8 +422,6 @@ class SongDatabaseTest {
         db.removePendingPlaybackReport(r2.songId, r2.startDate)
         assertTrue(db.allPendingPlaybackReports().isEmpty())
     }
-
-    // TODO: Add test for reloading data instead of just syncing.
 }
 
 /** Construct a [Song] based on the supplied information. */
