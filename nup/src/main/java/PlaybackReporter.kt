@@ -19,26 +19,35 @@ class PlaybackReporter(
     private val networkHelper: NetworkHelper,
 ) {
     private val lock = ReentrantLock()
+    private var reporting = false
 
-    /** Synchronously report the playback of [songId] starting at [startDate]. */
+    /** Report the playback of [songId] starting at [startDate]. */
     suspend fun report(songId: Long, startDate: Date) {
-        lock.withLock() { songDb.addPendingPlaybackReport(songId, startDate) }
+        songDb.addPendingPlaybackReport(songId, startDate)
         if (networkHelper.isNetworkAvailable) reportPending()
     }
 
     /** Synchronously report all unreported songs. */
     suspend fun reportPending() {
         lock.withLock() {
-            for (report in songDb.allPendingPlaybackReports()) {
-                if (send(report.songId, report.startDate)) {
-                    songDb.removePendingPlaybackReport(report.songId, report.startDate)
-                }
+            if (reporting) return
+            reporting = true
+        }
+
+        for (report in songDb.allPendingPlaybackReports()) {
+            if (send(report.songId, report.startDate)) {
+                songDb.removePendingPlaybackReport(report.songId, report.startDate)
             }
         }
+
+        // report() could've added more songs while we were sending the pending reports to the
+        // server. This probably isn't a big deal, since we'll send those songs next time. Kotlin
+        // won't let us call suspend functions in critical sections.
+        lock.withLock() { reporting = false }
     }
 
     /** Sends a report of [songId] starting at [startDate]. */
-    private fun send(songId: Long, startDate: Date): Boolean {
+    private suspend fun send(songId: Long, startDate: Date): Boolean {
         if (!networkHelper.isNetworkAvailable) return false
 
         Log.d(TAG, "Reporting song $songId started at $startDate")

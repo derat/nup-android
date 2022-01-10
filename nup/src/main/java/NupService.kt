@@ -927,7 +927,7 @@ class NupService :
 
         val song = songIdToSong[entry.songId] ?: return
         song.updateBytes(entry)
-        songDb.handleSongCached(song.id)
+        scope.launch(Dispatchers.IO) { songDb.handleSongCached(song.id) }
 
         if (song == curSong) {
             if (waitingForDownload) {
@@ -983,7 +983,13 @@ class NupService :
         assertOnMainThread()
         Log.d(TAG, "Song ${entry.songId} evicted")
 
-        songDb.handleSongEvicted(entry.songId)
+        // TODO: I think that there's a bit of a race here, in that (as I understand it from
+        // https://discuss.kotlinlang.org/t/coroutines-execution-order-when-launching-them-sequentially/22069),
+        // there's no guarantee about the execution order of Dispatchers.IO, and it's possible that
+        // handleSongCached and handleSongEvicted calls could get swapped. I'm hopeful that it's
+        // unlikely to ever be a problem in practice, and SongDatabase recreates the CachedSongs
+        // table on startup in any case.
+        scope.launch(Dispatchers.IO) { songDb.handleSongEvicted(entry.songId) }
         val song = songIdToSong[entry.songId]
         if (song != null) {
             song.availableBytes = 0

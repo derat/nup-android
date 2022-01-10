@@ -137,7 +137,6 @@ class SongDatabaseTest {
             downloader,
             networkHelper,
             initDispatcher = dispatcher,
-            updateExecutor = MoreExecutors.newDirectExecutorService(),
         )
     }
 

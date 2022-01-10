@@ -15,8 +15,6 @@ import android.util.Log
 import java.util.Collections
 import java.util.Date
 import java.util.concurrent.Executor
-import java.util.concurrent.ExecutorService
-import java.util.concurrent.Executors
 import kotlinx.coroutines.CoroutineDispatcher
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -36,10 +34,8 @@ class SongDatabase(
     private val downloader: Downloader,
     private val networkHelper: NetworkHelper,
     initDispatcher: CoroutineDispatcher = Dispatchers.IO, // for tests
-    updateExecutor: ExecutorService = Executors.newSingleThreadExecutor(), // for tests
 ) {
     private val opener: DatabaseOpener
-    private val updater: DatabaseUpdater
 
     var aggregateDataLoaded = false
         private set
@@ -118,7 +114,6 @@ class SongDatabase(
     )
 
     fun quit() {
-        updater.quit()
         opener.close()
     }
 
@@ -260,39 +255,50 @@ class SongDatabase(
     }
 
     /** Record the fact that a song has been successfully cached. */
-    fun handleSongCached(songId: Long) {
-        updater.postUpdate("REPLACE INTO CachedSongs (SongId) VALUES(?)", arrayOf(songId))
+    suspend fun handleSongCached(songId: Long) {
+        opener.getDb() task@{ db ->
+            if (db == null) return@task // quit() already called
+            val values = ContentValues(1)
+            values.put("SongId", songId)
+            db.replace("CachedSongs", "", values)
+        }
     }
 
     /** Record the fact that a song has been evicted from the cache. */
-    fun handleSongEvicted(songId: Long) {
-        updater.postUpdate("DELETE FROM CachedSongs WHERE SongId = ?", arrayOf(songId))
+    suspend fun handleSongEvicted(songId: Long) {
+        opener.getDb() task@{ db ->
+            if (db == null) return@task // quit() already called
+            db.delete("CachedSongs ", "SongId = ?", arrayOf(songId.toString()))
+        }
     }
 
     /** Add an entry to the PendingPlaybackReports table. */
-    fun addPendingPlaybackReport(songId: Long, startDate: Date) {
-        updater.postUpdate(
-            "REPLACE INTO PendingPlaybackReports (SongId, StartTime) VALUES(?, ?)",
-            arrayOf(songId, startDate.time)
-        )
+    suspend fun addPendingPlaybackReport(songId: Long, startDate: Date) {
+        opener.getDb() task@{ db ->
+            if (db == null) return@task // quit() already called
+            val values = ContentValues(2)
+            values.put("SongId", songId)
+            values.put("StartTime", startDate.time)
+            db.replace("PendingPlaybackReports", "", values)
+        }
     }
 
     /** Remove an entry from the PendingPlaybackReports table. */
-    fun removePendingPlaybackReport(songId: Long, startDate: Date) {
-        updater.postUpdate(
-            "DELETE FROM PendingPlaybackReports WHERE SongId = ? AND StartTime = ?",
-            arrayOf(songId, startDate.time)
-        )
+    suspend fun removePendingPlaybackReport(songId: Long, startDate: Date) {
+        opener.getDb() task@{ db ->
+            if (db == null) return@task // quit() already called
+            db.delete(
+                "PendingPlaybackReports ", "SongId = ? AND StartTime = ?",
+                arrayOf(songId.toString(), startDate.time.toString())
+            )
+        }
     }
 
     /** Queued report of a song being played. */
     data class PendingPlaybackReport(var songId: Long, var startDate: Date)
 
     /** Get all pending playback reports from the PendingPlaybackReports table. */
-    fun allPendingPlaybackReports(): List<PendingPlaybackReport> {
-        // TODO: This should probably be marked 'suspend', but doing so produces a "The
-        // 'allPendingPlaybackReports' suspension point is inside a critical section" error in
-        // [PlaybackReporter]. Figure out how threading should work here.
+    suspend fun allPendingPlaybackReports(): List<PendingPlaybackReport> {
         val reports = mutableListOf<PendingPlaybackReport>()
         opener.getDb() task@{ db ->
             if (db == null) return@task // quit() already called
@@ -1164,6 +1170,5 @@ class SongDatabase(
                 }
             }
         }
-        updater = DatabaseUpdater(opener, updateExecutor)
     }
 }

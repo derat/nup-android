@@ -10,7 +10,9 @@ import java.net.URL
 import java.util.Arrays
 import java.util.Date
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.test.TestCoroutineScope
+import kotlinx.coroutines.test.runBlockingTest
 import org.erat.nup.Downloader
 import org.erat.nup.NetworkHelper
 import org.erat.nup.PlaybackReporter
@@ -46,15 +48,16 @@ class PlaybackReporterTest {
         val reportPath = getReportPath(SONG_ID, START_DATE)
         reportUrl = getReportUrl(reportPath)
         Mockito.`when`(downloader.getServerUrl(reportPath)).thenReturn(reportUrl)
-        Mockito.`when`(songDb.allPendingPlaybackReports())
-            .thenReturn(ArrayList())
+        runBlocking {
+            Mockito.`when`(songDb.allPendingPlaybackReports()).thenReturn(ArrayList())
+        }
     }
 
     @After fun tearDown() {
         openMocks.close()
     }
 
-    @Test fun immediateSuccessfulReport() {
+    @Test fun immediateSuccessfulReport() = runBlockingTest {
         Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(true)
 
         val reporter = createReporter()
@@ -74,7 +77,7 @@ class PlaybackReporterTest {
         inOrder.verify(songDb).removePendingPlaybackReport(SONG_ID, START_DATE)
     }
 
-    @Test fun deferReportWhenNetworkUnavailable() {
+    @Test fun deferReportWhenNetworkUnavailable() = runBlockingTest {
         Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(false)
         val reporter = createReporter()
         scope.launch { reporter.report(SONG_ID, START_DATE) }
@@ -82,7 +85,7 @@ class PlaybackReporterTest {
         Mockito.verifyNoMoreInteractions(downloader)
     }
 
-    @Test fun deferReportOnServerError() {
+    @Test fun deferReportOnServerError() = runBlockingTest {
         Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(true)
         Mockito.`when`(songDb.allPendingPlaybackReports())
             .thenReturn(Arrays.asList(PendingPlaybackReport(SONG_ID, START_DATE)))
@@ -97,7 +100,7 @@ class PlaybackReporterTest {
         inOrder.verify(songDb, Mockito.never()).removePendingPlaybackReport(SONG_ID, START_DATE)
     }
 
-    @Test fun reportPendingAtCreation() {
+    @Test fun reportPendingAtCreation() = runBlockingTest {
         Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(true)
         Mockito.`when`(songDb.allPendingPlaybackReports())
             .thenReturn(Arrays.asList(PendingPlaybackReport(SONG_ID, START_DATE)))
@@ -112,7 +115,7 @@ class PlaybackReporterTest {
         inOrder.verify(songDb).removePendingPlaybackReport(SONG_ID, START_DATE)
     }
 
-    @Test fun reportPendingWhenReportRequested() {
+    @Test fun reportPendingWhenReportRequested() = runBlockingTest {
         Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(true)
 
         // Queue up an old report. Let it succeed, but the next report fail.
