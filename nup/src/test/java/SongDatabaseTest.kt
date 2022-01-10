@@ -5,6 +5,10 @@
 
 package org.erat.nup.test
 
+import android.content.ContentValues
+import android.content.Context
+import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteOpenHelper
 import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.util.concurrent.MoreExecutors
@@ -422,6 +426,79 @@ class SongDatabaseTest {
         db.removePendingPlaybackReport(r2.songId, r2.startDate)
         assertTrue(db.allPendingPlaybackReports().isEmpty())
     }
+
+    @Test fun upgradeDatabase() = runBlockingTest {
+        // Replace the existing SQLite database with an ancient version.
+        db.quit()
+        val ctx: Context = ApplicationProvider.getApplicationContext()
+        ctx.deleteDatabase(SongDatabase.DATABASE_NAME)
+
+        val song = Song(
+            id = 1234567890,
+            artist = "Artist Name",
+            title = "Title Name",
+            album = "Album Name",
+            albumId = "", // not in version 13
+            filename = "", // not in version 13
+            coverFilename = "", // not in version 13
+            lengthSec = 201,
+            track = 5,
+            disc = 1,
+            trackGain = 0.0, // not in version 13
+            albumGain = 0.0, // not in version 13
+            peakAmp = 0.0, // not in version 13
+            rating = 0.75,
+        )
+        val report = SongDatabase.PendingPlaybackReport(song.id, Date(1641855862L * 1000))
+
+        val helper = object : SQLiteOpenHelper(ctx, SongDatabase.DATABASE_NAME, null, 13) {
+            override fun onCreate(db: SQLiteDatabase) {
+                createTablesV13(db)
+
+                // Insert some data so we can check that it's preserved.
+                var values = ContentValues(10)
+                values.put("SongId", song.id)
+                values.put("Url", "https://example.org/artist/album/5-song.mp3")
+                values.put("CoverUrl", "https://example.org/covers/album.jpg")
+                values.put("Artist", song.artist)
+                values.put("Title", song.title)
+                values.put("Album", song.album)
+                values.put("TrackNumber", song.track)
+                values.put("DiscNumber", song.disc)
+                values.put("Length", song.lengthSec)
+                values.put("Rating", song.rating)
+                db.replace("Songs", "", values)
+
+                values = ContentValues(5)
+                values.put("Artist", song.artist)
+                values.put("Album", song.album)
+                values.put("NumSongs", 1)
+                values.put("ArtistSortKey", song.artist)
+                values.put("AlbumSortKey", song.album)
+                db.replace("ArtistAlbumStats", "", values)
+
+                values = ContentValues(2)
+                values.put("SongId", song.id)
+                values.put("StartTime", report.startDate.getTime())
+                db.replace("PendingPlaybackReports", "", values)
+            }
+            override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) =
+                throw RuntimeException("Unexpected upgrade from $oldVersion to $newVersion")
+        }
+        helper.getWritableDatabase()
+        helper.close()
+
+        // Initialize SongDatabase again to let it upgrade the database.
+        initDb()
+        assertEquals(1, db.numSongs)
+        assertEquals(listOf(song), db.query())
+        assertEquals(listOf(StatsRow(song.artist, "", "", 1)), db.artistsSortedAlphabetically)
+        assertEquals(
+            listOf(StatsRow(song.artist, song.album, "", 1)),
+            db.albumsSortedAlphabetically
+        )
+        assertEquals(listOf(report), db.allPendingPlaybackReports())
+    }
 }
 
 /** Construct a [Song] based on the supplied information. */
@@ -504,4 +581,46 @@ private fun searchPresetToJson(p: SearchPreset): JSONObject {
     o.put("shuffle", p.shuffle)
     o.put("play", p.play)
     return o
+}
+
+/** Creates [SongDatabase]'s tables for version 13 (commit 614ec53f). */
+private fun createTablesV13(db: SQLiteDatabase) {
+    db.execSQL(
+        "CREATE TABLE Songs (" +
+            "SongId INTEGER PRIMARY KEY NOT NULL, " +
+            "Url VARCHAR(256) NOT NULL, " +
+            "CoverUrl VARCHAR(256) NOT NULL, " +
+            "Artist VARCHAR(256) NOT NULL, " +
+            "Title VARCHAR(256) NOT NULL, " +
+            "Album VARCHAR(256) NOT NULL, " +
+            "TrackNumber INTEGER NOT NULL, " +
+            "DiscNumber INTEGER NOT NULL, " +
+            "Length INTEGER NOT NULL, " +
+            "Rating FLOAT NOT NULL)"
+    )
+    db.execSQL("CREATE INDEX Artist ON Songs (Artist)")
+    db.execSQL("CREATE INDEX Album ON Songs (Album)")
+    db.execSQL(
+        "CREATE TABLE ArtistAlbumStats (" +
+            "Artist VARCHAR(256) NOT NULL, " +
+            "Album VARCHAR(256) NOT NULL, " +
+            "NumSongs INTEGER NOT NULL, " +
+            "ArtistSortKey VARCHAR(256) NOT NULL, " +
+            "AlbumSortKey VARCHAR(256) NOT NULL)"
+    )
+    db.execSQL("CREATE INDEX ArtistSortKey ON ArtistAlbumStats (ArtistSortKey)")
+    db.execSQL("CREATE INDEX AlbumSortKey ON ArtistAlbumStats (AlbumSortKey)")
+    db.execSQL(
+        "CREATE TABLE LastUpdateTime (" +
+            "LocalTimeNsec INTEGER NOT NULL, " +
+            "ServerTimeNsec INTEGER NOT NULL)"
+    )
+    db.execSQL("INSERT INTO LastUpdateTime (LocalTimeNsec, ServerTimeNsec) VALUES(0, 0)")
+    db.execSQL("CREATE TABLE CachedSongs (SongId INTEGER PRIMARY KEY NOT NULL)")
+    db.execSQL(
+        "CREATE TABLE PendingPlaybackReports (" +
+            "SongId INTEGER NOT NULL, " +
+            "StartTime INTEGER NOT NULL, " +
+            "PRIMARY KEY (SongId, StartTime))"
+    )
 }

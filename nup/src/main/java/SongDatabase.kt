@@ -819,9 +819,9 @@ class SongDatabase(
         // so "[unknown]" is out (MusicBrainz uses it for unknown artists).
         public const val UNSET_STRING = "[unset]"
 
-        private const val DATABASE_NAME = "NupSongs"
-        private const val MAX_QUERY_RESULTS = 250
+        public const val DATABASE_NAME = "NupSongs" // public for tests
         private const val DATABASE_VERSION = 17
+        private const val MAX_QUERY_RESULTS = 250
         private const val SERVER_SONG_BATCH_SIZE = 100
 
         // IMPORTANT NOTE: When updating any of these, you must replace all previous references in
