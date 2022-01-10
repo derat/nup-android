@@ -60,6 +60,7 @@ class SongDatabase(
 
     private var _searchPresets = mutableListOf<SearchPreset>()
     val searchPresets: List<SearchPreset> get() = _searchPresets
+    val searchPresetsAutoplay get() = searchPresets.filter { it.play }
 
     enum class SyncState {
         IDLE,

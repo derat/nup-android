@@ -117,9 +117,9 @@ class MediaBrowserHelper(
             }
             parentId == PRESETS_ID -> {
                 result.sendResult(
-                    db.searchPresets.filter { it.play }.mapIndexed { i, p ->
+                    db.searchPresetsAutoplay.mapIndexed { i, p ->
                         makeMenuItem(
-                            p.name, PRESET_PREFIX + p.name, playable = true,
+                            p.name, "${PRESET_PREFIX}_$i", playable = true,
                             imgResId = presetResIds[i % presetResIds.size]
                         )
                     }.toMutableList()
@@ -280,8 +280,11 @@ class MediaBrowserHelper(
     /** Query the database for songs identified by [id]. */
     public suspend fun getSongsForMediaId(id: String): List<Song> {
         return when {
-            id.startsWith(PRESET_PREFIX) ->
-                doPresetSearch(id.substring(PRESET_PREFIX.length))
+            id.startsWith(PRESET_PREFIX) -> {
+                val idx = id.substring(PRESET_PREFIX.length).toInt()
+                val preset = db.searchPresetsAutoplay.getOrNull(idx) ?: return listOf<Song>()
+                return searchUsingPreset(db, downloader, preset)
+            }
             id.startsWith(ALBUM_ID_PREFIX) ->
                 db.query(albumId = id.substring(ALBUM_ID_PREFIX.length))
             id.startsWith(CACHED_ALBUM_ID_PREFIX) ->
@@ -293,16 +296,6 @@ class MediaBrowserHelper(
                 listOf<Song>()
             }
         }
-    }
-
-    /** Performs a network search using the preset named [name]. */
-    private suspend fun doPresetSearch(name: String): List<Song> {
-        val preset = db.searchPresets.find { it.name == name }
-        if (preset == null) {
-            Log.e(TAG, "Unknown search preset \"$name\"")
-            return listOf<Song>()
-        }
-        return searchUsingPreset(db, downloader, preset)
     }
 
     companion object {

@@ -21,7 +21,8 @@ class BrowseArtistsActivity : BrowseActivityBase() {
         setTitle(if (onlyCached) R.string.browse_cached_artists else R.string.browse_artists)
     }
 
-    override fun onRowClick(row: StatsRow, pos: Int) = startBrowseAlbumsActivity(row.key.artist)
+    override fun onRowClick(row: StatsRow, pos: Int, fragment: BrowseListFragment) =
+        startBrowseAlbumsActivity(row.key.artist)
 
     override fun fillMenu(menu: ContextMenu, row: StatsRow) {
         menu.setHeaderTitle(row.key.artist)

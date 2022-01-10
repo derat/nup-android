@@ -35,10 +35,11 @@ class BrowseAlbumsActivity : BrowseActivityBase() {
 
     // TODO: Right now, we show the full album by default instead of limiting it to songs by
     // the artist. Decide if this makes sense.
-    override fun onRowClick(row: StatsRow, pos: Int) = startBrowseSongsActivity(
-        album = row.key.album,
-        albumId = row.key.albumId
-    )
+    override fun onRowClick(row: StatsRow, pos: Int, fragment: BrowseListFragment) =
+        startBrowseSongsActivity(
+            album = row.key.album,
+            albumId = row.key.albumId
+        )
 
     override fun fillMenu(menu: ContextMenu, row: StatsRow) {
         menu.setHeaderTitle(row.key.album)

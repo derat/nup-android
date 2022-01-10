@@ -22,7 +22,7 @@ class BrowseTopActivity : BrowseActivityBase() {
         setTitle(R.string.browse)
     }
 
-    override fun onRowClick(row: StatsRow, pos: Int) {
+    override fun onRowClick(row: StatsRow, pos: Int, fragment: BrowseListFragment) {
         when (pos) {
             0 -> startActivityForResult(
                 Intent(this, BrowseArtistsActivity::class.java), BROWSE_ARTISTS_REQUEST_CODE
@@ -41,14 +41,13 @@ class BrowseTopActivity : BrowseActivityBase() {
                 startActivityForResult(intent, BROWSE_ALBUMS_REQUEST_CODE)
             }
             else -> {
-                val idx = pos - 4
-                val presets = service.songDb.searchPresets
-                if (idx >= presets.size) return
-                val preset = presets[idx]
+                val preset = service.songDb.searchPresetsAutoplay.getOrNull(pos - 4) ?: return
                 service.scope.async(Dispatchers.Main) {
+                    fragment.setListShown(false)
                     val songs = async(Dispatchers.IO) {
                         searchUsingPreset(service.songDb, service.downloader, preset)
                     }.await()
+                    fragment.setListShown(true)
                     if (songs.size > 0) {
                         service.clearPlaylist()
                         service.appendSongsToPlaylist(songs)
@@ -72,7 +71,7 @@ class BrowseTopActivity : BrowseActivityBase() {
             StatsRow(getString(R.string.artists_cached), "", "", -1),
             StatsRow(getString(R.string.albums_cached), "", "", -1),
         )
-        rows.addAll(db.searchPresets.filter { it.play }.map { StatsRow(it.name, "", "", -1) })
+        rows.addAll(db.searchPresetsAutoplay.map { StatsRow(it.name, "", "", -1) })
         update(rows)
     }
 }

@@ -28,7 +28,7 @@ abstract class BrowseActivityBase : AppCompatActivity(), NupService.SongDatabase
     protected var onlyCached: Boolean = false // displaying only cached songs
 
     abstract val display: StatsRowArrayAdapter.Display
-    abstract fun onRowClick(row: StatsRow, pos: Int)
+    abstract fun onRowClick(row: StatsRow, pos: Int, fragment: BrowseListFragment)
     abstract fun fillMenu(menu: ContextMenu, row: StatsRow)
     abstract fun onMenuClick(itemId: Int, row: StatsRow): Boolean
     abstract fun getRows(
@@ -149,6 +149,6 @@ class BrowseListFragment : ListFragment() {
 
     override fun onListItemClick(listView: ListView, view: View, position: Int, id: Long) {
         (activity as BrowseActivityBase)
-            .onRowClick((listAdapter as StatsRowArrayAdapter).rows[position], position)
+            .onRowClick((listAdapter as StatsRowArrayAdapter).rows[position], position, this)
     }
 }
