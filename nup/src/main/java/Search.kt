@@ -188,7 +188,7 @@ suspend fun searchServer(
     add("shuffle", if (shuffle) "1" else "")
     add("keywords", keywords)
     add("tags", tags)
-    add("minRating", if (minRating >= 0) "%.2f".format(minRating) else "")
+    add("minRating", if (minRating > 0) "%.2f".format(minRating) else "")
     add("unrated", if (unrated) "1" else "")
     add("maxPlays", if (maxPlays >= 0) maxPlays.toString() else "")
     add("firstTrack", if (firstTrack) "1" else "")

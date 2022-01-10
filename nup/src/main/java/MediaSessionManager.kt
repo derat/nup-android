@@ -92,28 +92,17 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
         buffering: Boolean,
         positionMs: Long,
         songIndex: Int,
-        numSongs: Int
+        numSongs: Int,
+        errorMsg: String? = null,
     ) {
         val builder = PlaybackStateCompat.Builder()
         if (song != null) builder.setActiveQueueItemId(songIndex.toLong())
 
-        // I experimented with using STATE_ERROR and calling setErrorMessage(), but the UX in
-        // the Android Auto app seems pretty poor:
-        //
-        // - When I call setErrorMessage() to report a transient error (e.g. switching from stream
-        //   to file), I don't see anything show up onscreen. Maybe the message is being removed
-        //   immediately by the next call to this method.
-        // - When I additionally use STATE_ERROR to report a fatal error (e.g. can't download
-        //   because network is unavailable), Android Auto shows a fullscreen error and doesn't seem
-        //   to let me do anything apart from going back to the browse screen.
-        //
-        // Android Auto seems to still display toasts at the bottom of the screen, so I'm going to
-        // just let NupService continue reporting errors like that for now.
-        //
         // More info:
         // https://developer.android.com/guide/topics/media-apps/working-with-a-media-session#errors
         builder.setState(
             when {
+                !errorMsg.isNullOrEmpty() -> PlaybackStateCompat.STATE_ERROR
                 numSongs == 0 -> PlaybackStateCompat.STATE_NONE
                 buffering -> PlaybackStateCompat.STATE_BUFFERING
                 playbackComplete && songIndex == numSongs - 1 -> PlaybackStateCompat.STATE_STOPPED
@@ -123,6 +112,10 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
             },
             positionMs, 1.0f
         )
+
+        if (!errorMsg.isNullOrEmpty()) {
+            builder.setErrorMessage(PlaybackStateCompat.ERROR_CODE_UNKNOWN_ERROR, errorMsg)
+        }
 
         var actions: Long = PlaybackStateCompat.ACTION_PLAY_FROM_MEDIA_ID or
             PlaybackStateCompat.ACTION_PLAY_FROM_SEARCH

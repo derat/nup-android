@@ -313,12 +313,12 @@ class NupService :
             this,
             object : MediaSessionCompat.Callback() {
                 override fun onAddQueueItem(description: MediaDescriptionCompat) {
-                    val id = description.getMediaId()
+                    val id = description.getMediaId() ?: return
                     Log.d(TAG, "MediaSession request to add $id")
                     getSongsForMediaId(id) { appendSongsToPlaylist(it) }
                 }
                 override fun onAddQueueItem(description: MediaDescriptionCompat, index: Int) {
-                    val id = description.getMediaId()
+                    val id = description.getMediaId() ?: return
                     Log.d(TAG, "MediaSession request to add $id at $index")
                     getSongsForMediaId(id) { insertSongs(it, index) }
                 }
@@ -333,11 +333,18 @@ class NupService :
                 }
                 override fun onPlayFromMediaId(mediaId: String, extras: Bundle) {
                     Log.d(TAG, "MediaSession request to play $mediaId")
-                    getSongsForMediaId(mediaId) {
-                        // TODO: Figure out how queue management should work here.
-                        clearPlaylist()
-                        appendSongsToPlaylist(it)
-                        unpause()
+                    // Clearing the playlist before doing the potentially-slow async search seems to
+                    // convince Android Auto to display a nice "Getting your selection..." message:
+                    // https://github.com/derat/nup-android/issues/31
+                    clearPlaylist()
+                    getSongsForMediaId(mediaId) { songs ->
+                        if (songs.isEmpty()) {
+                            // This replaces the "Getting your selection..." message with an error.
+                            updatePlaybackState(errorMsg = getText(R.string.no_results).toString())
+                        } else {
+                            appendSongsToPlaylist(songs)
+                            unpause()
+                        }
                     }
                 }
                 override fun onPlayFromSearch(query: String, extras: Bundle) {
@@ -366,12 +373,13 @@ class NupService :
                     }
                 }
                 override fun onRemoveQueueItem(description: MediaDescriptionCompat) {
-                    Log.d(TAG, "MediaSession request to remove ${description.getMediaId()}")
-                    getSongsForMediaId(description.getMediaId()) {
-                        for (song in it) {
-                            val idx = getSongIndex(song.id)
-                            if (idx >= 0) removeFromPlaylist(idx)
-                        }
+                    val id = description.getMediaId() ?: return
+                    Log.d(TAG, "MediaSession request to remove $id")
+                    getSongsForMediaId(id) { songs ->
+                        songs.map { getSongIndex(it.id) }
+                            .filter { it >= 0 }
+                            .sortedDescending()
+                            .forEach { removeFromPlaylist(it) }
                     }
                 }
                 override fun onRemoveQueueItemAt(index: Int) {
@@ -805,18 +813,9 @@ class NupService :
     fun getSongIndex(songId: Long) = playlist.indexOfFirst { it.id == songId }
 
     /** Asynchronously get songs for [id] and pass them to [fn]. */
-    fun getSongsForMediaId(id: String?, fn: (List<Song>) -> Unit) {
-        if (id == null) {
-            Log.e(TAG, "Can't get songs for null media ID")
-            return
-        }
+    fun getSongsForMediaId(id: String, fn: (List<Song>) -> Unit) {
         scope.launch(Dispatchers.Main) {
-            val songs = async(Dispatchers.IO) { mediaBrowserHelper.getSongsForMediaId(id) }.await()
-            if (songs.isEmpty()) {
-                Log.e(TAG, "No songs found for media ID \"$id\"")
-            } else {
-                fn(songs)
-            }
+            fn(async(Dispatchers.IO) { mediaBrowserHelper.getSongsForMediaId(id) }.await())
         }
     }
 
@@ -897,6 +896,7 @@ class NupService :
     override fun onPlaybackError(description: String) {
         assertOnMainThread()
         Toast.makeText(this@NupService, description, Toast.LENGTH_LONG).show()
+        updatePlaybackState(errorMsg = description)
     }
 
     override fun onCacheDownloadError(entry: FileCacheEntry, reason: String) {
@@ -1175,7 +1175,7 @@ class NupService :
     }
 
     /** Notify [mediaSessionManager] about the current playback state. */
-    private fun updatePlaybackState() {
+    private fun updatePlaybackState(errorMsg: String? = null) {
         mediaSessionManager.updatePlaybackState(
             song = curSong,
             paused = paused,
@@ -1184,6 +1184,7 @@ class NupService :
             positionMs = lastPosMs.toLong(),
             songIndex = curSongIndex,
             numSongs = playlist.size,
+            errorMsg = errorMsg,
         )
     }
 
