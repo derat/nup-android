@@ -302,7 +302,7 @@ class MediaBrowserHelper(
             Log.e(TAG, "Unknown search preset \"$name\"")
             return listOf<Song>()
         }
-        return searchServerPreset(db, downloader, preset)
+        return searchUsingPreset(db, downloader, preset)
     }
 
     companion object {

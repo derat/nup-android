@@ -220,22 +220,28 @@ suspend fun searchServer(
     return db.getSongs(songIds, onlyCached = onlyCached).first
 }
 
-/** Search the server for songs using [preset]. */
-suspend fun searchServerPreset(
+/** Search for songs using [preset]. Network access may be needed. */
+suspend fun searchUsingPreset(
     db: SongDatabase,
     downloader: Downloader,
     preset: SearchPreset
-) = searchServer(
-    db,
-    downloader,
-    tags = if (preset.tags != "") preset.tags else null,
-    minRating = preset.minRating,
-    unrated = preset.unrated,
-    firstPlayed = preset.firstPlayed,
-    lastPlayed = preset.lastPlayed,
-    firstTrack = preset.firstTrack,
-    shuffle = preset.shuffle
-)
+): List<Song> {
+    if (preset.canSearchLocal()) {
+        return db.query(minRating = preset.minRating, shuffle = preset.shuffle)
+    }
+
+    return searchServer(
+        db,
+        downloader,
+        tags = if (preset.tags != "") preset.tags else null,
+        minRating = preset.minRating,
+        unrated = preset.unrated,
+        firstPlayed = preset.firstPlayed,
+        lastPlayed = preset.lastPlayed,
+        firstTrack = preset.firstTrack,
+        shuffle = preset.shuffle
+    )
+}
 
 /** Predefined search specified in the server's configuration. */
 data class SearchPreset(
@@ -248,7 +254,14 @@ data class SearchPreset(
     val firstTrack: Boolean,
     val shuffle: Boolean,
     val play: Boolean, // automatically play results
-)
+) {
+    /** Return true if the search can be performed with [searchLocal] rather than [searchServer]. */
+    fun canSearchLocal() = tags.isEmpty() &&
+        unrated == false &&
+        firstPlayed == 0 &&
+        lastPlayed == 0 &&
+        firstTrack == false
+}
 
 /** Thrown if an error is encountered while searching. */
 class SearchException(reason: String) : Exception(reason)

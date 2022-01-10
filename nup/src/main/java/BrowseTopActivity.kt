@@ -47,7 +47,7 @@ class BrowseTopActivity : BrowseActivityBase() {
                 val preset = presets[idx]
                 service.scope.async(Dispatchers.Main) {
                     val songs = async(Dispatchers.IO) {
-                        searchServerPreset(service.songDb, service.downloader, preset)
+                        searchUsingPreset(service.songDb, service.downloader, preset)
                     }.await()
                     if (songs.size > 0) {
                         service.clearPlaylist()

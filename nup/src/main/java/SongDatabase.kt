@@ -290,6 +290,9 @@ class SongDatabase(
 
     /** Get all pending playback reports from the PendingPlaybackReports table. */
     fun allPendingPlaybackReports(): List<PendingPlaybackReport> {
+        // TODO: This should probably be marked 'suspend', but doing so produces a "The
+        // 'allPendingPlaybackReports' suspension point is inside a critical section" error in
+        // [PlaybackReporter]. Figure out how threading should work here.
         val reports = mutableListOf<PendingPlaybackReport>()
         opener.getDb() task@{ db ->
             if (db == null) return@task // quit() already called

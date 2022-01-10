@@ -20,10 +20,12 @@ import org.erat.nup.SearchPreset
 import org.erat.nup.Song
 import org.erat.nup.SongDatabase
 import org.erat.nup.StatsRow
+import org.erat.nup.searchLocal
 import org.json.JSONArray
 import org.json.JSONObject
 import org.junit.After
-import org.junit.Assert
+import org.junit.Assert.assertEquals
+import org.junit.Assert.assertTrue
 import org.junit.Before
 import org.junit.Test
 import org.junit.runner.RunWith
@@ -152,26 +154,26 @@ class SongDatabaseTest {
         serverSongs.addAll(listOf(SongInfo(s1), SongInfo(s2), SongInfo(s3), SongInfo(s4)))
 
         db.syncWithServer()
-        Assert.assertEquals(SongDatabase.SyncState.IDLE, db.syncState)
-        Assert.assertTrue(lastSyncSuccess)
-        Assert.assertEquals(4, lastSyncUpdatedSongs)
-        Assert.assertTrue(db.aggregateDataLoaded)
-        Assert.assertEquals(4, db.numSongs)
+        assertEquals(SongDatabase.SyncState.IDLE, db.syncState)
+        assertTrue(lastSyncSuccess)
+        assertEquals(4, lastSyncUpdatedSongs)
+        assertTrue(db.aggregateDataLoaded)
+        assertEquals(4, db.numSongs)
 
-        Assert.assertEquals(listOf(s1, s2, s3, s4), db.query())
-        Assert.assertEquals(listOf(s1, s2), db.query(artist = "A"))
-        Assert.assertEquals(listOf(s4), db.query(artist = "B"))
-        Assert.assertEquals(listOf(s3, s4), db.query(artistPrefix = "B"))
-        Assert.assertEquals(listOf(s1, s4), db.query(title = "Track 1"))
-        Assert.assertEquals(listOf(s1, s2, s3), db.query(album = "Album 1"))
-        Assert.assertEquals(listOf(s2), db.query(songId = s2.id))
-        Assert.assertEquals(listOf(s2, s3), db.query(songIds = listOf(s2.id, s3.id)))
-        Assert.assertEquals(listOf(s1, s3), db.query(minRating = 0.75))
-        Assert.assertEquals(listOf(s3), db.query(minRating = 1.0))
-        Assert.assertEquals(listOf(s3, s4), db.query(artist = "B", substring = true))
-        Assert.assertEquals(listOf<Song>(), db.query(artist = "Somebody Else"))
+        assertEquals(listOf(s1, s2, s3, s4), db.query())
+        assertEquals(listOf(s1, s2), db.query(artist = "A"))
+        assertEquals(listOf(s4), db.query(artist = "B"))
+        assertEquals(listOf(s3, s4), db.query(artistPrefix = "B"))
+        assertEquals(listOf(s1, s4), db.query(title = "Track 1"))
+        assertEquals(listOf(s1, s2, s3), db.query(album = "Album 1"))
+        assertEquals(listOf(s2), db.query(songId = s2.id))
+        assertEquals(listOf(s2, s3), db.query(songIds = listOf(s2.id, s3.id)))
+        assertEquals(listOf(s1, s3), db.query(minRating = 0.75))
+        assertEquals(listOf(s3), db.query(minRating = 1.0))
+        assertEquals(listOf(s3, s4), db.query(artist = "B", substring = true))
+        assertEquals(listOf<Song>(), db.query(artist = "Somebody Else"))
 
-        Assert.assertEquals(
+        assertEquals(
             Pair(listOf(s1, s4, s3, s2), 2),
             db.getSongs(listOf(s1.id, s4.id, 500L, s3.id, s2.id), origIndex = 3)
         )
@@ -184,11 +186,11 @@ class SongDatabaseTest {
         serverSongs.addAll(listOf(SongInfo(s1), SongInfo(s2)))
         serverNowNs++
         db.syncWithServer()
-        Assert.assertTrue(lastSyncSuccess)
-        Assert.assertEquals(2, lastSyncUpdatedSongs)
-        Assert.assertEquals(0, lastSyncDeletedSongs)
-        Assert.assertEquals(2, db.numSongs)
-        Assert.assertEquals(listOf(s1, s2), db.query())
+        assertTrue(lastSyncSuccess)
+        assertEquals(2, lastSyncUpdatedSongs)
+        assertEquals(0, lastSyncDeletedSongs)
+        assertEquals(2, db.numSongs)
+        assertEquals(listOf(s1, s2), db.query())
 
         // At time 1, update the first song, delete the second song, and add a third song.
         serverNowNs++
@@ -198,15 +200,15 @@ class SongDatabaseTest {
         val s3 = makeSong("A", "Track 3", "Album 1", 3, rating = 1.0)
         serverSongs.add(SongInfo(s3, serverNowNs))
         db.syncWithServer()
-        Assert.assertTrue(lastSyncSuccess)
-        Assert.assertEquals(2, lastSyncUpdatedSongs)
-        Assert.assertEquals(1, lastSyncDeletedSongs)
-        Assert.assertEquals(2, db.numSongs)
-        Assert.assertEquals(listOf(s1u, s3), db.query())
+        assertTrue(lastSyncSuccess)
+        assertEquals(2, lastSyncUpdatedSongs)
+        assertEquals(1, lastSyncDeletedSongs)
+        assertEquals(2, db.numSongs)
+        assertEquals(listOf(s1u, s3), db.query())
     }
 
     @Test fun aggregateData() = runBlockingTest {
-        Assert.assertTrue(db.aggregateDataLoaded) // happens initially
+        assertTrue(db.aggregateDataLoaded) // happens initially
         val oldUpdates = aggregateDataUpdates
 
         val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 0.75)
@@ -223,10 +225,10 @@ class SongDatabaseTest {
             ),
         )
         db.syncWithServer()
-        Assert.assertTrue(lastSyncSuccess)
-        Assert.assertEquals(oldUpdates + 1, aggregateDataUpdates)
+        assertTrue(lastSyncSuccess)
+        assertEquals(oldUpdates + 1, aggregateDataUpdates)
 
-        Assert.assertEquals(
+        assertEquals(
             listOf(
                 StatsRow("A", "", "", 2),
                 StatsRow("B", "", "", 4),
@@ -234,7 +236,7 @@ class SongDatabaseTest {
             ),
             db.artistsSortedAlphabetically
         )
-        Assert.assertEquals(
+        assertEquals(
             listOf(
                 StatsRow("B", "", "", 4),
                 StatsRow("A", "", "", 2),
@@ -242,7 +244,7 @@ class SongDatabaseTest {
             ),
             db.artistsSortedByNumSongs
         )
-        Assert.assertEquals(
+        assertEquals(
             listOf(
                 StatsRow("B", SongDatabase.UNSET_STRING, "", 1),
                 StatsRow("B, A, B feat. C", "Album 1", s1.albumId, 4),
@@ -250,14 +252,14 @@ class SongDatabaseTest {
             ),
             db.albumsSortedAlphabetically
         )
-        Assert.assertEquals(
+        assertEquals(
             listOf(
                 StatsRow("A", "Album 1", s1.albumId, 1),
                 StatsRow("A", "Album 2", s5.albumId, 1),
             ),
             db.albumsByArtist("A")
         )
-        Assert.assertEquals(
+        assertEquals(
             listOf(
                 StatsRow("B", SongDatabase.UNSET_STRING, "", 1),
                 StatsRow("B", "Album 1", s1.albumId, 2),
@@ -265,7 +267,7 @@ class SongDatabaseTest {
             ),
             db.albumsByArtist("B")
         )
-        Assert.assertEquals(
+        assertEquals(
             listOf(
                 StatsRow("B feat. C", "Album 1", s1.albumId, 1),
             ),
@@ -284,59 +286,56 @@ class SongDatabaseTest {
         )
 
         db.syncWithServer()
-        Assert.assertEquals(5, db.numSongs)
-        Assert.assertEquals(listOf<StatsRow>(), db.cachedArtistsSortedAlphabetically())
-        Assert.assertEquals(listOf<StatsRow>(), db.cachedAlbumsSortedAlphabetically())
-        Assert.assertEquals(listOf<StatsRow>(), db.cachedAlbumsByArtist("A"))
-        Assert.assertEquals(listOf<StatsRow>(), db.cachedAlbumsByArtist("B"))
+        assertEquals(5, db.numSongs)
+        assertEquals(listOf<StatsRow>(), db.cachedArtistsSortedAlphabetically())
+        assertEquals(listOf<StatsRow>(), db.cachedAlbumsSortedAlphabetically())
+        assertEquals(listOf<StatsRow>(), db.cachedAlbumsByArtist("A"))
+        assertEquals(listOf<StatsRow>(), db.cachedAlbumsByArtist("B"))
 
         db.handleSongCached(s1.id)
         db.handleSongCached(s3.id)
         db.handleSongCached(s5.id)
-        Assert.assertEquals(
+        assertEquals(
             listOf(StatsRow("A", "", "", 1), StatsRow("B", "", "", 2)),
             db.cachedArtistsSortedAlphabetically()
         )
-        Assert.assertEquals(
+        assertEquals(
             listOf(
                 StatsRow("B", SongDatabase.UNSET_STRING, "", 1),
                 StatsRow("A, B", "Album 1", s1.albumId, 2),
             ),
             db.cachedAlbumsSortedAlphabetically()
         )
-        Assert.assertEquals(
+        assertEquals(
             listOf(StatsRow("A", "Album 1", s1.albumId, 1)),
             db.cachedAlbumsByArtist("A")
         )
-        Assert.assertEquals(
+        assertEquals(
             listOf(
                 StatsRow("B", SongDatabase.UNSET_STRING, "", 1),
                 StatsRow("B", "Album 1", s3.albumId, 1),
             ),
             db.cachedAlbumsByArtist("B")
         )
-        Assert.assertEquals(listOf(s5, s1, s3), db.query(onlyCached = true))
-        Assert.assertEquals(listOf(s1), db.query(artist = "A", onlyCached = true))
-        Assert.assertEquals(listOf(s5, s3), db.query(artist = "B", onlyCached = true))
-        Assert.assertEquals(
+        assertEquals(listOf(s5, s1, s3), db.query(onlyCached = true))
+        assertEquals(listOf(s1), db.query(artist = "A", onlyCached = true))
+        assertEquals(listOf(s5, s3), db.query(artist = "B", onlyCached = true))
+        assertEquals(
             Pair(listOf(s1, s3, s5), -1),
             db.getSongs(listOf(s1.id, s2.id, s3.id, s4.id, s5.id), onlyCached = true)
         )
 
         db.handleSongEvicted(s1.id)
-        Assert.assertEquals(
-            listOf(StatsRow("B", "", "", 2)),
-            db.cachedArtistsSortedAlphabetically()
-        )
-        Assert.assertEquals(
+        assertEquals(listOf(StatsRow("B", "", "", 2)), db.cachedArtistsSortedAlphabetically())
+        assertEquals(
             listOf(
                 StatsRow("B", SongDatabase.UNSET_STRING, "", 1),
                 StatsRow("B", "Album 1", s3.albumId, 1),
             ),
             db.cachedAlbumsSortedAlphabetically()
         )
-        Assert.assertEquals(listOf<StatsRow>(), db.cachedAlbumsByArtist("A"))
-        Assert.assertEquals(
+        assertEquals(listOf<StatsRow>(), db.cachedAlbumsByArtist("A"))
+        assertEquals(
             listOf(
                 StatsRow("B", SongDatabase.UNSET_STRING, "", 1),
                 StatsRow("B", "Album 1", s3.albumId, 1),
@@ -360,21 +359,40 @@ class SongDatabaseTest {
             )
         )
         db.syncWithServer()
-        Assert.assertEquals(serverSearchPresets, db.searchPresets)
+        assertEquals(serverSearchPresets, db.searchPresets)
     }
 
-    @Test fun playbackReports() {
+    // This tests a function from Search.kt, but it depends heavily on [SongDatabase].
+    @Test fun searchLocalSongs() = runBlockingTest {
+        val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 0.75)
+        val s2 = makeSong("B", "Track 2", "Album 1", 2, rating = 1.0)
+        val s3 = makeSong("B feat. C", "Track 3", "Album 1", 3, rating = 0.75)
+        val s4 = makeSong("B", "Track 1", "Album 2", 1, rating = 0.25)
+        serverSongs.addAll(listOf(SongInfo(s1), SongInfo(s2), SongInfo(s3), SongInfo(s4)))
+        db.syncWithServer()
+        assertEquals(4, db.numSongs)
+
+        assertEquals(listOf(s1), searchLocal(db, "A"))
+        assertEquals(setOf(s2, s3), searchLocal(db, "B").toSet())
+        assertEquals(listOf(s3), searchLocal(db, "C"))
+        assertEquals(listOf(s1, s2, s3), searchLocal(db, "Album 1"))
+        assertEquals(listOf(s4), searchLocal(db, "Album 2"))
+        assertEquals(listOf(s1, s2, s3, s4), searchLocal(db, "Album"))
+        assertEquals(listOf(s2), searchLocal(db, ""))
+    }
+
+    @Test fun playbackReports() = runBlockingTest {
         val r1 = SongDatabase.PendingPlaybackReport(1, Date(1))
         val r2 = SongDatabase.PendingPlaybackReport(2, Date(2))
         db.addPendingPlaybackReport(r1.songId, r1.startDate)
         db.addPendingPlaybackReport(r2.songId, r2.startDate)
-        Assert.assertEquals(listOf(r1, r2), db.allPendingPlaybackReports())
+        assertEquals(listOf(r1, r2), db.allPendingPlaybackReports())
 
         db.removePendingPlaybackReport(r1.songId, r1.startDate)
-        Assert.assertEquals(listOf(r2), db.allPendingPlaybackReports())
+        assertEquals(listOf(r2), db.allPendingPlaybackReports())
 
         db.removePendingPlaybackReport(r2.songId, r2.startDate)
-        Assert.assertTrue(db.allPendingPlaybackReports().isEmpty())
+        assertTrue(db.allPendingPlaybackReports().isEmpty())
     }
 
     // TODO: Add test for reloading data instead of just syncing.
