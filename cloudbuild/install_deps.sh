@@ -13,15 +13,22 @@ fi
 
 echo "Installing dependencies to $ANDROID_HOME and $GRADLE_HOME"
 
-# TODO: When I switch this to a Dockerfile, run apt-get upgrade too.
+# TODO: If I switch this to a Dockerfile, run apt-get upgrade too.
 apt-get update
 apt-get install -y --no-install-recommends \
+  gnupg \
   openjdk-11-jdk:amd64 \
   openjdk-11-jdk-headless:amd64 \
   openjdk-11-jre:amd64 \
   openjdk-11-jre-headless:amd64 \
   unzip \
   wget
+
+wget -q -O- https://packages.cloud.google.com/apt/doc/apt-key.gpg | apt-key add -
+echo 'deb [arch=amd64] https://packages.cloud.google.com/apt cloud-sdk main' \
+    >>/etc/apt/sources.list.d/cloud-sdk.list
+apt-get update
+apt-get install -y --no-install-recommends google-cloud-sdk
 
 wget -q -O /tmp/tools.zip \
   "https://dl.google.com/android/repository/commandlinetools-linux-${CMDLINE_TOOLS_VERSION}_latest.zip"
