@@ -45,6 +45,7 @@
   <string name="download_rate_description">Limit in KB/sec (0 is unlimited)</string>
   <string name="download_rate_value">%d KB/sec</string>
   <string name="exit">Exit</string>
+  <string name="gain_adjustment">Gain adjustment</string>
   <string name="first_played">First played</string>
   <string name="first_played_suffix"> or less ago</string>
   <string name="insert">Insert</string>
@@ -105,6 +106,21 @@
   <string name="unlimited">Unlimited</string>
   <string name="username">Username</string>
   <string name="username_description">HTTP basic auth with server</string>
+
+  <!-- These two arrays must be kept in sync.
+       gain_type_values corresponds to NupPreferences.GAIN_TYPE_*. -->
+  <string-array name="gain_types">
+    <item>Auto</item>
+    <item>Album</item>
+    <item>Track</item>
+    <item>None</item>
+  </string-array>
+  <string-array name="gain_type_values">
+    <item>auto</item>
+    <item>album</item>
+    <item>track</item>
+    <item>none</item>
+  </string-array>
 
   <!-- SearchFormActivity depends on these strings' lengths. -->
   <string-array name="min_ratings">

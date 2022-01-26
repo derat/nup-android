@@ -278,7 +278,9 @@ class NupService :
         // way to implement preferences.
         val origPolicy = StrictMode.allowThreadDiskReads()
         try {
-            PreferenceManager.setDefaultValues(this@NupService, R.xml.settings, false)
+            // Without passing true for readAgain, "this method sets the default values only if
+            // this method has never been called in the past".
+            PreferenceManager.setDefaultValues(this@NupService, R.xml.settings, true)
         } finally {
             StrictMode.setThreadPolicy(origPolicy)
         }
@@ -294,6 +296,7 @@ class NupService :
             applyPref(NupPreferences.CACHE_SIZE)
             applyPref(NupPreferences.DOWNLOAD_RATE)
             applyPref(NupPreferences.PASSWORD)
+            applyPref(NupPreferences.GAIN_TYPE)
             applyPref(NupPreferences.PRE_AMP_GAIN)
             applyPref(NupPreferences.USERNAME)
             applyPref(NupPreferences.SERVER_URL)
@@ -555,6 +558,7 @@ class NupService :
                 cache.maxRate = if (rate > 0) rate * 1024 else rate
             }
             NupPreferences.PASSWORD -> downloader.password = readPref(key)
+            NupPreferences.GAIN_TYPE -> player.gainType = readPref(key)
             NupPreferences.PRE_AMP_GAIN -> player.preAmpGain = readPref(key).toDouble()
             NupPreferences.USERNAME -> downloader.username = readPref(key)
             NupPreferences.SERVER_URL -> downloader.server = readPref(key)
@@ -718,6 +722,8 @@ class NupService :
             }
         }
 
+        if (playlist.isEmpty()) player.shuffled = false
+
         if (removedPlaying) {
             if (!playlist.isEmpty() && curSongIndex < playlist.size) {
                 selectSongAtIndex(curSongIndex)
@@ -796,7 +802,10 @@ class NupService :
         if (next != null) {
             val nextEntry = cache.getEntry(next.id)
             if (nextEntry != null && nextEntry.isFullyCached) {
-                player.queueFile(nextEntry.file, nextEntry.totalBytes, next.albumGain, next.peakAmp)
+                player.queueFile(
+                    nextEntry.file, nextEntry.totalBytes, next.trackGain, next.albumGain,
+                    next.peakAmp
+                )
             }
         }
 
@@ -936,7 +945,9 @@ class NupService :
             }
             mediaSessionManager.updateSong(song, entry)
         } else if (song == nextSong) {
-            player.queueFile(entry.file, entry.totalBytes, song.albumGain, song.peakAmp)
+            player.queueFile(
+                entry.file, entry.totalBytes, song.trackGain, song.albumGain, song.peakAmp
+            )
         }
 
         songListener?.onSongFileSizeChange(song)
@@ -1056,6 +1067,10 @@ class NupService :
         if (curSongIndex >= 0 && index <= curSongIndex) curSongIndex += resSongs.size
         if (downloadIndex >= 0 && index <= downloadIndex) downloadIndex += resSongs.size
 
+        // Make a half-hearted guess about whether the songs were shuffled. This determines whether
+        // "auto" gain adjustment uses per-track adjustments rather than per-album.
+        if (songs.size == 1 || !sameAlbum(resSongs)) player.shuffled = true
+
         songListener?.onPlaylistChange(playlist)
         mediaSessionManager.updatePlaylist(playlist)
         for (song in newSongs) {
@@ -1086,9 +1101,7 @@ class NupService :
                     val nextEntry = cache.getEntry(song.id)
                     if (nextEntry != null && nextEntry.isFullyCached) {
                         player.queueFile(
-                            nextEntry.file,
-                            nextEntry.totalBytes,
-                            song.albumGain,
+                            nextEntry.file, nextEntry.totalBytes, song.trackGain, song.albumGain,
                             song.peakAmp,
                         )
                     }
@@ -1107,7 +1120,7 @@ class NupService :
         }
         if (!paused && !getAudioFocus()) Log.w(TAG, "Couldn't get focus to play ${entry.songId}")
         curFile = entry.file
-        player.loadFile(entry.file, entry.totalBytes, song.albumGain, song.peakAmp)
+        player.loadFile(entry.file, entry.totalBytes, song.trackGain, song.albumGain, song.peakAmp)
         playStart = Date()
         cache.updateLastAccessTime(entry.songId)
         updatePlaybackState()

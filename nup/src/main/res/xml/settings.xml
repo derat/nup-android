@@ -36,6 +36,14 @@
   </PreferenceCategory>
 
   <PreferenceCategory android:title="Playback" app:iconSpaceReserved="false">
+    <androidx.preference.DropDownPreference
+      android:key="gain_type"
+      android:defaultValue="auto"
+      android:title="@string/gain_adjustment"
+      android:entries="@array/gain_types"
+      android:entryValues="@array/gain_type_values"
+      app:iconSpaceReserved="false"
+    />
     <!-- TODO: This really ought to be using androidx.preference.SeekBarPreference.
          As a consequence of using EditTextPreference, the saved pref is a string
          rather than a float. -->

@@ -12,11 +12,18 @@ object NupPreferences {
     const val USERNAME = "username"
     const val PASSWORD = "password"
     const val SYNC_SONG_LIST = "sync_song_list"
+    const val GAIN_TYPE = "gain_type" // values are GAIN_TYPE_*
     const val PRE_AMP_GAIN = "pre_amp_gain" // positive or negative decibels
     const val CACHE_SIZE = "cache_size" // megabytes
     const val CLEAR_CACHE = "clear_cache"
     const val SONGS_TO_PRELOAD = "songs_to_preload"
     const val DOWNLOAD_RATE = "download_rate" // kilobytes per second
+
+    // These values for GAIN_TYPE must match R.array.gain_type_values.
+    const val GAIN_TYPE_AUTO = "auto"
+    const val GAIN_TYPE_ALBUM = "album"
+    const val GAIN_TYPE_TRACK = "track"
+    const val GAIN_TYPE_NONE = "none"
 
     const val PREV_PLAYLIST_SONG_IDS = "prev_playlist_song_ids" // comma-separated list of long IDs
     const val PREV_PLAYLIST_INDEX = "prev_playlist_index" // int index into playlist

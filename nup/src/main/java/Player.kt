@@ -49,7 +49,8 @@ class Player(
     private inner class FilePlayer(
         val file: File,
         val totalBytes: Long,
-        val songGain: Double,
+        val trackGain: Double,
+        val albumGain: Double,
         val peakAmp: Double,
     ) {
         val mediaPlayer = MediaPlayer()
@@ -128,13 +129,20 @@ class Player(
         fun adjustVolume() {
             threadChecker.assertThread()
 
+            val songGain: Double = when (gainType) {
+                NupPreferences.GAIN_TYPE_AUTO -> if (shuffled) trackGain else albumGain
+                NupPreferences.GAIN_TYPE_ALBUM -> albumGain
+                NupPreferences.GAIN_TYPE_TRACK -> trackGain
+                else -> 0.0
+            }
+
             // https://wiki.hydrogenaud.io/index.php?title=ReplayGain_specification
-            var pct = Math.pow(10.0, (preAmpGain + songGain) / 20)
+            var pct = Math.pow(10.0, (preAmpGain + songGain) / 20.0)
             if (lowVolume) pct *= LOW_VOLUME_FRACTION.toDouble()
             if (peakAmp > 0) pct = Math.min(pct, 1 / peakAmp)
             Log.d(TAG, "Setting $mediaPlayer volume to ${String.format("%.3f", pct)}")
 
-            // Hooray: MediaPlayer only accepts volumes in the range [0.0, 1.0],
+            // Sigh: MediaPlayer only accepts volumes in the range [0.0, 1.0],
             // while LoudnessEnhancer seems to only accept positive gains (in mB).
             if (pct <= 1) {
                 mediaPlayer.setVolume(pct.toFloat(), pct.toFloat())
@@ -175,7 +183,7 @@ class Player(
             mediaPlayer.start()
             return switchedToFile
         }
-    }
+    } // FilePlayer
 
     /** Shut down the player. */
     fun quit() {
@@ -197,7 +205,13 @@ class Player(
      *
      * The play/pause state is not changed. If we're not paused, the song will start playing.
      */
-    fun loadFile(file: File, totalBytes: Long, gain: Double, peakAmp: Double) {
+    fun loadFile(
+        file: File,
+        totalBytes: Long,
+        trackGain: Double,
+        albumGain: Double,
+        peakAmp: Double
+    ) {
         executor.execute {
             Log.d(TAG, "Playing $file")
             resetCurrent()
@@ -206,7 +220,7 @@ class Player(
                 currentPlayer = queuedPlayer
                 queuedPlayer = null
             } else {
-                currentPlayer = FilePlayer(file, totalBytes, gain, peakAmp)
+                currentPlayer = FilePlayer(file, totalBytes, trackGain, albumGain, peakAmp)
                 if (!currentPlayer!!.prepare()) currentPlayer = null
             }
             if (currentPlayer != null && !paused) {
@@ -217,12 +231,18 @@ class Player(
     }
 
     /** Queue [file] for future playback. */
-    fun queueFile(file: File, totalBytes: Long, gain: Double, peakAmp: Double) {
+    fun queueFile(
+        file: File,
+        totalBytes: Long,
+        trackGain: Double,
+        albumGain: Double,
+        peakAmp: Double
+    ) {
         executor.execute task@{
             if (queuedPlayer?.file == file) return@task
 
             Log.d(TAG, "Queuing $file")
-            val player = FilePlayer(file, totalBytes, gain, peakAmp)
+            val player = FilePlayer(file, totalBytes, trackGain, albumGain, peakAmp)
             if (!player.prepare()) return@task
 
             Log.d(TAG, "Finished preparing $file")
@@ -306,20 +326,40 @@ class Player(
             executor.execute {
                 if (value != lowVolume) {
                     field = value
-                    currentPlayer?.adjustVolume()
-                    queuedPlayer?.adjustVolume()
+                    adjustVolumes()
                 }
             }
         }
 
-    /** Adjust playback volume up or down by specified decibels. */
+    /** Type of gain adjustment to perform. See GAIN_TYPE_* in [NupPreferences]. */
+    var gainType = NupPreferences.GAIN_TYPE_NONE
+        set(value) {
+            executor.execute {
+                if (value != gainType) {
+                    field = value
+                    adjustVolumes()
+                }
+            }
+        }
+
+    /** Playback volume adjustment as positive or negative decibels. */
     var preAmpGain: Double = 0.0
         set(value) {
             executor.execute {
                 if (value != preAmpGain) {
                     field = value
-                    currentPlayer?.adjustVolume()
-                    queuedPlayer?.adjustVolume()
+                    adjustVolumes()
+                }
+            }
+        }
+
+    /** Whether the songs being played were shuffled or not. */
+    var shuffled = false
+        set(value) {
+            executor.execute {
+                if (value != shuffled) {
+                    field = value
+                    if (gainType == NupPreferences.GAIN_TYPE_AUTO) adjustVolumes()
                 }
             }
         }
@@ -350,6 +390,12 @@ class Player(
         threadChecker.assertThread()
         positionFuture?.cancel(false)
         positionFuture = null
+    }
+
+    private fun adjustVolumes() {
+        threadChecker.assertThread()
+        currentPlayer?.adjustVolume()
+        queuedPlayer?.adjustVolume()
     }
 
     override fun onCompletion(player: MediaPlayer) {

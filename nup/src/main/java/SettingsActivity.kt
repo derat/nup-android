@@ -15,7 +15,9 @@ import android.view.Menu
 import android.view.MenuItem
 import androidx.appcompat.app.AppCompatActivity
 import androidx.preference.DialogPreference
+import androidx.preference.DropDownPreference
 import androidx.preference.EditTextPreference
+import androidx.preference.ListPreference
 import androidx.preference.Preference
 import androidx.preference.Preference.SummaryProvider
 import androidx.preference.PreferenceDialogFragmentCompat
@@ -95,13 +97,16 @@ class SettingsFragment :
         val signed = InputType.TYPE_NUMBER_FLAG_SIGNED
         val text = InputType.TYPE_CLASS_TEXT
 
-        configEditText(NupPreferences.SERVER_URL, simpleSummary, text or noSuggest, false)
-        configEditText(NupPreferences.USERNAME, simpleSummary, text or noSuggest, false)
+        configEditText(NupPreferences.SERVER_URL, editTextSummary, text or noSuggest, false)
+        configEditText(NupPreferences.USERNAME, editTextSummary, text or noSuggest, false)
         configEditText(NupPreferences.PASSWORD, null, text or password, false)
         configEditText(NupPreferences.PRE_AMP_GAIN, gainSummary, number or decimal or signed, true)
         configEditText(NupPreferences.CACHE_SIZE, cacheSizeSummary, number, false)
         configEditText(NupPreferences.SONGS_TO_PRELOAD, songsSummary, number, true)
         configEditText(NupPreferences.DOWNLOAD_RATE, rateSummary, number, true)
+
+        val gainPref = findPreference<DropDownPreference>(NupPreferences.GAIN_TYPE)!!
+        gainPref.setSummaryProvider(listSummary)
 
         val syncPref = findPreference<YesNoPreference>(NupPreferences.SYNC_SONG_LIST)!!
         syncPref.setSummaryProvider(syncSummary)
@@ -176,7 +181,8 @@ class SettingsFragment :
     }
 
     // Custom providers for producing summaries of different prefs' current values.
-    val simpleSummary = EditTextPreference.SimpleSummaryProvider.getInstance()
+    val editTextSummary = EditTextPreference.SimpleSummaryProvider.getInstance()
+    val listSummary = ListPreference.SimpleSummaryProvider.getInstance()
     val syncSummary = object : SummaryProvider<YesNoPreference> {
         override fun provideSummary(preference: YesNoPreference): String {
             return getSyncSummary(

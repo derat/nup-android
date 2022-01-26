@@ -76,6 +76,10 @@ fun getSongOrderKey(str: String, @Suppress("UNUSED_PARAMETER") order: SongOrder)
     return key
 }
 
+/** Return true if [songs] are all from the same album. */
+fun sameAlbum(songs: List<Song>) = (songs.size <= 1) ||
+    (songs.all { it.album == songs[0].album } && songs.all { it.albumId == songs[0].albumId })
+
 private val keyTags =
     setOf("[dialogue]", "[no artist]", "[unknown]", "[non-album tracks]", "[unset]")
 private val keyPrefixes =
