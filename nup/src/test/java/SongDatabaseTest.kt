@@ -154,10 +154,10 @@ class SongDatabaseTest {
     }
 
     @Test fun syncAndQuery() = runBlockingTest {
-        val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 0.75)
+        val s1 = makeSong("Ä", "Track 1", "Album 1", 1, rating = 0.75)
         val s2 = makeSong("A", "Track 2", "Album 1", 2, rating = 0.25)
         val s3 = makeSong("B feat. C", "Track 3", "Album 1", 3, rating = 1.0)
-        val s4 = makeSong("B", "Track 1", "Album 2", 1, rating = -1.0)
+        val s4 = makeSong("B", "Traĉk 1", "Albúm ²", 1, rating = -1.0)
         serverSongs.addAll(listOf(SongInfo(s1), SongInfo(s2), SongInfo(s3), SongInfo(s4)))
 
         db.syncWithServer()
@@ -168,11 +168,15 @@ class SongDatabaseTest {
         assertEquals(4, db.numSongs)
 
         assertEquals(listOf(s1, s2, s3, s4), db.query())
-        assertEquals(listOf(s1, s2), db.query(artist = "A"))
+        assertEquals(listOf(s1, s2), db.query(artist = "Ä"))
+        assertEquals(listOf(s1, s2), db.query(artist = "a"))
         assertEquals(listOf(s4), db.query(artist = "B"))
         assertEquals(listOf(s3, s4), db.query(artistPrefix = "B"))
+        assertEquals(listOf(s1, s4), db.query(title = "Traĉk 1"))
         assertEquals(listOf(s1, s4), db.query(title = "Track 1"))
         assertEquals(listOf(s1, s2, s3), db.query(album = "Album 1"))
+        assertEquals(listOf(s4), db.query(album = "Albúm ²"))
+        assertEquals(listOf(s4), db.query(album = "album 2"))
         assertEquals(listOf(s2), db.query(songId = s2.id))
         assertEquals(listOf(s2, s3), db.query(songIds = listOf(s2.id, s3.id)))
         assertEquals(listOf(s1, s3), db.query(minRating = 0.75))
@@ -231,7 +235,7 @@ class SongDatabaseTest {
         val s4 = makeSong("B", "Track 4", "Album 1", 4, rating = -1.0)
         val s5 = makeSong("B", "Track 1", "Album 2", 1, rating = 0.5)
         val s6 = makeSong("A", "Track 2", "Album 2", 2, rating = 1.0)
-        val s7 = makeSong("B", "Track 1", "", 1, rating = 0.25)
+        val s7 = makeSong("b", "Track 1", "", 1, rating = 0.25)
         serverSongs.addAll(
             listOf(
                 SongInfo(s1), SongInfo(s2), SongInfo(s3), SongInfo(s4), SongInfo(s5),
@@ -435,13 +439,13 @@ class SongDatabaseTest {
 
         val song = Song(
             id = 1234567890,
-            artist = "Artist Name",
-            title = "Title Name",
-            album = "Album Name",
+            artist = "µ-Ziq", // U+00b5, "MICRO SIGN"
+            title = "Títle Name",
+            album = "Album Ñame",
             albumId = "", // not in version 13
             filename = "", // not in version 13
             coverFilename = "", // not in version 13
-            lengthSec = 201,
+            lengthSec = 201.0,
             track = 5,
             disc = 1,
             trackGain = 0.0, // not in version 13
@@ -465,7 +469,7 @@ class SongDatabaseTest {
                 values.put("Album", song.album)
                 values.put("TrackNumber", song.track)
                 values.put("DiscNumber", song.disc)
-                values.put("Length", song.lengthSec)
+                values.put("Length", song.lengthSec.toInt())
                 values.put("Rating", song.rating)
                 db.replace("Songs", "", values)
 
@@ -498,6 +502,17 @@ class SongDatabaseTest {
             db.albumsSortedAlphabetically
         )
         assertEquals(listOf(report), db.allPendingPlaybackReports())
+
+        // Check that the normalized fields used for searching were backfilled in the upgrade to
+        // version 18.
+        assertEquals(
+            listOf(song),
+            db.query(
+                artist = "μ-Ziq", // U+03bc, "GREEK SMALL LETTER MU"
+                title = "title name",
+                album = "album name"
+            )
+        )
     }
 }
 
@@ -523,7 +538,7 @@ private fun makeSong(
         albumId = albumId,
         filename = "$album/$artist-$title.mp3",
         coverFilename = "$albumId.jpg",
-        lengthSec = 4 * size,
+        lengthSec = 4.5 * size,
         track = track,
         disc = disc,
         trackGain = -6.5,
@@ -545,7 +560,7 @@ private fun songToJson(s: Song): JSONObject {
     o.put("albumId", s.albumId)
     o.put("track", s.track)
     o.put("disc", s.disc)
-    o.put("length", s.lengthSec.toDouble())
+    o.put("length", s.lengthSec)
     o.put("trackGain", s.trackGain)
     o.put("albumGain", s.albumGain)
     o.put("peakAmp", s.peakAmp)

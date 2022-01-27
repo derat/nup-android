@@ -881,7 +881,7 @@ class NupService :
             playedMs += elapsed.toLong()
             // TODO: Add a currentSongReportThresholdMs or similar member to simplify this.
             if (!reported && (
-                playedMs >= Math.max(durationMs, song.lengthSec * 1000) / 2 ||
+                playedMs >= Math.max(durationMs, (song.lengthSec * 1000).toInt()) / 2 ||
                     playedMs >= REPORT_PLAYBACK_THRESHOLD_MS
                 )
             ) {

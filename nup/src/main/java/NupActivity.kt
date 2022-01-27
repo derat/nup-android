@@ -186,7 +186,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
                 val downloaded = song.availableBytes == song.totalBytes
                 val durationSec =
                     if (downloaded && durationMs >= 0) durationMs / 1000
-                    else song.lengthSec
+                    else song.lengthSec.toInt()
                 timeLabel.text = formatDurationProgress(sec, durationSec)
                 lastPosSec = sec
             }
@@ -251,7 +251,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
             albumLabel.text = song.album
             timeLabel.text = formatDurationProgress(
                 if (song == service.curSong) service.lastPosMs / 1000 else 0,
-                song.lengthSec
+                song.lengthSec.toInt()
             )
             downloadStatusLabel.text = ""
 

@@ -18,7 +18,7 @@ fun showSongDetailsDialog(context: Context, song: Song) {
     view.findViewById<TextView>(R.id.title)!!.text = song.title
     view.findViewById<TextView>(R.id.album)!!.text = song.album
     view.findViewById<TextView>(R.id.track)!!.text = song.track.toString()
-    view.findViewById<TextView>(R.id.length)!!.text = formatDuration(song.lengthSec)
+    view.findViewById<TextView>(R.id.length)!!.text = formatDuration(song.lengthSec.toInt())
 
     var ratingStr = ""
     if (song.rating >= 0.0) {

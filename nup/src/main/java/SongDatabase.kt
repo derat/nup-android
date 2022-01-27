@@ -12,6 +12,7 @@ import android.database.sqlite.SQLiteDatabase
 import android.database.sqlite.SQLiteOpenHelper
 import android.text.TextUtils
 import android.util.Log
+import java.text.Normalizer
 import java.util.Collections
 import java.util.Date
 import java.util.concurrent.Executor
@@ -82,10 +83,10 @@ class SongDatabase(
     }
 
     suspend fun cachedArtistsSortedAlphabetically(): List<StatsRow> = getSortedRows(
-        "SELECT s.Artist, '' AS Album, '' AS AlbumId, COUNT(*) " +
+        "SELECT MIN(s.Artist), '' AS Album, '' AS AlbumId, COUNT(*) " +
             "FROM Songs s " +
             "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
-            "GROUP BY LOWER(TRIM(s.Artist))",
+            "GROUP BY s.ArtistNorm",
         null,
         false /* aggregateAlbums */,
         SongOrder.ARTIST,
@@ -93,23 +94,23 @@ class SongDatabase(
     )
 
     suspend fun cachedAlbumsSortedAlphabetically(): List<StatsRow> = getSortedRows(
-        "SELECT s.Artist, s.Album, s.AlbumId, COUNT(*) " +
+        "SELECT MIN(s.Artist), MIN(s.Album), s.AlbumId, COUNT(*) " +
             "FROM Songs s " +
             "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
-            "GROUP BY LOWER(TRIM(s.Artist)), LOWER(TRIM(s.Album)), s.AlbumId " +
-            "ORDER BY LOWER(TRIM(s.Album)) ASC, s.AlbumId ASC, 4 DESC",
+            "GROUP BY s.ArtistNorm, s.AlbumNorm, s.AlbumId " +
+            "ORDER BY s.AlbumNorm ASC, s.AlbumId ASC, 4 DESC",
         null,
         true /* aggregateAlbums */,
         SongOrder.ALBUM,
     )
 
     suspend fun cachedAlbumsByArtist(artist: String): List<StatsRow> = getSortedRows(
-        "SELECT ? AS Artist, s.Album, s.AlbumId, COUNT(*) " +
+        "SELECT ? AS Artist, MIN(s.Album), s.AlbumId, COUNT(*) " +
             "FROM Songs s " +
             "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
-            "WHERE LOWER(s.Artist) = LOWER(?) " +
-            "GROUP BY LOWER(TRIM(s.Album)), s.AlbumId",
-        arrayOf(artist, artist),
+            "WHERE s.ArtistNorm = ? " +
+            "GROUP BY s.AlbumNorm, s.AlbumId",
+        arrayOf(artist, normalizeForSearch(artist)),
         false /* aggregateAlbums */,
         SongOrder.ALBUM,
     )
@@ -140,14 +141,20 @@ class SongDatabase(
             var selections = ArrayList<String>()
             var selectionArgs = ArrayList<String>()
 
-            fun add(clause: String, selectionArg: String?, substring: Boolean) {
-                if (selectionArg.isNullOrEmpty()) return
+            fun add(
+                clause: String,
+                arg: String?,
+                substring: Boolean = false,
+                normalize: Boolean = false
+            ) {
+                if (arg.isNullOrEmpty()) return
 
                 selections.add(clause)
-                if (selectionArg == UNSET_STRING) {
+                if (arg == UNSET_STRING) {
                     selectionArgs.add("")
                 } else {
-                    selectionArgs.add(if (substring) "%$selectionArg%" else selectionArg)
+                    val s = if (normalize) normalizeForSearch(arg) else arg
+                    selectionArgs.add(if (substring) "%$s%" else s)
                 }
             }
 
@@ -169,12 +176,12 @@ class SongDatabase(
         }
 
         val builder = QueryBuilder()
-        builder.add("Artist LIKE ?", artist, substring)
-        builder.add("Title LIKE ?", title, substring)
-        builder.add("Album LIKE ?", album, substring)
-        builder.add("AlbumId = ?", albumId, false)
-        builder.add("s.SongId = ?", if (songId >= 0) songId.toString() else null, false)
-        builder.add("Rating >= ?", if (minRating >= 0.0) minRating.toString() else null, false)
+        builder.add("ArtistNorm LIKE ?", artist, substring, true)
+        builder.add("TitleNorm LIKE ?", title, substring, true)
+        builder.add("AlbumNorm LIKE ?", album, substring, true)
+        builder.add("AlbumId = ?", albumId)
+        builder.add("s.SongId = ?", if (songId >= 0) songId.toString() else null)
+        builder.add("Rating >= ?", if (minRating >= 0.0) minRating.toString() else null)
         if (songIds != null && songIds.size > 0) {
             builder.addLiteral("s.SongId IN (" + songIds.joinToString(",") + ")")
         }
@@ -186,14 +193,14 @@ class SongDatabase(
         }
         val query = (
             "SELECT s.SongId, Artist, Title, Album, AlbumId, Filename, CoverFilename, Length, " +
-                "TrackNumber, DiscNumber, TrackGain, AlbumGain, PeakAmp, Rating " +
+                "Track, Disc, TrackGain, AlbumGain, PeakAmp, Rating " +
                 "FROM Songs s " +
                 (if (onlyCached) "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " else "") +
                 builder.whereClause +
                 "ORDER BY " +
                 (
                     if (shuffle) "RANDOM() "
-                    else "Album ASC, AlbumId ASC, DiscNumber ASC, TrackNumber ASC "
+                    else "Album ASC, AlbumId ASC, Disc ASC, Track ASC "
                     ) +
                 "LIMIT " + MAX_QUERY_RESULTS
             )
@@ -216,7 +223,7 @@ class SongDatabase(
                     albumId = cursor.getString(4),
                     filename = cursor.getString(5),
                     coverFilename = cursor.getString(6),
-                    lengthSec = cursor.getInt(7),
+                    lengthSec = cursor.getFloat(7).toDouble(),
                     track = cursor.getInt(8),
                     disc = cursor.getInt(9),
                     trackGain = cursor.getFloat(10).toDouble(),
@@ -462,16 +469,23 @@ class SongDatabase(
                                 Log.d(TAG, "Deleting song $songId")
                                 db.delete("Songs", "SongId = ?", arrayOf(songId.toString()))
                             } else {
-                                val values = ContentValues(14)
+                                val artist = item.getString("artist")
+                                val title = item.getString("title")
+                                val album = item.getString("album")
+
+                                val values = ContentValues(17)
                                 values.put("SongId", songId)
                                 values.put("Filename", item.getString("filename"))
                                 values.put("CoverFilename", item.optString("coverFilename"))
-                                values.put("Artist", item.getString("artist"))
-                                values.put("Title", item.getString("title"))
-                                values.put("Album", item.getString("album"))
+                                values.put("Artist", artist)
+                                values.put("Title", title)
+                                values.put("Album", album)
                                 values.put("AlbumId", item.optString("albumId"))
-                                values.put("TrackNumber", item.getInt("track"))
-                                values.put("DiscNumber", item.getInt("disc"))
+                                values.put("ArtistNorm", normalizeForSearch(artist))
+                                values.put("TitleNorm", normalizeForSearch(title))
+                                values.put("AlbumNorm", normalizeForSearch(album))
+                                values.put("Track", item.getInt("track"))
+                                values.put("Disc", item.getInt("disc"))
                                 values.put("Length", item.getDouble("length"))
                                 values.put("TrackGain", item.optDouble("trackGain", 0.0))
                                 values.put("AlbumGain", item.optDouble("albumGain", 0.0))
@@ -567,49 +581,42 @@ class SongDatabase(
 
     /** Rebuild the artistAlbumStats table from the Songs table. */
     private fun updateArtistAlbumStats(db: SQLiteDatabase) {
-        // Lowercased artist name to the first row that we saw in its original case.
-        val artistCaseMap = mutableMapOf<String, String>()
-
-        // Artist name to map from album to number of songs.
-        val artistMap = mutableMapOf<String, MutableMap<StatsKey, Int>>()
+        // Normalized artist name to most-common original artist name.
+        val canonArtists = mutableMapOf<String, String>()
+        // Canonical artist name to album stats.
+        val artistAlbums = mutableMapOf<String, MutableList<StatsRow>>()
 
         val cursor = db.rawQuery(
             "SELECT Artist, Album, AlbumId, COUNT(*) " +
                 "FROM Songs " +
-                "GROUP BY Artist, Album, AlbumId",
+                "GROUP BY Artist, Album, AlbumId " +
+                "ORDER BY 4 DESC",
             null
         )
         cursor.moveToFirst()
         while (!cursor.isAfterLast) {
-            // Normalize the artist case so that we'll still group all their songs together
-            // even if some use different capitalization.
-            var origArtist = cursor.getString(0)
-            if (origArtist.isEmpty()) origArtist = UNSET_STRING
-            val artist = artistCaseMap.getOrPut(origArtist.toLowerCase(), { origArtist })
-
-            var album = cursor.getString(1)
-            if (album.isEmpty()) album = UNSET_STRING
-
+            var origArtist = cursor.getString(0).ifEmpty { UNSET_STRING }
+            val canonArtist = canonArtists.getOrPut(normalizeForSearch(origArtist), { origArtist })
+            var album = cursor.getString(1).ifEmpty { UNSET_STRING }
             val albumId = cursor.getString(2)
             val numSongs = cursor.getInt(3)
-
-            val key = StatsKey(origArtist, album, albumId)
-            artistMap.getOrPut(artist, { mutableMapOf() })[key] = numSongs
+            val row = StatsRow(origArtist, album, albumId, numSongs)
+            artistAlbums.getOrPut(canonArtist, { mutableListOf() }).add(row)
             cursor.moveToNext()
         }
         cursor.close()
 
         db.delete("ArtistAlbumStats", null, null)
-        for ((artist, albums) in artistMap) {
+        for ((artist, rows) in artistAlbums) {
             val artistSortKey = getSongOrderKey(artist, SongOrder.ARTIST)
-            for (key in albums.keys) {
+            for (row in rows) {
                 val values = ContentValues(6)
-                values.put("Artist", artist)
-                values.put("Album", key.album)
-                values.put("AlbumId", key.albumId)
-                values.put("NumSongs", albums[key])
+                values.put("Artist", artist) // canonical
+                values.put("Album", row.key.album)
+                values.put("AlbumId", row.key.albumId)
+                values.put("NumSongs", row.count)
                 values.put("ArtistSortKey", artistSortKey)
-                values.put("AlbumSortKey", getSongOrderKey(key.album, SongOrder.ALBUM))
+                values.put("AlbumSortKey", getSongOrderKey(row.key.album, SongOrder.ALBUM))
                 db.insert("ArtistAlbumStats", "", values)
             }
         }
@@ -657,7 +664,7 @@ class SongDatabase(
         cursor = db.rawQuery(
             "SELECT Artist, SUM(NumSongs) " +
                 "FROM ArtistAlbumStats " +
-                "GROUP BY LOWER(TRIM(Artist)) " +
+                "GROUP BY Artist " +
                 "ORDER BY ArtistSortKey ASC",
             null
         )
@@ -671,7 +678,7 @@ class SongDatabase(
         cursor = db.rawQuery(
             "SELECT Artist, Album, AlbumId, SUM(NumSongs) " +
                 "FROM ArtistAlbumStats " +
-                "GROUP BY LOWER(TRIM(Artist)), LOWER(TRIM(Album)), AlbumId " +
+                "GROUP BY Artist, Album, AlbumId " +
                 "ORDER BY AlbumSortKey ASC, AlbumId ASC, 4 DESC",
             null
         )
@@ -820,7 +827,7 @@ class SongDatabase(
         public const val UNSET_STRING = "[unset]"
 
         public const val DATABASE_NAME = "NupSongs" // public for tests
-        private const val DATABASE_VERSION = 17
+        private const val DATABASE_VERSION = 18
         private const val MAX_QUERY_RESULTS = 250
         private const val SERVER_SONG_BATCH_SIZE = 100
 
@@ -835,9 +842,12 @@ class SongDatabase(
                 "Title VARCHAR(256) NOT NULL, " +
                 "Album VARCHAR(256) NOT NULL, " +
                 "AlbumId VARCHAR(256) NOT NULL, " +
-                "TrackNumber INTEGER NOT NULL, " +
-                "DiscNumber INTEGER NOT NULL, " +
-                "Length INTEGER NOT NULL, " + // TODO: Why is this an int?
+                "ArtistNorm VARCHAR(256) NOT NULL, " +
+                "TitleNorm VARCHAR(256) NOT NULL, " +
+                "AlbumNorm VARCHAR(256) NOT NULL, " +
+                "Track INTEGER NOT NULL, " +
+                "Disc INTEGER NOT NULL, " +
+                "Length FLOAT NOT NULL, " +
                 "TrackGain FLOAT NOT NULL, " +
                 "AlbumGain FLOAT NOT NULL, " +
                 "PeakAmp FLOAT NOT NULL, " +
@@ -1145,6 +1155,67 @@ class SongDatabase(
                     } else if (newVersion == 17) {
                         // Version 17: Add SearchPresets table.
                         db.execSQL(CREATE_SEARCH_PRESETS_SQL)
+                    } else if (newVersion == 18) {
+                        // Version 18:
+                        // - Add ArtistNorm, TitleNorm, and AlbumNorm to Songs.
+                        // - Change Length from INT to FLOAT in Songs.
+                        // - Rename TrackNumber to Track and DiscNumber to Disc in Songs.
+                        db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp")
+                        db.execSQL(
+                            "CREATE TABLE Songs (" +
+                                "SongId INTEGER PRIMARY KEY NOT NULL, " +
+                                "Filename VARCHAR(256) NOT NULL, " +
+                                "CoverFilename VARCHAR(256) NOT NULL, " +
+                                "Artist VARCHAR(256) NOT NULL, " +
+                                "Title VARCHAR(256) NOT NULL, " +
+                                "Album VARCHAR(256) NOT NULL, " +
+                                "AlbumId VARCHAR(256) NOT NULL, " +
+                                "ArtistNorm VARCHAR(256) NOT NULL, " +
+                                "TitleNorm VARCHAR(256) NOT NULL, " +
+                                "AlbumNorm VARCHAR(256) NOT NULL, " +
+                                "Track INTEGER NOT NULL, " +
+                                "Disc INTEGER NOT NULL, " +
+                                "Length FLOAT NOT NULL, " +
+                                "TrackGain FLOAT NOT NULL, " +
+                                "AlbumGain FLOAT NOT NULL, " +
+                                "PeakAmp FLOAT NOT NULL, " +
+                                "Rating FLOAT NOT NULL)"
+                        )
+                        val cursor = db.rawQuery("SELECT * FROM SongsTmp", null)
+                        cursor.moveToFirst()
+                        while (!cursor.isAfterLast) {
+                            val artist = cursor.getString(3)
+                            val title = cursor.getString(4)
+                            val album = cursor.getString(5)
+                            val vals = ContentValues(17)
+                            vals.put("SongId", cursor.getLong(0))
+                            vals.put("Filename", cursor.getString(1))
+                            vals.put("CoverFilename", cursor.getString(2))
+                            vals.put("Artist", artist)
+                            vals.put("Title", title)
+                            vals.put("Album", album)
+                            vals.put("AlbumId", cursor.getString(6))
+                            vals.put("ArtistNorm", normalizeForSearch(artist))
+                            vals.put("TitleNorm", normalizeForSearch(title))
+                            vals.put("AlbumNorm", normalizeForSearch(album))
+                            vals.put("Track", cursor.getInt(7))
+                            vals.put("Disc", cursor.getInt(8))
+                            vals.put("Length", cursor.getInt(9).toDouble())
+                            vals.put("TrackGain", cursor.getFloat(10))
+                            vals.put("AlbumGain", cursor.getFloat(11))
+                            vals.put("PeakAmp", cursor.getFloat(12))
+                            vals.put("Rating", cursor.getFloat(13))
+                            db.replace("Songs", "", vals)
+
+                            cursor.moveToNext()
+                        }
+                        cursor.close()
+
+                        db.execSQL("DROP TABLE SongsTmp")
+                        db.execSQL(CREATE_SONGS_ARTIST_INDEX_SQL)
+                        db.execSQL(CREATE_SONGS_ALBUM_INDEX_SQL)
+                        db.execSQL(CREATE_SONGS_ALBUM_ID_INDEX_SQL)
+                        updateArtistAlbumStats(db)
                     } else {
                         throw RuntimeException(
                             "Got request to upgrade database to unknown version $newVersion"
@@ -1172,4 +1243,17 @@ class SongDatabase(
             }
         }
     }
+}
+
+/**
+ * Decompose Unicode characters in [s], strip accents, and trim and lowercase it.
+ *
+ * This matches the server's query.Normalize() function.
+ */
+fun normalizeForSearch(s: String): String {
+    return Normalizer
+        .normalize(s, Normalizer.Form.NFKD)
+        .replace("\\p{Mn}".toRegex(), "")
+        .trim()
+        .toLowerCase()
 }

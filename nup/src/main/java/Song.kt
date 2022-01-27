@@ -16,7 +16,7 @@ data class Song(
     val albumId: String,
     val filename: String,
     val coverFilename: String,
-    val lengthSec: Int, // TODO: Why is this an int?
+    val lengthSec: Double,
     val track: Int,
     val disc: Int,
     val trackGain: Double,
