@@ -31,21 +31,18 @@ class FileCacheDatabase(
             if (db == null) return@task // quit() already called
 
             Log.d(TAG, "Loading cache entries")
-            val cursor =
-                db.rawQuery("SELECT SongId, TotalBytes, LastAccessTime FROM CacheEntries", null)
-            cursor.moveToFirst()
-            while (!cursor.isAfterLast) {
-                val entry = FileCacheEntry(
-                    musicDir = musicDir,
-                    songId = cursor.getLong(0),
-                    totalBytes = cursor.getLong(1),
-                    lastAccessTime = cursor.getInt(2),
-                )
-                entries[entry.songId] = entry
-                cursor.moveToNext()
+            db.rawQuery("SELECT SongId, TotalBytes, LastAccessTime FROM CacheEntries", null).use {
+                while (it.moveToNext()) {
+                    val songId = it.getLong(0)
+                    entries[songId] = FileCacheEntry(
+                        musicDir = musicDir,
+                        songId = songId,
+                        totalBytes = it.getLong(1),
+                        lastAccessTime = it.getInt(2),
+                    )
+                }
             }
             Log.d(TAG, "Finished loading ${entries.size} cache entries")
-            cursor.close()
         }
     }
 
@@ -175,28 +172,26 @@ class FileCacheDatabase(
                         db.execSQL("DROP INDEX IF EXISTS RemotePath")
                         db.execSQL("ALTER TABLE CacheEntries RENAME TO CacheEntriesTmp")
                         db.execSQL(CREATE_CACHE_ENTRIES_SQL)
-                        val cursor = db.rawQuery(
+                        db.rawQuery(
                             "SELECT LocalPath, " +
                                 "IFNULL(ContentLength, 0), " +
                                 "IFNULL(LastAccessTime, 0) " +
                                 "FROM CacheEntriesTmp",
                             null
-                        )
-                        cursor.moveToFirst()
-                        while (!cursor.isAfterLast) {
-                            val file = File(cursor.getString(0))
-                            val songId = Integer
-                                .valueOf(file.name.split("\\.").toTypedArray()[0])
-                                .toLong()
-                            db.execSQL(
-                                "REPLACE INTO CacheEntries " +
-                                    "(SongId, TotalBytes, LastAccessTime) " +
-                                    "VALUES(?, ?, ?)",
-                                arrayOf<Any>(songId, cursor.getInt(1), cursor.getInt(2))
-                            )
-                            cursor.moveToNext()
+                        ).use { cursor ->
+                            while (cursor.moveToNext()) {
+                                val file = File(cursor.getString(0))
+                                val songId = Integer
+                                    .valueOf(file.name.split("\\.").toTypedArray()[0])
+                                    .toLong()
+                                db.execSQL(
+                                    "REPLACE INTO CacheEntries " +
+                                        "(SongId, TotalBytes, LastAccessTime) " +
+                                        "VALUES(?, ?, ?)",
+                                    arrayOf<Any>(songId, cursor.getInt(1), cursor.getInt(2))
+                                )
+                            }
                         }
-                        cursor.close()
                         db.execSQL("DROP TABLE CacheEntriesTmp")
                     } else {
                         throw RuntimeException(

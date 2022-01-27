@@ -210,31 +210,31 @@ class SongDatabase(
             if (db == null) return@task // quit() already called
 
             Log.d(TAG, "Running \"$query\" with ${TextUtils.join(", ", builder.selectionArgs)}")
-            val cursor = db.rawQuery(
-                query, builder.selectionArgs.toArray<String>(arrayOf<String>())
-            )
-            cursor.moveToFirst()
-            while (!cursor.isAfterLast) {
-                val song = Song(
-                    id = cursor.getLong(0),
-                    artist = cursor.getString(1),
-                    title = cursor.getString(2),
-                    album = cursor.getString(3),
-                    albumId = cursor.getString(4),
-                    filename = cursor.getString(5),
-                    coverFilename = cursor.getString(6),
-                    lengthSec = cursor.getFloat(7).toDouble(),
-                    track = cursor.getInt(8),
-                    disc = cursor.getInt(9),
-                    trackGain = cursor.getFloat(10).toDouble(),
-                    albumGain = cursor.getFloat(11).toDouble(),
-                    peakAmp = cursor.getFloat(12).toDouble(),
-                    rating = cursor.getFloat(13).toDouble(),
-                )
-                songs.add(song)
-                cursor.moveToNext()
+            val args = builder.selectionArgs.toArray<String>(arrayOf<String>())
+            db.rawQuery(query, args).use {
+                with(it) {
+                    while (moveToNext()) {
+                        songs.add(
+                            Song(
+                                id = getLong(0),
+                                artist = getString(1),
+                                title = getString(2),
+                                album = getString(3),
+                                albumId = getString(4),
+                                filename = getString(5),
+                                coverFilename = getString(6),
+                                lengthSec = getFloat(7).toDouble(),
+                                track = getInt(8),
+                                disc = getInt(9),
+                                trackGain = getFloat(10).toDouble(),
+                                albumGain = getFloat(11).toDouble(),
+                                peakAmp = getFloat(12).toDouble(),
+                                rating = getFloat(13).toDouble(),
+                            )
+                        )
+                    }
+                }
             }
-            cursor.close()
         }
         return songs
     }
@@ -311,15 +311,12 @@ class SongDatabase(
         opener.getDb() task@{ db ->
             if (db == null) return@task // quit() already called
 
-            val cursor = db.rawQuery("SELECT SongId, StartTime FROM PendingPlaybackReports", null)
-            cursor.moveToFirst()
-            while (!cursor.isAfterLast) {
-                reports.add(
-                    PendingPlaybackReport(cursor.getLong(0), Date(cursor.getLong(1)))
-                )
-                cursor.moveToNext()
+            val query = "SELECT SongId, StartTime FROM PendingPlaybackReports"
+            db.rawQuery(query, null).use {
+                while (it.moveToNext()) {
+                    reports.add(PendingPlaybackReport(it.getLong(0), Date(it.getLong(1))))
+                }
             }
-            cursor.close()
         }
         return reports
     }
@@ -383,10 +380,10 @@ class SongDatabase(
             var startNs = startStr.toLong()
 
             // Start where we left off last time.
-            val dbCursor = db.rawQuery("SELECT ServerTimeNsec FROM LastUpdateTime", null)
-            dbCursor.moveToFirst()
-            val prevStartNs = dbCursor.getLong(0)
-            dbCursor.close()
+            val prevStartNs = db.rawQuery("SELECT ServerTimeNsec FROM LastUpdateTime", null).use {
+                it.moveToFirst()
+                it.getLong(0)
+            }
 
             try {
                 updatedSongs += syncSongUpdates(db, prevStartNs, false)
@@ -586,25 +583,26 @@ class SongDatabase(
         // Canonical artist name to album stats.
         val artistAlbums = mutableMapOf<String, MutableList<StatsRow>>()
 
-        val cursor = db.rawQuery(
+        db.rawQuery(
             "SELECT Artist, Album, AlbumId, COUNT(*) " +
                 "FROM Songs " +
                 "GROUP BY Artist, Album, AlbumId " +
                 "ORDER BY 4 DESC",
             null
-        )
-        cursor.moveToFirst()
-        while (!cursor.isAfterLast) {
-            var origArtist = cursor.getString(0).ifEmpty { UNSET_STRING }
-            val canonArtist = canonArtists.getOrPut(normalizeForSearch(origArtist), { origArtist })
-            var album = cursor.getString(1).ifEmpty { UNSET_STRING }
-            val albumId = cursor.getString(2)
-            val numSongs = cursor.getInt(3)
-            val row = StatsRow(origArtist, album, albumId, numSongs)
-            artistAlbums.getOrPut(canonArtist, { mutableListOf() }).add(row)
-            cursor.moveToNext()
+        ).use {
+            with(it) {
+                while (moveToNext()) {
+                    var origArtist = getString(0).ifEmpty { UNSET_STRING }
+                    val canonArtist = canonArtists
+                        .getOrPut(normalizeForSearch(origArtist), { origArtist })
+                    var album = getString(1).ifEmpty { UNSET_STRING }
+                    val albumId = getString(2)
+                    val numSongs = getInt(3)
+                    val row = StatsRow(origArtist, album, albumId, numSongs)
+                    artistAlbums.getOrPut(canonArtist, { mutableListOf() }).add(row)
+                }
+            }
         }
-        cursor.close()
 
         db.delete("ArtistAlbumStats", null, null)
         for ((artist, rows) in artistAlbums) {
@@ -638,11 +636,11 @@ class SongDatabase(
 
     /** Update members containing aggregate data from the database. */
     private fun loadAggregateData(db: SQLiteDatabase, songsUpdated: Boolean) {
-        var cursor = db.rawQuery("SELECT LocalTimeNsec FROM LastUpdateTime", null)
-        cursor.moveToFirst()
-        val newSyncDate =
-            if (cursor.getLong(0) > 0) Date(cursor.getLong(0) / (1000 * 1000)) else null
-        cursor.close()
+        val newSyncDate = db.rawQuery("SELECT LocalTimeNsec FROM LastUpdateTime", null).use {
+            it.moveToFirst()
+            val ns = it.getLong(0)
+            if (ns > 0) Date(ns / (1000 * 1000)) else null
+        }
 
         // If the song data didn't change and we've already loaded it, bail out early.
         if (!songsUpdated && aggregateDataLoaded) {
@@ -650,10 +648,10 @@ class SongDatabase(
             return
         }
 
-        cursor = db.rawQuery("SELECT COUNT(*) FROM Songs", null)
-        cursor.moveToFirst()
-        val newNumSongs = cursor.getInt(0)
-        cursor.close()
+        val newNumSongs = db.rawQuery("SELECT COUNT(*) FROM Songs", null).use {
+            it.moveToFirst()
+            it.getInt(0)
+        }
 
         // Avoid modifying the live members.
         val newArtistsAlpha = mutableListOf<StatsRow>()
@@ -661,30 +659,28 @@ class SongDatabase(
         val newAlbumsAlpha = mutableListOf<StatsRow>()
         val newArtistAlbums = mutableMapOf<String, MutableList<StatsRow>>()
 
-        cursor = db.rawQuery(
+        db.rawQuery(
             "SELECT Artist, SUM(NumSongs) " +
                 "FROM ArtistAlbumStats " +
                 "GROUP BY Artist " +
                 "ORDER BY ArtistSortKey ASC",
             null
-        )
-        cursor.moveToFirst()
-        while (!cursor.isAfterLast) {
-            newArtistsAlpha.add(StatsRow(cursor.getString(0), "", "", cursor.getInt(1)))
-            cursor.moveToNext()
+        ).use {
+            while (it.moveToNext()) {
+                newArtistsAlpha.add(StatsRow(it.getString(0), "", "", it.getInt(1)))
+            }
         }
-        cursor.close()
 
-        cursor = db.rawQuery(
+        db.rawQuery(
             "SELECT Artist, Album, AlbumId, SUM(NumSongs) " +
                 "FROM ArtistAlbumStats " +
                 "GROUP BY Artist, Album, AlbumId " +
                 "ORDER BY AlbumSortKey ASC, AlbumId ASC, 4 DESC",
             null
-        )
-        cursor.moveToFirst()
-        readAlbumRows(cursor, newAlbumsAlpha, true /* aggregateAlbums */, newArtistAlbums)
-        cursor.close()
+        ).use {
+            it.moveToFirst()
+            readAlbumRows(it, newAlbumsAlpha, true /* aggregateAlbums */, newArtistAlbums)
+        }
 
         newArtistsNumSongs.addAll(newArtistsAlpha)
         Collections.sort(newArtistsNumSongs) { a, b -> b.count - a.count }
@@ -704,29 +700,29 @@ class SongDatabase(
     private fun loadSearchPresets(db: SQLiteDatabase) {
         val presets = mutableListOf<SearchPreset>()
 
-        val cursor = db.rawQuery(
+        db.rawQuery(
             "SELECT Name, Tags, MinRating, Unrated, FirstPlayed, LastPlayed, " +
                 "FirstTrack, Shuffle, Play FROM SearchPresets ORDER By SortKey ASC",
             null
-        )
-        cursor.moveToFirst()
-        while (!cursor.isAfterLast) {
-            presets.add(
-                SearchPreset(
-                    name = cursor.getString(0),
-                    tags = cursor.getString(1),
-                    minRating = cursor.getFloat(2).toDouble(),
-                    unrated = cursor.getInt(3) != 0,
-                    firstPlayed = cursor.getInt(4),
-                    lastPlayed = cursor.getInt(5),
-                    firstTrack = cursor.getInt(6) != 0,
-                    shuffle = cursor.getInt(7) != 0,
-                    play = cursor.getInt(8) != 0,
-                )
-            )
-            cursor.moveToNext()
+        ).use {
+            with(it) {
+                while (moveToNext()) {
+                    presets.add(
+                        SearchPreset(
+                            name = getString(0),
+                            tags = getString(1),
+                            minRating = getFloat(2).toDouble(),
+                            unrated = getInt(3) != 0,
+                            firstPlayed = getInt(4),
+                            lastPlayed = getInt(5),
+                            firstTrack = getInt(6) != 0,
+                            shuffle = getInt(7) != 0,
+                            play = getInt(8) != 0,
+                        )
+                    )
+                }
+            }
         }
-        cursor.close()
 
         _searchPresets = presets
     }
@@ -751,10 +747,10 @@ class SongDatabase(
         val rows = mutableListOf<StatsRow>()
         opener.getDb() task@{ db ->
             if (db == null) return@task // quit() already called
-            val cursor = db.rawQuery(query, selectionArgs)
-            cursor.moveToFirst()
-            readAlbumRows(cursor, rows, aggregateAlbums, null, unsetArtist, unsetAlbum)
-            cursor.close()
+            db.rawQuery(query, selectionArgs).use {
+                it.moveToFirst()
+                readAlbumRows(it, rows, aggregateAlbums, null, unsetArtist, unsetAlbum)
+            }
         }
         sortStatsRows(rows, order)
         return rows
@@ -1181,35 +1177,31 @@ class SongDatabase(
                                 "PeakAmp FLOAT NOT NULL, " +
                                 "Rating FLOAT NOT NULL)"
                         )
-                        val cursor = db.rawQuery("SELECT * FROM SongsTmp", null)
-                        cursor.moveToFirst()
-                        while (!cursor.isAfterLast) {
-                            val artist = cursor.getString(3)
-                            val title = cursor.getString(4)
-                            val album = cursor.getString(5)
-                            val vals = ContentValues(17)
-                            vals.put("SongId", cursor.getLong(0))
-                            vals.put("Filename", cursor.getString(1))
-                            vals.put("CoverFilename", cursor.getString(2))
-                            vals.put("Artist", artist)
-                            vals.put("Title", title)
-                            vals.put("Album", album)
-                            vals.put("AlbumId", cursor.getString(6))
-                            vals.put("ArtistNorm", normalizeForSearch(artist))
-                            vals.put("TitleNorm", normalizeForSearch(title))
-                            vals.put("AlbumNorm", normalizeForSearch(album))
-                            vals.put("Track", cursor.getInt(7))
-                            vals.put("Disc", cursor.getInt(8))
-                            vals.put("Length", cursor.getInt(9).toDouble())
-                            vals.put("TrackGain", cursor.getFloat(10))
-                            vals.put("AlbumGain", cursor.getFloat(11))
-                            vals.put("PeakAmp", cursor.getFloat(12))
-                            vals.put("Rating", cursor.getFloat(13))
-                            db.replace("Songs", "", vals)
-
-                            cursor.moveToNext()
+                        db.rawQuery("SELECT * FROM SongsTmp", null).use {
+                            with(it) {
+                                while (moveToNext()) {
+                                    val vals = ContentValues(17)
+                                    vals.put("SongId", getLong(0))
+                                    vals.put("Filename", getString(1))
+                                    vals.put("CoverFilename", getString(2))
+                                    vals.put("Artist", getString(3))
+                                    vals.put("Title", getString(4))
+                                    vals.put("Album", getString(5))
+                                    vals.put("AlbumId", getString(6))
+                                    vals.put("ArtistNorm", normalizeForSearch(getString(3)))
+                                    vals.put("TitleNorm", normalizeForSearch(getString(4)))
+                                    vals.put("AlbumNorm", normalizeForSearch(getString(5)))
+                                    vals.put("Track", getInt(7))
+                                    vals.put("Disc", getInt(8))
+                                    vals.put("Length", getInt(9).toDouble())
+                                    vals.put("TrackGain", getFloat(10))
+                                    vals.put("AlbumGain", getFloat(11))
+                                    vals.put("PeakAmp", getFloat(12))
+                                    vals.put("Rating", getFloat(13))
+                                    db.replace("Songs", "", vals)
+                                }
+                            }
                         }
-                        cursor.close()
 
                         db.execSQL("DROP TABLE SongsTmp")
                         db.execSQL(CREATE_SONGS_ARTIST_INDEX_SQL)
