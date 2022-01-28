@@ -128,14 +128,14 @@ class MediaBrowserHelper(
             parentId == ARTISTS_ID -> {
                 val items = mutableListOf<MediaItem>()
                 for (row in db.artistsSortedAlphabetically) {
-                    items.add(makeArtistItem(row, onlyCached = false))
+                    items.add(makeArtistItem(row))
                 }
                 result.sendResult(items)
             }
             parentId == ALBUMS_ID -> {
                 val items = mutableListOf<MediaItem>()
                 for (row in db.albumsSortedAlphabetically) {
-                    items.add(makeAlbumItem(row, onlyCached = false, includeArtist = true))
+                    items.add(makeAlbumItem(row, includeArtist = true))
                 }
                 result.sendResult(items)
             }
@@ -163,7 +163,7 @@ class MediaBrowserHelper(
                 val items = mutableListOf<MediaItem>()
                 val artist = parentId.substring(ARTIST_ID_PREFIX.length)
                 for (row in db.albumsByArtist(artist)) {
-                    items.add(makeAlbumItem(row, onlyCached = false, includeArtist = false))
+                    items.add(makeAlbumItem(row, includeCover = true))
                 }
                 result.sendResult(items)
             }
@@ -173,7 +173,7 @@ class MediaBrowserHelper(
                     val artist = parentId.substring(CACHED_ARTIST_ID_PREFIX.length)
                     val items = mutableListOf<MediaItem>()
                     for (row in db.cachedAlbumsByArtist(artist)) {
-                        items.add(makeAlbumItem(row, onlyCached = true, includeArtist = false))
+                        items.add(makeAlbumItem(row, includeCover = true))
                     }
                     result.sendResult(items)
                 }
@@ -236,20 +236,29 @@ class MediaBrowserHelper(
     }
 
     /** Create a [MediaItem] for the artist described by [row]. */
-    private fun makeArtistItem(row: StatsRow, onlyCached: Boolean): MediaItem {
+    private fun makeArtistItem(row: StatsRow, onlyCached: Boolean = false): MediaItem {
         val pre = if (onlyCached) CACHED_ARTIST_ID_PREFIX else ARTIST_ID_PREFIX
-        val desc = MediaDescriptionCompat.Builder()
+        val builder = MediaDescriptionCompat.Builder()
             .setTitle(row.key.artist)
             .setMediaId(pre + row.key.artist)
-            .build()
-        return MediaItem(desc, MediaItem.FLAG_BROWSABLE)
+
+        // Display the artist's albums in a grid instead of a list.
+        val extras = Bundle()
+        extras.putInt(
+            MediaConstants.DESCRIPTION_EXTRAS_KEY_CONTENT_STYLE_PLAYABLE,
+            MediaConstants.DESCRIPTION_EXTRAS_VALUE_CONTENT_STYLE_GRID_ITEM
+        )
+        builder.setExtras(extras)
+
+        return MediaItem(builder.build(), MediaItem.FLAG_BROWSABLE)
     }
 
     /** Create a [MediaItem] for the album described by [row]. */
     private fun makeAlbumItem(
         row: StatsRow,
-        onlyCached: Boolean,
-        includeArtist: Boolean
+        onlyCached: Boolean = false,
+        includeArtist: Boolean = false,
+        includeCover: Boolean = false,
     ): MediaItem {
         // This seems like it's close to an internal Android limit. When I call setExtras()
         // to attach a Bundle with android.media.browse.CONTENT_STYLE_GROUP_TITLE_HINT, I'm unable
@@ -262,6 +271,16 @@ class MediaBrowserHelper(
             .setTitle(row.key.album)
             .setMediaId(pre + row.key.albumId)
         if (includeArtist) builder.setSubtitle(row.key.artist)
+
+        if (includeCover && !row.coverFilename.isEmpty()) {
+            builder.setIconUri(
+                Uri.Builder()
+                    .scheme(ContentResolver.SCHEME_CONTENT)
+                    .authority(CoverProvider.AUTHORITY)
+                    .appendPath(row.coverFilename)
+                    .build()
+            )
+        }
 
         // TODO: Why isn't Android Audio displaying UI for browsing into albums?
         // I asked at https://stackoverflow.com/q/66509112/6882947.

@@ -61,6 +61,12 @@
     <activity android:name=".SearchFormActivity" android:theme="@style/AppTheme" />
     <activity android:name=".SettingsActivity" android:theme="@style/AppTheme" />
 
+    <provider
+      android:name=".CoverProvider"
+      android:authorities="org.erat.nup.covers"
+      android:exported="true"
+    />
+
     <receiver android:name="androidx.media.session.MediaButtonReceiver" android:exported="true">
       <intent-filter>
         <action android:name="android.intent.action.MEDIA_BUTTON" />

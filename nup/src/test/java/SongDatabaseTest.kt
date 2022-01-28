@@ -24,6 +24,7 @@ import org.erat.nup.SearchPreset
 import org.erat.nup.Song
 import org.erat.nup.SongDatabase
 import org.erat.nup.StatsRow
+import org.erat.nup.normalizeForSearch
 import org.erat.nup.searchLocal
 import org.json.JSONArray
 import org.json.JSONObject
@@ -264,30 +265,30 @@ class SongDatabaseTest {
         )
         assertEquals(
             listOf(
-                StatsRow("B", SongDatabase.UNSET_STRING, "", 1),
-                StatsRow("B, A, B feat. C", "Album 1", s1.albumId, 4),
-                StatsRow("A, B", "Album 2", s5.albumId, 2),
+                StatsRow("B", SongDatabase.UNSET_STRING, "", 1, s7.coverFilename),
+                StatsRow("B, A, B feat. C", "Album 1", s1.albumId, 4, s1.coverFilename),
+                StatsRow("A, B", "Album 2", s5.albumId, 2, s5.coverFilename),
             ),
             db.albumsSortedAlphabetically
         )
         assertEquals(
             listOf(
-                StatsRow("A", "Album 1", s1.albumId, 1),
-                StatsRow("A", "Album 2", s5.albumId, 1),
+                StatsRow("A", "Album 1", s1.albumId, 1, s1.coverFilename),
+                StatsRow("A", "Album 2", s5.albumId, 1, s6.coverFilename),
             ),
             db.albumsByArtist("A")
         )
         assertEquals(
             listOf(
-                StatsRow("B", SongDatabase.UNSET_STRING, "", 1),
-                StatsRow("B", "Album 1", s1.albumId, 2),
-                StatsRow("B", "Album 2", s5.albumId, 1),
+                StatsRow("B", SongDatabase.UNSET_STRING, "", 1, s7.coverFilename),
+                StatsRow("B", "Album 1", s1.albumId, 2, s2.coverFilename),
+                StatsRow("B", "Album 2", s5.albumId, 1, s5.coverFilename),
             ),
             db.albumsByArtist("B")
         )
         assertEquals(
             listOf(
-                StatsRow("B feat. C", "Album 1", s1.albumId, 1),
+                StatsRow("B feat. C", "Album 1", s1.albumId, 1, s3.coverFilename),
             ),
             db.albumsByArtist("B feat. C")
         )
@@ -332,19 +333,19 @@ class SongDatabaseTest {
         )
         assertEquals(
             listOf(
-                StatsRow("B", SongDatabase.UNSET_STRING, "", 1),
-                StatsRow("A, B", "Album 1", s1.albumId, 2),
+                StatsRow("B", SongDatabase.UNSET_STRING, "", 1, s5.coverFilename),
+                StatsRow("A, B", "Album 1", s1.albumId, 2, s1.coverFilename),
             ),
             db.cachedAlbumsSortedAlphabetically()
         )
         assertEquals(
-            listOf(StatsRow("A", "Album 1", s1.albumId, 1)),
+            listOf(StatsRow("A", "Album 1", s1.albumId, 1, s1.coverFilename)),
             db.cachedAlbumsByArtist("A")
         )
         assertEquals(
             listOf(
-                StatsRow("B", SongDatabase.UNSET_STRING, "", 1),
-                StatsRow("B", "Album 1", s3.albumId, 1),
+                StatsRow("B", SongDatabase.UNSET_STRING, "", 1, s5.coverFilename),
+                StatsRow("B", "Album 1", s3.albumId, 1, s3.coverFilename),
             ),
             db.cachedAlbumsByArtist("B")
         )
@@ -361,15 +362,15 @@ class SongDatabaseTest {
         assertEquals(
             listOf(
                 StatsRow("B", SongDatabase.UNSET_STRING, "", 1),
-                StatsRow("B", "Album 1", s3.albumId, 1),
+                StatsRow("B", "Album 1", s3.albumId, 1, s3.coverFilename),
             ),
             db.cachedAlbumsSortedAlphabetically()
         )
         assertEquals(listOf<StatsRow>(), db.cachedAlbumsByArtist("A"))
         assertEquals(
             listOf(
-                StatsRow("B", SongDatabase.UNSET_STRING, "", 1),
-                StatsRow("B", "Album 1", s3.albumId, 1),
+                StatsRow("B", SongDatabase.UNSET_STRING, "", 1, s5.coverFilename),
+                StatsRow("B", "Album 1", s3.albumId, 1, s3.coverFilename),
             ),
             db.cachedAlbumsByArtist("B")
         )
@@ -526,8 +527,8 @@ private fun makeSong(
     rating: Double? = null,
 ): Song {
     val albumId =
-        if (!album.isEmpty()) UUID.nameUUIDFromBytes(album.toByteArray()).toString()
-        else ""
+        if (album.isEmpty()) ""
+        else UUID.nameUUIDFromBytes(normalizeForSearch(album).toByteArray()).toString()
     val size = artist.length + title.length + album.length
     return Song(
         // [SongDatabase.query] expects this to be positive.
@@ -536,8 +537,8 @@ private fun makeSong(
         title = title,
         album = album,
         albumId = albumId,
-        filename = "$album/$artist-$title.mp3",
-        coverFilename = "$albumId.jpg",
+        filename = "${album.ifEmpty { "misc" }}/$artist-$title.mp3",
+        coverFilename = if (albumId.isEmpty()) "" else "$albumId.jpg",
         lengthSec = 4.5 * size,
         track = track,
         disc = disc,

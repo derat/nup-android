@@ -17,10 +17,16 @@ import java.util.Collections
 /** Key for song counts. Fields may be empty. */
 data class StatsKey(var artist: String, val album: String, val albumId: String)
 
-/** Song count for a specific [StatsKey]. */
-data class StatsRow(val key: StatsKey, var count: Int) {
-    constructor(artist: String, album: String, albumId: String, count: Int) :
-        this(StatsKey(artist, album, albumId), count) {}
+/** Song count and related information for a specific [StatsKey]. */
+data class StatsRow(val key: StatsKey, var count: Int, var coverFilename: String = "") {
+    constructor(
+        artist: String,
+        album: String,
+        albumId: String,
+        count: Int,
+        coverFilename: String = ""
+    ) :
+        this(StatsKey(artist, album, albumId), count, coverFilename) {}
 }
 
 /** Sort [stats] according to [order]. */

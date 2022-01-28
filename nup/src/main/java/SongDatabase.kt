@@ -83,7 +83,7 @@ class SongDatabase(
     }
 
     suspend fun cachedArtistsSortedAlphabetically(): List<StatsRow> = getSortedRows(
-        "SELECT MIN(s.Artist), '' AS Album, '' AS AlbumId, COUNT(*) " +
+        "SELECT MIN(s.Artist), '' AS Album, '' AS AlbumId, COUNT(*), '' AS CoverFilename " +
             "FROM Songs s " +
             "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
             "GROUP BY s.ArtistNorm",
@@ -94,7 +94,7 @@ class SongDatabase(
     )
 
     suspend fun cachedAlbumsSortedAlphabetically(): List<StatsRow> = getSortedRows(
-        "SELECT MIN(s.Artist), MIN(s.Album), s.AlbumId, COUNT(*) " +
+        "SELECT MIN(s.Artist), MIN(s.Album), s.AlbumId, COUNT(*), MIN(s.CoverFilename) " +
             "FROM Songs s " +
             "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
             "GROUP BY s.ArtistNorm, s.AlbumNorm, s.AlbumId " +
@@ -105,7 +105,7 @@ class SongDatabase(
     )
 
     suspend fun cachedAlbumsByArtist(artist: String): List<StatsRow> = getSortedRows(
-        "SELECT ? AS Artist, MIN(s.Album), s.AlbumId, COUNT(*) " +
+        "SELECT ? AS Artist, MIN(s.Album), s.AlbumId, COUNT(*), MIN(s.CoverFilename) " +
             "FROM Songs s " +
             "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
             "WHERE s.ArtistNorm = ? " +
@@ -584,7 +584,7 @@ class SongDatabase(
         val artistAlbums = mutableMapOf<String, MutableList<StatsRow>>()
 
         db.rawQuery(
-            "SELECT Artist, Album, AlbumId, COUNT(*) " +
+            "SELECT Artist, Album, AlbumId, COUNT(*), MIN(CoverFilename) " +
                 "FROM Songs " +
                 "GROUP BY Artist, Album, AlbumId " +
                 "ORDER BY 4 DESC",
@@ -598,7 +598,8 @@ class SongDatabase(
                     var album = getString(1).ifEmpty { UNSET_STRING }
                     val albumId = getString(2)
                     val numSongs = getInt(3)
-                    val row = StatsRow(origArtist, album, albumId, numSongs)
+                    val coverFilename = getString(4)
+                    val row = StatsRow(origArtist, album, albumId, numSongs, coverFilename)
                     artistAlbums.getOrPut(canonArtist, { mutableListOf() }).add(row)
                 }
             }
@@ -608,13 +609,14 @@ class SongDatabase(
         for ((artist, rows) in artistAlbums) {
             val artistSortKey = getSongOrderKey(artist, SongOrder.ARTIST)
             for (row in rows) {
-                val values = ContentValues(6)
+                val values = ContentValues(7)
                 values.put("Artist", artist) // canonical
                 values.put("Album", row.key.album)
                 values.put("AlbumId", row.key.albumId)
                 values.put("NumSongs", row.count)
                 values.put("ArtistSortKey", artistSortKey)
                 values.put("AlbumSortKey", getSongOrderKey(row.key.album, SongOrder.ALBUM))
+                values.put("CoverFilename", row.coverFilename)
                 db.insert("ArtistAlbumStats", "", values)
             }
         }
@@ -672,7 +674,7 @@ class SongDatabase(
         }
 
         db.rawQuery(
-            "SELECT Artist, Album, AlbumId, SUM(NumSongs) " +
+            "SELECT Artist, Album, AlbumId, SUM(NumSongs), MIN(CoverFilename) " +
                 "FROM ArtistAlbumStats " +
                 "GROUP BY Artist, Album, AlbumId " +
                 "ORDER BY AlbumSortKey ASC, AlbumId ASC, 4 DESC",
@@ -729,7 +731,7 @@ class SongDatabase(
 
     /** Get sorted results from the supplied query.
      *
-     * @param query SQL query returning rows of (artist, album, album ID, num songs)
+     * @param query SQL query returning rows of (artist, album, album ID, num songs, cover filename)
      * @param selectionArgs positional parameters for [query]
      * @param aggregateAlbums group rows by (album, album ID)
      * @param order sort order for rows
@@ -763,7 +765,7 @@ class SongDatabase(
      * If [aggregateAlbums] is true, rows should ordered by ascending album and descending count
      * (so that the most-represented artist can be identified for each album).
      *
-     * @param cursor cursor for reading rows of (artist, album, album ID, count)
+     * @param cursor cursor for reading rows of (artist, album, album ID, count, cover filename)
      * @param albums destination for per-album stats
      * @param aggregateAlbums group rows by (album, album ID)
      * @param artistAlbums optional destination for per-artist, per-album stats
@@ -787,6 +789,7 @@ class SongDatabase(
             if (album.isEmpty()) album = unsetAlbum
             val albumId = cursor.getString(2)
             val count = cursor.getInt(3)
+            val coverFilename = cursor.getString(4)
 
             // TODO: Decide if we should special-case songs with missing albums here. Right now they
             // all get lumped together, but that's arguably better than creating a separate row for
@@ -799,7 +802,7 @@ class SongDatabase(
                 lastAlbum.count += count
                 lastAlbum.key.artist += ", " + artist
             } else {
-                albums.add(StatsRow(artist, album, albumId, count))
+                albums.add(StatsRow(artist, album, albumId, count, coverFilename))
                 lastAlbum = albums.last()
             }
 
@@ -808,7 +811,7 @@ class SongDatabase(
             // affect the count displayed when navigating from BrowseArtistsActivity to
             // BrowseAlbumsActivity.
             artistAlbums?.getOrPut(artist.toLowerCase(), { mutableListOf() })
-                ?.add(StatsRow(artist, album, albumId, count))
+                ?.add(StatsRow(artist, album, albumId, count, coverFilename))
 
             cursor.moveToNext()
         }
@@ -823,7 +826,7 @@ class SongDatabase(
         public const val UNSET_STRING = "[unset]"
 
         public const val DATABASE_NAME = "NupSongs" // public for tests
-        private const val DATABASE_VERSION = 18
+        private const val DATABASE_VERSION = 19
         private const val MAX_QUERY_RESULTS = 250
         private const val SERVER_SONG_BATCH_SIZE = 100
 
@@ -860,7 +863,8 @@ class SongDatabase(
                 "AlbumId VARCHAR(256) NOT NULL, " +
                 "NumSongs INTEGER NOT NULL, " +
                 "ArtistSortKey VARCHAR(256) NOT NULL, " +
-                "AlbumSortKey VARCHAR(256) NOT NULL)"
+                "AlbumSortKey VARCHAR(256) NOT NULL, " +
+                "CoverFilename VARCHAR(256) NOT NULL)"
         private const val CREATE_ARTIST_ALBUM_STATS_ARTIST_SORT_KEY_INDEX_SQL =
             "CREATE INDEX ArtistSortKey ON ArtistAlbumStats (ArtistSortKey)"
         private const val CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL =
@@ -927,9 +931,12 @@ class SongDatabase(
                     }
                 }
 
-                // Upgrade the database from the version before [newVersion] to [newVersion].
-                // The only reason I'm keeping the old upgrade steps is for reference when
-                // writing new ones.
+                // Upgrade the database from [newVersion]-1 to [newVersion]. The only reason I'm
+                // keeping the old upgrade steps is for reference when writing new ones.
+                //
+                // Be careful when modifying the ArtistAlbumStats table, as any existing here
+                // updateArtistAlbumStats calls will need to be removed since they'll be operating
+                // on a now-outdated schema for the table.
                 private fun upgradeFromPreviousVersion(db: SQLiteDatabase, newVersion: Int) {
                     if (newVersion == 2) {
                         // Version 2: Create LastUpdateTime table.
@@ -1036,7 +1043,15 @@ class SongDatabase(
                         db.execSQL(
                             "ALTER TABLE ArtistAlbumStats RENAME TO ArtistAlbumStatsTmp"
                         )
-                        db.execSQL(CREATE_ARTIST_ALBUM_STATS_SQL)
+                        db.execSQL(
+                            "CREATE TABLE ArtistAlbumStats (" +
+                                "Artist VARCHAR(256) NOT NULL, " +
+                                "Album VARCHAR(256) NOT NULL, " +
+                                "AlbumId VARCHAR(256) NOT NULL, " +
+                                "NumSongs INTEGER NOT NULL, " +
+                                "ArtistSortKey VARCHAR(256) NOT NULL, " +
+                                "AlbumSortKey VARCHAR(256) NOT NULL)"
+                        )
                         db.execSQL(
                             "INSERT INTO ArtistAlbumStats SELECT Artist, Album, NumSongs, " +
                                 "Artist, Album FROM ArtistAlbumStatsTmp"
@@ -1046,13 +1061,18 @@ class SongDatabase(
                         db.execSQL("DROP TABLE ArtistAlbumStatsTmp")
                     } else if (newVersion == 8) {
                         // Version 8: Add CachedSongs table.
-                        db.execSQL(CREATE_CACHED_SONGS_SQL)
+                        db.execSQL("CREATE TABLE CachedSongs (SongId INTEGER PRIMARY KEY NOT NULL)")
                     } else if (newVersion == 9) {
                         // Version 9: Add index on Songs.Filename.
                         db.execSQL("CREATE INDEX Filename ON Songs (Filename)")
                     } else if (newVersion == 10) {
                         // Version 10: Add PendingPlaybackReports table.
-                        db.execSQL(CREATE_PENDING_PLAYBACK_REPORTS_SQL)
+                        db.execSQL(
+                            "CREATE TABLE PendingPlaybackReports (" +
+                                "SongId INTEGER NOT NULL, " +
+                                "StartTime INTEGER NOT NULL, " +
+                                "PRIMARY KEY (SongId, StartTime))"
+                        )
                     } else if (newVersion == 11) {
                         // Version 11: Change way too much stuff for AppEngine backend.
                         throw RuntimeException(
@@ -1060,10 +1080,8 @@ class SongDatabase(
                         )
                     } else if (newVersion == 12 || newVersion == 13) {
                         // Versions 12 and 13: Update sort ordering.
-                        // It isn't actually safe to call updateArtistAlbumStats() like this, since
-                        // it could be now be assuming a schema different than the one used in
-                        // these old versions.
-                        updateArtistAlbumStats(db)
+                        // There was a [updateArtistAlbumStats] call here, but now the schema has
+                        // changed.
                     } else if (newVersion == 14) {
                         // Version 14: Add AlbumId, TrackGain, AlbumGain, and PeakAmp to Songs.
                         db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp")
@@ -1112,7 +1130,6 @@ class SongDatabase(
                         )
                         db.execSQL(CREATE_ARTIST_ALBUM_STATS_ARTIST_SORT_KEY_INDEX_SQL)
                         db.execSQL(CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL)
-                        updateArtistAlbumStats(db)
                     } else if (newVersion == 16) {
                         // Version 16: Replace Url and CoverUrl with Filename and CoverFilename.
                         db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp")
@@ -1150,7 +1167,19 @@ class SongDatabase(
                         )
                     } else if (newVersion == 17) {
                         // Version 17: Add SearchPresets table.
-                        db.execSQL(CREATE_SEARCH_PRESETS_SQL)
+                        db.execSQL(
+                            "CREATE TABLE SearchPresets (" +
+                                "SortKey INTEGER NOT NULL, " +
+                                "Name VARCHAR(256) NOT NULL, " +
+                                "Tags VARCHAR(256) NOT NULL, " +
+                                "MinRating FLOAT NOT NULL, " +
+                                "Unrated BOOLEAN NOT NULL, " +
+                                "FirstPlayed INTEGER NOT NULL, " +
+                                "LastPlayed INTEGER NOT NULL, " +
+                                "FirstTrack BOOLEAN NOT NULL, " +
+                                "Shuffle BOOLEAN NOT NULL, " +
+                                "Play BOOLEAN NOT NULL)"
+                        )
                     } else if (newVersion == 18) {
                         // Version 18:
                         // - Add ArtistNorm, TitleNorm, and AlbumNorm to Songs.
@@ -1207,6 +1236,21 @@ class SongDatabase(
                         db.execSQL(CREATE_SONGS_ARTIST_INDEX_SQL)
                         db.execSQL(CREATE_SONGS_ALBUM_INDEX_SQL)
                         db.execSQL(CREATE_SONGS_ALBUM_ID_INDEX_SQL)
+                    } else if (newVersion == 19) {
+                        // Version 19: Add CoverFilename to ArtistAlbumStats.
+                        db.execSQL("DROP TABLE ArtistAlbumStats")
+                        db.execSQL(
+                            "CREATE TABLE ArtistAlbumStats (" +
+                                "Artist VARCHAR(256) NOT NULL, " +
+                                "Album VARCHAR(256) NOT NULL, " +
+                                "AlbumId VARCHAR(256) NOT NULL, " +
+                                "NumSongs INTEGER NOT NULL, " +
+                                "ArtistSortKey VARCHAR(256) NOT NULL, " +
+                                "AlbumSortKey VARCHAR(256) NOT NULL, " +
+                                "CoverFilename VARCHAR(256) NOT NULL)"
+                        )
+                        db.execSQL(CREATE_ARTIST_ALBUM_STATS_ARTIST_SORT_KEY_INDEX_SQL)
+                        db.execSQL(CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL)
                         updateArtistAlbumStats(db)
                     } else {
                         throw RuntimeException(

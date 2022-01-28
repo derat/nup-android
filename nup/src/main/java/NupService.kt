@@ -845,7 +845,7 @@ class NupService :
 
         songCoverFetches.add(song)
         scope.launch(Dispatchers.Main) {
-            val bitmap = async(Dispatchers.IO) { coverLoader.loadCover(song.coverFilename) }.await()
+            val bitmap = async(Dispatchers.IO) { coverLoader.getBitmap(song.coverFilename) }.await()
             storeCoverForSong(song, bitmap)
             songCoverFetches.remove(song)
 

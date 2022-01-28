@@ -5,10 +5,16 @@
 
 package org.erat.nup
 
+import android.content.ContentProvider
+import android.content.ContentValues
 import android.content.Context
+import android.database.Cursor
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.net.Uri
+import android.os.ParcelFileDescriptor
 import android.util.Log
+import androidx.core.content.FileProvider
 import java.io.File
 import java.io.IOException
 import java.net.HttpURLConnection
@@ -19,8 +25,9 @@ import kotlin.concurrent.withLock
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
-/** CoverLoader loads and caches album art. */
+/** Loads and caches album art. */
 open class CoverLoader(
     context: Context,
     scope: CoroutineScope,
@@ -36,11 +43,32 @@ open class CoverLoader(
     private val loadLock = ReentrantLock() // guards [filesBeingLoaded]
     private val loadFinishedCond = loadLock.newCondition() // signaled for [filesBeingLoaded]
 
-    // The last cover that we've loaded. We store it here so that we can reuse the already-loaded
+    // The last cover that we've loaded. We store it here so that we can reuse the already-decoded
     // bitmap in the common case where we're playing an album and need the same cover over and over.
     private var lastFile: File? = null
     private var lastBitmap: Bitmap? = null
     private val lastLock = ReentrantLock()
+
+    /**
+     * Synchronously load and decodes the cover at [path] (corresponding to [Song.coverFilename]).
+     *
+     * Tries to find the cover locally first; then goes to the server.
+     *
+     * @return cover image or null if unavailable
+     */
+    suspend fun getBitmap(path: String): Bitmap? {
+        val file = getFile(path) ?: return null
+        if (!file.exists()) {
+            Log.e(TAG, "${file.name} disappeared")
+            return null
+        }
+        lastLock.withLock {
+            if (lastFile != null && lastFile == file) return lastBitmap
+            lastFile = file
+            lastBitmap = decodeFile(file.path)
+            return lastBitmap
+        }
+    }
 
     /**
      * Synchronously load the cover at [path] (corresponding to [Song.coverFilename]).
@@ -49,28 +77,18 @@ open class CoverLoader(
      *
      * @return cover image or null if unavailable
      */
-    suspend fun loadCover(path: String): Bitmap? {
+    suspend fun getFile(path: String): File? {
         waitUntilReady() // wait for [coverDir]
 
-        var file = lookForLocalCover(path)
-        if (file != null) {
-            Log.d(TAG, "Using local file ${file.name}")
-        } else {
-            file = downloadCover(path) ?: return null
-            Log.d(TAG, "Fetched remote file ${file.name}")
+        lookForLocalCover(path)?.let {
+            Log.d(TAG, "Using local file ${it.name}")
+            return it
         }
-
-        if (!file.exists()) {
-            Log.e(TAG, "${file.name} disappeared")
-            return null
+        downloadCover(path)?.let {
+            Log.d(TAG, "Fetched remote file ${it.name}")
+            return it
         }
-
-        lastLock.withLock {
-            if (lastFile != null && lastFile == file) return lastBitmap
-            lastFile = file
-            lastBitmap = decodeFile(file.path)
-            return lastBitmap
-        }
+        return null
     }
 
     private suspend fun lookForLocalCover(path: String): File? {
@@ -162,6 +180,8 @@ open class CoverLoader(
     }
 
     init {
+        CoverProvider.loader = this
+
         // [externalCacheDir] hits the disk, so do it in the background.
         scope.launch(Dispatchers.IO) {
             coverDir = File(context.externalCacheDir, DIR_NAME)
@@ -171,5 +191,48 @@ open class CoverLoader(
                 readyCond.signal()
             }
         }
+    }
+}
+
+/** [FileProvider] implementation for accessing album art. */
+class CoverProvider() : ContentProvider() {
+    override fun onCreate(): Boolean = true
+
+    override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor? {
+        val fn = uri.lastPathSegment ?: return null
+        val file = runBlocking { loader?.getFile(fn) } ?: return null
+        return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
+    }
+    // TODO: Determine this based on the filename.
+    override fun getType(uri: Uri): String? = "image/jpeg"
+
+    // All of the normal content provider methods are unneeded.
+    override fun query(
+        uri: Uri,
+        projection: Array<String>?,
+        selection: String?,
+        selectionArgs: Array<String>?,
+        sortOrder: String?
+    ): Cursor? {
+        return null
+    }
+    override fun insert(uri: Uri, values: ContentValues?): Uri? = null
+    override fun update(
+        uri: Uri,
+        values: ContentValues?,
+        selection: String?,
+        selectionArgs: Array<String>?
+    ): Int = 0
+    override fun delete(
+        uri: Uri,
+        selection: String?,
+        selectionArgs: Array<String>?
+    ): Int = 0
+
+    companion object {
+        private const val TAG = "CoverProvider"
+        const val AUTHORITY = "org.erat.nup.covers"
+
+        var loader: CoverLoader? = null
     }
 }

@@ -156,5 +156,5 @@ class CoverLoaderTest {
         return bitmap
     }
 
-    fun load(path: String): Bitmap? = runBlocking { coverLoader.loadCover(path) }
+    fun load(path: String): Bitmap? = runBlocking { coverLoader.getBitmap(path) }
 }
