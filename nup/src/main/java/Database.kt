@@ -107,3 +107,20 @@ class DatabaseUpdater(
         private const val SHUTDOWN_TIMEOUT_SEC = 60L
     }
 }
+
+/** Split semicolon-separated SQL statements on semicolons. */
+fun splitSQL(statements: String) = statements
+    .replace("\\s*--[^\n]*".toRegex(), "") // remove end-of-line comments
+    .replace(";\\s*$".toRegex(), "") // remove final semicolon
+    .split(";\n") // split on semicolon to get statements
+    .map { statement ->
+        statement
+            .split("\n") // split statement into lines
+            .map { it.trim() } // remove leading/trailing whitespace from lines
+            .filterNot { it.isEmpty() } // drop empty lines
+            .joinToString(" ") // join lines back into single statement
+    }
+
+/** Run the supplied SQL statements against [db]. */
+fun runSQL(db: SQLiteDatabase, statements: String) =
+    splitSQL(statements).forEach { db.execSQL(it) }

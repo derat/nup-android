@@ -83,10 +83,12 @@ class SongDatabase(
     }
 
     suspend fun cachedArtistsSortedAlphabetically(): List<StatsRow> = getSortedRows(
-        "SELECT MIN(s.Artist), '' AS Album, '' AS AlbumId, COUNT(*), '' AS CoverFilename " +
-            "FROM Songs s " +
-            "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
-            "GROUP BY s.ArtistNorm",
+        """
+        SELECT MIN(s.Artist), '' AS Album, '' AS AlbumId, COUNT(*), '' AS CoverFilename
+          FROM Songs s
+          JOIN CachedSongs cs ON(s.SongId = cs.SongId)
+          GROUP BY s.ArtistNorm
+        """.trimIndent(),
         null,
         false /* aggregateAlbums */,
         SongOrder.ARTIST,
@@ -94,22 +96,26 @@ class SongDatabase(
     )
 
     suspend fun cachedAlbumsSortedAlphabetically(): List<StatsRow> = getSortedRows(
-        "SELECT MIN(s.Artist), MIN(s.Album), s.AlbumId, COUNT(*), MIN(s.CoverFilename) " +
-            "FROM Songs s " +
-            "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
-            "GROUP BY s.ArtistNorm, s.AlbumNorm, s.AlbumId " +
-            "ORDER BY s.AlbumNorm ASC, s.AlbumId ASC, 4 DESC",
+        """
+        SELECT MIN(s.Artist), MIN(s.Album), s.AlbumId, COUNT(*), MIN(s.CoverFilename)
+          FROM Songs s
+          JOIN CachedSongs cs ON(s.SongId = cs.SongId)
+          GROUP BY s.ArtistNorm, s.AlbumNorm, s.AlbumId
+          ORDER BY s.AlbumNorm ASC, s.AlbumId ASC, 4 DESC
+        """.trimIndent(),
         null,
         true /* aggregateAlbums */,
         SongOrder.ALBUM,
     )
 
     suspend fun cachedAlbumsByArtist(artist: String): List<StatsRow> = getSortedRows(
-        "SELECT ? AS Artist, MIN(s.Album), s.AlbumId, COUNT(*), MIN(s.CoverFilename) " +
-            "FROM Songs s " +
-            "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " +
-            "WHERE s.ArtistNorm = ? " +
-            "GROUP BY s.AlbumNorm, s.AlbumId",
+        """
+        SELECT ? AS Artist, MIN(s.Album), s.AlbumId, COUNT(*), MIN(s.CoverFilename)
+          FROM Songs s
+          JOIN CachedSongs cs ON(s.SongId = cs.SongId)
+          WHERE s.ArtistNorm = ?
+          GROUP BY s.AlbumNorm, s.AlbumId
+        """.trimIndent(),
         arrayOf(artist, normalizeForSearch(artist)),
         false /* aggregateAlbums */,
         SongOrder.ALBUM,
@@ -165,14 +171,9 @@ class SongDatabase(
 
             fun addLiteral(clause: String) = selections.add(clause)
 
-            // Get a WHERE clause (plus trailing space) if |selections| is non-empty, or just an
-            // empty string otherwise.
-            val whereClause: String
-                get() = if (selections.isEmpty()) {
-                    ""
-                } else {
-                    "WHERE " + TextUtils.join(" AND ", selections) + " "
-                }
+            fun whereClause() =
+                if (selections.isEmpty()) ""
+                else ("WHERE " + TextUtils.join(" AND ", selections))
         }
 
         val builder = QueryBuilder()
@@ -191,20 +192,17 @@ class SongDatabase(
                 listOf(artistPrefix, "$artistPrefix %")
             )
         }
-        val query = (
-            "SELECT s.SongId, Artist, Title, Album, AlbumId, Filename, CoverFilename, Length, " +
-                "Track, Disc, TrackGain, AlbumGain, PeakAmp, Rating " +
-                "FROM Songs s " +
-                (if (onlyCached) "JOIN CachedSongs cs ON(s.SongId = cs.SongId) " else "") +
-                builder.whereClause +
-                "ORDER BY " +
-                (
-                    if (shuffle) "RANDOM() "
-                    else "Album ASC, AlbumId ASC, Disc ASC, Track ASC "
-                    ) +
-                "LIMIT " + MAX_QUERY_RESULTS
-            )
-
+        val cachedJoin = if (onlyCached) "JOIN CachedSongs cs ON(s.SongId = cs.SongId)" else ""
+        val order = if (shuffle) "RANDOM()" else "Album ASC, AlbumId ASC, Disc ASC, Track ASC"
+        val query =
+            """
+            SELECT s.SongId, Artist, Title, Album, AlbumId, Filename, CoverFilename, Length,
+              Track, Disc, TrackGain, AlbumGain, PeakAmp, Rating
+              FROM Songs s $cachedJoin
+              ${builder.whereClause()}
+              ORDER BY $order
+              LIMIT $MAX_QUERY_RESULTS
+            """.trimIndent()
         val songs = mutableListOf<Song>()
         opener.getDb() task@{ db ->
             if (db == null) return@task // quit() already called
@@ -584,10 +582,12 @@ class SongDatabase(
         val artistAlbums = mutableMapOf<String, MutableList<StatsRow>>()
 
         db.rawQuery(
-            "SELECT Artist, Album, AlbumId, COUNT(*), MIN(CoverFilename) " +
-                "FROM Songs " +
-                "GROUP BY Artist, Album, AlbumId " +
-                "ORDER BY 4 DESC",
+            """
+            SELECT Artist, Album, AlbumId, COUNT(*), MIN(CoverFilename)
+              FROM Songs
+              GROUP BY Artist, Album, AlbumId
+              ORDER BY 4 DESC
+            """.trimIndent(),
             null
         ).use {
             with(it) {
@@ -662,10 +662,12 @@ class SongDatabase(
         val newArtistAlbums = mutableMapOf<String, MutableList<StatsRow>>()
 
         db.rawQuery(
-            "SELECT Artist, SUM(NumSongs) " +
-                "FROM ArtistAlbumStats " +
-                "GROUP BY Artist " +
-                "ORDER BY ArtistSortKey ASC",
+            """
+            SELECT Artist, SUM(NumSongs)
+              FROM ArtistAlbumStats
+              GROUP BY Artist
+              ORDER BY ArtistSortKey ASC
+            """.trimIndent(),
             null
         ).use {
             while (it.moveToNext()) {
@@ -674,10 +676,12 @@ class SongDatabase(
         }
 
         db.rawQuery(
-            "SELECT Artist, Album, AlbumId, SUM(NumSongs), MIN(CoverFilename) " +
-                "FROM ArtistAlbumStats " +
-                "GROUP BY Artist, Album, AlbumId " +
-                "ORDER BY AlbumSortKey ASC, AlbumId ASC, 4 DESC",
+            """
+            SELECT Artist, Album, AlbumId, SUM(NumSongs), MIN(CoverFilename)
+              FROM ArtistAlbumStats
+              GROUP BY Artist, Album, AlbumId
+              ORDER BY AlbumSortKey ASC, AlbumId ASC, 4 DESC
+            """.trimIndent(),
             null
         ).use {
             it.moveToFirst()
@@ -703,8 +707,12 @@ class SongDatabase(
         val presets = mutableListOf<SearchPreset>()
 
         db.rawQuery(
-            "SELECT Name, Tags, MinRating, Unrated, FirstPlayed, LastPlayed, " +
-                "FirstTrack, Shuffle, Play FROM SearchPresets ORDER By SortKey ASC",
+            """
+            SELECT Name, Tags, MinRating, Unrated, FirstPlayed, LastPlayed,
+                FirstTrack, Shuffle, Play
+              FROM SearchPresets
+              ORDER By SortKey ASC
+            """.trimIndent(),
             null
         ).use {
             with(it) {
@@ -810,7 +818,8 @@ class SongDatabase(
             // each album rather than just songs exactly matching the artist. This will
             // affect the count displayed when navigating from BrowseArtistsActivity to
             // BrowseAlbumsActivity.
-            artistAlbums?.getOrPut(artist.toLowerCase(), { mutableListOf() })
+            artistAlbums
+                ?.getOrPut(artist.toLowerCase(), { mutableListOf() })
                 ?.add(StatsRow(artist, album, albumId, count, coverFilename))
 
             cursor.moveToNext()
@@ -826,99 +835,15 @@ class SongDatabase(
         public const val UNSET_STRING = "[unset]"
 
         public const val DATABASE_NAME = "NupSongs" // public for tests
-        private const val DATABASE_VERSION = 19
         private const val MAX_QUERY_RESULTS = 250
         private const val SERVER_SONG_BATCH_SIZE = 100
-
-        // IMPORTANT NOTE: When updating any of these, you must replace all previous references in
-        // upgradeFromPreviousVersion() with the hardcoded older version of the string.
-        private const val CREATE_SONGS_SQL =
-            "CREATE TABLE Songs (" +
-                "SongId INTEGER PRIMARY KEY NOT NULL, " +
-                "Filename VARCHAR(256) NOT NULL, " +
-                "CoverFilename VARCHAR(256) NOT NULL, " +
-                "Artist VARCHAR(256) NOT NULL, " +
-                "Title VARCHAR(256) NOT NULL, " +
-                "Album VARCHAR(256) NOT NULL, " +
-                "AlbumId VARCHAR(256) NOT NULL, " +
-                "ArtistNorm VARCHAR(256) NOT NULL, " +
-                "TitleNorm VARCHAR(256) NOT NULL, " +
-                "AlbumNorm VARCHAR(256) NOT NULL, " +
-                "Track INTEGER NOT NULL, " +
-                "Disc INTEGER NOT NULL, " +
-                "Length FLOAT NOT NULL, " +
-                "TrackGain FLOAT NOT NULL, " +
-                "AlbumGain FLOAT NOT NULL, " +
-                "PeakAmp FLOAT NOT NULL, " +
-                "Rating FLOAT NOT NULL)"
-        private const val CREATE_SONGS_ARTIST_INDEX_SQL = "CREATE INDEX Artist ON Songs (Artist)"
-        private const val CREATE_SONGS_ALBUM_INDEX_SQL = "CREATE INDEX Album ON Songs (Album)"
-        private const val CREATE_SONGS_ALBUM_ID_INDEX_SQL =
-            "CREATE INDEX AlbumId ON Songs (AlbumId)"
-
-        private const val CREATE_ARTIST_ALBUM_STATS_SQL =
-            "CREATE TABLE ArtistAlbumStats (" +
-                "Artist VARCHAR(256) NOT NULL, " +
-                "Album VARCHAR(256) NOT NULL, " +
-                "AlbumId VARCHAR(256) NOT NULL, " +
-                "NumSongs INTEGER NOT NULL, " +
-                "ArtistSortKey VARCHAR(256) NOT NULL, " +
-                "AlbumSortKey VARCHAR(256) NOT NULL, " +
-                "CoverFilename VARCHAR(256) NOT NULL)"
-        private const val CREATE_ARTIST_ALBUM_STATS_ARTIST_SORT_KEY_INDEX_SQL =
-            "CREATE INDEX ArtistSortKey ON ArtistAlbumStats (ArtistSortKey)"
-        private const val CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL =
-            "CREATE INDEX AlbumSortKey ON ArtistAlbumStats (AlbumSortKey)"
-
-        private const val CREATE_LAST_UPDATE_TIME_SQL = (
-            "CREATE TABLE LastUpdateTime (" +
-                "LocalTimeNsec INTEGER NOT NULL, " +
-                "ServerTimeNsec INTEGER NOT NULL)"
-            )
-        private const val INSERT_LAST_UPDATE_TIME_SQL =
-            "INSERT INTO LastUpdateTime (LocalTimeNsec, ServerTimeNsec) VALUES(0, 0)"
-
-        private const val CREATE_CACHED_SONGS_SQL =
-            "CREATE TABLE CachedSongs (SongId INTEGER PRIMARY KEY NOT NULL)"
-
-        private const val CREATE_PENDING_PLAYBACK_REPORTS_SQL =
-            "CREATE TABLE PendingPlaybackReports (" +
-                "SongId INTEGER NOT NULL, " +
-                "StartTime INTEGER NOT NULL, " +
-                "PRIMARY KEY (SongId, StartTime))"
-
-        private const val CREATE_SEARCH_PRESETS_SQL =
-            "CREATE TABLE SearchPresets (" +
-                "SortKey INTEGER NOT NULL, " + // 0-based index in array from server
-                "Name VARCHAR(256) NOT NULL, " +
-                "Tags VARCHAR(256) NOT NULL, " +
-                "MinRating FLOAT NOT NULL, " + // [0.0, 1.0], -1 for unset
-                "Unrated BOOLEAN NOT NULL, " +
-                "FirstPlayed INTEGER NOT NULL, " + // seconds before now, 0 for unset
-                "LastPlayed INTEGER NOT NULL, " + // seconds before now, 0 for unset
-                "FirstTrack BOOLEAN NOT NULL, " +
-                "Shuffle BOOLEAN NOT NULL, " +
-                "Play BOOLEAN NOT NULL)"
     }
 
     init {
-        val helper: SQLiteOpenHelper =
-            object : SQLiteOpenHelper(context, DATABASE_NAME, null, DATABASE_VERSION) {
-                override fun onCreate(db: SQLiteDatabase) {
-                    db.execSQL(CREATE_SONGS_SQL)
-                    db.execSQL(CREATE_SONGS_ARTIST_INDEX_SQL)
-                    db.execSQL(CREATE_SONGS_ALBUM_INDEX_SQL)
-                    db.execSQL(CREATE_SONGS_ALBUM_ID_INDEX_SQL)
-                    db.execSQL(CREATE_ARTIST_ALBUM_STATS_SQL)
-                    db.execSQL(CREATE_ARTIST_ALBUM_STATS_ARTIST_SORT_KEY_INDEX_SQL)
-                    db.execSQL(CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL)
-                    db.execSQL(CREATE_LAST_UPDATE_TIME_SQL)
-                    db.execSQL(INSERT_LAST_UPDATE_TIME_SQL)
-                    db.execSQL(CREATE_CACHED_SONGS_SQL)
-                    db.execSQL(CREATE_PENDING_PLAYBACK_REPORTS_SQL)
-                    db.execSQL(CREATE_SEARCH_PRESETS_SQL)
-                }
-
+        opener = DatabaseOpener(
+            context, DATABASE_NAME,
+            object : SQLiteOpenHelper(context, DATABASE_NAME, null, getMaxSongDatabaseVersion()) {
+                override fun onCreate(db: SQLiteDatabase) = createSongDatabase(db)
                 override fun onUpgrade(db: SQLiteDatabase, oldVersion: Int, newVersion: Int) {
                     Log.d(TAG, "Upgrading from $oldVersion to $newVersion")
                     // Per https://developer.android.com/reference/kotlin/android/database/sqlite/SQLiteOpenHelper,
@@ -927,339 +852,19 @@ class SongDatabase(
                     // its own transaction and threw if db.inTransaction() was initially true, so
                     // presumably something must've changed at some point.
                     for (nextVersion in (oldVersion + 1)..newVersion) {
-                        upgradeFromPreviousVersion(db, nextVersion)
+                        upgradeSongDatabase(db, nextVersion)
                     }
-                }
 
-                // Upgrade the database from [newVersion]-1 to [newVersion]. The only reason I'm
-                // keeping the old upgrade steps is for reference when writing new ones.
-                //
-                // Be careful when modifying the ArtistAlbumStats table, as any existing here
-                // updateArtistAlbumStats calls will need to be removed since they'll be operating
-                // on a now-outdated schema for the table.
-                private fun upgradeFromPreviousVersion(db: SQLiteDatabase, newVersion: Int) {
-                    if (newVersion == 2) {
-                        // Version 2: Create LastUpdateTime table.
-                        db.execSQL(
-                            "CREATE TABLE LastUpdateTime (" +
-                                "Timestamp INTEGER NOT NULL, " +
-                                "MaxLastModified INTEGER NOT NULL)"
-                        )
-                        db.execSQL(
-                            "INSERT INTO LastUpdateTime " +
-                                "(Timestamp, MaxLastModified) " +
-                                "VALUES(0, 0)"
-                        )
-                    } else if (newVersion == 3) {
-                        // Version 3: Add Songs.Deleted column.
-                        db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp")
-                        db.execSQL(
-                            "CREATE TABLE Songs (" +
-                                "SongId INTEGER PRIMARY KEY NOT NULL, " +
-                                "Sha1 CHAR(40) NOT NULL, " +
-                                "Filename VARCHAR(256) NOT NULL, " +
-                                "Artist VARCHAR(256) NOT NULL, " +
-                                "Title VARCHAR(256) NOT NULL, " +
-                                "Album VARCHAR(256) NOT NULL, " +
-                                "TrackNumber INTEGER NOT NULL, " +
-                                "Length INTEGER NOT NULL, " +
-                                "Rating FLOAT NOT NULL, " +
-                                "Deleted BOOLEAN NOT NULL, " +
-                                "LastModifiedUsec INTEGER NOT NULL)"
-                        )
-                        db.execSQL(
-                            "INSERT INTO Songs " +
-                                "SELECT SongId, Sha1, Filename, Artist, Title, Album, " +
-                                "TrackNumber, Length, Rating, 0, LastModified " +
-                                "FROM SongsTmp"
-                        )
-                        db.execSQL("DROP TABLE SongsTmp")
-                    } else if (newVersion == 4) {
-                        // Version 4: Create ArtistAlbumStats table and indexes on Songs.Artist
-                        // and Songs.Album.
-                        db.execSQL(
-                            "CREATE TABLE ArtistAlbumStats (" +
-                                "Artist VARCHAR(256) NOT NULL, " +
-                                "Album VARCHAR(256) NOT NULL, " +
-                                "NumSongs INTEGER NOT NULL)"
-                        )
-                        db.execSQL(CREATE_SONGS_ARTIST_INDEX_SQL)
-                        db.execSQL(CREATE_SONGS_ALBUM_INDEX_SQL)
-                    } else if (newVersion == 5) {
-                        // Version 5: LastModified -> LastModifiedUsec (seconds to
-                        // microseconds).
-                        db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp")
-                        db.execSQL("UPDATE SongsTmp SET LastModified = LastModified * 1000000")
-                        db.execSQL(
-                            "CREATE TABLE Songs (" +
-                                "SongId INTEGER PRIMARY KEY NOT NULL, " +
-                                "Sha1 CHAR(40) NOT NULL, " +
-                                "Filename VARCHAR(256) NOT NULL, " +
-                                "Artist VARCHAR(256) NOT NULL, " +
-                                "Title VARCHAR(256) NOT NULL, " +
-                                "Album VARCHAR(256) NOT NULL, " +
-                                "TrackNumber INTEGER NOT NULL, " +
-                                "Length INTEGER NOT NULL, " +
-                                "Rating FLOAT NOT NULL, " +
-                                "Deleted BOOLEAN NOT NULL, " +
-                                "LastModifiedUsec INTEGER NOT NULL)"
-                        )
-                        db.execSQL("INSERT INTO Songs SELECT * FROM SongsTmp")
-                        db.execSQL("DROP TABLE SongsTmp")
-                        db.execSQL("ALTER TABLE LastUpdateTime RENAME TO LastUpdateTimeTmp")
-                        db.execSQL(
-                            "UPDATE LastUpdateTimeTmp SET MaxLastModified = " +
-                                "MaxLastModified * 1000000 WHERE MaxLastModified > 0"
-                        )
-                        db.execSQL(CREATE_LAST_UPDATE_TIME_SQL)
-                        db.execSQL(
-                            "INSERT INTO LastUpdateTime SELECT * FROM LastUpdateTimeTmp"
-                        )
-                        db.execSQL("DROP TABLE LastUpdateTimeTmp")
-                    } else if (newVersion == 6) {
-                        // Version 6: Drop Sha1, Deleted, and LastModifiedUsec columns from
-                        // Songs table.
-                        db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp")
-                        db.execSQL(
-                            "CREATE TABLE Songs (" +
-                                "SongId INTEGER PRIMARY KEY NOT NULL, " +
-                                "Filename VARCHAR(256) NOT NULL, " +
-                                "Artist VARCHAR(256) NOT NULL, " +
-                                "Title VARCHAR(256) NOT NULL, " +
-                                "Album VARCHAR(256) NOT NULL, " +
-                                "TrackNumber INTEGER NOT NULL, " +
-                                "Length INTEGER NOT NULL, " +
-                                "Rating FLOAT NOT NULL)"
-                        )
-                        db.execSQL(
-                            "INSERT INTO Songs SELECT SongId, Filename, Artist, Title, " +
-                                " Album, TrackNumber, Length, Rating FROM SongsTmp WHERE" +
-                                " Deleted = 0"
-                        )
-                        db.execSQL("DROP TABLE SongsTmp")
-                    } else if (newVersion == 7) {
-                        // Version 7: Add ArtistSortKey and AlbumSortKey columns to
-                        // ArtistAlbumStats.
-                        db.execSQL(
-                            "ALTER TABLE ArtistAlbumStats RENAME TO ArtistAlbumStatsTmp"
-                        )
-                        db.execSQL(
-                            "CREATE TABLE ArtistAlbumStats (" +
-                                "Artist VARCHAR(256) NOT NULL, " +
-                                "Album VARCHAR(256) NOT NULL, " +
-                                "AlbumId VARCHAR(256) NOT NULL, " +
-                                "NumSongs INTEGER NOT NULL, " +
-                                "ArtistSortKey VARCHAR(256) NOT NULL, " +
-                                "AlbumSortKey VARCHAR(256) NOT NULL)"
-                        )
-                        db.execSQL(
-                            "INSERT INTO ArtistAlbumStats SELECT Artist, Album, NumSongs, " +
-                                "Artist, Album FROM ArtistAlbumStatsTmp"
-                        )
-                        db.execSQL(CREATE_ARTIST_ALBUM_STATS_ARTIST_SORT_KEY_INDEX_SQL)
-                        db.execSQL(CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL)
-                        db.execSQL("DROP TABLE ArtistAlbumStatsTmp")
-                    } else if (newVersion == 8) {
-                        // Version 8: Add CachedSongs table.
-                        db.execSQL("CREATE TABLE CachedSongs (SongId INTEGER PRIMARY KEY NOT NULL)")
-                    } else if (newVersion == 9) {
-                        // Version 9: Add index on Songs.Filename.
-                        db.execSQL("CREATE INDEX Filename ON Songs (Filename)")
-                    } else if (newVersion == 10) {
-                        // Version 10: Add PendingPlaybackReports table.
-                        db.execSQL(
-                            "CREATE TABLE PendingPlaybackReports (" +
-                                "SongId INTEGER NOT NULL, " +
-                                "StartTime INTEGER NOT NULL, " +
-                                "PRIMARY KEY (SongId, StartTime))"
-                        )
-                    } else if (newVersion == 11) {
-                        // Version 11: Change way too much stuff for AppEngine backend.
-                        throw RuntimeException(
-                            "Sorry, you need to delete everything and start over. :-("
-                        )
-                    } else if (newVersion == 12 || newVersion == 13) {
-                        // Versions 12 and 13: Update sort ordering.
-                        // There was a [updateArtistAlbumStats] call here, but now the schema has
-                        // changed.
-                    } else if (newVersion == 14) {
-                        // Version 14: Add AlbumId, TrackGain, AlbumGain, and PeakAmp to Songs.
-                        db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp")
-                        db.execSQL(
-                            "CREATE TABLE Songs (" +
-                                "SongId INTEGER PRIMARY KEY NOT NULL, " +
-                                "Url VARCHAR(256) NOT NULL, " +
-                                "CoverUrl VARCHAR(256) NOT NULL, " +
-                                "Artist VARCHAR(256) NOT NULL, " +
-                                "Title VARCHAR(256) NOT NULL, " +
-                                "Album VARCHAR(256) NOT NULL, " +
-                                "AlbumId VARCHAR(256) NOT NULL, " +
-                                "TrackNumber INTEGER NOT NULL, " +
-                                "DiscNumber INTEGER NOT NULL, " +
-                                "Length INTEGER NOT NULL, " +
-                                "TrackGain FLOAT NOT NULL, " +
-                                "AlbumGain FLOAT NOT NULL, " +
-                                "PeakAmp FLOAT NOT NULL, " +
-                                "Rating FLOAT NOT NULL)"
-                        )
-                        db.execSQL(
-                            "INSERT INTO Songs " +
-                                "SELECT SongId, Url, CoverUrl, Artist, Title, Album, '', " +
-                                "TrackNumber, DiscNumber, Length, 0, 0, 0, Rating " +
-                                "FROM SongsTmp"
-                        )
-                        db.execSQL("DROP TABLE SongsTmp")
-                        // Sigh, I think I should've been recreating indexes after previous
-                        // upgrades. From testing with the sqlite3 command, it looks like the
-                        // old indexes will probably be updated to point at SongsTmp and then
-                        // dropped.
-                        db.execSQL(CREATE_SONGS_ARTIST_INDEX_SQL)
-                        db.execSQL(CREATE_SONGS_ALBUM_INDEX_SQL)
-                        db.execSQL(CREATE_SONGS_ALBUM_ID_INDEX_SQL)
-                    } else if (newVersion == 15) {
-                        // Version 15: Add AlbumId to ArtistAlbumStats.
-                        db.execSQL("DROP TABLE ArtistAlbumStats")
-                        db.execSQL(
-                            "CREATE TABLE ArtistAlbumStats (" +
-                                "Artist VARCHAR(256) NOT NULL, " +
-                                "Album VARCHAR(256) NOT NULL, " +
-                                "AlbumId VARCHAR(256) NOT NULL, " +
-                                "NumSongs INTEGER NOT NULL, " +
-                                "ArtistSortKey VARCHAR(256) NOT NULL, " +
-                                "AlbumSortKey VARCHAR(256) NOT NULL)"
-                        )
-                        db.execSQL(CREATE_ARTIST_ALBUM_STATS_ARTIST_SORT_KEY_INDEX_SQL)
-                        db.execSQL(CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL)
-                    } else if (newVersion == 16) {
-                        // Version 16: Replace Url and CoverUrl with Filename and CoverFilename.
-                        db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp")
-                        db.execSQL(
-                            "CREATE TABLE Songs (" +
-                                "SongId INTEGER PRIMARY KEY NOT NULL, " +
-                                "Filename VARCHAR(256) NOT NULL, " +
-                                "CoverFilename VARCHAR(256) NOT NULL, " +
-                                "Artist VARCHAR(256) NOT NULL, " +
-                                "Title VARCHAR(256) NOT NULL, " +
-                                "Album VARCHAR(256) NOT NULL, " +
-                                "AlbumId VARCHAR(256) NOT NULL, " +
-                                "TrackNumber INTEGER NOT NULL, " +
-                                "DiscNumber INTEGER NOT NULL, " +
-                                "Length INTEGER NOT NULL, " +
-                                "TrackGain FLOAT NOT NULL, " +
-                                "AlbumGain FLOAT NOT NULL, " +
-                                "PeakAmp FLOAT NOT NULL, " +
-                                "Rating FLOAT NOT NULL)"
-                        )
-                        db.execSQL(
-                            "INSERT INTO Songs " +
-                                "SELECT SongId, '', '', Artist, Title, Album, AlbumId, " +
-                                "TrackNumber, DiscNumber, Length, TrackGain, AlbumGain, " +
-                                "PeakAmp, Rating FROM SongsTmp"
-                        )
-                        db.execSQL("DROP TABLE SongsTmp")
-                        db.execSQL(CREATE_SONGS_ARTIST_INDEX_SQL)
-                        db.execSQL(CREATE_SONGS_ALBUM_INDEX_SQL)
-                        db.execSQL(CREATE_SONGS_ALBUM_ID_INDEX_SQL)
-                        // I'm deeming it too hard to convert URLs to filenames,
-                        // so force a full sync.
-                        db.execSQL(
-                            "UPDATE LastUpdateTime SET LocalTimeNsec = 0, ServerTimeNsec = 0"
-                        )
-                    } else if (newVersion == 17) {
-                        // Version 17: Add SearchPresets table.
-                        db.execSQL(
-                            "CREATE TABLE SearchPresets (" +
-                                "SortKey INTEGER NOT NULL, " +
-                                "Name VARCHAR(256) NOT NULL, " +
-                                "Tags VARCHAR(256) NOT NULL, " +
-                                "MinRating FLOAT NOT NULL, " +
-                                "Unrated BOOLEAN NOT NULL, " +
-                                "FirstPlayed INTEGER NOT NULL, " +
-                                "LastPlayed INTEGER NOT NULL, " +
-                                "FirstTrack BOOLEAN NOT NULL, " +
-                                "Shuffle BOOLEAN NOT NULL, " +
-                                "Play BOOLEAN NOT NULL)"
-                        )
-                    } else if (newVersion == 18) {
-                        // Version 18:
-                        // - Add ArtistNorm, TitleNorm, and AlbumNorm to Songs.
-                        // - Change Length from INT to FLOAT in Songs.
-                        // - Rename TrackNumber to Track and DiscNumber to Disc in Songs.
-                        db.execSQL("ALTER TABLE Songs RENAME TO SongsTmp")
-                        db.execSQL(
-                            "CREATE TABLE Songs (" +
-                                "SongId INTEGER PRIMARY KEY NOT NULL, " +
-                                "Filename VARCHAR(256) NOT NULL, " +
-                                "CoverFilename VARCHAR(256) NOT NULL, " +
-                                "Artist VARCHAR(256) NOT NULL, " +
-                                "Title VARCHAR(256) NOT NULL, " +
-                                "Album VARCHAR(256) NOT NULL, " +
-                                "AlbumId VARCHAR(256) NOT NULL, " +
-                                "ArtistNorm VARCHAR(256) NOT NULL, " +
-                                "TitleNorm VARCHAR(256) NOT NULL, " +
-                                "AlbumNorm VARCHAR(256) NOT NULL, " +
-                                "Track INTEGER NOT NULL, " +
-                                "Disc INTEGER NOT NULL, " +
-                                "Length FLOAT NOT NULL, " +
-                                "TrackGain FLOAT NOT NULL, " +
-                                "AlbumGain FLOAT NOT NULL, " +
-                                "PeakAmp FLOAT NOT NULL, " +
-                                "Rating FLOAT NOT NULL)"
-                        )
-                        db.rawQuery("SELECT * FROM SongsTmp", null).use {
-                            with(it) {
-                                while (moveToNext()) {
-                                    val vals = ContentValues(17)
-                                    vals.put("SongId", getLong(0))
-                                    vals.put("Filename", getString(1))
-                                    vals.put("CoverFilename", getString(2))
-                                    vals.put("Artist", getString(3))
-                                    vals.put("Title", getString(4))
-                                    vals.put("Album", getString(5))
-                                    vals.put("AlbumId", getString(6))
-                                    vals.put("ArtistNorm", normalizeForSearch(getString(3)))
-                                    vals.put("TitleNorm", normalizeForSearch(getString(4)))
-                                    vals.put("AlbumNorm", normalizeForSearch(getString(5)))
-                                    vals.put("Track", getInt(7))
-                                    vals.put("Disc", getInt(8))
-                                    vals.put("Length", getInt(9).toDouble())
-                                    vals.put("TrackGain", getFloat(10))
-                                    vals.put("AlbumGain", getFloat(11))
-                                    vals.put("PeakAmp", getFloat(12))
-                                    vals.put("Rating", getFloat(13))
-                                    db.replace("Songs", "", vals)
-                                }
-                            }
-                        }
-
-                        db.execSQL("DROP TABLE SongsTmp")
-                        db.execSQL(CREATE_SONGS_ARTIST_INDEX_SQL)
-                        db.execSQL(CREATE_SONGS_ALBUM_INDEX_SQL)
-                        db.execSQL(CREATE_SONGS_ALBUM_ID_INDEX_SQL)
-                    } else if (newVersion == 19) {
-                        // Version 19: Add CoverFilename to ArtistAlbumStats.
-                        db.execSQL("DROP TABLE ArtistAlbumStats")
-                        db.execSQL(
-                            "CREATE TABLE ArtistAlbumStats (" +
-                                "Artist VARCHAR(256) NOT NULL, " +
-                                "Album VARCHAR(256) NOT NULL, " +
-                                "AlbumId VARCHAR(256) NOT NULL, " +
-                                "NumSongs INTEGER NOT NULL, " +
-                                "ArtistSortKey VARCHAR(256) NOT NULL, " +
-                                "AlbumSortKey VARCHAR(256) NOT NULL, " +
-                                "CoverFilename VARCHAR(256) NOT NULL)"
-                        )
-                        db.execSQL(CREATE_ARTIST_ALBUM_STATS_ARTIST_SORT_KEY_INDEX_SQL)
-                        db.execSQL(CREATE_ARTIST_ALBUM_STATS_ALBUM_SORT_KEY_INDEX_SQL)
-                        updateArtistAlbumStats(db)
-                    } else {
-                        throw RuntimeException(
-                            "Got request to upgrade database to unknown version $newVersion"
-                        )
+                    // This is a bit of a hack, but if it looks like one or more upgrades dropped
+                    // and recreated the ArtistAlbumStats table, regenerate it.
+                    val numRows = db.rawQuery("SELECT COUNT(*) FROM ArtistAlbumStats", null).use {
+                        it.moveToFirst()
+                        it.getInt(0)
                     }
+                    if (numRows == 0) updateArtistAlbumStats(db)
                 }
             }
-        opener = DatabaseOpener(context, DATABASE_NAME, helper)
+        )
 
         // Get some info from the database in a background thread.
         scope.launch(initDispatcher) {
