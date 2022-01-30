@@ -99,9 +99,7 @@ class FileCacheDatabase(
     val songIdsByAge: List<Long>
         get() {
             val ids = entries.keys.toMutableList()
-            ids.sortWith(
-                Comparator { a, b -> getEntry(a)!!.lastAccessTime - getEntry(b)!!.lastAccessTime }
-            )
+            ids.sortBy { getEntry(it)!!.lastAccessTime }
             return ids
         }
 

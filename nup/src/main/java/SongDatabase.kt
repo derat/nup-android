@@ -234,6 +234,9 @@ class SongDatabase(
                 }
             }
         }
+
+        if (shuffle) spreadSongs(songs)
+
         return songs
     }
 

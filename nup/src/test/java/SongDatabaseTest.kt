@@ -518,7 +518,7 @@ class SongDatabaseTest {
 }
 
 /** Construct a [Song] based on the supplied information. */
-private fun makeSong(
+fun makeSong(
     artist: String,
     title: String,
     album: String,

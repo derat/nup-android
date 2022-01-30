@@ -6,9 +6,11 @@
 package org.erat.nup.test
 
 import com.google.common.truth.Truth.assertThat
-import java.util.Collections
+import kotlin.random.Random
 import org.erat.nup.SongOrder
 import org.erat.nup.getSongOrderKey
+import org.erat.nup.spreadSongs
+import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 class SongTest {
@@ -21,10 +23,7 @@ class SongTest {
             "[no artist]",
             "[unset]",
         )
-        Collections.sort(artists) { a, b ->
-            getSongOrderKey(a, SongOrder.ARTIST)
-                .compareTo(getSongOrderKey(b, SongOrder.ARTIST))
-        }
+        artists.sortBy { getSongOrderKey(it, SongOrder.ARTIST) }
         assertThat(artists).containsExactly(
             "[no artist]",
             "[unset]",
@@ -33,5 +32,34 @@ class SongTest {
             "Daft Punk",
             "def leppard",
         ).inOrder()
+    }
+
+    @Test fun spreadSongsWorks() {
+        val numArtists = 10
+        val numSongsPerArtist = 10
+        val numAlbums = 5
+
+        val songs = IntArray(numArtists * numSongsPerArtist) { it }.map {
+            val artist = "ar${(it / numSongsPerArtist) + 1}"
+            val album = "al${(it % numAlbums) + 1}"
+            makeSong(artist, "${it + 1}", album, it + 1)
+        }.toMutableList()
+
+        // Do a regular Fisher-Yates shuffle and then spread out the songs.
+        val rand = Random(0xbeefface)
+        for (i in 0..(songs.size - 2)) {
+            val j = i + rand.nextInt(songs.size - i)
+            songs[i] = songs[j].also { songs[j] = songs[i] }
+        }
+        spreadSongs(songs, rand)
+
+        // Check that the same artist doesn't appear back-to-back and that we don't play the same
+        // album twice in a row for a given artist.
+        val lastArtistAlbum = mutableMapOf<String, String>()
+        for ((idx, song) in songs.withIndex()) {
+            if (idx < songs.size - 1) assertNotEquals(songs[idx + 1].artist, song.artist)
+            assertNotEquals(lastArtistAlbum.get(song.artist), song.album)
+            lastArtistAlbum[song.artist] = song.album
+        }
     }
 }

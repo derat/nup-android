@@ -7,6 +7,7 @@ package org.erat.nup
 
 import android.graphics.Bitmap
 import java.io.Serializable
+import kotlin.random.Random
 
 data class Song(
     val id: Long,
@@ -84,3 +85,45 @@ private val keyTags =
     setOf("[dialogue]", "[no artist]", "[unknown]", "[non-album tracks]", "[unset]")
 private val keyPrefixes =
     arrayOf(" ", "\"", "'", "’", "(", "[", "<", "...", "a ", "an ", "the ")
+
+/**
+ * Reorder [songs] in-place to make it unlikely that songs by the same artist will appear close to
+ * each other or that an album will be repeated for a given artist.
+ *
+ * [songs] should have already been randomly shuffled.
+ *
+ * This is a reimplementation of the server's spreadSongs function.
+ */
+fun spreadSongs(songs: MutableList<Song>, rand: Random = Random) {
+    val maxSkew = 0.25 // maximum offset to skew songs' positions
+
+    lateinit var shuf: (
+        songs: MutableList<Song>,
+        outerKeyFunc: ((s: Song) -> String),
+        innerKeyFunc: ((s: Song) -> String)?
+    ) -> Unit
+    shuf = { songs, outerKeyFunc, innerKeyFunc ->
+        val groups = mutableMapOf<String, MutableList<Song>>()
+        songs.forEach { song ->
+            // Group songs using the key function.
+            val key = outerKeyFunc(song)
+            groups.getOrPut(key, { mutableListOf() }).add(song)
+        }
+
+        // Spread out each group across the entire range.
+        val dists = mutableMapOf<Song, Double>()
+        for (group in groups.values) {
+            // Recursively spread out the songs within the group first if needed.
+            if (innerKeyFunc != null) shuf(group, innerKeyFunc, null)
+
+            // Apply a random offset at the beginning and then further skew each song's position.
+            val off = (1.0 - maxSkew) * rand.nextDouble()
+            for ((idx, song) in group.withIndex()) {
+                dists[song] = (off + idx + maxSkew * rand.nextDouble()) / group.size
+            }
+        }
+        songs.sortBy { dists[it] }
+    }
+
+    shuf(songs, { normalizeForSearch(it.artist) }, { normalizeForSearch(it.album) })
+}
