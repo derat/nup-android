@@ -172,6 +172,7 @@ suspend fun searchServer(
     maxPlays: Int = -1,
     firstPlayed: Int = 0,
     lastPlayed: Int = 0,
+    orderByLastPlayed: Boolean = false,
     firstTrack: Boolean = false,
     onlyCached: Boolean = false,
 ): List<Song> {
@@ -191,6 +192,7 @@ suspend fun searchServer(
     add("minRating", if (minRating > 0) "%.2f".format(minRating) else "")
     add("unrated", if (unrated) "1" else "")
     add("maxPlays", if (maxPlays >= 0) maxPlays.toString() else "")
+    add("orderByLastPlayed", if (orderByLastPlayed) "1" else "")
     add("firstTrack", if (firstTrack) "1" else "")
 
     // We get numbers of seconds before the current time, but the server
@@ -238,6 +240,7 @@ suspend fun searchUsingPreset(
         unrated = preset.unrated,
         firstPlayed = preset.firstPlayed,
         lastPlayed = preset.lastPlayed,
+        orderByLastPlayed = preset.orderByLastPlayed,
         firstTrack = preset.firstTrack,
         shuffle = preset.shuffle
     )
@@ -251,6 +254,7 @@ data class SearchPreset(
     val unrated: Boolean,
     val firstPlayed: Int, // seconds before now, 0 for unset
     val lastPlayed: Int, // seconds before now, 0 for unset
+    val orderByLastPlayed: Boolean,
     val firstTrack: Boolean,
     val shuffle: Boolean,
     val play: Boolean, // automatically play results
@@ -260,6 +264,7 @@ data class SearchPreset(
         unrated == false &&
         firstPlayed == 0 &&
         lastPlayed == 0 &&
+        orderByLastPlayed == false &&
         firstTrack == false
 }
 

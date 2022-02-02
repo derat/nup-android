@@ -549,7 +549,7 @@ class SongDatabase(
                 o in JSONArray(JSONTokener(response)).iterator<JSONObject>()
                     .asSequence().toList()
             ) {
-                val values = ContentValues(10)
+                val values = ContentValues(11)
                 values.put("SortKey", numPresets)
                 values.put("Name", o.getString("name"))
                 values.put("Tags", o.optString("tags"))
@@ -562,6 +562,7 @@ class SongDatabase(
                 values.put("Unrated", o.optBoolean("unrated"))
                 values.put("FirstPlayed", timeEnumToSec(o.optInt("firstPlayed")))
                 values.put("LastPlayed", timeEnumToSec(o.optInt("lastPlayed")))
+                values.put("OrderByLastPlayed", o.optBoolean("orderByLastPlayed"))
                 values.put("FirstTrack", o.optBoolean("firstTrack"))
                 values.put("Shuffle", o.optBoolean("shuffle"))
                 values.put("Play", o.optBoolean("play"))
@@ -712,9 +713,9 @@ class SongDatabase(
         db.rawQuery(
             """
             SELECT Name, Tags, MinRating, Unrated, FirstPlayed, LastPlayed,
-                FirstTrack, Shuffle, Play
-              FROM SearchPresets
-              ORDER By SortKey ASC
+              OrderByLastPlayed, FirstTrack, Shuffle, Play
+            FROM SearchPresets
+            ORDER By SortKey ASC
             """.trimIndent(),
             null
         ).use {
@@ -728,9 +729,10 @@ class SongDatabase(
                             unrated = getInt(3) != 0,
                             firstPlayed = getInt(4),
                             lastPlayed = getInt(5),
-                            firstTrack = getInt(6) != 0,
-                            shuffle = getInt(7) != 0,
-                            play = getInt(8) != 0,
+                            orderByLastPlayed = getInt(6) != 0,
+                            firstTrack = getInt(7) != 0,
+                            shuffle = getInt(8) != 0,
+                            play = getInt(9) != 0,
                         )
                     )
                 }
