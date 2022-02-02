@@ -18,7 +18,6 @@ import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.Button
 import android.widget.ListView
 import android.widget.SimpleAdapter
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import java.io.Serializable
 import kotlinx.coroutines.Dispatchers
@@ -73,21 +72,8 @@ class SearchResultsActivity : AppCompatActivity() {
             }.await()
 
             Log.d(TAG, "Got ${songs.size} song(s)")
+            showSearchResultsToast(this@SearchResultsActivity, songs, err)
             displaySongs()
-
-            Toast.makeText(
-                this@SearchResultsActivity,
-                // https://stackoverflow.com/a/56116264/6882947
-                if (err != null) err?.let { it.message!! }
-                else if (songs.isEmpty()) getString(R.string.no_results)
-                else resources.getQuantityString(
-                    R.plurals.search_found_songs_fmt,
-                    songs.size,
-                    songs.size,
-                ),
-                Toast.LENGTH_SHORT
-            ).show()
-
             if (songs.isEmpty()) finish()
         }
     }

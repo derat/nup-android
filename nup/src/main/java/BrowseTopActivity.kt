@@ -42,13 +42,22 @@ class BrowseTopActivity : BrowseActivityBase() {
             }
             else -> {
                 val preset = service.songDb.searchPresetsAutoplay.getOrNull(pos - 4) ?: return
+
+                fragment.setListShown(false)
                 service.scope.async(Dispatchers.Main) {
-                    fragment.setListShown(false)
+                    var err: SearchException? = null
                     val songs = async(Dispatchers.IO) {
-                        searchUsingPreset(service.songDb, service.downloader, preset)
+                        try {
+                            searchUsingPreset(service.songDb, service.downloader, preset)
+                        } catch (e: SearchException) {
+                            err = e
+                            listOf<Song>()
+                        }
                     }.await()
+
                     fragment.setListShown(true)
-                    if (songs.size > 0) {
+                    showSearchResultsToast(this@BrowseTopActivity, songs, err)
+                    if (!songs.isEmpty()) {
                         service.clearPlaylist()
                         service.appendSongsToPlaylist(songs)
                         setResult(RESULT_OK)

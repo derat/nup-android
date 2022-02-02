@@ -5,7 +5,9 @@
 
 package org.erat.nup
 
+import android.content.Context
 import android.util.Log
+import android.widget.Toast
 import java.net.URLEncoder
 import java.util.Date
 import org.json.JSONArray
@@ -223,6 +225,7 @@ suspend fun searchServer(
 }
 
 /** Search for songs using [preset]. Network access may be needed. */
+@Throws(SearchException::class)
 suspend fun searchUsingPreset(
     db: SongDatabase,
     downloader: Downloader,
@@ -270,6 +273,20 @@ data class SearchPreset(
 
 /** Thrown if an error is encountered while searching. */
 class SearchException(reason: String) : Exception(reason)
+
+/** Show a toast describing the results of a search. */
+fun showSearchResultsToast(context: Context, songs: List<Song>, err: SearchException?) =
+    Toast.makeText(
+        context,
+        if (err != null) err.message!!
+        else if (songs.isEmpty()) context.getString(R.string.no_results)
+        else context.getResources().getQuantityString(
+            R.plurals.search_found_songs_fmt,
+            songs.size,
+            songs.size,
+        ),
+        Toast.LENGTH_SHORT
+    ).show()
 
 private fun findArtistExact(rows: List<StatsRow>, artist: String) =
     rows.find { it.key.artist.equals(artist, ignoreCase = true) }
