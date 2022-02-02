@@ -62,6 +62,7 @@
   <string name="next">Next</string>
   <string name="never_synced">Never synced</string>
   <string name="no_results">No results.</string>
+  <string name="order_by_last_played">Order by last played</string>
   <string name="password">Password</string>
   <string name="password_description">HTTP Basic Auth with server</string>
   <string name="pause">Pause</string>

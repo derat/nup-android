@@ -121,6 +121,12 @@
         />
       </com.google.android.material.textfield.TextInputLayout>
 
+      <com.google.android.material.checkbox.MaterialCheckBox
+        android:id="@+id/order_by_last_played_checkbox"
+        style="@style/SearchCheckbox"
+        android:text="@string/order_by_last_played"
+      />
+
       <!-- TODO: Find some way to make this look better: the user's input ends
            up too close to the prefix text but the suffix is right-aligned. I
            spent way too long failing to get baseline alignment working between

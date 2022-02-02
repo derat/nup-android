@@ -38,6 +38,7 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
     private lateinit var minRatingSpinner: AutoCompleteTextView
     private lateinit var keywordsEdit: EditText
     private lateinit var tagsEdit: AutoCompleteTextView
+    private lateinit var orderByLastPlayedCheckbox: CheckBox
     private lateinit var maxPlaysEdit: EditText
     private lateinit var firstPlayedSpinner: AutoCompleteTextView
     private lateinit var lastPlayedSpinner: AutoCompleteTextView
@@ -83,6 +84,9 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
         tagsEdit = findViewById<AutoCompleteTextView>(R.id.tags_edit_text)
         tagsEditAdapter = createAutocompleteAdapter(tagsEdit)
         tagsEdit.doAfterTextChanged { _ -> updateTagsSuggestions() }
+
+        orderByLastPlayedCheckbox = findViewById<CheckBox>(R.id.order_by_last_played_checkbox)
+        orderByLastPlayedCheckbox.setOnCheckedChangeListener { _, _ -> updateControlsEnabled() }
 
         maxPlaysEdit = findViewById<EditText>(R.id.max_plays_edit_text)
         firstPlayedSpinner = configureSpinner(R.id.first_played_spinner, R.array.played_times)
@@ -205,18 +209,26 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
 
         intent.putExtra(SearchResultsActivity.BUNDLE_KEYWORDS, keywordsEdit.text.toString().trim())
         intent.putExtra(SearchResultsActivity.BUNDLE_TAGS, tagsEdit.text.toString().trim())
+        intent.putExtra(
+            SearchResultsActivity.BUNDLE_ORDER_BY_LAST_PLAYED,
+            orderByLastPlayedCheckbox.isChecked
+        )
 
         val maxPlays = maxPlaysEdit.text.toString().trim()
-        if (!maxPlays.isEmpty()) {
+        if (maxPlaysEdit.isEnabled() && !maxPlays.isEmpty()) {
             intent.putExtra(SearchResultsActivity.BUNDLE_MAX_PLAYS, maxPlays.toInt())
         }
 
         val playedStr = getResources().getStringArray(R.array.played_times)
         val playedSec = getResources().getStringArray(R.array.played_times_sec).map { it.toInt() }
         val firstPlayed = playedSec[playedStr.indexOf(firstPlayedSpinner.text.toString())]
-        if (firstPlayed > 0) intent.putExtra(SearchResultsActivity.BUNDLE_FIRST_PLAYED, firstPlayed)
+        if (firstPlayedSpinner.isEnabled() && firstPlayed > 0) {
+            intent.putExtra(SearchResultsActivity.BUNDLE_FIRST_PLAYED, firstPlayed)
+        }
         val lastPlayed = playedSec[playedStr.indexOf(lastPlayedSpinner.text.toString())]
-        if (lastPlayed > 0) intent.putExtra(SearchResultsActivity.BUNDLE_LAST_PLAYED, lastPlayed)
+        if (lastPlayedSpinner.isEnabled() && lastPlayed > 0) {
+            intent.putExtra(SearchResultsActivity.BUNDLE_LAST_PLAYED, lastPlayed)
+        }
 
         startActivityForResult(intent, RESULTS_REQUEST_CODE)
     }
@@ -231,9 +243,19 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
         minRatingSpinner.setText("")
         keywordsEdit.setText("")
         tagsEdit.setText("")
+        orderByLastPlayedCheckbox.isChecked = false
         maxPlaysEdit.setText("")
         firstPlayedSpinner.setText("")
         lastPlayedSpinner.setText("")
+
+        updateControlsEnabled()
+    }
+
+    private fun updateControlsEnabled() {
+        val enabled = !orderByLastPlayedCheckbox.isChecked
+        maxPlaysEdit.setEnabled(enabled)
+        firstPlayedSpinner.setEnabled(enabled)
+        lastPlayedSpinner.setEnabled(enabled)
     }
 
     override fun onSongDatabaseSyncChange(state: SongDatabase.SyncState, updatedSongs: Int) {}
