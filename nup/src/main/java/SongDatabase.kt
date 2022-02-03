@@ -297,7 +297,7 @@ class SongDatabase(
         opener.getDb() task@{ db ->
             if (db == null) return@task // quit() already called
             db.delete(
-                "PendingPlaybackReports ", "SongId = ? AND StartTime = ?",
+                "PendingPlaybackReports", "SongId = ? AND StartTime = ?",
                 arrayOf(songId.toString(), startDate.time.toString())
             )
         }
@@ -311,7 +311,6 @@ class SongDatabase(
         val reports = mutableListOf<PendingPlaybackReport>()
         opener.getDb() task@{ db ->
             if (db == null) return@task // quit() already called
-
             val query = "SELECT SongId, StartTime FROM PendingPlaybackReports"
             db.rawQuery(query, null).use {
                 while (it.moveToNext()) {

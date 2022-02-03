@@ -429,6 +429,10 @@ class SongDatabaseTest {
         db.removePendingPlaybackReport(r1.songId, r1.startDate)
         assertEquals(listOf(r2), db.allPendingPlaybackReports())
 
+        db.quit()
+        initDb()
+        assertEquals(listOf(r2), db.allPendingPlaybackReports())
+
         db.removePendingPlaybackReport(r2.songId, r2.startDate)
         assertTrue(db.allPendingPlaybackReports().isEmpty())
     }
