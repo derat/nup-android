@@ -5,32 +5,42 @@
 
 package org.erat.nup.test
 
-import com.google.common.truth.Truth.assertThat
 import kotlin.random.Random
 import org.erat.nup.getSongOrderKey
+import org.erat.nup.getSongSection
+import org.erat.nup.songNumberSection
+import org.erat.nup.songOtherSection
 import org.erat.nup.spreadSongs
+import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 class SongTest {
     @Test fun getSongOrderKeyWorks() {
-        val artists = arrayListOf<String>(
-            "def leppard",
-            "Daft Punk",
-            " The Black Dog",
-            "The Alan Parsons Project",
-            "[no artist]",
-            "[unset]",
-        )
-        artists.sortBy { getSongOrderKey(it) }
-        assertThat(artists).containsExactly(
-            "[no artist]",
-            "[unset]",
-            "The Alan Parsons Project",
-            " The Black Dog",
-            "Daft Punk",
-            "def leppard",
-        ).inOrder()
+        assertEquals("def leppard", getSongOrderKey("Def Leppard"))
+        assertEquals("alan parsons project", getSongOrderKey(" The Alan Parsons Project"))
+        assertEquals("strangely isolated place", getSongOrderKey("A Strangely Isolated Place"))
+        assertEquals("black dog", getSongOrderKey(" The Black Dog"))
+        assertEquals("i care because you do", getSongOrderKey("...I Care Because You Do"))
+        assertEquals("i care because you do", getSongOrderKey("…I Care Because You Do"))
+        assertEquals("endtroducing.....", getSongOrderKey("Endtroducing....."))
+        assertEquals("003 + ¥024 + 2x = ¥727", getSongOrderKey("¥003 + ¥024 + 2X = ¥727"))
+        assertEquals("近藤浩治", getSongOrderKey("近藤浩治"))
+        assertEquals("( )", getSongOrderKey("( )"))
+        assertEquals("smart quotes”", getSongOrderKey("“Smart quotes”"))
+        assertEquals("![no artist]", getSongOrderKey("[no artist]"))
+        assertEquals("![unset]", getSongOrderKey("[unset]"))
+    }
+
+    @Test fun getSongSectionWorks() {
+        assertEquals("D", getSongSection("Def Leppard"))
+        assertEquals("A", getSongSection(" The Alan Parsons Project"))
+        assertEquals(songNumberSection, getSongSection("¥003 + ¥024 + 2X = ¥727"))
+        assertEquals(songNumberSection, getSongSection("( )"))
+        assertEquals(songNumberSection, getSongSection("[no artist]"))
+        assertEquals(songNumberSection, getSongSection("[unset]"))
+        assertEquals(songOtherSection, getSongSection("近藤浩治"))
+        assertEquals(songOtherSection, getSongSection("Ümlaut"))
     }
 
     @Test fun spreadSongsWorks() {

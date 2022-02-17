@@ -47,23 +47,24 @@ enum class SongOrder { ARTIST, TITLE, ALBUM, UNSORTED }
 /**
  * Get a key for ordering artist or album name [str].
  *
- * [str] is converted to lowercase and common leading articles are removed.
+ * [str] is converted to lowercase and leading punctuation and common articles are removed.
  * When this method is changed, [SongDatabase.updateArtistAlbumStats] must be called on the next
  * run, as sorting keys are cached in the database.
  */
 fun getSongOrderKey(str: String): String {
-    var key = str.toLowerCase()
+    val key = str.toLowerCase()
 
     // Preserve bracketed strings used by MusicBrainz and/or Picard.
     if (keyTags.contains(key)) return "!$key"
 
-    // Preserve some specific weird album names.
-    // TODO: Generalize this to preserve all strings that only contain punctuation and spaces.
-    if (key.startsWith("( )")) return key
-
     // Strip off leading punctuation, common articles, and other junk.
     var start = 0
     loop@ while (start < key.length) {
+        val ch = key[start]
+        if (!ch.isLetterOrDigit()) {
+            start++
+            continue
+        }
         for (pre in keyPrefixes) {
             if (key.startsWith(pre, start)) {
                 start += pre.length
@@ -72,15 +73,18 @@ fun getSongOrderKey(str: String): String {
         }
         break
     }
-    if (start > 0) key = key.substring(start)
-    return key
+
+    return if (start > 0 && start < key.length) key.substring(start) else key
 }
 
-private val keyTags =
-    setOf("[dialogue]", "[no artist]", "[unknown]", "[non-album tracks]", "[unset]")
-// TODO: Add more characters: _, ¡, ¿, smartquotes, ellipsis, etc.
-private val keyPrefixes =
-    arrayOf(" ", "\"", "'", "’", "(", "[", "<", "...", "a ", "an ", "the ")
+private val keyTags = setOf(
+    "[dialogue]",
+    "[no artist]",
+    "[non-album tracks]",
+    "[unknown]",
+    "[unset]"
+)
+private val keyPrefixes = arrayOf("a ", "an ", "the ")
 
 /**
  * Return the human-readable section into which [str], an artist or album name, should be grouped.
@@ -98,8 +102,8 @@ fun getSongSection(str: String): String {
     }
 }
 
-private val songNumberSection = "#"
-private val songOtherSection = "文"
+val songNumberSection = "#"
+val songOtherSection = "文"
 
 /** All sections into which songs can be grouped in the order they should be displayed. */
 val allSongSections = listOf(
