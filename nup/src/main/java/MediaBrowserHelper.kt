@@ -105,12 +105,12 @@ class MediaBrowserHelper(
                         // The full "Artists (cached)" string is too long for Android Auto's tabs.
                         res.getText(if (online) R.string.artists else R.string.artists_star),
                         if (online) ARTISTS_ID else CACHED_ARTISTS_ID,
-                        iconResId = R.drawable.account_music
+                        iconResId = R.drawable.account_music,
                     ),
                     makeMenuItem(
                         res.getText(if (online) R.string.albums else R.string.albums_star),
                         if (online) ALBUMS_ID else CACHED_ALBUMS_ID,
-                        iconResId = R.drawable.disc
+                        iconResId = R.drawable.disc,
                     )
                 )
                 result.sendResult(items)
@@ -126,66 +126,80 @@ class MediaBrowserHelper(
                 )
             }
             parentId == ARTISTS_ID -> {
-                val items = mutableListOf<MediaItem>()
-                for (row in db.artistsSortedAlphabetically) {
-                    items.add(makeArtistItem(row))
-                }
-                result.sendResult(items)
+                result.sendResult(
+                    allSongSections.map { makeMenuItem(it, "$ARTISTS_SECTION_ID_PREFIX$it") }
+                        .toMutableList()
+                )
             }
             parentId == ALBUMS_ID -> {
-                val items = mutableListOf<MediaItem>()
-                for (row in db.albumsSortedAlphabetically) {
-                    items.add(makeAlbumItem(row, includeArtist = true))
-                }
-                result.sendResult(items)
+                result.sendResult(
+                    allSongSections.map { makeMenuItem(it, "$ALBUMS_SECTION_ID_PREFIX$it") }
+                        .toMutableList()
+                )
             }
-            parentId.startsWith(CACHED_ARTISTS_ID) -> {
+            parentId == CACHED_ARTISTS_ID -> {
                 if (!deferred) result.detach()
                 scope.launch(Dispatchers.IO) {
-                    val items = mutableListOf<MediaItem>()
-                    for (row in db.cachedArtistsSortedAlphabetically()) {
-                        items.add(makeArtistItem(row, onlyCached = true))
-                    }
-                    result.sendResult(items)
+                    result.sendResult(
+                        db.cachedArtistsSortedAlphabetically().map {
+                            makeArtistItem(it, onlyCached = true)
+                        }.toMutableList()
+                    )
                 }
             }
-            parentId.startsWith(CACHED_ALBUMS_ID) -> {
+            parentId == CACHED_ALBUMS_ID -> {
                 if (!deferred) result.detach()
                 scope.launch(Dispatchers.IO) {
-                    val items = mutableListOf<MediaItem>()
-                    for (row in db.cachedAlbumsSortedAlphabetically()) {
-                        items.add(makeAlbumItem(row, onlyCached = true, includeArtist = true))
-                    }
-                    result.sendResult(items)
+                    result.sendResult(
+                        db.cachedAlbumsSortedAlphabetically().map {
+                            makeAlbumItem(it, onlyCached = true, includeArtist = true)
+                        }.toMutableList()
+                    )
                 }
+            }
+            parentId.startsWith(ARTISTS_SECTION_ID_PREFIX) -> {
+                val section = parentId.substring(ARTISTS_SECTION_ID_PREFIX.length)
+                result.sendResult(
+                    db.artistsSortedAlphabetically
+                        .filter { getSongSection(it.key.artist) == section }
+                        .map { makeArtistItem(it) }
+                        .toMutableList()
+                )
+            }
+            parentId.startsWith(ALBUMS_SECTION_ID_PREFIX) -> {
+                val section = parentId.substring(ALBUMS_SECTION_ID_PREFIX.length)
+                result.sendResult(
+                    db.albumsSortedAlphabetically
+                        .filter { getSongSection(it.key.album) == section }
+                        .map { makeAlbumItem(it, includeArtist = true) }
+                        .toMutableList()
+                )
             }
             parentId.startsWith(ARTIST_ID_PREFIX) -> {
-                val items = mutableListOf<MediaItem>()
                 val artist = parentId.substring(ARTIST_ID_PREFIX.length)
-                for (row in db.albumsByArtist(artist)) {
-                    items.add(makeAlbumItem(row, includeCover = true))
-                }
-                result.sendResult(items)
+                result.sendResult(
+                    db.albumsByArtist(artist).map {
+                        makeAlbumItem(it, includeCover = true)
+                    }.toMutableList()
+                )
             }
             parentId.startsWith(CACHED_ARTIST_ID_PREFIX) -> {
                 if (!deferred) result.detach()
                 scope.launch(Dispatchers.IO) {
                     val artist = parentId.substring(CACHED_ARTIST_ID_PREFIX.length)
-                    val items = mutableListOf<MediaItem>()
-                    for (row in db.cachedAlbumsByArtist(artist)) {
-                        items.add(makeAlbumItem(row, includeCover = true))
-                    }
-                    result.sendResult(items)
+                    result.sendResult(
+                        db.cachedAlbumsByArtist(artist).map {
+                            makeAlbumItem(it, includeCover = true)
+                        }.toMutableList()
+                    )
                 }
             }
             parentId.startsWith(ALBUM_ID_PREFIX) -> {
                 if (!deferred) result.detach()
                 scope.launch(Dispatchers.IO) {
-                    val items = mutableListOf<MediaItem>()
-                    for (song in getSongsForMediaId(parentId)) {
-                        items.add(makeSongItem(song))
-                    }
-                    result.sendResult(items)
+                    result.sendResult(
+                        getSongsForMediaId(parentId).map { makeSongItem(it) }.toMutableList()
+                    )
                 }
             }
             else -> {
@@ -330,6 +344,8 @@ class MediaBrowserHelper(
         private const val CACHED_ALBUMS_ID = "cached_albums"
 
         private const val PRESET_PREFIX = "preset_"
+        private const val ARTISTS_SECTION_ID_PREFIX = "artists_section_"
+        private const val ALBUMS_SECTION_ID_PREFIX = "albums_section_"
         private const val ARTIST_ID_PREFIX = "artist_"
         private const val ALBUM_ID_PREFIX = "album_"
         private const val CACHED_ARTIST_ID_PREFIX = "cached_artist_"

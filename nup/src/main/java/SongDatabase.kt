@@ -610,7 +610,7 @@ class SongDatabase(
 
         db.delete("ArtistAlbumStats", null, null)
         for ((artist, rows) in artistAlbums) {
-            val artistSortKey = getSongOrderKey(artist, SongOrder.ARTIST)
+            val artistSortKey = getSongOrderKey(artist)
             for (row in rows) {
                 val values = ContentValues(7)
                 values.put("Artist", artist) // canonical
@@ -618,7 +618,7 @@ class SongDatabase(
                 values.put("AlbumId", row.key.albumId)
                 values.put("NumSongs", row.count)
                 values.put("ArtistSortKey", artistSortKey)
-                values.put("AlbumSortKey", getSongOrderKey(row.key.album, SongOrder.ALBUM))
+                values.put("AlbumSortKey", getSongOrderKey(row.key.album))
                 values.put("CoverFilename", row.coverFilename)
                 db.insert("ArtistAlbumStats", "", values)
             }

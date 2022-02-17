@@ -37,10 +37,10 @@ fun sortStatsRows(stats: List<StatsRow>, order: SongOrder) {
     val keys = HashMap<StatsKey, String>()
     when (order) {
         SongOrder.ALBUM -> for (s in stats) {
-            keys[s.key] = "${getSongOrderKey(s.key.album, order)} ${s.key.albumId}"
+            keys[s.key] = "${getSongOrderKey(s.key.album)} ${s.key.albumId}"
         }
         SongOrder.ARTIST -> for (s in stats) {
-            keys[s.key] = getSongOrderKey(s.key.artist, order)
+            keys[s.key] = getSongOrderKey(s.key.artist)
         }
         else -> throw IllegalArgumentException("Invalid ordering $order")
     }
@@ -113,41 +113,25 @@ class StatsRowArrayAdapter(
 
     /** Update [sections] and [sectionPositions] for [rows]. */
     private fun initSections() {
-        // Create a list of all possible sections in the order in which they'd appear.
-        val allSections = ArrayList<String>()
-        allSections.add(NUMBER_SECTION)
-        for (ch in 'A'..'Z') allSections.add(Character.toString(ch))
-        allSections.add(OTHER_SECTION)
-
         // Update the main list to have the sections that are needed.
         sections.clear()
         sectionPositions.clear()
         var sectionIndex = -1
         for (rowIndex in rows.indices) {
             val key = rows[rowIndex].key
-            val sectionName = getSectionNameForString(
+            val sectionName = getSongSection(
                 if (order == SongOrder.ARTIST) key.artist else key.album
             )
             val prevSectionIndex = sectionIndex
-            while (sectionIndex == -1 || sectionName != allSections[sectionIndex]) sectionIndex++
+            while (sectionIndex == -1 || sectionName != allSongSections[sectionIndex]) {
+                sectionIndex++
+            }
 
             // If we advanced to a new section, register it.
             if (sectionIndex != prevSectionIndex) {
-                sections.add(allSections[sectionIndex])
+                sections.add(allSongSections[sectionIndex])
                 sectionPositions.add(rowIndex)
             }
-        }
-    }
-
-    /** Get the section for [str]. */
-    private fun getSectionNameForString(str: String): String {
-        if (str.isEmpty()) return NUMBER_SECTION
-        val sortStr = getSongOrderKey(str, order)
-        val ch = sortStr[0]
-        return when {
-            ch < 'a' -> NUMBER_SECTION
-            ch >= 'a' && ch <= 'z' -> Character.toString(Character.toUpperCase(ch))
-            else -> OTHER_SECTION
         }
     }
 
@@ -159,11 +143,6 @@ class StatsRowArrayAdapter(
         ALBUM_ARTIST { override fun songOrder() = SongOrder.ALBUM };
 
         abstract fun songOrder(): SongOrder
-    }
-
-    companion object {
-        private const val NUMBER_SECTION = "#"
-        private const val OTHER_SECTION = "\u2668" // HOT SPRINGS (Android isn't snowman-compatible)
     }
 
     init {

@@ -7,7 +7,6 @@ package org.erat.nup.test
 
 import com.google.common.truth.Truth.assertThat
 import kotlin.random.Random
-import org.erat.nup.SongOrder
 import org.erat.nup.getSongOrderKey
 import org.erat.nup.spreadSongs
 import org.junit.Assert.assertNotEquals
@@ -23,7 +22,7 @@ class SongTest {
             "[no artist]",
             "[unset]",
         )
-        artists.sortBy { getSongOrderKey(it, SongOrder.ARTIST) }
+        artists.sortBy { getSongOrderKey(it) }
         assertThat(artists).containsExactly(
             "[no artist]",
             "[unset]",

@@ -45,21 +45,20 @@ data class Song(
 enum class SongOrder { ARTIST, TITLE, ALBUM, UNSORTED }
 
 /**
- * Get a key for ordering [str] according to [order].
+ * Get a key for ordering artist or album name [str].
  *
  * [str] is converted to lowercase and common leading articles are removed.
- * If this method is changed, SongDatabase.updateStatsTables() must be called on the next run,
- * as sorting keys are cached in the database.
+ * When this method is changed, [SongDatabase.updateArtistAlbumStats] must be called on the next
+ * run, as sorting keys are cached in the database.
  */
-fun getSongOrderKey(str: String, @Suppress("UNUSED_PARAMETER") order: SongOrder): String {
-    // TODO: Consider dropping the order parameter since it isn't actually used now.
-    // Note that the enum is still needed for sortStatsRows(), though.
+fun getSongOrderKey(str: String): String {
     var key = str.toLowerCase()
 
     // Preserve bracketed strings used by MusicBrainz and/or Picard.
     if (keyTags.contains(key)) return "!$key"
 
     // Preserve some specific weird album names.
+    // TODO: Generalize this to preserve all strings that only contain punctuation and spaces.
     if (key.startsWith("( )")) return key
 
     // Strip off leading punctuation, common articles, and other junk.
@@ -77,14 +76,41 @@ fun getSongOrderKey(str: String, @Suppress("UNUSED_PARAMETER") order: SongOrder)
     return key
 }
 
+private val keyTags =
+    setOf("[dialogue]", "[no artist]", "[unknown]", "[non-album tracks]", "[unset]")
+// TODO: Add more characters: _, ¡, ¿, smartquotes, ellipsis, etc.
+private val keyPrefixes =
+    arrayOf(" ", "\"", "'", "’", "(", "[", "<", "...", "a ", "an ", "the ")
+
+/**
+ * Return the human-readable section into which [str], an artist or album name, should be grouped.
+ *
+ * @return item from [allSongSections]
+ */
+fun getSongSection(str: String): String {
+    if (str.isEmpty()) return songNumberSection
+    val sortStr = getSongOrderKey(str)
+    val ch = sortStr[0]
+    return when {
+        ch < 'a' -> songNumberSection
+        ch >= 'a' && ch <= 'z' -> Character.toString(Character.toUpperCase(ch))
+        else -> songOtherSection
+    }
+}
+
+private val songNumberSection = "#"
+private val songOtherSection = "文"
+
+/** All sections into which songs can be grouped in the order they should be displayed. */
+val allSongSections = listOf(
+    songNumberSection,
+    *('A'..'Z').map { it.toString() }.toTypedArray(),
+    songOtherSection,
+)
+
 /** Return true if [songs] are all from the same album. */
 fun sameAlbum(songs: List<Song>) = (songs.size <= 1) ||
     (songs.all { it.album == songs[0].album } && songs.all { it.albumId == songs[0].albumId })
-
-private val keyTags =
-    setOf("[dialogue]", "[no artist]", "[unknown]", "[non-album tracks]", "[unset]")
-private val keyPrefixes =
-    arrayOf(" ", "\"", "'", "’", "(", "[", "<", "...", "a ", "an ", "the ")
 
 /**
  * Reorder [songs] in-place to make it unlikely that songs by the same artist will appear close to
@@ -98,13 +124,13 @@ fun spreadSongs(songs: MutableList<Song>, rand: Random = Random) {
     val maxSkew = 0.25 // maximum offset to skew songs' positions
 
     lateinit var shuf: (
-        songs: MutableList<Song>,
+        shufSongs: MutableList<Song>,
         outerKeyFunc: ((s: Song) -> String),
         innerKeyFunc: ((s: Song) -> String)?
     ) -> Unit
-    shuf = { songs, outerKeyFunc, innerKeyFunc ->
+    shuf = { shufSongs, outerKeyFunc, innerKeyFunc ->
         val groups = mutableMapOf<String, MutableList<Song>>()
-        songs.forEach { song ->
+        shufSongs.forEach { song ->
             // Group songs using the key function.
             val key = outerKeyFunc(song)
             groups.getOrPut(key, { mutableListOf() }).add(song)
@@ -122,7 +148,7 @@ fun spreadSongs(songs: MutableList<Song>, rand: Random = Random) {
                 dists[song] = (off + idx + maxSkew * rand.nextDouble()) / group.size
             }
         }
-        songs.sortBy { dists[it] }
+        shufSongs.sortBy { dists[it] }
     }
 
     shuf(songs, { normalizeForSearch(it.artist) }, { normalizeForSearch(it.album) })
