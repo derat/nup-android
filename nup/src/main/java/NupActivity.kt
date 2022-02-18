@@ -60,10 +60,9 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
     private lateinit var playlistView: ListView
 
     public override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
         Log.d(TAG, "Activity created")
+        super.onCreate(savedInstanceState)
 
-        // [NupService.onCreate] initializes StrictMode, so do this early.
         val serviceIntent = Intent(this, NupService::class.java)
         startService(serviceIntent)
         bindService(serviceIntent, connection, 0)

@@ -5,6 +5,7 @@
 
 package org.erat.nup
 
+import android.net.TrafficStats
 import android.util.Base64
 import android.util.Log
 import java.io.BufferedReader
@@ -56,6 +57,13 @@ open class Downloader() {
         headers: Map<String, String>?,
     ): HttpURLConnection {
         Log.d(TAG, "$method $url")
+
+        // Prevent "StrictMode: StrictMode policy violation:
+        // android.os.strictmode.UntaggedSocketViolation: Untagged socket detected; use
+        // TrafficStats.setTrafficStatsTag() to track all network usage".
+        // It seems like the framework ought to just do this by default.
+        TrafficStats.setThreadStatsTag(Thread.currentThread().getId().toInt())
+
         val conn = url.openConnection() as HttpsURLConnection
         conn.connectTimeout = CONNECT_TIMEOUT_MS
         conn.readTimeout = READ_TIMEOUT_MS

@@ -233,40 +233,8 @@ class NupService :
     private val fileCacheSizeChangeListeners = mutableSetOf<FileCacheSizeChangeListener>()
 
     override fun onCreate() {
-        super.onCreate()
         Log.d(TAG, "Service created")
-
-        StrictMode.setThreadPolicy(
-            StrictMode.ThreadPolicy.Builder()
-                .detectDiskReads()
-                .detectDiskWrites()
-                .detectNetwork()
-                .detectResourceMismatches()
-                .penaltyDeathOnNetwork()
-                .penaltyDialog()
-                .penaltyLog()
-                .build()
-        )
-        StrictMode.setVmPolicy(
-            StrictMode.VmPolicy.Builder()
-                .detectActivityLeaks()
-                .detectCleartextNetwork()
-                .detectIncorrectContextUse()
-                // TODO: android.view.SurfaceControl: https://github.com/derat/nup-android/issues/11
-                .detectLeakedClosableObjects()
-                .detectLeakedRegistrationObjects()
-                .detectLeakedSqlLiteObjects()
-                .penaltyLog()
-                .build()
-        )
-
-        // It'd be nice to set this up before we do anything else, but getExternalFilesDir() blocks.
-        scope.launch(Dispatchers.Main) {
-            val dir = async(Dispatchers.IO) {
-                File(getExternalFilesDir(null), CRASH_DIR_NAME)
-            }.await()
-            CrashLogger.register(dir)
-        }
+        super.onCreate()
 
         audioManager = getSystemService(AUDIO_SERVICE) as AudioManager
         audioAttrs = AudioAttributes.Builder()
@@ -1256,7 +1224,6 @@ class NupService :
         private const val MIN_BYTES_BEFORE_PLAYING = 128 * 1024L // bytes needed before playing
         private const val EXTRA_BUFFER_MS = 10 * 1000L // headroom needed to play song
         private const val MAX_LOADED_COVERS = 3 // max number of cover bitmaps to keep in memory
-        private const val CRASH_DIR_NAME = "crashes" // files subdir where crashes are written
         private const val MAX_POSITION_REPORT_MS = 5 * 1000L // threshold for playback updates
         private const val REPORT_PLAYBACK_THRESHOLD_MS = 240 * 1000L // reporting threshold
         private const val IGNORE_NOISY_AUDIO_AFTER_USER_SWITCH_MS = 1000L

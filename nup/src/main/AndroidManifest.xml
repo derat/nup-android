@@ -5,6 +5,7 @@
   package="org.erat.nup"
 >
   <application
+    android:name=".NupApplication"
     android:label="@string/app_name"
     android:icon="@mipmap/launcher"
     android:hardwareAccelerated="true"
