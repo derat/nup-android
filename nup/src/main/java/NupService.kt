@@ -12,6 +12,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.graphics.Bitmap
+import android.hardware.display.DisplayManager
 import android.media.AudioAttributes
 import android.media.AudioFocusRequest
 import android.media.AudioManager
@@ -25,6 +26,8 @@ import android.support.v4.media.MediaBrowserCompat.MediaItem
 import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.util.Log
+import android.view.Display
+import android.view.WindowManager
 import android.widget.Toast
 import androidx.media.MediaBrowserServiceCompat
 import androidx.media.session.MediaButtonReceiver
@@ -97,6 +100,7 @@ class NupService :
     private lateinit var audioAttrs: AudioAttributes
     private lateinit var audioFocusReq: AudioFocusRequest
     private lateinit var prefs: SharedPreferences
+    private lateinit var windowContext: Context
 
     private val songIdToSong = mutableMapOf<Long, Song>() // canonical [Song]s indexed by ID
     private val _playlist = mutableListOf<Song>()
@@ -167,11 +171,7 @@ class NupService :
                         Date().time - last.time <= IGNORE_NOISY_AUDIO_AFTER_USER_SWITCH_MS
                     if (curSongIndex >= 0 && !paused && !userSwitchedRecently) {
                         pause()
-                        Toast.makeText(
-                            this@NupService,
-                            "Paused since unplugged",
-                            Toast.LENGTH_SHORT
-                        ).show()
+                        showToast("Paused since unplugged", Toast.LENGTH_SHORT)
                     }
                 }
                 Intent.ACTION_USER_BACKGROUND -> {
@@ -236,6 +236,30 @@ class NupService :
         super.onCreate()
         Log.d(TAG, "Service created")
 
+        StrictMode.setThreadPolicy(
+            StrictMode.ThreadPolicy.Builder()
+                .detectDiskReads()
+                .detectDiskWrites()
+                .detectNetwork()
+                .detectResourceMismatches()
+                .penaltyDeathOnNetwork()
+                .penaltyDialog()
+                .penaltyLog()
+                .build()
+        )
+        StrictMode.setVmPolicy(
+            StrictMode.VmPolicy.Builder()
+                .detectActivityLeaks()
+                .detectCleartextNetwork()
+                .detectIncorrectContextUse()
+                // TODO: android.view.SurfaceControl: https://github.com/derat/nup-android/issues/11
+                .detectLeakedClosableObjects()
+                .detectLeakedRegistrationObjects()
+                .detectLeakedSqlLiteObjects()
+                .penaltyLog()
+                .build()
+        )
+
         // It'd be nice to set this up before we do anything else, but getExternalFilesDir() blocks.
         scope.launch(Dispatchers.Main) {
             val dir = async(Dispatchers.IO) {
@@ -278,9 +302,18 @@ class NupService :
         // way to implement preferences.
         val origPolicy = StrictMode.allowThreadDiskReads()
         try {
-            // Without passing true for readAgain, "this method sets the default values only if
-            // this method has never been called in the past".
-            PreferenceManager.setDefaultValues(this@NupService, R.xml.settings, true)
+            PreferenceManager.setDefaultValues(
+                // Passing the service as the context produces "StrictMode policy violation:
+                // android.os.strictmode.IncorrectContextUseViolation: The API:LayoutInflater needs
+                // a proper configuration. Use UI contexts such as an activity or a context created via
+                // createWindowContext(Display, int, Bundle) or
+                // createConfigurationContext(Configuration) with a proper configuration."
+                createConfigurationContext(getResources().getConfiguration()),
+                R.xml.settings,
+                // Without passing true for readAgain, "this method sets the default values only if
+                // this method has never been called in the past".
+                true,
+            )
         } finally {
             StrictMode.setThreadPolicy(origPolicy)
         }
@@ -424,6 +457,13 @@ class NupService :
             mediaSessionManager.session,
         )
         startForeground(NOTIFICATION_ID, notificationCreator.createNotification(false))
+
+        // Create a context that can be used to display toasts.
+        val displayManager = getSystemService(DISPLAY_SERVICE) as DisplayManager
+        val display = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
+        windowContext = createDisplayContext(display).createWindowContext(
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null
+        )
     }
 
     override fun onDestroy() {
@@ -904,24 +944,21 @@ class NupService :
 
     override fun onPlaybackError(description: String) {
         assertOnMainThread()
-        Toast.makeText(this@NupService, description, Toast.LENGTH_LONG).show()
+        showToast(description, Toast.LENGTH_LONG)
         updatePlaybackState(errorMsg = description)
     }
 
     override fun onCacheDownloadError(entry: FileCacheEntry, reason: String) {
         assertOnMainThread()
-        Toast.makeText(this@NupService, "Got retryable error: $reason", Toast.LENGTH_SHORT).show()
+        showToast("Got retryable error: $reason", Toast.LENGTH_SHORT)
     }
 
     override fun onCacheDownloadFail(entry: FileCacheEntry, reason: String) {
         assertOnMainThread()
         Log.d(TAG, "Download of song ${entry.songId} failed: $reason")
 
-        Toast.makeText(
-            this@NupService,
-            "Download of \"${songIdToSong[entry.songId]?.filename}\" failed: $reason",
-            Toast.LENGTH_LONG
-        ).show()
+        val fn = songIdToSong[entry.songId]?.filename
+        showToast("Download of \"$fn\" failed: $reason", Toast.LENGTH_LONG)
 
         if (entry.songId == downloadSongId) {
             downloadSongId = -1
@@ -1020,7 +1057,8 @@ class NupService :
 
     override fun onSyncDone(success: Boolean, message: String) {
         assertOnMainThread()
-        Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        Log.d(TAG, "Sync ${if (success) "succeeded" else "failed"}: $message")
+        showToast(message, Toast.LENGTH_SHORT)
     }
 
     override fun onAggregateDataUpdate() {
@@ -1199,6 +1237,16 @@ class NupService :
             numSongs = playlist.size,
             errorMsg = errorMsg,
         )
+    }
+
+    /** Display a toast containing [text] for [duration], e.g. [Toast.LENGTH_SHORT]. */
+    private fun showToast(text: CharSequence, duration: Int) {
+        // Passing the service's context produces "StrictMode: StrictMode policy violation:
+        // android.os.strictmode.IncorrectContextUseViolation: WindowManager should be accessed
+        // from Activity or other visual Context. Use an Activity or a Context created with
+        // Context#createWindowContext(int, Bundle), which are adjusted to the configuration
+        // and visual bounds of an area on screen."
+        Toast.makeText(windowContext, text, duration).show()
     }
 
     companion object {

@@ -13,8 +13,6 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
-import android.os.StrictMode
-import android.os.StrictMode.VmPolicy
 import android.util.Log
 import android.view.ContextMenu
 import android.view.ContextMenu.ContextMenuInfo
@@ -62,32 +60,13 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
     private lateinit var playlistView: ListView
 
     public override fun onCreate(savedInstanceState: Bundle?) {
-        StrictMode.setThreadPolicy(
-            StrictMode.ThreadPolicy.Builder()
-                .detectDiskReads()
-                .detectDiskWrites()
-                .detectNetwork()
-                .detectResourceMismatches()
-                .penaltyDeathOnNetwork()
-                .penaltyDialog()
-                .penaltyLog()
-                .build()
-        )
-        // TODO: Add detectIncorrectContextUse (added in S).
-        StrictMode.setVmPolicy(
-            VmPolicy.Builder()
-                .detectActivityLeaks()
-                .detectCleartextNetwork()
-                // TODO: android.view.SurfaceControl: https://github.com/derat/nup-android/issues/11
-                .detectLeakedClosableObjects()
-                .detectLeakedRegistrationObjects()
-                .detectLeakedSqlLiteObjects()
-                .penaltyLog()
-                .build()
-        )
-
         super.onCreate(savedInstanceState)
         Log.d(TAG, "Activity created")
+
+        // [NupService.onCreate] initializes StrictMode, so do this early.
+        val serviceIntent = Intent(this, NupService::class.java)
+        startService(serviceIntent)
+        bindService(serviceIntent, connection, 0)
 
         setContentView(R.layout.main)
 
@@ -106,10 +85,6 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         playlistView = findViewById<ListView>(R.id.playlist)
         registerForContextMenu(playlistView)
         playlistView.adapter = songListAdapter
-
-        val serviceIntent = Intent(this, NupService::class.java)
-        startService(serviceIntent)
-        bindService(serviceIntent, connection, 0)
 
         volumeControlStream = AudioManager.STREAM_MUSIC
     }

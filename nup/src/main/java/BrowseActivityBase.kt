@@ -89,7 +89,6 @@ abstract class BrowseActivityBase : AppCompatActivity(), NupService.SongDatabase
     }
 
     override fun onSongDatabaseSyncChange(state: SongDatabase.SyncState, updatedSongs: Int) {}
-
     override fun onSongDatabaseUpdate() {
         getRows(
             service.songDb,

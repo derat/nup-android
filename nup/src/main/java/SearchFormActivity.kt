@@ -259,7 +259,6 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
     }
 
     override fun onSongDatabaseSyncChange(state: SongDatabase.SyncState, updatedSongs: Int) {}
-
     override fun onSongDatabaseUpdate() {
         artistEditAdapter.clear()
         artistEditAdapter.addAll(

@@ -207,9 +207,9 @@ class SongDatabase(
         opener.getDb() task@{ db ->
             if (db == null) return@task // quit() already called
 
-            Log.d(TAG, "Running \"$query\" with ${TextUtils.join(", ", builder.selectionArgs)}")
-            val args = builder.selectionArgs.toArray<String>(arrayOf<String>())
-            db.rawQuery(query, args).use {
+            val args = builder.selectionArgs
+            Log.d(TAG, "Running \"$query\" with args $args")
+            db.rawQuery(query, args.toArray<String>(arrayOf<String>())).use {
                 with(it) {
                     while (moveToNext()) {
                         songs.add(
