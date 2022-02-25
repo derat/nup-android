@@ -51,6 +51,7 @@ class SearchResultsActivity : AppCompatActivity() {
             var err: SearchException? = null
             songs = async(Dispatchers.IO) {
                 try {
+                    val online = service.networkHelper.isNetworkAvailable
                     if (intent.action == Intent.ACTION_SEARCH) {
                         // I'm not sure when/if this is actually used. Voice searches performed via
                         // Android Auto go through onPlayFromSearch() and onSearch() in NupService.
@@ -58,9 +59,10 @@ class SearchResultsActivity : AppCompatActivity() {
                         searchLocal(
                             service.songDb,
                             intent.getStringExtra(SearchManager.QUERY) ?: "",
-                            online = service.networkHelper.isNetworkAvailable,
+                            online = online
                         )
                     } else if (needsServerSearch()) {
+                        if (!online) throw SearchException("Network is unavailable")
                         doServerSearch()
                     } else {
                         doLocalSearch()

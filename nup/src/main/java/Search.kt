@@ -229,12 +229,16 @@ suspend fun searchServer(
 suspend fun searchUsingPreset(
     db: SongDatabase,
     downloader: Downloader,
+    networkHelper: NetworkHelper,
     preset: SearchPreset
 ): List<Song> {
     if (preset.canSearchLocal()) {
         return db.query(minRating = preset.minRating, shuffle = preset.shuffle)
     }
 
+    if (!networkHelper.isNetworkAvailable) {
+        throw SearchException("Network is unavailable")
+    }
     return searchServer(
         db,
         downloader,

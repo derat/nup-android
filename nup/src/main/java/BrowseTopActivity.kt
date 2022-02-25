@@ -48,7 +48,9 @@ class BrowseTopActivity : BrowseActivityBase() {
                     var err: SearchException? = null
                     val songs = async(Dispatchers.IO) {
                         try {
-                            searchUsingPreset(service.songDb, service.downloader, preset)
+                            searchUsingPreset(
+                                service.songDb, service.downloader, service.networkHelper, preset
+                            )
                         } catch (e: SearchException) {
                             err = e
                             listOf<Song>()

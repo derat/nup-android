@@ -317,7 +317,7 @@ class MediaBrowserHelper(
             id.startsWith(PRESET_PREFIX) -> {
                 val idx = id.substring(PRESET_PREFIX.length).toInt()
                 val preset = db.searchPresetsAutoplay.getOrNull(idx) ?: return listOf<Song>()
-                return searchUsingPreset(db, downloader, preset)
+                return searchUsingPreset(db, downloader, networkHelper, preset)
             }
             id.startsWith(ALBUM_ID_PREFIX) ->
                 db.query(albumId = id.substring(ALBUM_ID_PREFIX.length))
