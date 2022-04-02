@@ -928,6 +928,8 @@ class NupService :
         val fn = songIdToSong[entry.songId]?.filename
         showToast("Download of \"$fn\" failed: $reason", Toast.LENGTH_LONG)
 
+        // TODO: How should this be handled? Just try to download the next song?
+        // Remove the song from the playlist?
         if (entry.songId == downloadSongId) {
             downloadSongId = -1
             downloadIndex = -1
@@ -1141,25 +1143,21 @@ class NupService :
             Log.e(TAG, "Aborting prefetch since download of song $downloadSongId is in progress")
             return
         }
-        var index = startIndex
-        while (index < playlist.size &&
-            (shouldDownloadAll || index - curSongIndex <= songsToPreload)
-        ) {
-            val song = playlist[index]
-            var entry = cache.getEntry(song.id)
-            if (entry != null && entry.isFullyCached) {
-                // We already have this one. Pin it to make sure that it
-                // doesn't get evicted by a later song.
-                cache.pinSongId(song.id)
-                index++
-                continue
+
+        for (idx in startIndex until playlist.size) {
+            if (idx - curSongIndex > songsToPreload && !shouldDownloadAll) break
+
+            val song = playlist[idx]
+            cache.pinSongId(song.id) // make sure it doesn't get evicted by a later song
+
+            val entry = cache.getEntry(song.id)
+            if (entry == null || !entry.isFullyCached) {
+                downloadSongId = song.id
+                downloadIndex = idx
+                cache.downloadSong(song)
+                fetchCoverForSongIfMissing(song)
+                break
             }
-            cache.downloadSong(song)
-            downloadSongId = song.id
-            downloadIndex = index
-            cache.pinSongId(song.id)
-            fetchCoverForSongIfMissing(song)
-            index++
         }
     }
 
@@ -1221,8 +1219,6 @@ class NupService :
         private const val TAG = "NupService"
 
         private const val NOTIFICATION_ID = 1 // "currently playing" notification (can't be 0)
-        private const val MIN_BYTES_BEFORE_PLAYING = 128 * 1024L // bytes needed before playing
-        private const val EXTRA_BUFFER_MS = 10 * 1000L // headroom needed to play song
         private const val MAX_LOADED_COVERS = 3 // max number of cover bitmaps to keep in memory
         private const val MAX_POSITION_REPORT_MS = 5 * 1000L // threshold for playback updates
         private const val REPORT_PLAYBACK_THRESHOLD_MS = 240 * 1000L // reporting threshold
