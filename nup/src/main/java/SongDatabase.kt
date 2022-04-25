@@ -562,6 +562,11 @@ class SongDatabase(
                 values.put("FirstPlayed", timeEnumToSec(o.optInt("firstPlayed")))
                 values.put("LastPlayed", timeEnumToSec(o.optInt("lastPlayed")))
                 values.put("OrderByLastPlayed", o.optBoolean("orderByLastPlayed"))
+                values.put(
+                    "MaxPlays",
+                    if (o.has("maxPlays")) o.getInt("maxPlays")
+                    else -1
+                )
                 values.put("FirstTrack", o.optBoolean("firstTrack"))
                 values.put("Shuffle", o.optBoolean("shuffle"))
                 values.put("Play", o.optBoolean("play"))
@@ -712,7 +717,7 @@ class SongDatabase(
         db.rawQuery(
             """
             SELECT Name, Tags, MinRating, Unrated, FirstPlayed, LastPlayed,
-              OrderByLastPlayed, FirstTrack, Shuffle, Play
+              OrderByLastPlayed, MaxPlays, FirstTrack, Shuffle, Play
             FROM SearchPresets
             ORDER By SortKey ASC
             """.trimIndent(),
@@ -729,9 +734,10 @@ class SongDatabase(
                             firstPlayed = getInt(4),
                             lastPlayed = getInt(5),
                             orderByLastPlayed = getInt(6) != 0,
-                            firstTrack = getInt(7) != 0,
-                            shuffle = getInt(8) != 0,
-                            play = getInt(9) != 0,
+                            maxPlays = getInt(7),
+                            firstTrack = getInt(8) != 0,
+                            shuffle = getInt(9) != 0,
+                            play = getInt(10) != 0,
                         )
                     )
                 }

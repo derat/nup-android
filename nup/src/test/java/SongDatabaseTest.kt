@@ -386,6 +386,7 @@ class SongDatabaseTest {
                 firstPlayed = 31536000,
                 lastPlayed = 2592000,
                 orderByLastPlayed = true,
+                maxPlays = 2,
                 firstTrack = false,
                 shuffle = true,
                 play = true,
@@ -599,6 +600,7 @@ private fun searchPresetToJson(p: SearchPreset): JSONObject {
     if (p.firstPlayed > 0) o.put("firstPlayed", secToTimeEnum(p.firstPlayed))
     if (p.lastPlayed > 0) o.put("lastPlayed", secToTimeEnum(p.lastPlayed))
     o.put("orderByLastPlayed", p.orderByLastPlayed)
+    o.put("maxPlays", p.maxPlays)
     o.put("firstTrack", p.firstTrack)
     o.put("shuffle", p.shuffle)
     o.put("play", p.play)

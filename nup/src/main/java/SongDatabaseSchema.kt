@@ -67,6 +67,7 @@ CREATE TABLE SearchPresets (
   FirstPlayed INTEGER NOT NULL, -- seconds before now, 0 for unset
   LastPlayed INTEGER NOT NULL, -- seconds before now, 0 for unset
   OrderByLastPlayed BOOLEAN NOT NULL,
+  MaxPlays INTEGER NOT NULL, -- -1 for unset
   FirstTrack BOOLEAN NOT NULL,
   Shuffle BOOLEAN NOT NULL,
   Play BOOLEAN NOT NULL);
@@ -293,6 +294,32 @@ private val upgradeSteps = mapOf<Int, (SQLiteDatabase) -> Unit>(
             INSERT INTO SearchPresets
               SELECT SortKey, Name, Tags, MinRating, Unrated, FirstPlayed, LastPlayed,
                 0, FirstTrack, Shuffle, Play FROM SearchPresetsTmp;
+            DROP TABLE SearchPresetsTmp;
+            """
+        )
+    },
+    21 to { db ->
+        // Add MaxPlays to SearchPresets.
+        runSQL(
+            db,
+            """
+            ALTER TABLE SearchPresets RENAME TO SearchPresetsTmp;
+            CREATE TABLE SearchPresets (
+              SortKey INTEGER NOT NULL, -- 0-based index in array from server
+              Name VARCHAR(256) NOT NULL,
+              Tags VARCHAR(256) NOT NULL,
+              MinRating FLOAT NOT NULL, -- [0.0, 1.0], -1 for unset
+              Unrated BOOLEAN NOT NULL,
+              FirstPlayed INTEGER NOT NULL, -- seconds before now, 0 for unset
+              LastPlayed INTEGER NOT NULL, -- seconds before now, 0 for unset
+              OrderByLastPlayed BOOLEAN NOT NULL,
+              MaxPlays INTEGER NOT NULL, -- -1 for unset
+              FirstTrack BOOLEAN NOT NULL,
+              Shuffle BOOLEAN NOT NULL,
+              Play BOOLEAN NOT NULL);
+            INSERT INTO SearchPresets
+              SELECT SortKey, Name, Tags, MinRating, Unrated, FirstPlayed, LastPlayed,
+                OrderByLastPlayed, -1, FirstTrack, Shuffle, Play FROM SearchPresetsTmp;
             DROP TABLE SearchPresetsTmp;
             """
         )
