@@ -93,7 +93,13 @@ class SongDatabaseTest {
 
         openMocks = MockitoAnnotations.openMocks(this)
         Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(true)
-        Mockito.`when`(downloader.downloadString(Mockito.anyString())).thenAnswer(
+        Mockito.`when`(
+            // We annoyingly need to include default arguments here:
+            // https://github.com/mockito/mockito-kotlin/issues/240
+            downloader.downloadString(
+                Mockito.anyString(), Mockito.anyInt(), Mockito.anyInt()
+            )
+        ).thenAnswer(
             object : Answer<Downloader.DownloadStringResult> {
                 override fun answer(inv: InvocationOnMock): Downloader.DownloadStringResult {
                     val path = inv.getArguments()[0] as String

@@ -203,7 +203,9 @@ suspend fun searchServer(
     if (firstPlayed > 0) add("minFirstPlayed", (now - firstPlayed).toString())
     if (lastPlayed > 0) add("maxLastPlayed", (now - lastPlayed).toString())
 
-    val (response, error) = downloader.downloadString("/query?$params")
+    val (response, error) = downloader.downloadString(
+        "/query?$params", readTimeoutMs = QUERY_TIMEOUT_MS
+    )
     response ?: throw SearchException(error!!)
 
     val songIds = try {
@@ -310,3 +312,7 @@ private const val TAG = "Search"
 // Minimum ratings to use for different types of queries.
 private const val EMPTY_MIN_RATING = 1.0
 private const val ARTIST_MIN_RATING = 0.75
+
+// Queries can occasionally take more than 10 seconds if datastore doesn't
+// have appropriate composite indexes. :-/
+private const val QUERY_TIMEOUT_MS = 15_000

@@ -47,6 +47,8 @@ open class Downloader() {
      * @param method HTTP method, e.g. "GET" or "POST"
      * @param authType authentication type to use
      * @param headers additional HTTP headers (may be null)
+     * @param connectTimeoutMs millisecond timeout for connecting to server
+     * @param readTimeoutMs millisecond timeout for reading response
      * @return active HTTP connection; [disconnect] must be called
      */
     @Throws(IOException::class)
@@ -55,6 +57,8 @@ open class Downloader() {
         method: String,
         authType: AuthType,
         headers: Map<String, String>?,
+        connectTimeoutMs: Int = CONNECT_TIMEOUT_MS,
+        readTimeoutMs: Int = READ_TIMEOUT_MS,
     ): HttpURLConnection {
         Log.d(TAG, "$method $url")
 
@@ -65,8 +69,8 @@ open class Downloader() {
         TrafficStats.setThreadStatsTag(Thread.currentThread().getId().toInt())
 
         val conn = url.openConnection() as HttpsURLConnection
-        conn.connectTimeout = CONNECT_TIMEOUT_MS
-        conn.readTimeout = READ_TIMEOUT_MS
+        conn.connectTimeout = connectTimeoutMs
+        conn.readTimeout = readTimeoutMs
         conn.requestMethod = method
 
         if (headers != null) {
@@ -109,10 +113,17 @@ open class Downloader() {
     data class DownloadStringResult(val data: String?, val error: String?)
 
     /** Download text data from the server. */
-    fun downloadString(path: String): DownloadStringResult {
+    fun downloadString(
+        path: String,
+        connectTimeoutMs: Int = CONNECT_TIMEOUT_MS,
+        readTimeoutMs: Int = READ_TIMEOUT_MS,
+    ): DownloadStringResult {
         var conn: HttpURLConnection? = null
         return try {
-            conn = download(getServerUrl(path), "GET", AuthType.SERVER, null)
+            conn = download(
+                getServerUrl(path), "GET", AuthType.SERVER, null,
+                connectTimeoutMs = connectTimeoutMs, readTimeoutMs = readTimeoutMs
+            )
             val status = conn.responseCode
             if (status != 200) {
                 return DownloadStringResult(
