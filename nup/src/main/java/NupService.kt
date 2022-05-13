@@ -118,7 +118,7 @@ class NupService :
 
     private var curFile: File? = null // local path of [curSong]
     private var playStart: Date? = null // time at which [curSong] was started
-    private var playedMs: Long = 0 // total time spent playing [curSong]
+    private var playedMs = 0L // total time spent playing [curSong]
 
     var paused = false // playback currently paused
         private set
@@ -885,14 +885,14 @@ class NupService :
         val song = curSong!!
         songListener?.onSongPositionChange(song, positionMs, durationMs)
         val elapsed = positionMs - lastPosMs
-        if (elapsed > 0 && elapsed <= MAX_POSITION_REPORT_MS) {
+        if (elapsed > 0 && elapsed <= MAX_CONTINUOUS_PLAYBACK_MS) {
             playedMs += elapsed.toLong()
-            // TODO: Add a currentSongReportThresholdMs or similar member to simplify this.
-            if (!reported && (
-                playedMs >= Math.max(durationMs, (song.lengthSec * 1000).toInt()) / 2 ||
-                    playedMs >= REPORT_PLAYBACK_THRESHOLD_MS
-                )
-            ) {
+            // Report the song after we've played more than half of it (or more than a reasonable
+            // fixed amount, to handle long songs). This is based on the Last.fm/Audioscrobbler
+            // guidelines (minus the dumb "track must be longer than 30 seconds" rule):
+            // https://www.last.fm/api/scrobbling#scrobble-requests
+            val halfMs = Math.max(durationMs, (song.lengthSec * 1000).toInt()).toLong() / 2
+            if (!reported && playedMs >= Math.min(halfMs, REPORT_PLAYBACK_THRESHOLD_MS)) {
                 val start = playStart!!
                 scope.launch(Dispatchers.IO) { playbackReporter.report(song.id, start) }
                 reported = true
@@ -1220,8 +1220,8 @@ class NupService :
 
         private const val NOTIFICATION_ID = 1 // "currently playing" notification (can't be 0)
         private const val MAX_LOADED_COVERS = 3 // max number of cover bitmaps to keep in memory
-        private const val MAX_POSITION_REPORT_MS = 5 * 1000L // threshold for playback updates
-        private const val REPORT_PLAYBACK_THRESHOLD_MS = 240 * 1000L // reporting threshold
+        private const val MAX_CONTINUOUS_PLAYBACK_MS = 5 * 1000L // position change threshold
+        private const val REPORT_PLAYBACK_THRESHOLD_MS = 240 * 1000L // always report after 4 min
         private const val IGNORE_NOISY_AUDIO_AFTER_USER_SWITCH_MS = 1000L
         private const val MAX_RESTORE_AGE_MS = 12 * 3600 * 1000L // max age for restoring state
     }

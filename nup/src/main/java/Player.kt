@@ -380,8 +380,13 @@ class Player(
     private fun startPositionTimer() {
         threadChecker.assertThread()
         stopPositionTimer()
+
+        // Report the position immediately and then slightly after we pass each second mark.
+        positionTask()
+        val partMs = (currentPlayer?.mediaPlayer?.currentPosition?.toLong() ?: 0L) % 1000L
+        val initialMs = (1000L + POSITION_CHANGE_DELAY_MS - partMs) % 1000L
         positionFuture = executor.scheduleAtFixedRate(
-            positionTask, 0, POSITION_CHANGE_REPORT_MS, TimeUnit.MILLISECONDS
+            positionTask, initialMs, 1000, TimeUnit.MILLISECONDS
         )
     }
 
@@ -446,7 +451,7 @@ class Player(
 
     companion object {
         private const val TAG = "Player"
-        private const val POSITION_CHANGE_REPORT_MS = 100L
+        private const val POSITION_CHANGE_DELAY_MS = 50L // delay after second to report position
         private const val SHUTDOWN_TIMEOUT_MS = 1000L
         private const val LOW_VOLUME_FRACTION = 0.2f // in [0.0, 1.0]
     }
