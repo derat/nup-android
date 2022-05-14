@@ -169,7 +169,7 @@ suspend fun searchServer(
     shuffle: Boolean = false,
     keywords: String? = null,
     tags: String? = null,
-    minRating: Double = -1.0,
+    minRating: Int = 0,
     unrated: Boolean = false,
     firstPlayed: Int = 0,
     lastPlayed: Int = 0,
@@ -191,7 +191,7 @@ suspend fun searchServer(
     add("shuffle", if (shuffle) "1" else "")
     add("keywords", keywords)
     add("tags", tags)
-    add("minRating", if (minRating > 0) "%.2f".format(minRating) else "")
+    add("minRating", if (minRating > 0) minRating.toString() else "")
     add("unrated", if (unrated) "1" else "")
     add("orderByLastPlayed", if (orderByLastPlayed) "1" else "")
     add("maxPlays", if (maxPlays >= 0) maxPlays.toString() else "")
@@ -260,7 +260,7 @@ suspend fun searchUsingPreset(
 data class SearchPreset(
     val name: String, // preset name displayed to user, e.g. 'Favorites' or 'Instrumental'
     val tags: String, // comma-separated list, empty for unset
-    val minRating: Double, // [0.0, 1.0] or -1 for no minimum (i.e. includes unrated)
+    val minRating: Int, // [1, 5] or 0 for no minimum (i.e. includes unrated)
     val unrated: Boolean,
     val firstPlayed: Int, // seconds before now, 0 for unset
     val lastPlayed: Int, // seconds before now, 0 for unset
@@ -310,8 +310,8 @@ private fun findAlbumsSubstring(rows: List<StatsRow>, album: String) =
 private const val TAG = "Search"
 
 // Minimum ratings to use for different types of queries.
-private const val EMPTY_MIN_RATING = 1.0
-private const val ARTIST_MIN_RATING = 0.75
+private const val EMPTY_MIN_RATING = 5
+private const val ARTIST_MIN_RATING = 4
 
 // Queries can occasionally take more than 10 seconds if datastore doesn't
 // have appropriate composite indexes. :-/

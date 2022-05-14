@@ -106,13 +106,13 @@ abstract class BrowseActivityBase : AppCompatActivity(), NupService.SongDatabase
         artist: String? = null,
         album: String? = null,
         albumId: String? = null,
-        minRating: Double = -1.0,
+        minRating: Int = 0,
     ) {
         val intent = Intent(this, BrowseSongsActivity::class.java)
         if (artist != null) intent.putExtra(BUNDLE_ARTIST, artist)
         if (album != null) intent.putExtra(BUNDLE_ALBUM, album)
         if (albumId != null) intent.putExtra(BUNDLE_ALBUM_ID, albumId)
-        if (minRating >= 0) intent.putExtra(BUNDLE_MIN_RATING, minRating)
+        if (minRating > 0) intent.putExtra(BUNDLE_MIN_RATING, minRating)
         intent.putExtra(BUNDLE_CACHED, onlyCached)
         startActivityForResult(intent, BROWSE_SONGS_REQUEST_CODE)
     }

@@ -30,7 +30,7 @@ CREATE TABLE Songs (
   TrackGain FLOAT NOT NULL,
   AlbumGain FLOAT NOT NULL,
   PeakAmp FLOAT NOT NULL,
-  Rating FLOAT NOT NULL);
+  Rating INTEGER NOT NULL);
 CREATE INDEX Artist ON Songs (Artist);
 CREATE INDEX Album ON Songs (Album);
 CREATE INDEX AlbumId ON Songs (AlbumId);
@@ -62,7 +62,7 @@ CREATE TABLE SearchPresets (
   SortKey INTEGER NOT NULL, -- 0-based index in array from server
   Name VARCHAR(256) NOT NULL,
   Tags VARCHAR(256) NOT NULL,
-  MinRating FLOAT NOT NULL, -- [0.0, 1.0], -1 for unset
+  MinRating INTEGER NOT NULL, -- [1, 5], 0 for unset
   Unrated BOOLEAN NOT NULL,
   FirstPlayed INTEGER NOT NULL, -- seconds before now, 0 for unset
   LastPlayed INTEGER NOT NULL, -- seconds before now, 0 for unset
@@ -324,4 +324,62 @@ private val upgradeSteps = mapOf<Int, (SQLiteDatabase) -> Unit>(
             """
         )
     },
+    22 to { db ->
+        // Convert Songs.Rating and SearchPresets.MinRating from float to int.
+        runSQL(
+            db,
+            """
+            ALTER TABLE Songs RENAME TO SongsTmp;
+            CREATE TABLE Songs (
+              SongId INTEGER PRIMARY KEY NOT NULL,
+              Filename VARCHAR(256) NOT NULL,
+              CoverFilename VARCHAR(256) NOT NULL,
+              Artist VARCHAR(256) NOT NULL,
+              Title VARCHAR(256) NOT NULL,
+              Album VARCHAR(256) NOT NULL,
+              AlbumId VARCHAR(256) NOT NULL,
+              ArtistNorm VARCHAR(256) NOT NULL,
+              TitleNorm VARCHAR(256) NOT NULL,
+              AlbumNorm VARCHAR(256) NOT NULL,
+              Track INTEGER NOT NULL,
+              Disc INTEGER NOT NULL,
+              Length FLOAT NOT NULL,
+              TrackGain FLOAT NOT NULL,
+              AlbumGain FLOAT NOT NULL,
+              PeakAmp FLOAT NOT NULL,
+              Rating INTEGER NOT NULL);
+            INSERT INTO Songs
+              SELECT SongId, Filename, CoverFilename, Artist, Title, Album, AlbumId, ArtistNorm,
+                TitleNorm, AlbumNorm, Track, Disc, Length, TrackGain, AlbumGain, PeakAmp,
+                CASE WHEN Rating < 0 THEN 0 ELSE Rating*4+1 END AS Rating
+              FROM SongsTmp;
+            DROP TABLE SongsTmp;
+            CREATE INDEX Artist ON Songs (Artist);
+            CREATE INDEX Album ON Songs (Album);
+            CREATE INDEX AlbumId ON Songs (AlbumId);
+
+            ALTER TABLE SearchPresets RENAME TO SearchPresetsTmp;
+            CREATE TABLE SearchPresets (
+              SortKey INTEGER NOT NULL, -- 0-based index in array from server
+              Name VARCHAR(256) NOT NULL,
+              Tags VARCHAR(256) NOT NULL,
+              MinRating INTEGER NOT NULL, -- [1, 5], 0 for unset
+              Unrated BOOLEAN NOT NULL,
+              FirstPlayed INTEGER NOT NULL, -- seconds before now, 0 for unset
+              LastPlayed INTEGER NOT NULL, -- seconds before now, 0 for unset
+              OrderByLastPlayed BOOLEAN NOT NULL,
+              MaxPlays INTEGER NOT NULL, -- -1 for unset
+              FirstTrack BOOLEAN NOT NULL,
+              Shuffle BOOLEAN NOT NULL,
+              Play BOOLEAN NOT NULL);
+            INSERT INTO SearchPresets
+              SELECT SortKey, Name, Tags,
+                CASE WHEN MinRating < 0 THEN 0 ELSE MinRating*4+1 END AS MinRating,
+                Unrated, FirstPlayed, LastPlayed, OrderByLastPlayed,
+                MaxPlays, FirstTrack, Shuffle, Play
+              FROM SearchPresetsTmp;
+            DROP TABLE SearchPresetsTmp;
+            """
+        )
+    }
 )

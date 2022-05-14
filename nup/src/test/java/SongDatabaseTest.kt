@@ -24,6 +24,7 @@ import org.erat.nup.SearchPreset
 import org.erat.nup.Song
 import org.erat.nup.SongDatabase
 import org.erat.nup.StatsRow
+import org.erat.nup.getMaxSongDatabaseVersion
 import org.erat.nup.normalizeForSearch
 import org.erat.nup.searchLocal
 import org.json.JSONArray
@@ -161,10 +162,10 @@ class SongDatabaseTest {
     }
 
     @Test fun syncAndQuery() = runBlockingTest {
-        val s1 = makeSong("Ä", "Track 1", "Album 1", 1, rating = 0.75)
-        val s2 = makeSong("A", "Track 2", "Album 1", 2, rating = 0.25)
-        val s3 = makeSong("B feat. C", "Track 3", "Album 1", 3, rating = 1.0)
-        val s4 = makeSong("B", "Traĉk 1", "Albúm ²", 1, rating = -1.0)
+        val s1 = makeSong("Ä", "Track 1", "Album 1", 1, rating = 4)
+        val s2 = makeSong("A", "Track 2", "Album 1", 2, rating = 2)
+        val s3 = makeSong("B feat. C", "Track 3", "Album 1", 3, rating = 5)
+        val s4 = makeSong("B", "Traĉk 1", "Albúm ²", 1, rating = 0)
         serverSongs.addAll(listOf(SongInfo(s1), SongInfo(s2), SongInfo(s3), SongInfo(s4)))
 
         db.syncWithServer()
@@ -186,8 +187,8 @@ class SongDatabaseTest {
         assertEquals(listOf(s4), db.query(album = "album 2"))
         assertEquals(listOf(s2), db.query(songId = s2.id))
         assertEquals(listOf(s2, s3), db.query(songIds = listOf(s2.id, s3.id)))
-        assertEquals(listOf(s1, s3), db.query(minRating = 0.75))
-        assertEquals(listOf(s3), db.query(minRating = 1.0))
+        assertEquals(listOf(s1, s3), db.query(minRating = 4))
+        assertEquals(listOf(s3), db.query(minRating = 5))
         assertEquals(listOf(s3, s4), db.query(artist = "B", substring = true))
         assertEquals(listOf<Song>(), db.query(artist = "Somebody Else"))
 
@@ -206,8 +207,8 @@ class SongDatabaseTest {
 
     @Test fun syncUpdates() = runBlockingTest {
         // Add some songs at time 0 and sync at time 1.
-        val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 0.75)
-        val s2 = makeSong("A", "Track 2", "Album 1", 2, rating = 0.25)
+        val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 4)
+        val s2 = makeSong("A", "Track 2", "Album 1", 2, rating = 2)
         serverSongs.addAll(listOf(SongInfo(s1), SongInfo(s2)))
         serverNowNs++
         db.syncWithServer()
@@ -219,10 +220,10 @@ class SongDatabaseTest {
 
         // At time 1, update the first song, delete the second song, and add a third song.
         serverNowNs++
-        val s1u = makeSong("A", "Track 1", "Album 1", 1, rating = 0.5)
+        val s1u = makeSong("A", "Track 1", "Album 1", 1, rating = 3)
         serverSongs[0] = SongInfo(s1u, serverNowNs)
         serverDelSongs.add(SongInfo(s2, serverNowNs))
-        val s3 = makeSong("A", "Track 3", "Album 1", 3, rating = 1.0)
+        val s3 = makeSong("A", "Track 3", "Album 1", 3, rating = 5)
         serverSongs.add(SongInfo(s3, serverNowNs))
         db.syncWithServer()
         assertTrue(lastSyncSuccess)
@@ -236,13 +237,13 @@ class SongDatabaseTest {
         assertTrue(db.aggregateDataLoaded) // happens initially
         val oldUpdates = aggregateDataUpdates
 
-        val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 0.75)
-        val s2 = makeSong("B", "Track 2", "Album 1", 2, rating = 0.25)
-        val s3 = makeSong("B feat. C", "Track 3", "Album 1", 3, rating = 1.0)
-        val s4 = makeSong("B", "Track 4", "Album 1", 4, rating = -1.0)
-        val s5 = makeSong("B", "Track 1", "Album 2", 1, rating = 0.5)
-        val s6 = makeSong("A", "Track 2", "Album 2", 2, rating = 1.0)
-        val s7 = makeSong("b", "Track 1", "", 1, rating = 0.25)
+        val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 4)
+        val s2 = makeSong("B", "Track 2", "Album 1", 2, rating = 2)
+        val s3 = makeSong("B feat. C", "Track 3", "Album 1", 3, rating = 5)
+        val s4 = makeSong("B", "Track 4", "Album 1", 4, rating = 0)
+        val s5 = makeSong("B", "Track 1", "Album 2", 1, rating = 3)
+        val s6 = makeSong("A", "Track 2", "Album 2", 2, rating = 5)
+        val s7 = makeSong("b", "Track 1", "", 1, rating = 2)
         serverSongs.addAll(
             listOf(
                 SongInfo(s1), SongInfo(s2), SongInfo(s3), SongInfo(s4), SongInfo(s5),
@@ -314,11 +315,11 @@ class SongDatabaseTest {
     }
 
     @Test fun cachedSongs() = runBlockingTest {
-        val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 0.75)
-        val s2 = makeSong("A", "Track 2", "Album 1", 2, rating = 0.25)
-        val s3 = makeSong("B", "Track 3", "Album 1", 3, rating = 1.0)
-        val s4 = makeSong("B", "Track 1", "Album 2", 1, rating = -1.0)
-        val s5 = makeSong("B", "Track 1", "", 1, rating = 0.5)
+        val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 4)
+        val s2 = makeSong("A", "Track 2", "Album 1", 2, rating = 2)
+        val s3 = makeSong("B", "Track 3", "Album 1", 3, rating = 5)
+        val s4 = makeSong("B", "Track 1", "Album 2", 1, rating = 0)
+        val s5 = makeSong("B", "Track 1", "", 1, rating = 3)
         serverSongs.addAll(
             listOf(SongInfo(s1), SongInfo(s2), SongInfo(s3), SongInfo(s4), SongInfo(s5))
         )
@@ -387,7 +388,7 @@ class SongDatabaseTest {
             SearchPreset(
                 name = "Favorites",
                 tags = "upbeat",
-                minRating = 0.75,
+                minRating = 4,
                 unrated = false,
                 firstPlayed = 31536000,
                 lastPlayed = 2592000,
@@ -409,10 +410,10 @@ class SongDatabaseTest {
 
     // This tests a function from Search.kt, but it depends heavily on [SongDatabase].
     @Test fun searchLocalSongs() = runBlockingTest {
-        val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 0.75)
-        val s2 = makeSong("B", "Track 2", "Album 1", 2, rating = 1.0)
-        val s3 = makeSong("B feat. C", "Track 3", "Album 1", 3, rating = 0.75)
-        val s4 = makeSong("B", "Track 1", "Album 2", 1, rating = 0.25)
+        val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 4)
+        val s2 = makeSong("B", "Track 2", "Album 1", 2, rating = 5)
+        val s3 = makeSong("B feat. C", "Track 3", "Album 1", 3, rating = 4)
+        val s4 = makeSong("B", "Track 1", "Album 2", 1, rating = 2)
         serverSongs.addAll(listOf(SongInfo(s1), SongInfo(s2), SongInfo(s3), SongInfo(s4)))
         db.syncWithServer()
         assertEquals(4, db.numSongs)
@@ -464,7 +465,7 @@ class SongDatabaseTest {
             trackGain = 0.0, // not in version 13
             albumGain = 0.0, // not in version 13
             peakAmp = 0.0, // not in version 13
-            rating = 0.75,
+            rating = 4,
         )
         val report = SongDatabase.PendingPlaybackReport(song.id, Date(1641855862L * 1000))
 
@@ -483,7 +484,7 @@ class SongDatabaseTest {
                 values.put("TrackNumber", song.track)
                 values.put("DiscNumber", song.disc)
                 values.put("Length", song.lengthSec.toInt())
-                values.put("Rating", song.rating)
+                values.put("Rating", (song.rating - 1) / 4.0) // used to be float
                 db.replace("Songs", "", values)
 
                 values = ContentValues(5)
@@ -507,6 +508,7 @@ class SongDatabaseTest {
 
         // Initialize SongDatabase again to let it upgrade the database.
         initDb()
+        assertEquals(getMaxSongDatabaseVersion(), db.getVersion())
         assertEquals(1, db.numSongs)
         assertEquals(listOf(song), db.query())
         assertEquals(listOf(StatsRow(song.artist, "", "", 1)), db.artistsSortedAlphabetically)
@@ -536,7 +538,7 @@ fun makeSong(
     album: String,
     track: Int,
     disc: Int = 1,
-    rating: Double? = null,
+    rating: Int? = null,
 ): Song {
     val albumId =
         if (album.isEmpty()) ""
@@ -557,7 +559,7 @@ fun makeSong(
         trackGain = -6.5,
         albumGain = -7.5,
         peakAmp = 1.0,
-        rating = if (rating != null) rating else (size % 5) / 4.0,
+        rating = if (rating != null) rating else (size % 5) + 1,
     )
 }
 
@@ -601,7 +603,7 @@ private fun searchPresetToJson(p: SearchPreset): JSONObject {
     val o = JSONObject()
     o.put("name", p.name)
     o.put("tags", p.tags)
-    if (p.minRating >= 0) o.put("minRating", (1 + p.minRating * 4).toInt())
+    if (p.minRating > 0) o.put("minRating", p.minRating)
     o.put("unrated", p.unrated)
     if (p.firstPlayed > 0) o.put("firstPlayed", secToTimeEnum(p.firstPlayed))
     if (p.lastPlayed > 0) o.put("lastPlayed", secToTimeEnum(p.lastPlayed))

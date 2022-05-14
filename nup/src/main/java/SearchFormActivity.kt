@@ -203,7 +203,7 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
         // determine the index of an AutoCompleteTextView's selected item is apparently by listening
         // for clicks.
         val stars = minRatingSpinner.text.toString().length
-        if (stars > 0) intent.putExtra(SearchResultsActivity.BUNDLE_MIN_RATING, (stars - 1) / 4.0)
+        if (stars > 0) intent.putExtra(SearchResultsActivity.BUNDLE_MIN_RATING, stars)
 
         intent.putExtra(SearchResultsActivity.BUNDLE_KEYWORDS, keywordsEdit.text.toString().trim())
         intent.putExtra(SearchResultsActivity.BUNDLE_TAGS, tagsEdit.text.toString().trim())

@@ -21,9 +21,8 @@ fun showSongDetailsDialog(context: Context, song: Song) {
     view.findViewById<TextView>(R.id.length)!!.text = formatDuration(song.lengthSec.toInt())
 
     var ratingStr = ""
-    if (song.rating >= 0.0) {
-        val numStars = 1 + Math.round(song.rating * 4.0).toInt()
-        for (i in 1..5) ratingStr += if (i <= numStars) "\u2605" else "\u2606"
+    if (song.rating > 0) {
+        for (i in 1..5) ratingStr += if (i <= song.rating) "\u2605" else "\u2606"
     }
     view.findViewById<TextView>(R.id.rating)!!.text = ratingStr
 

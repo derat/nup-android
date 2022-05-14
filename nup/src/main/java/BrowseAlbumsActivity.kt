@@ -65,7 +65,7 @@ class BrowseAlbumsActivity : BrowseActivityBase() {
                 startBrowseSongsActivity(
                     album = row.key.album,
                     albumId = row.key.albumId,
-                    minRating = 0.75
+                    minRating = 4
                 )
                 true
             }

@@ -82,6 +82,14 @@ class SongDatabase(
         fun onAggregateDataUpdate()
     }
 
+    /** Get the current database version for testing. */
+    suspend fun getVersion(): Int? {
+        // TODO: What's the right way to do this in a single line in Kotlin?
+        var version: Int? = 0
+        opener.getDb() { version = it?.getVersion() }
+        return version
+    }
+
     suspend fun cachedArtistsSortedAlphabetically(): List<StatsRow> = getSortedRows(
         """
         SELECT MIN(s.Artist), '' AS Album, '' AS AlbumId, COUNT(*), '' AS CoverFilename
@@ -138,7 +146,7 @@ class SongDatabase(
         albumId: String? = null,
         songId: Long = -1,
         songIds: List<Long>? = null,
-        minRating: Double = -1.0,
+        minRating: Int = 0,
         shuffle: Boolean = false,
         substring: Boolean = false,
         onlyCached: Boolean = false,
@@ -182,7 +190,7 @@ class SongDatabase(
         builder.add("AlbumNorm LIKE ?", album, substring, true)
         builder.add("AlbumId = ?", albumId)
         builder.add("s.SongId = ?", if (songId >= 0) songId.toString() else null)
-        builder.add("Rating >= ?", if (minRating >= 0.0) minRating.toString() else null)
+        builder.add("Rating >= ?", if (minRating > 0) minRating.toString() else null)
         if (songIds != null && songIds.size > 0) {
             builder.addLiteral("s.SongId IN (" + songIds.joinToString(",") + ")")
         }
@@ -227,7 +235,7 @@ class SongDatabase(
                                 trackGain = getFloat(10).toDouble(),
                                 albumGain = getFloat(11).toDouble(),
                                 peakAmp = getFloat(12).toDouble(),
-                                rating = getFloat(13).toDouble(),
+                                rating = getInt(13),
                             )
                         )
                     }
@@ -487,7 +495,7 @@ class SongDatabase(
                                 values.put("TrackGain", item.optDouble("trackGain", 0.0))
                                 values.put("AlbumGain", item.optDouble("albumGain", 0.0))
                                 values.put("PeakAmp", item.optDouble("peakAmp", 0.0))
-                                values.put("Rating", item.getDouble("rating"))
+                                values.put("Rating", item.getInt("rating"))
                                 db.replace("Songs", "", values)
                             }
                             numUpdates++
@@ -552,12 +560,7 @@ class SongDatabase(
                 values.put("SortKey", numPresets)
                 values.put("Name", o.getString("name"))
                 values.put("Tags", o.optString("tags"))
-                values.put(
-                    "MinRating",
-                    // Convert number of stars in [1, 5] to rating in [0.0, 1.0].
-                    if (o.has("minRating")) (o.getInt("minRating").coerceIn(1, 5) - 1) / 4.0
-                    else -1.0
-                )
+                values.put("MinRating", o.optInt("minRating"))
                 values.put("Unrated", o.optBoolean("unrated"))
                 values.put("FirstPlayed", timeEnumToSec(o.optInt("firstPlayed")))
                 values.put("LastPlayed", timeEnumToSec(o.optInt("lastPlayed")))
@@ -729,7 +732,7 @@ class SongDatabase(
                         SearchPreset(
                             name = getString(0),
                             tags = getString(1),
-                            minRating = getFloat(2).toDouble(),
+                            minRating = getInt(2),
                             unrated = getInt(3) != 0,
                             firstPlayed = getInt(4),
                             lastPlayed = getInt(5),
@@ -862,7 +865,12 @@ class SongDatabase(
                     // its own transaction and threw if db.inTransaction() was initially true, so
                     // presumably something must've changed at some point.
                     for (nextVersion in (oldVersion + 1)..newVersion) {
-                        upgradeSongDatabase(db, nextVersion)
+                        try {
+                            upgradeSongDatabase(db, nextVersion)
+                        } catch (e: Exception) {
+                            Log.e(TAG, "Failed upgrading to $nextVersion: $e")
+                            throw e
+                        }
                     }
 
                     // This is a bit of a hack, but if it looks like one or more upgrades dropped

@@ -34,7 +34,7 @@ class BrowseArtistsActivity : BrowseActivityBase() {
     override fun onMenuClick(itemId: Int, row: StatsRow): Boolean {
         return when (itemId) {
             MENU_ITEM_BROWSE_SONGS_WITH_RATING -> {
-                startBrowseSongsActivity(artist = row.key.artist, minRating = 0.75)
+                startBrowseSongsActivity(artist = row.key.artist, minRating = 4)
                 true
             }
             MENU_ITEM_BROWSE_SONGS -> {

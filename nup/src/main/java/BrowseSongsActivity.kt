@@ -38,7 +38,7 @@ class BrowseSongsActivity : AppCompatActivity(), OnItemClickListener {
     private var album: String? = null
     private var albumId: String? = null
     private var onlyCached = false
-    private var minRating = -1.0
+    private var minRating = 0
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -49,7 +49,7 @@ class BrowseSongsActivity : AppCompatActivity(), OnItemClickListener {
         album = intent.getStringExtra(BrowseActivityBase.BUNDLE_ALBUM)
         albumId = intent.getStringExtra(BrowseActivityBase.BUNDLE_ALBUM_ID)
         onlyCached = intent.getBooleanExtra(BrowseActivityBase.BUNDLE_CACHED, false)
-        minRating = intent.getDoubleExtra(BrowseActivityBase.BUNDLE_MIN_RATING, -1.0)
+        minRating = intent.getIntExtra(BrowseActivityBase.BUNDLE_MIN_RATING, 0)
 
         title = if (album != null) {
             getString(

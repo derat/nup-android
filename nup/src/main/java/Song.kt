@@ -23,7 +23,7 @@ data class Song(
     val trackGain: Double,
     val albumGain: Double,
     val peakAmp: Double,
-    val rating: Double,
+    val rating: Int,
 ) : Serializable {
     var coverBitmap: Bitmap? = null
 

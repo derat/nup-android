@@ -40,12 +40,13 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
         builder.putString(MediaMetadataCompat.METADATA_KEY_TITLE, song.title)
         builder.putString(MediaMetadataCompat.METADATA_KEY_ALBUM, song.album)
 
-        if (song.rating >= 0.0) {
+        if (song.rating > 0) {
+            // TODO: Sigh, RATING_5_STARS means "a rating style with 0 to 5 stars", i.e. six
+            // possible values. We use 1 as the lowest user rating and 0 for unrated.
+            // I'm not sure where this is displayed, so maybe none of this matters.
             builder.putRating(
                 MediaMetadataCompat.METADATA_KEY_RATING,
-                RatingCompat.newStarRating(
-                    RatingCompat.RATING_5_STARS, (1.0 + song.rating * 4.0).toFloat()
-                )
+                RatingCompat.newStarRating(RatingCompat.RATING_5_STARS, song.rating.toFloat())
             )
         }
         if (song.track > 0) {
