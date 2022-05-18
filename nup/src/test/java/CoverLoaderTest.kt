@@ -138,7 +138,7 @@ class CoverLoaderTest {
         Assert.assertEquals(bitmap, load(file))
     }
 
-    fun getPath(filename: String) = "/cover?filename=$filename&size=512"
+    fun getPath(filename: String) = "/cover?filename=$filename&size=512&webp=1"
     fun getUrl(filename: String) = URL("https://www.example.org" + getPath(filename))
 
     fun createConnection(statusCode: Int, data: String?): HttpURLConnection {

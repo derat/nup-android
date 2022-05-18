@@ -112,7 +112,7 @@ open class CoverLoader(
         var success = false
         val file = File(coverDir, filename)
         val enc = URLEncoder.encode(path, "UTF-8")
-        val url = downloader.getServerUrl("/cover?filename=$enc&size=$COVER_SIZE")
+        val url = downloader.getServerUrl("/cover?filename=$enc&size=$COVER_SIZE&webp=1")
         var conn: HttpURLConnection? = null
         try {
             // Check if another thread downloaded it while we were waiting.
@@ -176,7 +176,7 @@ open class CoverLoader(
     companion object {
         private const val TAG = "CoverLoader"
         private const val DIR_NAME = "covers"
-        private const val COVER_SIZE = 512
+        private const val COVER_SIZE = 512 // size hardcoded in server's /cover handler
     }
 
     init {
@@ -203,8 +203,11 @@ class CoverProvider() : ContentProvider() {
         val file = runBlocking { loader?.getFile(fn) } ?: return null
         return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
     }
-    // TODO: Determine this based on the filename.
-    override fun getType(uri: Uri): String? = "image/jpeg"
+    // TODO: Determine this based on the filename. This seems like it'll be super-painful
+    // since we don't actually know whether the server will give us WebP or JPEG. Maybe it
+    // doesn't matter, or this doesn't even get called by the MediaBrowserService stuff?
+    // JPEG images still seem to get displayed in Android Auto when this returns image/webp.
+    override fun getType(uri: Uri): String? = "image/webp"
 
     // All of the normal content provider methods are unneeded.
     override fun query(
