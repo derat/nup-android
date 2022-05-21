@@ -38,7 +38,9 @@
   <string name="channel_name">nup</string>
   <string name="channel_description">Music playback status</string>
   <string name="clear_cache">Clear cache</string>
-  <string name="clear_cache_message">Delete all locally-cached music?</string>
+  <string name="clear_cache_message">Delete all cached music?</string>
+  <string name="clear_covers">Clear cover images</string>
+  <string name="clear_covers_message">Delete all downloaded cover images?</string>
   <string name="dont_download_all">Don\'t download all</string>
   <string name="download_all">Download all</string>
   <string name="download_rate">Download rate</string>

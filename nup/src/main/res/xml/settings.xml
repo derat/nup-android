@@ -86,5 +86,13 @@
       android:dialogMessage="@string/download_rate_description"
       app:iconSpaceReserved="false"
     />
+    <org.erat.nup.YesNoPreference
+      android:key="clear_covers"
+      android:title="@string/clear_covers"
+      android:dialogMessage="@string/clear_covers_message"
+      android:dialogTitle="@string/clear_covers"
+      app:iconSpaceReserved="false"
+      style="@style/AppPreference.DialogPreference"
+    />
   </PreferenceCategory>
 </PreferenceScreen>

@@ -43,6 +43,10 @@ open class CoverLoader(
     private val loadLock = ReentrantLock() // guards [filesBeingLoaded]
     private val loadFinishedCond = loadLock.newCondition() // signaled for [filesBeingLoaded]
 
+    private var _totalBytes = 0L // total size of files in [coverDir]
+    val totalBytes get() = totalBytesLock.withLock { _totalBytes }
+    private val totalBytesLock = ReentrantLock() // guards [_totalBytes]
+
     // The last cover that we've loaded. We store it here so that we can reuse the already-decoded
     // bitmap in the common case where we're playing an album and need the same cover over and over.
     private var lastFile: File? = null
@@ -50,14 +54,15 @@ open class CoverLoader(
     private val lastLock = ReentrantLock()
 
     /**
-     * Synchronously load and decodes the cover at [path] (corresponding to [Song.coverFilename]).
+     * Synchronously load and decodes the cover at [filename] (corresponding to
+     * [Song.coverFilename]).
      *
      * Tries to find the cover locally first; then goes to the server.
      *
      * @return cover image or null if unavailable
      */
-    suspend fun getBitmap(path: String): Bitmap? {
-        val file = getFile(path) ?: return null
+    suspend fun getBitmap(filename: String): Bitmap? {
+        val file = getFile(filename) ?: return null
         if (!file.exists()) {
             Log.e(TAG, "${file.name} disappeared")
             return null
@@ -71,28 +76,27 @@ open class CoverLoader(
     }
 
     /**
-     * Synchronously load the cover at [path] (corresponding to [Song.coverFilename]).
+     * Synchronously load the cover at [filename] (corresponding to [Song.coverFilename]).
      *
      * Tries to find the cover locally first; then goes to the server.
      *
      * @return cover image or null if unavailable
      */
-    suspend fun getFile(path: String): File? {
+    suspend fun getFile(filename: String): File? {
         waitUntilReady() // wait for [coverDir]
 
-        lookForLocalCover(path)?.let {
+        lookForLocalCover(filename)?.let {
             Log.d(TAG, "Using local file ${it.name}")
             return it
         }
-        downloadCover(path)?.let {
+        downloadCover(filename)?.let {
             Log.d(TAG, "Fetched remote file ${it.name}")
             return it
         }
         return null
     }
 
-    private suspend fun lookForLocalCover(path: String): File? {
-        val filename = getFilenameForPath(path)
+    private suspend fun lookForLocalCover(filename: String): File? {
         startLoad(filename)
         try {
             val file = File(coverDir, filename)
@@ -103,15 +107,18 @@ open class CoverLoader(
         return null
     }
 
-    private suspend fun downloadCover(path: String): File? {
+    private suspend fun downloadCover(filename: String): File? {
         if (!networkHelper.isNetworkAvailable) return null
 
-        val filename = getFilenameForPath(path)
         startLoad(filename)
 
         var success = false
         val file = File(coverDir, filename)
-        val enc = URLEncoder.encode(path, "UTF-8")
+        if (!file.toPath().startsWith(coverDir.toPath())) {
+            Log.e(TAG, "Cover $filename escapes cover dir")
+            return null
+        }
+        val enc = URLEncoder.encode(filename, "UTF-8")
         val url = downloader.getServerUrl("/cover?filename=$enc&size=$COVER_SIZE&webp=1")
         var conn: HttpURLConnection? = null
         try {
@@ -123,6 +130,7 @@ open class CoverLoader(
 
             conn = downloader.download(url, "GET", Downloader.AuthType.SERVER, null)
             if (conn.responseCode != 200) throw IOException("Status code " + conn.responseCode)
+            file.parentFile?.mkdirs()
             file.createNewFile()
             file.outputStream().use { conn.inputStream.copyTo(it) }
             success = true
@@ -130,16 +138,12 @@ open class CoverLoader(
             Log.e(TAG, "IO error while fetching $url: $e")
         } finally {
             conn?.disconnect()
-            if (!success && file.exists()) file.delete()
+            if (success) totalBytesLock.withLock { _totalBytes += file.length() }
+            else if (file.exists()) file.delete()
             finishLoad(filename)
         }
 
         return if (success) file else null
-    }
-
-    private fun getFilenameForPath(path: String): String {
-        val parts = path.split("/").toTypedArray()
-        return parts[parts.size - 1]
     }
 
     // Call before checking for the existence of a local cover file and before starting to download
@@ -173,6 +177,24 @@ open class CoverLoader(
     /** Decode the bitmap at the given path. */
     open fun decodeFile(path: String): Bitmap? = BitmapFactory.decodeFile(path)
 
+    /** Delete all downloaded covers. */
+    suspend fun clear() {
+        var bytes = 0L
+        try {
+            loadLock.withLock {
+                coverDir.walkTopDown().forEach loop@{ file ->
+                    val fn = coverDir.toPath().relativize(file.toPath()).toString()
+                    if (!file.isFile || filesBeingLoaded.contains(fn)) return@loop
+                    val len = file.length()
+                    file.delete()
+                    bytes += len
+                }
+            }
+        } finally {
+            totalBytesLock.withLock { _totalBytes = Math.max(_totalBytes - bytes, 0L) }
+        }
+    }
+
     companion object {
         private const val TAG = "CoverLoader"
         private const val DIR_NAME = "covers"
@@ -186,6 +208,9 @@ open class CoverLoader(
         scope.launch(Dispatchers.IO) {
             coverDir = File(context.externalCacheDir, DIR_NAME)
             coverDir.mkdirs()
+            totalBytesLock.withLock {
+                _totalBytes = coverDir.walkTopDown().filter { it.isFile }.map { it.length() }.sum()
+            }
             readyLock.withLock {
                 ready = true
                 readyCond.signal()
@@ -199,8 +224,8 @@ class CoverProvider() : ContentProvider() {
     override fun onCreate(): Boolean = true
 
     override fun openFile(uri: Uri, mode: String): ParcelFileDescriptor? {
-        val fn = uri.lastPathSegment ?: return null
-        val file = runBlocking { loader?.getFile(fn) } ?: return null
+        val filename = uri.path ?: return null
+        val file = runBlocking { loader?.getFile(filename) } ?: return null
         return ParcelFileDescriptor.open(file, ParcelFileDescriptor.MODE_READ_ONLY)
     }
     // TODO: Determine this based on the filename. This seems like it'll be super-painful

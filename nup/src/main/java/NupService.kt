@@ -73,9 +73,13 @@ class NupService :
         fun onSongDatabaseUpdate()
     }
 
-    /** Listener for [FileCache]'s size changing. */
-    interface FileCacheSizeChangeListener {
-        fun onFileCacheSizeChange()
+    /** Listener for [FileCache]'s and [CoverLoader]'s sizes changing. */
+    interface SizeChangeListener {
+        /** Called when the total cached song size changes. */
+        fun onCacheSizeChange()
+        /** Called when the total size of downloaded covers changes. */
+        /* TODO: Right now, we only call this when clearing the covers. */
+        fun onCoversSizeChange()
     }
 
     val scope = MainScope()
@@ -230,7 +234,7 @@ class NupService :
 
     private var songListener: SongListener? = null
     private val songDatabaseUpdateListeners = mutableSetOf<SongDatabaseUpdateListener>()
-    private val fileCacheSizeChangeListeners = mutableSetOf<FileCacheSizeChangeListener>()
+    private val sizeChangeListeners = mutableSetOf<SizeChangeListener>()
 
     override fun onCreate() {
         Log.d(TAG, "Service created")
@@ -486,11 +490,11 @@ class NupService :
         songDatabaseUpdateListeners.remove(listener)
     }
 
-    fun addFileCacheSizeChangeListener(listener: FileCacheSizeChangeListener) {
-        fileCacheSizeChangeListeners.add(listener)
+    fun addSizeChangeListener(listener: SizeChangeListener) {
+        sizeChangeListeners.add(listener)
     }
-    fun removeFileCacheSizeChangeListener(listener: FileCacheSizeChangeListener) {
-        fileCacheSizeChangeListeners.remove(listener)
+    fun removeSizeChangeListener(listener: SizeChangeListener) {
+        sizeChangeListeners.remove(listener)
     }
 
     /**
@@ -868,8 +872,15 @@ class NupService :
     }
 
     val totalCachedBytes: Long get() = cache.totalCachedBytes
-
     fun clearCache() { cache.clear() }
+
+    val totalCoverBytes: Long get() = coverLoader.totalBytes
+    fun clearCovers() {
+        scope.launch(Dispatchers.Main) {
+            async(Dispatchers.IO) { coverLoader.clear() }.await()
+            sizeChangeListeners.forEach { it.onCoversSizeChange() }
+        }
+    }
 
     override fun onPlaybackComplete() {
         assertOnMainThread()
@@ -958,7 +969,7 @@ class NupService :
         }
 
         songListener?.onSongFileSizeChange(song)
-        for (listener in fileCacheSizeChangeListeners) listener.onFileCacheSizeChange()
+        sizeChangeListeners.forEach { it.onCacheSizeChange() }
 
         if (entry.songId == downloadSongId) {
             val nextIndex = downloadIndex + 1
@@ -1014,7 +1025,7 @@ class NupService :
             song.totalBytes = 0
             songListener?.onSongFileSizeChange(song)
         }
-        for (listener in fileCacheSizeChangeListeners) listener.onFileCacheSizeChange()
+        sizeChangeListeners.forEach { it.onCacheSizeChange() }
     }
 
     override fun onSyncChange(state: SongDatabase.SyncState, updatedSongs: Int) {

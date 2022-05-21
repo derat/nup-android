@@ -62,7 +62,7 @@ class SettingsActivity : AppCompatActivity() {
 class SettingsFragment :
     PreferenceFragmentCompat(),
     NupService.SongDatabaseUpdateListener,
-    NupService.FileCacheSizeChangeListener {
+    NupService.SizeChangeListener {
 
     // Cached values from [onSongDatabaseSyncChange].
     private var syncState = SongDatabase.SyncState.IDLE
@@ -71,14 +71,14 @@ class SettingsFragment :
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         service.addSongDatabaseUpdateListener(this)
-        service.addFileCacheSizeChangeListener(this)
+        service.addSizeChangeListener(this)
         syncState = service.songDb.syncState
     }
 
     override fun onDestroy() {
         super.onDestroy()
         service.removeSongDatabaseUpdateListener(this)
-        service.removeFileCacheSizeChangeListener(this)
+        service.removeSizeChangeListener(this)
     }
 
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
@@ -114,6 +114,8 @@ class SettingsFragment :
 
         findPreference<YesNoPreference>(NupPreferences.CLEAR_CACHE)!!
             .setSummaryProvider(clearCacheSummary)
+        findPreference<YesNoPreference>(NupPreferences.CLEAR_COVERS)!!
+            .setSummaryProvider(clearCoversSummary)
     }
 
     override fun onDisplayPreferenceDialog(preference: Preference) {
@@ -142,13 +144,13 @@ class SettingsFragment :
     }
 
     override fun onSongDatabaseUpdate() {
-        // Force the pref's summary (showing the last sync date) to be updated.
         findPreference<YesNoPreference>(NupPreferences.SYNC_SONG_LIST)!!.notifyChanged()
     }
-
-    override fun onFileCacheSizeChange() {
-        // Force the pref's summary (showing the current cache size) to be updated.
+    override fun onCacheSizeChange() {
         findPreference<YesNoPreference>(NupPreferences.CLEAR_CACHE)!!.notifyChanged()
+    }
+    override fun onCoversSizeChange() {
+        findPreference<YesNoPreference>(NupPreferences.CLEAR_COVERS)!!.notifyChanged()
     }
 
     /**
@@ -206,6 +208,16 @@ class SettingsFragment :
     val clearCacheSummary = object : SummaryProvider<YesNoPreference> {
         override fun provideSummary(preference: YesNoPreference): String {
             val bytes = service.totalCachedBytes
+            return if (bytes > 0) {
+                getString(R.string.cache_current_usage, bytes / (1024 * 1024).toDouble())
+            } else {
+                getString(R.string.cache_is_empty)
+            }
+        }
+    }
+    val clearCoversSummary = object : SummaryProvider<YesNoPreference> {
+        override fun provideSummary(preference: YesNoPreference): String {
+            val bytes = service.totalCoverBytes
             return if (bytes > 0) {
                 getString(R.string.cache_current_usage, bytes / (1024 * 1024).toDouble())
             } else {
@@ -299,6 +311,7 @@ class YesNoPreferenceDialogFragment : PreferenceDialogFragmentCompat() {
                 service.songDb.syncWithServer()
             }
             NupPreferences.CLEAR_CACHE -> service.clearCache()
+            NupPreferences.CLEAR_COVERS -> service.clearCovers()
             else -> throw RuntimeException("Unhandled preference $key")
         }
     }

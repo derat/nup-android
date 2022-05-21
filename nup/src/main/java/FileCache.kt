@@ -123,10 +123,8 @@ class FileCache constructor(
                 entry.file.delete()
                 listenerExecutor.execute { listener.onCacheEviction(entry) }
             }
-
             // Shouldn't be anything there, but whatever.
-            val files = musicDir.listFiles()
-            if (files != null) for (file: File in files) file.delete()
+            musicDir.listFiles()?.forEach { it.delete() }
         }
     }
 

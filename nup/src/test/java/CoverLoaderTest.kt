@@ -84,6 +84,9 @@ class CoverLoaderTest {
         Mockito.`when`(downloader.download(getUrl(file2), "GET", Downloader.AuthType.SERVER, null))
             .thenReturn(conn2)
 
+        Assert.assertEquals(0L, coverLoader.totalBytes)
+        Assert.assertEquals(0, tempDir.walkTopDown().filter { it.isFile }.count())
+
         // The first load request for each cover should result in it being downloaded, but it should
         // be cached after that.
         Assert.assertEquals(bitmap1, load(file1))
@@ -96,6 +99,13 @@ class CoverLoaderTest {
             .download(getUrl(file1), "GET", Downloader.AuthType.SERVER, null)
         Mockito.verify(downloader, Mockito.times(1))
             .download(getUrl(file2), "GET", Downloader.AuthType.SERVER, null)
+
+        Assert.assertEquals(2, tempDir.walkTopDown().filter { it.isFile }.count())
+        Assert.assertEquals((data1.length + data2.length).toLong(), coverLoader.totalBytes)
+
+        runBlocking { coverLoader.clear() }
+        Assert.assertEquals(0L, coverLoader.totalBytes)
+        Assert.assertEquals(0, tempDir.walkTopDown().filter { it.isFile }.count())
     }
 
     @Test fun skipDownloadWhenNetworkUnavailable() {

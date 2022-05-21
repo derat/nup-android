@@ -18,6 +18,7 @@ object NupPreferences {
     const val CLEAR_CACHE = "clear_cache"
     const val SONGS_TO_PRELOAD = "songs_to_preload"
     const val DOWNLOAD_RATE = "download_rate" // kilobytes per second
+    const val CLEAR_COVERS = "clear_covers"
 
     // These values for GAIN_TYPE must match R.array.gain_type_values.
     const val GAIN_TYPE_AUTO = "auto"
