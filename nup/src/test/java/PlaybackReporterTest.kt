@@ -11,6 +11,7 @@ import java.util.Arrays
 import java.util.Date
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.test.TestCoroutineDispatcher
 import kotlinx.coroutines.test.TestCoroutineScope
 import kotlinx.coroutines.test.runBlockingTest
 import org.erat.nup.Downloader
@@ -21,16 +22,21 @@ import org.erat.nup.SongDatabase.PendingPlaybackReport
 import org.junit.After
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.MockitoAnnotations
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.shadows.ShadowLog
 
+@RunWith(RobolectricTestRunner::class)
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class PlaybackReporterTest {
     val SONG_ID: Long = 1234
     val START_DATE = Date(1000 * 1469974953L)
 
     val scope = TestCoroutineScope()
+    val dispatcher = TestCoroutineDispatcher()
 
     lateinit var openMocks: AutoCloseable
     @Mock lateinit var songDb: SongDatabase
@@ -42,6 +48,8 @@ class PlaybackReporterTest {
     lateinit var reportUrl: URL
 
     @Before fun setUp() {
+        ShadowLog.stream = System.out // preserve log calls
+
         openMocks = MockitoAnnotations.openMocks(this)
         Mockito.`when`(successConn.responseCode).thenReturn(200)
         Mockito.`when`(serverErrorConn.responseCode).thenReturn(500)
@@ -100,15 +108,38 @@ class PlaybackReporterTest {
         inOrder.verify(songDb, Mockito.never()).removePendingPlaybackReport(SONG_ID, START_DATE)
     }
 
-    @Test fun reportPendingAtCreation() = runBlockingTest {
+    @Test fun startOnline() = runBlockingTest {
         Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(true)
         Mockito.`when`(songDb.allPendingPlaybackReports())
             .thenReturn(Arrays.asList(PendingPlaybackReport(SONG_ID, START_DATE)))
         Mockito.`when`(downloader.download(reportUrl, "POST", Downloader.AuthType.SERVER, null))
             .thenReturn(successConn)
 
-        var reporter = createReporter()
-        scope.launch { reporter.reportPending() }
+        val reporter = createReporter()
+        reporter.start()
+
+        Mockito.verify(networkHelper, Mockito.times(1)).addListener(reporter)
+        val inOrder = Mockito.inOrder(songDb, downloader)
+        inOrder.verify(downloader).download(reportUrl, "POST", Downloader.AuthType.SERVER, null)
+        inOrder.verify(songDb).removePendingPlaybackReport(SONG_ID, START_DATE)
+    }
+
+    @Test fun startOffline() = runBlockingTest {
+        // start() shouldn't do anything if we're offline when it's called.
+        Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(false)
+        val reporter = createReporter()
+        reporter.start()
+        Mockito.verify(networkHelper, Mockito.times(1)).addListener(reporter)
+        Mockito.verifyNoMoreInteractions(songDb)
+        Mockito.verifyNoMoreInteractions(downloader)
+
+        // When the reporter is notified that we're online, it should send pending reports.
+        Mockito.`when`(networkHelper.isNetworkAvailable).thenReturn(true)
+        Mockito.`when`(songDb.allPendingPlaybackReports())
+            .thenReturn(Arrays.asList(PendingPlaybackReport(SONG_ID, START_DATE)))
+        Mockito.`when`(downloader.download(reportUrl, "POST", Downloader.AuthType.SERVER, null))
+            .thenReturn(successConn)
+        reporter.onNetworkAvailabilityChange(true)
 
         val inOrder = Mockito.inOrder(songDb, downloader)
         inOrder.verify(downloader).download(reportUrl, "POST", Downloader.AuthType.SERVER, null)
@@ -177,7 +208,10 @@ class PlaybackReporterTest {
         inOrder.verify(songDb).removePendingPlaybackReport(NEW_SONG_ID, NEW_START_DATE)
     }
 
-    fun createReporter() = PlaybackReporter(songDb, downloader, networkHelper)
+    fun createReporter() = PlaybackReporter(
+        scope, songDb, downloader, networkHelper,
+        pendingDispatcher = dispatcher
+    )
 
     fun getReportPath(songId: Long, startDate: Date): String {
         val start = String.format("%.3f", startDate.time / 1000.0)

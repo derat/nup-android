@@ -11,15 +11,31 @@ import java.net.HttpURLConnection
 import java.util.Date
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
+import kotlinx.coroutines.CoroutineDispatcher
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import org.erat.nup.Downloader.PrefException
 
 class PlaybackReporter(
+    private val scope: CoroutineScope,
     private val songDb: SongDatabase,
     private val downloader: Downloader,
     private val networkHelper: NetworkHelper,
-) {
+    private val pendingDispatcher: CoroutineDispatcher = Dispatchers.IO, // for tests
+) : NetworkHelper.Listener {
     private val lock = ReentrantLock()
     private var reporting = false
+
+    /** Start listening for network changes and send pending reports if possible. */
+    fun start() {
+        networkHelper.addListener(this)
+        if (networkHelper.isNetworkAvailable) scope.launch(pendingDispatcher) { reportPending() }
+    }
+
+    override fun onNetworkAvailabilityChange(available: Boolean) {
+        if (available) scope.launch(pendingDispatcher) { reportPending() }
+    }
 
     /** Report the playback of [songId] starting at [startDate]. */
     suspend fun report(songId: Long, startDate: Date) {
@@ -34,7 +50,9 @@ class PlaybackReporter(
             reporting = true
         }
 
-        for (report in songDb.allPendingPlaybackReports()) {
+        val reports = songDb.allPendingPlaybackReports()
+        if (!reports.isEmpty()) Log.d(TAG, "Sending ${reports.size} pending report(s)")
+        for (report in reports) {
             if (send(report.songId, report.startDate)) {
                 songDb.removePendingPlaybackReport(report.songId, report.startDate)
             }
@@ -46,7 +64,7 @@ class PlaybackReporter(
         lock.withLock() { reporting = false }
     }
 
-    /** Sends a report of [songId] starting at [startDate]. */
+    /** Send a report of [songId] starting at [startDate]. */
     private suspend fun send(songId: Long, startDate: Date): Boolean {
         if (!networkHelper.isNetworkAvailable) return false
 

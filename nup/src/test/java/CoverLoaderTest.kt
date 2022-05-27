@@ -23,10 +23,14 @@ import org.junit.After
 import org.junit.Assert
 import org.junit.Before
 import org.junit.Test
+import org.junit.runner.RunWith
 import org.mockito.Mock
 import org.mockito.Mockito
 import org.mockito.MockitoAnnotations
+import org.robolectric.RobolectricTestRunner
+import org.robolectric.shadows.ShadowLog
 
+@RunWith(RobolectricTestRunner::class)
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class CoverLoaderTest {
     val scope = TestCoroutineScope()
@@ -40,6 +44,8 @@ class CoverLoaderTest {
     @Mock lateinit var networkHelper: NetworkHelper
 
     @Before fun setUp() {
+        ShadowLog.stream = System.out // preserve log calls
+
         openMocks = MockitoAnnotations.openMocks(this)
 
         tempDir = Files.createTempDirectory(null).toFile()

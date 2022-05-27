@@ -265,7 +265,7 @@ class NupService :
         cache = FileCache(this, this, mainExecutor, downloader, networkHelper)
         songDb = SongDatabase(this, scope, this, mainExecutor, cache, downloader, networkHelper)
         coverLoader = CoverLoader(this, scope, downloader, networkHelper)
-        playbackReporter = PlaybackReporter(songDb, downloader, networkHelper)
+        playbackReporter = PlaybackReporter(scope, songDb, downloader, networkHelper)
 
         // Sigh. This hits the disk, but it crashes with "java.lang.RuntimeException: Can't create
         // handler inside thread Thread[DefaultDispatcher-worker-2,5,main] that has not called
@@ -311,10 +311,8 @@ class NupService :
             playlistRestored = true
             songListener?.onPlaylistRestore()
 
-            if (networkHelper.isNetworkAvailable) {
-                launch(Dispatchers.IO) { playbackReporter.reportPending() }
-                // TODO: Listen for the network coming up and send pending reports then too?
-            }
+            // We need to load prefs before we can send pending reports.
+            playbackReporter.start()
         }
 
         mediaSessionManager = MediaSessionManager(

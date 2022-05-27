@@ -29,8 +29,8 @@ import kotlinx.coroutines.runBlocking
 
 /** Loads and caches album art. */
 open class CoverLoader(
-    context: Context,
-    scope: CoroutineScope,
+    private val context: Context,
+    private val scope: CoroutineScope,
     private val downloader: Downloader,
     private val networkHelper: NetworkHelper,
 ) {

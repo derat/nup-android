@@ -34,7 +34,7 @@ class SongDatabase(
     private val cache: FileCache,
     private val downloader: Downloader,
     private val networkHelper: NetworkHelper,
-    initDispatcher: CoroutineDispatcher = Dispatchers.IO, // for tests
+    private val initDispatcher: CoroutineDispatcher = Dispatchers.IO, // for tests
 ) {
     private val opener: DatabaseOpener
 
