@@ -27,7 +27,8 @@ class NotificationCreator(
     private var lastMediaId = ""
     private var lastState = PlaybackStateCompat.STATE_NONE
     private var showingCover = false
-    private var showingPlayPause = false
+    private var showingPlay = false
+    private var showingPause = false
     private var showingPrev = false
     private var showingNext = false
 
@@ -41,22 +42,23 @@ class NotificationCreator(
         // The Kotlin defs for many of the controller's getters seem to incorrectly say that their
         // return values are non-nullable.
         val controller = mediaSession.controller
-        val songIndex = controller.playbackState?.activeQueueItemId ?: -1
         val state = controller.playbackState?.state ?: PlaybackStateCompat.STATE_NONE
+        val actions = controller.playbackState?.actions ?: 0L
         val metadata: MediaMetadataCompat? = controller.metadata
 
         val mediaId = metadata?.getString(MediaMetadataCompat.METADATA_KEY_MEDIA_ID) ?: ""
         val cover = metadata?.getBitmap(MediaMetadataCompat.METADATA_KEY_ALBUM_ART)
-        val showPlayPause = state == PlaybackStateCompat.STATE_PLAYING ||
-            state == PlaybackStateCompat.STATE_PAUSED
-        val showPrev = songIndex >= 1
-        val showNext = songIndex in 0 until ((controller.queue?.size ?: 0) - 1)
+        val showPlay = actions and PlaybackStateCompat.ACTION_PLAY != 0L
+        val showPause = actions and PlaybackStateCompat.ACTION_PAUSE != 0L
+        val showPrev = actions and PlaybackStateCompat.ACTION_SKIP_TO_PREVIOUS != 0L
+        val showNext = actions and PlaybackStateCompat.ACTION_SKIP_TO_NEXT != 0L
 
         if (onlyIfChanged &&
             mediaId == lastMediaId &&
             state == lastState &&
             (cover != null) == showingCover &&
-            showPlayPause == showingPlayPause &&
+            showPlay == showingPlay &&
+            showPause == showingPause &&
             showPrev == showingPrev &&
             showNext == showingNext
         ) {
@@ -66,7 +68,8 @@ class NotificationCreator(
         lastMediaId = mediaId
         lastState = state
         showingCover = cover != null
-        showingPlayPause = showPlayPause
+        showingPlay = showPlay
+        showingPause = showPause
         showingPrev = showPrev
         showingNext = showNext
 
@@ -100,12 +103,11 @@ class NotificationCreator(
                 ).build()
             )
         }
-        if (showPlayPause) {
-            val paused = state == PlaybackStateCompat.STATE_PAUSED
+        if (showPlay || showPause) {
             builder.addAction(
                 NotificationCompat.Action.Builder(
-                    if (paused) R.drawable.play else R.drawable.pause,
-                    context.getString(if (paused) R.string.play else R.string.pause),
+                    if (showPlay) R.drawable.play else R.drawable.pause,
+                    context.getString(if (showPlay) R.string.play else R.string.pause),
                     MediaButtonReceiver.buildMediaButtonPendingIntent(
                         context, PlaybackStateCompat.ACTION_PLAY_PAUSE
                     ),
@@ -125,7 +127,7 @@ class NotificationCreator(
         }
 
         // This is silly.
-        val numActions = (if (showPlayPause) 1 else 0) +
+        val numActions = (if (showPlay || showPause) 1 else 0) +
             (if (showPrev) 1 else 0) +
             (if (showNext) 1 else 0)
         if (numActions > 0) {
