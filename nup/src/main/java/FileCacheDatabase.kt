@@ -95,13 +95,15 @@ class FileCacheDatabase(
         )
     }
 
-    @get:Synchronized
-    val songIdsByAge: List<Long>
-        get() {
-            val ids = entries.keys.toMutableList()
-            ids.sortBy { getEntry(it)!!.lastAccessTime }
-            return ids
-        }
+    @Synchronized fun getSongIdsInDeletionOrder(): List<Long> {
+        // First sort by access time, and then do a second sort to shift partially-downloaded
+        // songs to the front of the list. sortBy() is stable, so we'll still prioritize older
+        // songs within each of the two groups.
+        val ids = entries.keys.toMutableList()
+        ids.sortBy { getEntry(it)!!.lastAccessTime }
+        ids.sortBy { getEntry(it)!!.isFullyCached }
+        return ids
+    }
 
     @get:Synchronized
     val totalCachedBytes: Long

@@ -117,7 +117,7 @@ class FileCache constructor(
         executor.execute {
             synchronized(inProgressSongIds) { inProgressSongIds.clear() }
             clearPinnedSongIds()
-            for (songId: Long in db.songIdsByAge) {
+            for (songId: Long in db.getSongIdsInDeletionOrder()) {
                 val entry = db.getEntry(songId) ?: continue
                 db.removeEntry(songId)
                 entry.file.delete()
@@ -501,10 +501,10 @@ class FileCache constructor(
     /**
      * Try to make room for [neededBytes] in the cache.
      *
-     * We delete the least-recently-accessed files first, ignoring ones
-     * that are currently being downloaded or are pinned.
+     * Partially-downloaded and least-recently-accessed files are deleted first,
+     * ignoring files that are currently being downloaded or are pinned.
      *
-     * @return true if the space is now available
+     * @return true if the requested space is now available
      */
     @Synchronized private fun makeSpace(neededBytes: Long): Boolean {
         threadChecker.assertThread()
@@ -514,7 +514,7 @@ class FileCache constructor(
         if (neededBytes <= availableBytes) return true
         Log.d(TAG, "Making space for $neededBytes bytes ($availableBytes available)")
 
-        val songIds = db.songIdsByAge
+        val songIds = db.getSongIdsInDeletionOrder()
         for (songId: Long in songIds) {
             if (neededBytes <= availableBytes) break
             if (isDownloadActive(songId)) continue
