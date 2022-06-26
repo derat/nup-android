@@ -24,7 +24,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import org.erat.nup.NupActivity.Companion.service
 
-/** Displays a list of songs from a search result. */
+/** Performs a search and displays the resulting songs. */
 class SearchResultsActivity : AppCompatActivity() {
     private var songs = listOf<Song>()
 
@@ -177,7 +177,8 @@ class SearchResultsActivity : AppCompatActivity() {
         orderByLastPlayed = intent.getBooleanExtra(BUNDLE_ORDER_BY_LAST_PLAYED, false),
         maxPlays = intent.getIntExtra(BUNDLE_MAX_PLAYS, -1),
         firstPlayed = intent.getIntExtra(BUNDLE_FIRST_PLAYED, 0),
-        lastPlayed = intent.getIntExtra(BUNDLE_LAST_PLAYED, 0)
+        lastPlayed = intent.getIntExtra(BUNDLE_LAST_PLAYED, 0),
+        onlyCached = intent.getBooleanExtra(BUNDLE_CACHED, false),
     )
 
     /** Update the activity to display [songs]. */
