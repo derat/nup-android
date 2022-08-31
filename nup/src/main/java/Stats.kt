@@ -129,6 +129,10 @@ class StatsRowArrayAdapter(
         // Update the main list to have the sections that are needed.
         sections.clear()
         sectionPositions.clear()
+
+        // Don't initialize sections if the rows won't be alphabetically ordered.
+        if (order != StatsOrder.ARTIST && order != StatsOrder.ALBUM) return
+
         var sectionIndex = -1
         for (rowIndex in rows.indices) {
             val key = rows[rowIndex].key
@@ -152,8 +156,8 @@ class StatsRowArrayAdapter(
     enum class Display {
         ARTIST { override fun statsOrder() = StatsOrder.ARTIST },
         ARTIST_UNSORTED { override fun statsOrder() = StatsOrder.UNSORTED },
-        ALBUM { override fun statsOrder() = StatsOrder.ALBUM },
-        ALBUM_ARTIST { override fun statsOrder() = StatsOrder.DATE };
+        ALBUM { override fun statsOrder() = StatsOrder.DATE }, // albums for single artist
+        ALBUM_ARTIST { override fun statsOrder() = StatsOrder.ALBUM }; // all albums
 
         abstract fun statsOrder(): StatsOrder
     }
