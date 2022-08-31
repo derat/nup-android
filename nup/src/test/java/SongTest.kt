@@ -6,8 +6,8 @@
 package org.erat.nup.test
 
 import kotlin.random.Random
-import org.erat.nup.getSongOrderKey
 import org.erat.nup.getSongSection
+import org.erat.nup.getSongSortKey
 import org.erat.nup.songNumberSection
 import org.erat.nup.songOtherSection
 import org.erat.nup.spreadSongs
@@ -16,20 +16,20 @@ import org.junit.Assert.assertNotEquals
 import org.junit.Test
 
 class SongTest {
-    @Test fun getSongOrderKeyWorks() {
-        assertEquals("def leppard", getSongOrderKey("Def Leppard"))
-        assertEquals("alan parsons project", getSongOrderKey(" The Alan Parsons Project"))
-        assertEquals("strangely isolated place", getSongOrderKey("A Strangely Isolated Place"))
-        assertEquals("black dog", getSongOrderKey(" The Black Dog"))
-        assertEquals("i care because you do", getSongOrderKey("...I Care Because You Do"))
-        assertEquals("i care because you do", getSongOrderKey("…I Care Because You Do"))
-        assertEquals("endtroducing.....", getSongOrderKey("Endtroducing....."))
-        assertEquals("003 + ¥024 + 2x = ¥727", getSongOrderKey("¥003 + ¥024 + 2X = ¥727"))
-        assertEquals("近藤浩治", getSongOrderKey("近藤浩治"))
-        assertEquals("( )", getSongOrderKey("( )"))
-        assertEquals("smart quotes”", getSongOrderKey("“Smart quotes”"))
-        assertEquals("![no artist]", getSongOrderKey("[no artist]"))
-        assertEquals("![unset]", getSongOrderKey("[unset]"))
+    @Test fun getSongSortKeyWorks() {
+        assertEquals("def leppard", getSongSortKey("Def Leppard"))
+        assertEquals("alan parsons project", getSongSortKey(" The Alan Parsons Project"))
+        assertEquals("strangely isolated place", getSongSortKey("A Strangely Isolated Place"))
+        assertEquals("black dog", getSongSortKey(" The Black Dog"))
+        assertEquals("i care because you do", getSongSortKey("...I Care Because You Do"))
+        assertEquals("i care because you do", getSongSortKey("…I Care Because You Do"))
+        assertEquals("endtroducing.....", getSongSortKey("Endtroducing....."))
+        assertEquals("003 + ¥024 + 2x = ¥727", getSongSortKey("¥003 + ¥024 + 2X = ¥727"))
+        assertEquals("近藤浩治", getSongSortKey("近藤浩治"))
+        assertEquals("( )", getSongSortKey("( )"))
+        assertEquals("smart quotes”", getSongSortKey("“Smart quotes”"))
+        assertEquals("![no artist]", getSongSortKey("[no artist]"))
+        assertEquals("![unset]", getSongSortKey("[unset]"))
     }
 
     @Test fun getSongSectionWorks() {

@@ -12,6 +12,7 @@ import android.database.sqlite.SQLiteOpenHelper
 import android.os.Build
 import androidx.test.core.app.ApplicationProvider
 import com.google.common.util.concurrent.MoreExecutors
+import java.time.Instant
 import java.util.Date
 import java.util.UUID
 import kotlinx.coroutines.test.TestCoroutineDispatcher
@@ -69,12 +70,16 @@ class SongDatabaseTest {
                 else -> {}
             }
         }
-        override fun onSyncDone(success: Boolean, message: String) { lastSyncSuccess = success }
+        override fun onSyncDone(success: Boolean, message: String) {
+            lastSyncSuccess = success
+            lastSyncMessage = message
+        }
         override fun onAggregateDataUpdate() { aggregateDataUpdates++ }
     }
     var lastSyncUpdatedSongs = 0
     var lastSyncDeletedSongs = 0
     var lastSyncSuccess = false
+    var lastSyncMessage = ""
     var aggregateDataUpdates = 0
 
     // Server info returned by [downloader].
@@ -165,12 +170,14 @@ class SongDatabaseTest {
         val s1 = makeSong("Ä", "Track 1", "Album 1", 1, rating = 4)
         val s2 = makeSong("A", "Track 2", "Album 1", 2, rating = 2)
         val s3 = makeSong("B feat. C", "Track 3", "Album 1", 3, rating = 5)
-        val s4 = makeSong("B", "Traĉk 1", "Albúm ²", 1, rating = 0)
+        val s4 = makeSong(
+            "B", "Traĉk 1", "Albúm ²", 1, rating = 0, date = Instant.parse("2011-12-03T10:15:30Z")
+        )
         serverSongs.addAll(listOf(SongInfo(s1), SongInfo(s2), SongInfo(s3), SongInfo(s4)))
 
         db.syncWithServer()
         assertEquals(SongDatabase.SyncState.IDLE, db.syncState)
-        assertTrue(lastSyncSuccess)
+        assertTrue(lastSyncMessage, lastSyncSuccess)
         assertEquals(4, lastSyncUpdatedSongs)
         assertTrue(db.aggregateDataLoaded)
         assertEquals(4, db.numSongs)
@@ -212,7 +219,7 @@ class SongDatabaseTest {
         serverSongs.addAll(listOf(SongInfo(s1), SongInfo(s2)))
         serverNowNs++
         db.syncWithServer()
-        assertTrue(lastSyncSuccess)
+        assertTrue(lastSyncMessage, lastSyncSuccess)
         assertEquals(2, lastSyncUpdatedSongs)
         assertEquals(0, lastSyncDeletedSongs)
         assertEquals(2, db.numSongs)
@@ -226,7 +233,7 @@ class SongDatabaseTest {
         val s3 = makeSong("A", "Track 3", "Album 1", 3, rating = 5)
         serverSongs.add(SongInfo(s3, serverNowNs))
         db.syncWithServer()
-        assertTrue(lastSyncSuccess)
+        assertTrue(lastSyncMessage, lastSyncSuccess)
         assertEquals(2, lastSyncUpdatedSongs)
         assertEquals(1, lastSyncDeletedSongs)
         assertEquals(2, db.numSongs)
@@ -237,12 +244,14 @@ class SongDatabaseTest {
         assertTrue(db.aggregateDataLoaded) // happens initially
         val oldUpdates = aggregateDataUpdates
 
-        val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 4)
-        val s2 = makeSong("B", "Track 2", "Album 1", 2, rating = 2)
-        val s3 = makeSong("B feat. C", "Track 3", "Album 1", 3, rating = 5)
-        val s4 = makeSong("B", "Track 4", "Album 1", 4, rating = 0)
-        val s5 = makeSong("B", "Track 1", "Album 2", 1, rating = 3)
-        val s6 = makeSong("A", "Track 2", "Album 2", 2, rating = 5)
+        val d1 = Instant.parse("2000-01-01T00:00:00Z")
+        val d2 = Instant.parse("1990-01-01T00:00:00Z")
+        val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 4, date = d1)
+        val s2 = makeSong("B", "Track 2", "Album 1", 2, rating = 2, date = d1)
+        val s3 = makeSong("B feat. C", "Track 3", "Album 1", 3, rating = 5, date = d1)
+        val s4 = makeSong("B", "Track 4", "Album 1", 4, rating = 0, date = d1)
+        val s5 = makeSong("B", "Track 1", "Album 2", 1, rating = 3, date = d2)
+        val s6 = makeSong("A", "Track 2", "Album 2", 2, rating = 5, date = d2)
         val s7 = makeSong("b", "Track 1", "", 1, rating = 2)
         serverSongs.addAll(
             listOf(
@@ -251,7 +260,7 @@ class SongDatabaseTest {
             ),
         )
         db.syncWithServer()
-        assertTrue(lastSyncSuccess)
+        assertTrue(lastSyncMessage, lastSyncSuccess)
         assertEquals(oldUpdates + 1, aggregateDataUpdates)
 
         assertEquals(
@@ -273,29 +282,29 @@ class SongDatabaseTest {
         assertEquals(
             listOf(
                 StatsRow("B", SongDatabase.UNSET_STRING, "", 1, s7.coverFilename),
-                StatsRow("B, A, B feat. C", "Album 1", s1.albumId, 4, s1.coverFilename),
-                StatsRow("A, B", "Album 2", s5.albumId, 2, s5.coverFilename),
+                StatsRow("B, A, B feat. C", "Album 1", s1.albumId, 4, s1.coverFilename, d1),
+                StatsRow("A, B", "Album 2", s5.albumId, 2, s5.coverFilename, d2),
             ),
             db.albumsSortedAlphabetically
         )
         assertEquals(
             listOf(
-                StatsRow("A", "Album 1", s1.albumId, 1, s1.coverFilename),
-                StatsRow("A", "Album 2", s5.albumId, 1, s6.coverFilename),
+                StatsRow("A", "Album 2", s5.albumId, 1, s6.coverFilename, d2),
+                StatsRow("A", "Album 1", s1.albumId, 1, s1.coverFilename, d1),
             ),
             db.albumsByArtist("A")
         )
         assertEquals(
             listOf(
+                StatsRow("B", "Album 2", s5.albumId, 1, s5.coverFilename, d2),
+                StatsRow("B", "Album 1", s1.albumId, 2, s2.coverFilename, d1),
                 StatsRow("B", SongDatabase.UNSET_STRING, "", 1, s7.coverFilename),
-                StatsRow("B", "Album 1", s1.albumId, 2, s2.coverFilename),
-                StatsRow("B", "Album 2", s5.albumId, 1, s5.coverFilename),
             ),
             db.albumsByArtist("B")
         )
         assertEquals(
             listOf(
-                StatsRow("B feat. C", "Album 1", s1.albumId, 1, s3.coverFilename),
+                StatsRow("B feat. C", "Album 1", s1.albumId, 1, s3.coverFilename, d1),
             ),
             db.albumsByArtist("B feat. C")
         )
@@ -315,10 +324,12 @@ class SongDatabaseTest {
     }
 
     @Test fun cachedSongs() = runBlockingTest {
-        val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 4)
-        val s2 = makeSong("A", "Track 2", "Album 1", 2, rating = 2)
-        val s3 = makeSong("B", "Track 3", "Album 1", 3, rating = 5)
-        val s4 = makeSong("B", "Track 1", "Album 2", 1, rating = 0)
+        val d1 = Instant.parse("2000-01-01T00:00:00Z")
+        val d2 = Instant.parse("1990-01-01T00:00:00Z")
+        val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 4, date = d1)
+        val s2 = makeSong("A", "Track 2", "Album 1", 2, rating = 2, date = d1)
+        val s3 = makeSong("B", "Track 3", "Album 1", 3, rating = 5, date = d1)
+        val s4 = makeSong("B", "Track 1", "Album 2", 1, rating = 0, date = d2)
         val s5 = makeSong("B", "Track 1", "", 1, rating = 3)
         serverSongs.addAll(
             listOf(SongInfo(s1), SongInfo(s2), SongInfo(s3), SongInfo(s4), SongInfo(s5))
@@ -341,18 +352,18 @@ class SongDatabaseTest {
         assertEquals(
             listOf(
                 StatsRow("B", SongDatabase.UNSET_STRING, "", 1, s5.coverFilename),
-                StatsRow("A, B", "Album 1", s1.albumId, 2, s1.coverFilename),
+                StatsRow("A, B", "Album 1", s1.albumId, 2, s1.coverFilename, d1),
             ),
             db.cachedAlbumsSortedAlphabetically()
         )
         assertEquals(
-            listOf(StatsRow("A", "Album 1", s1.albumId, 1, s1.coverFilename)),
+            listOf(StatsRow("A", "Album 1", s1.albumId, 1, s1.coverFilename, d1)),
             db.cachedAlbumsByArtist("A")
         )
         assertEquals(
             listOf(
+                StatsRow("B", "Album 1", s3.albumId, 1, s3.coverFilename, d1),
                 StatsRow("B", SongDatabase.UNSET_STRING, "", 1, s5.coverFilename),
-                StatsRow("B", "Album 1", s3.albumId, 1, s3.coverFilename),
             ),
             db.cachedAlbumsByArtist("B")
         )
@@ -369,15 +380,25 @@ class SongDatabaseTest {
         assertEquals(
             listOf(
                 StatsRow("B", SongDatabase.UNSET_STRING, "", 1),
-                StatsRow("B", "Album 1", s3.albumId, 1, s3.coverFilename),
+                StatsRow("B", "Album 1", s3.albumId, 1, s3.coverFilename, d1),
             ),
             db.cachedAlbumsSortedAlphabetically()
         )
         assertEquals(listOf<StatsRow>(), db.cachedAlbumsByArtist("A"))
         assertEquals(
             listOf(
+                StatsRow("B", "Album 1", s3.albumId, 1, s3.coverFilename, d1),
                 StatsRow("B", SongDatabase.UNSET_STRING, "", 1, s5.coverFilename),
-                StatsRow("B", "Album 1", s3.albumId, 1, s3.coverFilename),
+            ),
+            db.cachedAlbumsByArtist("B")
+        )
+
+        db.handleSongCached(s4.id)
+        assertEquals(
+            listOf(
+                StatsRow("B", "Album 2", s4.albumId, 1, s4.coverFilename, d2),
+                StatsRow("B", "Album 1", s3.albumId, 1, s3.coverFilename, d1),
+                StatsRow("B", SongDatabase.UNSET_STRING, "", 1, s5.coverFilename),
             ),
             db.cachedAlbumsByArtist("B")
         )
@@ -462,6 +483,7 @@ class SongDatabaseTest {
             lengthSec = 201.0,
             track = 5,
             disc = 1,
+            date = null, // not in version 13
             trackGain = 0.0, // not in version 13
             albumGain = 0.0, // not in version 13
             peakAmp = 0.0, // not in version 13
@@ -539,6 +561,7 @@ fun makeSong(
     track: Int,
     disc: Int = 1,
     rating: Int? = null,
+    date: Instant? = null,
 ): Song {
     val albumId =
         if (album.isEmpty()) ""
@@ -556,6 +579,7 @@ fun makeSong(
         lengthSec = 4.5 * size,
         track = track,
         disc = disc,
+        date = date,
         trackGain = -6.5,
         albumGain = -7.5,
         peakAmp = 1.0,
@@ -575,6 +599,7 @@ private fun songToJson(s: Song): JSONObject {
     o.put("albumId", s.albumId)
     o.put("track", s.track)
     o.put("disc", s.disc)
+    s.date?.let { o.put("date", it.toString()) }
     o.put("length", s.lengthSec)
     o.put("trackGain", s.trackGain)
     o.put("albumGain", s.albumGain)

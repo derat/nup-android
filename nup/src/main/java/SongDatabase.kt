@@ -13,6 +13,7 @@ import android.database.sqlite.SQLiteOpenHelper
 import android.text.TextUtils
 import android.util.Log
 import java.text.Normalizer
+import java.time.Instant
 import java.util.Collections
 import java.util.Date
 import java.util.concurrent.Executor
@@ -56,6 +57,7 @@ class SongDatabase(
     val artistsSortedAlphabetically: List<StatsRow> get() = _artistsSortedAlphabetically
     val artistsSortedByNumSongs: List<StatsRow> get() = _artistsSortedByNumSongs
     val albumsSortedAlphabetically: List<StatsRow> get() = _albumsSortedAlphabetically
+    // Each artist's albums are sorted by ascending date.
     fun albumsByArtist(artist: String): List<StatsRow> =
         _artistAlbums[artist.toLowerCase()] ?: listOf()
 
@@ -92,20 +94,20 @@ class SongDatabase(
 
     suspend fun cachedArtistsSortedAlphabetically(): List<StatsRow> = getSortedRows(
         """
-        SELECT MIN(s.Artist), '' AS Album, '' AS AlbumId, COUNT(*), '' AS CoverFilename
+        SELECT MIN(s.Artist), '' AS Album, '' AS AlbumId, COUNT(*), '' AS CoverFilename, '' AS Date
           FROM Songs s
           JOIN CachedSongs cs ON(s.SongId = cs.SongId)
           GROUP BY s.ArtistNorm
         """.trimIndent(),
         null,
         false /* aggregateAlbums */,
-        SongOrder.ARTIST,
+        StatsOrder.ARTIST,
         unsetAlbum = "",
     )
 
     suspend fun cachedAlbumsSortedAlphabetically(): List<StatsRow> = getSortedRows(
         """
-        SELECT MIN(s.Artist), MIN(s.Album), s.AlbumId, COUNT(*), MIN(s.CoverFilename)
+        SELECT MIN(s.Artist), MIN(s.Album), s.AlbumId, COUNT(*), MIN(s.CoverFilename), MIN(s.Date)
           FROM Songs s
           JOIN CachedSongs cs ON(s.SongId = cs.SongId)
           GROUP BY s.ArtistNorm, s.AlbumNorm, s.AlbumId
@@ -113,12 +115,12 @@ class SongDatabase(
         """.trimIndent(),
         null,
         true /* aggregateAlbums */,
-        SongOrder.ALBUM,
+        StatsOrder.ALBUM,
     )
 
     suspend fun cachedAlbumsByArtist(artist: String): List<StatsRow> = getSortedRows(
         """
-        SELECT ? AS Artist, MIN(s.Album), s.AlbumId, COUNT(*), MIN(s.CoverFilename)
+        SELECT ? AS Artist, MIN(s.Album), s.AlbumId, COUNT(*), MIN(s.CoverFilename), MIN(s.Date)
           FROM Songs s
           JOIN CachedSongs cs ON(s.SongId = cs.SongId)
           WHERE s.ArtistNorm = ?
@@ -126,7 +128,7 @@ class SongDatabase(
         """.trimIndent(),
         arrayOf(artist, normalizeForSearch(artist)),
         false /* aggregateAlbums */,
-        SongOrder.ALBUM,
+        StatsOrder.DATE,
     )
 
     fun quit() {
@@ -205,7 +207,7 @@ class SongDatabase(
         val query =
             """
             SELECT s.SongId, Artist, Title, Album, AlbumId, Filename, CoverFilename, Length,
-              Track, Disc, TrackGain, AlbumGain, PeakAmp, Rating
+              Track, Disc, Date, TrackGain, AlbumGain, PeakAmp, Rating
               FROM Songs s $cachedJoin
               ${builder.whereClause()}
               ORDER BY $order
@@ -232,10 +234,13 @@ class SongDatabase(
                                 lengthSec = getFloat(7).toDouble(),
                                 track = getInt(8),
                                 disc = getInt(9),
-                                trackGain = getFloat(10).toDouble(),
-                                albumGain = getFloat(11).toDouble(),
-                                peakAmp = getFloat(12).toDouble(),
-                                rating = getInt(13),
+                                date = getString(10).let {
+                                    if (it.isEmpty()) null else Instant.parse(it)
+                                },
+                                trackGain = getFloat(11).toDouble(),
+                                albumGain = getFloat(12).toDouble(),
+                                peakAmp = getFloat(13).toDouble(),
+                                rating = getInt(14),
                             )
                         )
                     }
@@ -478,7 +483,19 @@ class SongDatabase(
                                 val title = item.getString("title")
                                 val album = item.getString("album")
 
-                                val values = ContentValues(17)
+                                // Java's time-related APIs are awful. Make sure that the date is in
+                                // a format that query() will be able to parse using Instant.parse,
+                                // which only supports ISO-8601 UTC, e.g. // '2011-12-03T10:15:30Z'.
+                                val date = item.optString("date")
+                                if (date.isNotEmpty()) {
+                                    try { Instant.parse(date) } catch (
+                                        e: java.time.format.DateTimeParseException
+                                    ) {
+                                        throw ServerException("Invalid date \"$date\" for $songId")
+                                    }
+                                }
+
+                                val values = ContentValues(18)
                                 values.put("SongId", songId)
                                 values.put("Filename", item.getString("filename"))
                                 values.put("CoverFilename", item.optString("coverFilename"))
@@ -491,6 +508,7 @@ class SongDatabase(
                                 values.put("AlbumNorm", normalizeForSearch(album))
                                 values.put("Track", item.getInt("track"))
                                 values.put("Disc", item.getInt("disc"))
+                                values.put("Date", date)
                                 values.put("Length", item.getDouble("length"))
                                 values.put("TrackGain", item.optDouble("trackGain", 0.0))
                                 values.put("AlbumGain", item.optDouble("albumGain", 0.0))
@@ -594,7 +612,7 @@ class SongDatabase(
 
         db.rawQuery(
             """
-            SELECT Artist, Album, AlbumId, COUNT(*), MIN(CoverFilename)
+            SELECT Artist, Album, AlbumId, COUNT(*), MIN(CoverFilename), MIN(Date)
               FROM Songs
               GROUP BY Artist, Album, AlbumId
               ORDER BY 4 DESC
@@ -610,7 +628,8 @@ class SongDatabase(
                     val albumId = getString(2)
                     val numSongs = getInt(3)
                     val coverFilename = getString(4)
-                    val row = StatsRow(origArtist, album, albumId, numSongs, coverFilename)
+                    val date = getString(5).let { if (it.isEmpty()) null else Instant.parse(it) }
+                    val row = StatsRow(origArtist, album, albumId, numSongs, coverFilename, date)
                     artistAlbums.getOrPut(canonArtist, { mutableListOf() }).add(row)
                 }
             }
@@ -618,16 +637,17 @@ class SongDatabase(
 
         db.delete("ArtistAlbumStats", null, null)
         for ((artist, rows) in artistAlbums) {
-            val artistSortKey = getSongOrderKey(artist)
+            val artistSortKey = getSongSortKey(artist)
             for (row in rows) {
-                val values = ContentValues(7)
+                val values = ContentValues(8)
                 values.put("Artist", artist) // canonical
                 values.put("Album", row.key.album)
                 values.put("AlbumId", row.key.albumId)
                 values.put("NumSongs", row.count)
                 values.put("ArtistSortKey", artistSortKey)
-                values.put("AlbumSortKey", getSongOrderKey(row.key.album))
+                values.put("AlbumSortKey", getSongSortKey(row.key.album))
                 values.put("CoverFilename", row.coverFilename)
+                values.put("Date", row.date?.toString() ?: "")
                 db.insert("ArtistAlbumStats", "", values)
             }
         }
@@ -688,7 +708,7 @@ class SongDatabase(
 
         db.rawQuery(
             """
-            SELECT Artist, Album, AlbumId, SUM(NumSongs), MIN(CoverFilename)
+            SELECT Artist, Album, AlbumId, SUM(NumSongs), MIN(CoverFilename), MIN(Date)
               FROM ArtistAlbumStats
               GROUP BY Artist, Album, AlbumId
               ORDER BY AlbumSortKey ASC, AlbumId ASC, 4 DESC
@@ -701,6 +721,7 @@ class SongDatabase(
 
         newArtistsNumSongs.addAll(newArtistsAlpha)
         Collections.sort(newArtistsNumSongs) { a, b -> b.count - a.count }
+        newArtistAlbums.values.forEach { sortStatsRows(it, StatsOrder.DATE) }
 
         lastSyncDate = newSyncDate
         numSongs = newNumSongs
@@ -752,7 +773,7 @@ class SongDatabase(
 
     /** Get sorted results from the supplied query.
      *
-     * @param query SQL query returning rows of (artist, album, album ID, num songs, cover filename)
+     * @param query SQL query returning (artist, album, album ID, num songs, cover, date)
      * @param selectionArgs positional parameters for [query]
      * @param aggregateAlbums group rows by (album, album ID)
      * @param order sort order for rows
@@ -763,7 +784,7 @@ class SongDatabase(
         query: String,
         selectionArgs: Array<String>?,
         aggregateAlbums: Boolean,
-        order: SongOrder,
+        order: StatsOrder,
         unsetArtist: String = UNSET_STRING,
         unsetAlbum: String = UNSET_STRING,
     ): List<StatsRow> {
@@ -786,7 +807,7 @@ class SongDatabase(
      * If [aggregateAlbums] is true, rows should ordered by ascending album and descending count
      * (so that the most-represented artist can be identified for each album).
      *
-     * @param cursor cursor for reading rows of (artist, album, album ID, count, cover filename)
+     * @param cursor cursor for reading (artist, album, album ID, count, cover, date)
      * @param albums destination for per-album stats
      * @param aggregateAlbums group rows by (album, album ID)
      * @param artistAlbums optional destination for per-artist, per-album stats
@@ -810,7 +831,8 @@ class SongDatabase(
             if (album.isEmpty()) album = unsetAlbum
             val albumId = cursor.getString(2)
             val count = cursor.getInt(3)
-            val coverFilename = cursor.getString(4)
+            val cover = cursor.getString(4)
+            val date = cursor.getString(5).let { if (it.isEmpty()) null else Instant.parse(it) }
 
             // TODO: Decide if we should special-case songs with missing albums here. Right now they
             // all get lumped together, but that's arguably better than creating a separate row for
@@ -823,7 +845,7 @@ class SongDatabase(
                 lastAlbum.count += count
                 lastAlbum.key.artist += ", " + artist
             } else {
-                albums.add(StatsRow(artist, album, albumId, count, coverFilename))
+                albums.add(StatsRow(artist, album, albumId, count, cover, date))
                 lastAlbum = albums.last()
             }
 
@@ -833,7 +855,7 @@ class SongDatabase(
             // BrowseAlbumsActivity.
             artistAlbums
                 ?.getOrPut(artist.toLowerCase(), { mutableListOf() })
-                ?.add(StatsRow(artist, album, albumId, count, coverFilename))
+                ?.add(StatsRow(artist, album, albumId, count, cover, date))
 
             cursor.moveToNext()
         }

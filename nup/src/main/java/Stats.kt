@@ -12,35 +12,48 @@ import android.view.ViewGroup
 import android.widget.ArrayAdapter
 import android.widget.SectionIndexer
 import android.widget.TextView
+import java.time.Instant
 import java.util.Collections
 
 /** Key for song counts. Fields may be empty. */
 data class StatsKey(var artist: String, val album: String, val albumId: String)
 
 /** Song count and related information for a specific [StatsKey]. */
-data class StatsRow(val key: StatsKey, var count: Int, var coverFilename: String = "") {
+data class StatsRow(
+    val key: StatsKey,
+    var count: Int,
+    var coverFilename: String = "",
+    var date: Instant? = null,
+) {
     constructor(
         artist: String,
         album: String,
         albumId: String,
         count: Int,
-        coverFilename: String = ""
+        coverFilename: String = "",
+        date: Instant? = null,
     ) :
-        this(StatsKey(artist, album, albumId), count, coverFilename) {}
+        this(StatsKey(artist, album, albumId), count, coverFilename, date) {}
 }
 
+/** Ways to order [StatsRow]s. */
+enum class StatsOrder { ARTIST, TITLE, ALBUM, DATE, UNSORTED }
+
 /** Sort [stats] according to [order]. */
-fun sortStatsRows(stats: List<StatsRow>, order: SongOrder) {
-    if (order == SongOrder.UNSORTED) return
+fun sortStatsRows(stats: List<StatsRow>, order: StatsOrder) {
+    if (order == StatsOrder.UNSORTED) return
 
     // Getting sorting keys is expensive, so just do it once.
     val keys = HashMap<StatsKey, String>()
     when (order) {
-        SongOrder.ALBUM -> for (s in stats) {
-            keys[s.key] = "${getSongOrderKey(s.key.album)} ${s.key.albumId}"
+        StatsOrder.ALBUM -> for (s in stats) {
+            keys[s.key] = "${getSongSortKey(s.key.album)} ${s.key.albumId}"
         }
-        SongOrder.ARTIST -> for (s in stats) {
-            keys[s.key] = getSongOrderKey(s.key.artist)
+        StatsOrder.ARTIST -> for (s in stats) {
+            keys[s.key] = getSongSortKey(s.key.artist)
+        }
+        StatsOrder.DATE -> for (s in stats) {
+            keys[s.key] = "${s.date?.toString() ?: "9999"} ${getSongSortKey(s.key.album)}"
         }
         else -> throw IllegalArgumentException("Invalid ordering $order")
     }
@@ -60,7 +73,7 @@ class StatsRowArrayAdapter(
     private val sections = ArrayList<String>()
     private val sectionPositions = ArrayList<Int>()
 
-    private val order = display.songOrder()
+    private val order = display.statsOrder()
 
     override fun getPositionForSection(section: Int): Int {
         return sectionPositions[section]
@@ -120,7 +133,7 @@ class StatsRowArrayAdapter(
         for (rowIndex in rows.indices) {
             val key = rows[rowIndex].key
             val sectionName = getSongSection(
-                if (order == SongOrder.ARTIST) key.artist else key.album
+                if (order == StatsOrder.ARTIST) key.artist else key.album
             )
             val prevSectionIndex = sectionIndex
             while (sectionIndex == -1 || sectionName != allSongSections[sectionIndex]) {
@@ -137,12 +150,12 @@ class StatsRowArrayAdapter(
 
     /** Type of information to display. */
     enum class Display {
-        ARTIST { override fun songOrder() = SongOrder.ARTIST },
-        ARTIST_UNSORTED { override fun songOrder() = SongOrder.UNSORTED },
-        ALBUM { override fun songOrder() = SongOrder.ALBUM },
-        ALBUM_ARTIST { override fun songOrder() = SongOrder.ALBUM };
+        ARTIST { override fun statsOrder() = StatsOrder.ARTIST },
+        ARTIST_UNSORTED { override fun statsOrder() = StatsOrder.UNSORTED },
+        ALBUM { override fun statsOrder() = StatsOrder.ALBUM },
+        ALBUM_ARTIST { override fun statsOrder() = StatsOrder.DATE };
 
-        abstract fun songOrder(): SongOrder
+        abstract fun statsOrder(): StatsOrder
     }
 
     init {

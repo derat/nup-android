@@ -55,6 +55,9 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
         if (song.disc > 0) {
             builder.putLong(MediaMetadataCompat.METADATA_KEY_DISC_NUMBER, song.disc.toLong())
         }
+        if (song.date != null) {
+            builder.putString(MediaMetadataCompat.METADATA_KEY_DATE, song.date.toString())
+        }
         builder.putLong(MediaMetadataCompat.METADATA_KEY_DURATION, (song.lengthSec * 1000).toLong())
 
         val bitmap = song.coverBitmap

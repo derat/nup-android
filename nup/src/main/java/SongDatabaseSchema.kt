@@ -10,6 +10,9 @@ import android.database.sqlite.SQLiteDatabase
 
 /** Create the latest version of the [SongDatabase] schema in [db]. */
 fun createSongDatabase(db: SQLiteDatabase) {
+    // TODO: Consider updating all of these to use the canonical SQLite types
+    // from https://www.sqlite.org/datatype3.html, i.e. TEXT, INTEGER, and REAL.
+    // Also declare the tables as STRICT: https://www.sqlite.org/stricttables.html
     runSQL(
         db,
         """
@@ -26,6 +29,7 @@ CREATE TABLE Songs (
   AlbumNorm VARCHAR(256) NOT NULL,
   Track INTEGER NOT NULL,
   Disc INTEGER NOT NULL,
+  Date TEXT NOT NULL, -- RFC 3339 UTC, e.g. '2011-12-03T10:15:30Z'
   Length FLOAT NOT NULL,
   TrackGain FLOAT NOT NULL,
   AlbumGain FLOAT NOT NULL,
@@ -42,7 +46,8 @@ CREATE TABLE ArtistAlbumStats (
   NumSongs INTEGER NOT NULL,
   ArtistSortKey VARCHAR(256) NOT NULL,
   AlbumSortKey VARCHAR(256) NOT NULL,
-  CoverFilename VARCHAR(256) NOT NULL);
+  CoverFilename VARCHAR(256) NOT NULL,
+  Date TEXT NOT NULL); -- RFC 3339 UTC, e.g. '2011-12-03T10:15:30Z'
 CREATE INDEX ArtistSortKey ON ArtistAlbumStats (ArtistSortKey);
 CREATE INDEX AlbumSortKey ON ArtistAlbumStats (AlbumSortKey);
 
@@ -381,5 +386,55 @@ private val upgradeSteps = mapOf<Int, (SQLiteDatabase) -> Unit>(
             DROP TABLE SearchPresetsTmp;
             """
         )
-    }
+    },
+    23 to { db ->
+        // Add Date to Songs and ArtistAlbumStats.
+        runSQL(
+            db,
+            """
+            ALTER TABLE Songs RENAME TO SongsTmp;
+            CREATE TABLE Songs (
+              SongId INTEGER PRIMARY KEY NOT NULL,
+              Filename VARCHAR(256) NOT NULL,
+              CoverFilename VARCHAR(256) NOT NULL,
+              Artist VARCHAR(256) NOT NULL,
+              Title VARCHAR(256) NOT NULL,
+              Album VARCHAR(256) NOT NULL,
+              AlbumId VARCHAR(256) NOT NULL,
+              ArtistNorm VARCHAR(256) NOT NULL,
+              TitleNorm VARCHAR(256) NOT NULL,
+              AlbumNorm VARCHAR(256) NOT NULL,
+              Track INTEGER NOT NULL,
+              Disc INTEGER NOT NULL,
+              Date TEXT NOT NULL,
+              Length FLOAT NOT NULL,
+              TrackGain FLOAT NOT NULL,
+              AlbumGain FLOAT NOT NULL,
+              PeakAmp FLOAT NOT NULL,
+              Rating INTEGER NOT NULL);
+            INSERT INTO Songs
+              SELECT SongId, Filename, CoverFilename, Artist, Title, Album, AlbumId, ArtistNorm,
+                TitleNorm, AlbumNorm, Track, Disc, '' AS Date, Length,
+                TrackGain, AlbumGain, PeakAmp, Rating
+              FROM SongsTmp;
+            DROP TABLE SongsTmp;
+            CREATE INDEX Artist ON Songs (Artist);
+            CREATE INDEX Album ON Songs (Album);
+            CREATE INDEX AlbumId ON Songs (AlbumId);
+
+            DROP TABLE ArtistAlbumStats;
+            CREATE TABLE ArtistAlbumStats (
+              Artist VARCHAR(256) NOT NULL,
+              Album VARCHAR(256) NOT NULL,
+              AlbumId VARCHAR(256) NOT NULL,
+              NumSongs INTEGER NOT NULL,
+              ArtistSortKey VARCHAR(256) NOT NULL,
+              AlbumSortKey VARCHAR(256) NOT NULL,
+              CoverFilename VARCHAR(256) NOT NULL,
+              Date TEXT NOT NULL); -- RFC 3339 UTC, e.g. '2011-12-03T10:15:30Z'
+            CREATE INDEX ArtistSortKey ON ArtistAlbumStats (ArtistSortKey);
+            CREATE INDEX AlbumSortKey ON ArtistAlbumStats (AlbumSortKey);
+            """
+        )
+    },
 )

@@ -7,6 +7,7 @@ package org.erat.nup
 
 import android.graphics.Bitmap
 import java.io.Serializable
+import java.time.Instant
 import kotlin.random.Random
 
 data class Song(
@@ -20,6 +21,7 @@ data class Song(
     val lengthSec: Double,
     val track: Int,
     val disc: Int,
+    val date: Instant?,
     val trackGain: Double,
     val albumGain: Double,
     val peakAmp: Double,
@@ -41,17 +43,14 @@ data class Song(
     }
 }
 
-/** Ways to order [Song]s. */
-enum class SongOrder { ARTIST, TITLE, ALBUM, UNSORTED }
-
 /**
- * Get a key for ordering artist or album name [str].
+ * Get a key for sorting artist or album name [str].
  *
  * [str] is converted to lowercase and leading punctuation and common articles are removed.
  * When this method is changed, [SongDatabase.updateArtistAlbumStats] must be called on the next
  * run, as sorting keys are cached in the database.
  */
-fun getSongOrderKey(str: String): String {
+fun getSongSortKey(str: String): String {
     val key = str.toLowerCase()
 
     // Preserve bracketed strings used by MusicBrainz and/or Picard.
@@ -93,7 +92,7 @@ private val keyPrefixes = arrayOf("a ", "an ", "the ")
  */
 fun getSongSection(str: String): String {
     if (str.isEmpty()) return songNumberSection
-    val sortStr = getSongOrderKey(str)
+    val sortStr = getSongSortKey(str)
     val ch = sortStr[0]
     return when {
         ch < 'a' -> songNumberSection

@@ -101,7 +101,7 @@ class BrowseSongsActivity : AppCompatActivity(), OnItemClickListener {
             // an artist, sort them alphabetically instead.
             if ((album?.isEmpty() ?: true) && (albumId?.isEmpty() ?: true)) {
                 Collections.sort(newSongs) { a, b ->
-                    getSongOrderKey(a.title).compareTo(getSongOrderKey(b.title))
+                    getSongSortKey(a.title).compareTo(getSongSortKey(b.title))
                 }
             }
 
