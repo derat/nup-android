@@ -168,7 +168,9 @@ class SongDatabaseTest {
 
     @Test fun syncAndQuery() = runBlockingTest {
         val s1 = makeSong("Ä", "Track 1", "Album 1", 1, rating = 4)
-        val s2 = makeSong("A", "Track 2", "Album 1", 2, rating = 2)
+        val s2 = makeSong(
+            "A", "Track 2", "Album 1", 2, rating = 2, date = Instant.parse("2005-01-23T00:00:00Z")
+        )
         val s3 = makeSong("B feat. C", "Track 3", "Album 1", 3, rating = 5)
         val s4 = makeSong(
             "B", "Traĉk 1", "Albúm ²", 1, rating = 0, date = Instant.parse("2011-12-03T10:15:30Z")
@@ -198,6 +200,14 @@ class SongDatabaseTest {
         assertEquals(listOf(s3), db.query(minRating = 5))
         assertEquals(listOf(s3, s4), db.query(artist = "B", substring = true))
         assertEquals(listOf<Song>(), db.query(artist = "Somebody Else"))
+        assertEquals(listOf(s2, s4), db.query(minDate = "2000-01-01T00:00:00Z"))
+        assertEquals(listOf(s4), db.query(minDate = "2011-01-01T00:00:00Z"))
+        assertEquals(listOf(s2), db.query(maxDate = "2011-01-01T00:00:00Z"))
+        assertEquals(listOf<Song>(), db.query(maxDate = "2000-01-01T00:00:00Z"))
+        assertEquals(
+            listOf(s2),
+            db.query(minDate = "2000-01-01T00:00:00Z", maxDate = "2010-01-01T00:00:00Z")
+        )
 
         assertEquals(
             Pair(listOf(s1, s4, s3, s2), 2),

@@ -36,6 +36,8 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
     private lateinit var substringCheckbox: CheckBox
     private lateinit var cachedCheckbox: CheckBox
     private lateinit var minRatingSpinner: AutoCompleteTextView
+    private lateinit var minDateEdit: EditText
+    private lateinit var maxDateEdit: EditText
     private lateinit var keywordsEdit: EditText
     private lateinit var tagsEdit: AutoCompleteTextView
     private lateinit var orderByLastPlayedCheckbox: CheckBox
@@ -76,6 +78,8 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
         artistEdit.doAfterTextChanged { _ -> updateAlbumSuggestions() }
 
         minRatingSpinner = configureSpinner(R.id.min_rating_spinner, R.array.min_ratings)
+        minDateEdit = findViewById<EditText>(R.id.min_date_edit_text)
+        maxDateEdit = findViewById<EditText>(R.id.max_date_edit_text)
         shuffleCheckbox = findViewById<CheckBox>(R.id.shuffle_checkbox)
         substringCheckbox = findViewById<CheckBox>(R.id.substring_checkbox)
         cachedCheckbox = findViewById<CheckBox>(R.id.cached_checkbox)
@@ -205,6 +209,18 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
         val stars = minRatingSpinner.text.toString().length
         if (stars > 0) intent.putExtra(SearchResultsActivity.BUNDLE_MIN_RATING, stars)
 
+        val dateRegex = """^\d{4}-\d{2}-\d{2}$""".toRegex()
+        var minDate = minDateEdit.text.toString().trim()
+        if (minDate.length == 4) minDate += "-01-01"
+        if (dateRegex.matches(minDate)) {
+            intent.putExtra(SearchResultsActivity.BUNDLE_MIN_DATE, minDate + "T00:00:00Z")
+        }
+        var maxDate = maxDateEdit.text.toString().trim()
+        if (maxDate.length == 4) maxDate += "-12-31"
+        if (dateRegex.matches(maxDate)) {
+            intent.putExtra(SearchResultsActivity.BUNDLE_MAX_DATE, maxDate + "T23:59:59.999Z")
+        }
+
         intent.putExtra(SearchResultsActivity.BUNDLE_KEYWORDS, keywordsEdit.text.toString().trim())
         intent.putExtra(SearchResultsActivity.BUNDLE_TAGS, tagsEdit.text.toString().trim())
         intent.putExtra(
@@ -235,6 +251,8 @@ class SearchFormActivity : AppCompatActivity(), SongDatabaseUpdateListener {
         substringCheckbox.isChecked = true
         cachedCheckbox.isChecked = false
         minRatingSpinner.setText("")
+        minDateEdit.setText("")
+        maxDateEdit.setText("")
         keywordsEdit.setText("")
         tagsEdit.setText("")
         orderByLastPlayedCheckbox.isChecked = false

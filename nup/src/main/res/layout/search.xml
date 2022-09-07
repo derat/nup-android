@@ -21,6 +21,7 @@
       android:paddingTop="@dimen/vertical_padding"
       android:paddingBottom="@dimen/vertical_padding"
     >
+      <!-- Artist -->
       <com.google.android.material.textfield.TextInputLayout
         android:hint="@string/artist"
         style="@style/SearchAutocompleteLayout"
@@ -32,6 +33,7 @@
         />
       </com.google.android.material.textfield.TextInputLayout>
 
+      <!-- Title -->
       <com.google.android.material.textfield.TextInputLayout
         android:hint="@string/title"
         style="@style/SearchTextLayout"
@@ -42,6 +44,7 @@
         />
       </com.google.android.material.textfield.TextInputLayout>
 
+      <!-- Album -->
       <com.google.android.material.textfield.TextInputLayout
         android:hint="@string/album"
         style="@style/SearchAutocompleteLayout"
@@ -58,17 +61,20 @@
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
       >
+        <!-- Substring -->
         <com.google.android.material.checkbox.MaterialCheckBox
           android:id="@+id/substring_checkbox"
           style="@style/SearchCheckbox"
           android:checked="true"
           android:text="@string/substring"
         />
+        <!-- Shuffle -->
         <com.google.android.material.checkbox.MaterialCheckBox
           android:id="@+id/shuffle_checkbox"
           style="@style/SearchCheckbox"
           android:text="@string/shuffle"
         />
+        <!-- Cached -->
         <com.google.android.material.checkbox.MaterialCheckBox
           android:id="@+id/cached_checkbox"
           style="@style/SearchCheckbox"
@@ -76,6 +82,7 @@
         />
       </LinearLayout>
 
+      <!-- Min rating -->
       <com.google.android.material.textfield.TextInputLayout
         android:hint="@string/minimum_rating"
         style="@style/SearchAutocompleteLayout"
@@ -87,19 +94,55 @@
         />
       </com.google.android.material.textfield.TextInputLayout>
 
+      <LinearLayout
+        android:orientation="horizontal"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+      >
+        <!-- Min date -->
+        <com.google.android.material.textfield.TextInputLayout
+          android:hint="@string/min_date"
+          android:layout_weight="1"
+          style="@style/SearchTextLayout"
+        >
+          <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/min_date_edit_text"
+            style="@style/SearchTextField"
+          />
+        </com.google.android.material.textfield.TextInputLayout>
+
+        <Space
+          android:layout_width="8dp"
+          android:layout_height="wrap_content"
+        />
+
+        <!-- Max date -->
+        <com.google.android.material.textfield.TextInputLayout
+          android:hint="@string/max_date"
+          android:layout_weight="1"
+          style="@style/SearchTextLayout"
+        >
+          <com.google.android.material.textfield.TextInputEditText
+            android:id="@+id/max_date_edit_text"
+            style="@style/SearchTextField"
+          />
+        </com.google.android.material.textfield.TextInputLayout>
+      </LinearLayout>
+
       <TextView
         android:text="@string/advanced"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:fontWeight="700"
         android:paddingTop="16dp"
         android:paddingBottom="8dp"
         android:paddingLeft="4dp"
         android:paddingRight="4dp"
-        android:textColor="?android:attr/textColorPrimary"
+        android:textColor="?android:attr/textColorSecondary"
         android:textSize="@dimen/search_heading_text"
+        android:textStyle="bold"
       />
 
+      <!-- Keywords -->
       <com.google.android.material.textfield.TextInputLayout
         android:hint="@string/keywords"
         style="@style/SearchTextLayout"
@@ -110,6 +153,7 @@
         />
       </com.google.android.material.textfield.TextInputLayout>
 
+      <!-- Tags -->
       <com.google.android.material.textfield.TextInputLayout
         android:hint="@string/tags"
         style="@style/SearchAutocompleteLayout"
@@ -121,12 +165,14 @@
         />
       </com.google.android.material.textfield.TextInputLayout>
 
+      <!-- Order by last played -->
       <com.google.android.material.checkbox.MaterialCheckBox
         android:id="@+id/order_by_last_played_checkbox"
         style="@style/SearchCheckbox"
         android:text="@string/order_by_last_played"
       />
 
+      <!-- Max plays -->
       <!-- TODO: Find some way to make this look better: the user's input ends
            up too close to the prefix text but the suffix is right-aligned. I
            spent way too long failing to get baseline alignment working between
@@ -144,6 +190,7 @@
         />
       </com.google.android.material.textfield.TextInputLayout>
 
+      <!-- First played -->
       <com.google.android.material.textfield.TextInputLayout
         style="@style/SearchAutocompleteLayout"
         android:hint="@string/first_played"
@@ -156,6 +203,7 @@
         />
       </com.google.android.material.textfield.TextInputLayout>
 
+      <!-- Last played -->
       <com.google.android.material.textfield.TextInputLayout
         style="@style/SearchAutocompleteLayout"
         android:hint="@string/last_played"
@@ -167,6 +215,12 @@
           android:inputType="none"
         />
       </com.google.android.material.textfield.TextInputLayout>
+
+      <!-- Add blank space at bottom to prevent overlap with fixed-position buttons. -->
+      <Space
+        android:layout_width="fill_parent"
+        android:layout_height="56dp"
+      />
     </LinearLayout>
   </ScrollView>
 

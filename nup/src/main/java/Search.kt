@@ -167,8 +167,10 @@ suspend fun searchServer(
     title: String? = null,
     album: String? = null,
     shuffle: Boolean = false,
-    keywords: String? = null,
-    tags: String? = null,
+    keywords: String? = null, // space-separated list
+    tags: String? = null, // space-separated list
+    minDate: String? = null, // ISO-8601, i.e. Instant.toString()
+    maxDate: String? = null, // ISO-8601, i.e. Instant.toString()
     minRating: Int = 0,
     unrated: Boolean = false,
     firstPlayed: Int = 0,
@@ -191,6 +193,8 @@ suspend fun searchServer(
     add("shuffle", if (shuffle) "1" else "")
     add("keywords", keywords)
     add("tags", tags)
+    add("minDate", minDate)
+    add("maxDate", maxDate)
     add("minRating", if (minRating > 0) minRating.toString() else "")
     add("unrated", if (unrated) "1" else "")
     add("orderByLastPlayed", if (orderByLastPlayed) "1" else "")

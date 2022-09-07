@@ -148,6 +148,8 @@ class SongDatabase(
         albumId: String? = null,
         songId: Long = -1,
         songIds: List<Long>? = null,
+        minDate: String? = null, // ISO-8601, i.e. Instant.toString()
+        maxDate: String? = null, // ISO-8601, i.e. Instant.toString()
         minRating: Int = 0,
         shuffle: Boolean = false,
         substring: Boolean = false,
@@ -191,6 +193,9 @@ class SongDatabase(
         builder.add("TitleNorm LIKE ?", title, substring, true)
         builder.add("AlbumNorm LIKE ?", album, substring, true)
         builder.add("AlbumId = ?", albumId)
+        builder.add("Date >= ? ", minDate)
+        builder.add("Date <= ?", maxDate)
+        if (!minDate.isNullOrEmpty() || !maxDate.isNullOrEmpty()) builder.addLiteral("Date != ''")
         builder.add("s.SongId = ?", if (songId >= 0) songId.toString() else null)
         builder.add("Rating >= ?", if (minRating > 0) minRating.toString() else null)
         if (songIds != null && songIds.size > 0) {

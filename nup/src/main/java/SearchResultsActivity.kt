@@ -143,6 +143,8 @@ class SearchResultsActivity : AppCompatActivity() {
             artist = intent.getStringExtra(BUNDLE_ARTIST),
             title = intent.getStringExtra(BUNDLE_TITLE),
             album = intent.getStringExtra(BUNDLE_ALBUM),
+            minDate = intent.getStringExtra(BUNDLE_MIN_DATE),
+            maxDate = intent.getStringExtra(BUNDLE_MAX_DATE),
             minRating = intent.getIntExtra(BUNDLE_MIN_RATING, 0),
             shuffle = intent.getBooleanExtra(BUNDLE_SHUFFLE, false),
             substring = intent.getBooleanExtra(BUNDLE_SUBSTRING, false),
@@ -173,6 +175,8 @@ class SearchResultsActivity : AppCompatActivity() {
         shuffle = intent.getBooleanExtra(BUNDLE_SHUFFLE, false),
         keywords = intent.getStringExtra(BUNDLE_KEYWORDS),
         tags = intent.getStringExtra(BUNDLE_TAGS),
+        minDate = intent.getStringExtra(BUNDLE_MIN_DATE),
+        maxDate = intent.getStringExtra(BUNDLE_MAX_DATE),
         minRating = intent.getIntExtra(BUNDLE_MIN_RATING, 0),
         orderByLastPlayed = intent.getBooleanExtra(BUNDLE_ORDER_BY_LAST_PLAYED, false),
         maxPlays = intent.getIntExtra(BUNDLE_MAX_PLAYS, -1),
@@ -235,6 +239,8 @@ class SearchResultsActivity : AppCompatActivity() {
         const val BUNDLE_ARTIST = "artist"
         const val BUNDLE_TITLE = "title"
         const val BUNDLE_ALBUM = "album"
+        const val BUNDLE_MIN_DATE = "min_date"
+        const val BUNDLE_MAX_DATE = "max_date"
         const val BUNDLE_MIN_RATING = "min_rating"
         const val BUNDLE_SHUFFLE = "shuffle"
         const val BUNDLE_SUBSTRING = "substring"
