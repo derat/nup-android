@@ -29,6 +29,11 @@
   </TableRow>
 
   <TableRow>
+    <TextView style="@style/SongDetailsLabel" android:text="@string/date_colon" />
+    <TextView android:id="@+id/date" style="@style/SongDetailsValue" />
+  </TableRow>
+
+  <TableRow>
     <TextView style="@style/SongDetailsLabel" android:text="@string/length_colon" />
     <TextView android:id="@+id/length" style="@style/SongDetailsValue" />
   </TableRow>

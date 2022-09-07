@@ -41,6 +41,7 @@
   <string name="clear_cache_message">Delete all cached music?</string>
   <string name="clear_covers">Clear cover images</string>
   <string name="clear_covers_message">Delete all downloaded cover images?</string>
+  <string name="date_colon">Date:</string>
   <string name="dont_download_all">Don\'t download all</string>
   <string name="download_all">Download all</string>
   <string name="download_rate">Download rate</string>
