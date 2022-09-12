@@ -97,15 +97,12 @@ class BrowseSongsActivity : AppCompatActivity(), OnItemClickListener {
 
             songs = newSongs
 
-            val titleKey = "title"
-            val data = mutableListOf<Map<String, String>>()
-            for (song in songs) data.add(mapOf(titleKey to song.title))
             view.adapter = SimpleAdapter(
                 this@BrowseSongsActivity,
-                data,
+                songs.map { mapOf("t" to it.title, "l" to it.lengthString()) },
                 R.layout.browse_row,
-                arrayOf(titleKey),
-                intArrayOf(R.id.main)
+                arrayOf("t", "l"),
+                intArrayOf(R.id.main, R.id.extra)
             )
 
             view.onItemClickListener = this@BrowseSongsActivity

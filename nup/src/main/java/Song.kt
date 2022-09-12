@@ -41,6 +41,9 @@ data class Song(
         availableBytes = entry.cachedBytes
         totalBytes = entry.totalBytes
     }
+
+    // Get the song's rounded length as e.g. "3:42".
+    fun lengthString() = formatDuration(Math.round(lengthSec).toInt())
 }
 
 /**
