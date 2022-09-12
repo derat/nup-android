@@ -53,24 +53,14 @@ class BrowseSongsActivity : AppCompatActivity(), OnItemClickListener {
 
         title = if (album != null) {
             getString(
-                if (onlyCached) {
-                    R.string.browse_cached_songs_from_album_fmt
-                } else {
-                    R.string.browse_songs_from_album_fmt
-                },
-                album
+                if (onlyCached) R.string.cached_songs_from_fmt else R.string.songs_from_fmt, album
             )
         } else if (artist != null) {
             getString(
-                if (onlyCached) {
-                    R.string.browse_cached_songs_by_artist_fmt
-                } else {
-                    R.string.browse_songs_by_artist_fmt
-                },
-                artist
+                if (onlyCached) R.string.cached_songs_by_fmt else R.string.songs_by_fmt, artist
             )
         } else {
-            getString(if (onlyCached) R.string.browse_cached_songs else R.string.browse_songs)
+            getString(if (onlyCached) R.string.cached_songs else R.string.songs)
         }
 
         // Create a temporary ArrayAdapter that just says "Loading...".

@@ -25,11 +25,11 @@ class BrowseAlbumsActivity : BrowseActivityBase() {
 
         title = if (onlyArtist != "") {
             getString(
-                if (onlyCached) R.string.browse_cached_albums_fmt else R.string.browse_albums_fmt,
+                if (onlyCached) R.string.cached_albums_by_fmt else R.string.albums_by_fmt,
                 onlyArtist
             )
         } else {
-            getString(if (onlyCached) R.string.browse_cached_albums else R.string.browse_albums)
+            getString(if (onlyCached) R.string.cached_albums else R.string.albums)
         }
     }
 
@@ -44,11 +44,11 @@ class BrowseAlbumsActivity : BrowseActivityBase() {
     override fun fillMenu(menu: ContextMenu, row: StatsRow) {
         menu.setHeaderTitle(row.key.album)
         if (onlyArtist != "") {
-            val msg = getString(R.string.browse_songs_by_artist_fmt, onlyArtist)
+            val msg = getString(R.string.songs_by_fmt, onlyArtist)
             menu.add(0, MENU_ITEM_BROWSE_SONGS_BY_ARTIST, 0, msg)
         }
-        menu.add(0, MENU_ITEM_BROWSE_SONGS_WITH_RATING, 0, R.string.browse_songs_four_stars)
-        menu.add(0, MENU_ITEM_BROWSE_SONGS, 0, R.string.browse_songs)
+        menu.add(0, MENU_ITEM_BROWSE_SONGS_WITH_RATING, 0, R.string.four_star_songs)
+        menu.add(0, MENU_ITEM_BROWSE_SONGS, 0, R.string.songs)
     }
 
     override fun onMenuClick(itemId: Int, row: StatsRow): Boolean {

@@ -18,7 +18,7 @@ class BrowseArtistsActivity : BrowseActivityBase() {
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        setTitle(if (onlyCached) R.string.browse_cached_artists else R.string.browse_artists)
+        setTitle(if (onlyCached) R.string.cached_artists else R.string.artists)
     }
 
     override fun onRowClick(row: StatsRow, pos: Int, fragment: BrowseListFragment) =
@@ -26,9 +26,9 @@ class BrowseArtistsActivity : BrowseActivityBase() {
 
     override fun fillMenu(menu: ContextMenu, row: StatsRow) {
         menu.setHeaderTitle(row.key.artist)
-        menu.add(0, MENU_ITEM_BROWSE_SONGS_WITH_RATING, 0, R.string.browse_songs_four_stars)
-        menu.add(0, MENU_ITEM_BROWSE_SONGS, 0, R.string.browse_songs)
-        menu.add(0, MENU_ITEM_BROWSE_ALBUMS, 0, R.string.browse_albums)
+        menu.add(0, MENU_ITEM_BROWSE_SONGS_WITH_RATING, 0, R.string.four_star_songs)
+        menu.add(0, MENU_ITEM_BROWSE_SONGS, 0, R.string.songs)
+        menu.add(0, MENU_ITEM_BROWSE_ALBUMS, 0, R.string.albums)
     }
 
     override fun onMenuClick(itemId: Int, row: StatsRow): Boolean {
