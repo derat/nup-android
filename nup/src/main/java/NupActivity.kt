@@ -9,7 +9,6 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
 import android.graphics.Bitmap
-import android.graphics.Color
 import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
@@ -50,20 +49,23 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         _service?.unpause()
     }
 
-    private lateinit var pauseButton: MaterialButton
-    private lateinit var prevButton: MaterialButton
-    private lateinit var nextButton: MaterialButton
-    private lateinit var albumImageView: ImageView
+    private lateinit var currentSongFrame: View
+    private lateinit var coverImageView: ImageView
     private lateinit var artistLabel: TextView
     private lateinit var titleLabel: TextView
     private lateinit var albumLabel: TextView
     private lateinit var timeLabel: TextView
     private lateinit var downloadStatusLabel: TextView
+
+    private lateinit var playbackButtonsRow: View
+    private lateinit var pauseButton: MaterialButton
+    private lateinit var prevButton: MaterialButton
+    private lateinit var nextButton: MaterialButton
+
     private lateinit var playlistView: ListView
 
-    // Used for songs without cover images and the state when there's no song.
+    // Used for songs without cover images.
     private val solidBitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
-    private val emptyBitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         Log.d(TAG, "Activity created")
@@ -75,17 +77,19 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
         setContentView(R.layout.main)
 
-        pauseButton = findViewById<MaterialButton>(R.id.pause_button)
-        prevButton = findViewById<MaterialButton>(R.id.prev_button)
-        nextButton = findViewById<MaterialButton>(R.id.next_button)
-        updateButtonStates()
-
-        albumImageView = findViewById<ImageView>(R.id.album_image)
+        currentSongFrame = findViewById<View>(R.id.current_song_frame)
+        coverImageView = findViewById<ImageView>(R.id.cover_image)
         artistLabel = findViewById<TextView>(R.id.artist_label)
         titleLabel = findViewById<TextView>(R.id.title_label)
         albumLabel = findViewById<TextView>(R.id.album_label)
         timeLabel = findViewById<TextView>(R.id.time_label)
         downloadStatusLabel = findViewById<TextView>(R.id.download_status_label)
+
+        playbackButtonsRow = findViewById<View>(R.id.playback_buttons_row)
+        pauseButton = findViewById<MaterialButton>(R.id.pause_button)
+        prevButton = findViewById<MaterialButton>(R.id.prev_button)
+        nextButton = findViewById<MaterialButton>(R.id.next_button)
+        updateButtonStates()
 
         playlistView = findViewById<ListView>(R.id.playlist)
         registerForContextMenu(playlistView)
@@ -94,7 +98,6 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         volumeControlStream = AudioManager.STREAM_MUSIC
 
         solidBitmap.eraseColor(ContextCompat.getColor(this@NupActivity, R.color.primary_dark))
-        emptyBitmap.eraseColor(Color.TRANSPARENT)
     }
 
     override fun onDestroy() {
@@ -184,7 +187,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
     override fun onSongCoverLoad(song: Song) {
         runOnUiThread {
-            if (song == curSong) albumImageView.setImageBitmap(song.coverBitmap)
+            if (song == curSong) coverImageView.setImageBitmap(song.coverBitmap)
         }
     }
 
@@ -230,16 +233,18 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
             else ""
         downloadStatusLabel.text = ""
 
-        albumImageView.setImageBitmap(
-            if (song != null) song.coverBitmap ?: solidBitmap
-            else emptyBitmap
-        )
+        coverImageView.setImageBitmap(song?.coverBitmap ?: solidBitmap)
         if (song != null && song.coverBitmap == null) {
             service.fetchCoverForSongIfMissing(song)
         }
 
         // Update the displayed time in response to the next position change we get.
         lastPosSec = -1
+
+        // Hide the controls when there's no song.
+        val vis = if (song != null) View.VISIBLE else View.INVISIBLE
+        currentSongFrame.visibility = vis
+        playbackButtonsRow.visibility = vis
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {

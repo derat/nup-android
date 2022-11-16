@@ -8,12 +8,13 @@
 >
   <FrameLayout
     style="@style/Raised"
+    android:id="@+id/current_song_frame"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
     android:paddingBottom="@dimen/vertical_padding"
   >
     <ImageView
-      android:id="@+id/album_image"
+      android:id="@+id/cover_image"
       android:layout_width="fill_parent"
       android:layout_height="wrap_content"
       android:adjustViewBounds="true"
@@ -51,6 +52,7 @@
 
   <LinearLayout
     style="@style/Raised"
+    android:id="@+id/playback_buttons_row"
     android:orientation="horizontal"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
@@ -59,27 +61,27 @@
     android:paddingTop="@dimen/vertical_padding"
     android:paddingBottom="@dimen/vertical_padding"
   >
-  <Button
-      android:id="@+id/prev_button"
-      style="@style/IconButton"
-      app:icon="@drawable/skip_previous"
-      android:onClick="onPrevButtonClicked"
-    />
-  <Space android:layout_width="@dimen/button_spacing" android:layout_height="fill_parent" />
-  <Button
-      android:id="@+id/pause_button"
-      style="@style/IconButton"
-      app:icon="@drawable/play"
-      android:onClick="onPauseButtonClicked"
-    />
-  <Space android:layout_width="@dimen/button_spacing" android:layout_height="fill_parent" />
-  <Button
-      android:id="@+id/next_button"
-      style="@style/IconButton"
-      app:icon="@drawable/skip_next"
-      android:onClick="onNextButtonClicked"
-    />
-</LinearLayout>
+    <Button
+        android:id="@+id/prev_button"
+        style="@style/IconButton"
+        app:icon="@drawable/skip_previous"
+        android:onClick="onPrevButtonClicked"
+      />
+    <Space android:layout_width="@dimen/button_spacing" android:layout_height="fill_parent" />
+    <Button
+        android:id="@+id/pause_button"
+        style="@style/IconButton"
+        app:icon="@drawable/play"
+        android:onClick="onPauseButtonClicked"
+      />
+    <Space android:layout_width="@dimen/button_spacing" android:layout_height="fill_parent" />
+    <Button
+        android:id="@+id/next_button"
+        style="@style/IconButton"
+        app:icon="@drawable/skip_next"
+        android:onClick="onNextButtonClicked"
+      />
+  </LinearLayout>
 
   <LinearLayout
     style="@style/Raised"

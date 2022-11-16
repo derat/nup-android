@@ -15,6 +15,7 @@ import android.support.v4.media.RatingCompat
 import android.support.v4.media.session.MediaSessionCompat
 import android.support.v4.media.session.MediaSessionCompat.QueueItem
 import android.support.v4.media.session.PlaybackStateCompat
+import androidx.core.content.ContextCompat
 
 /** Updates [MediaSession] data for the current song. */
 class MediaSessionManager constructor(context: Context, callback: MediaSessionCompat.Callback) {
@@ -168,7 +169,7 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
     init {
         // As far as I can tell, the Porter-Duff "over" operation or something like it is used to
         // composite the new bitmap on top of the previous one, so make this non-transparent.
-        emptyBitmap.eraseColor(context.getResources().getColor(R.color.primary_dark))
+        emptyBitmap.eraseColor(ContextCompat.getColor(context, R.color.primary_dark))
 
         session = MediaSessionCompat(context, "nup").apply {
             setCallback(callback)
