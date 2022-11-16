@@ -9,8 +9,7 @@
   <dimen name="text_spacing">12dp</dimen>
   <dimen name="button_spacing">12dp</dimen>
 
-  <dimen name="playing_song_image">100dp</dimen>
-  <dimen name="playing_song_text">15dp</dimen>
+  <dimen name="playing_song_text">18dp</dimen>
 
   <dimen name="song_list_text">15sp</dimen>
   <dimen name="song_list_percent">13sp</dimen>

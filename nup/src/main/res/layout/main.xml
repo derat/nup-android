@@ -6,28 +6,27 @@
   android:layout_width="fill_parent"
   android:layout_height="fill_parent"
 >
-  <LinearLayout
+  <FrameLayout
     style="@style/Raised"
-    android:orientation="horizontal"
-    android:gravity="center_vertical"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
-    android:paddingLeft="@dimen/horizontal_padding"
-    android:paddingRight="@dimen/horizontal_padding"
-    android:paddingTop="@dimen/vertical_padding"
+    android:paddingBottom="@dimen/vertical_padding"
   >
     <ImageView
       android:id="@+id/album_image"
-      android:layout_width="@dimen/playing_song_image"
-      android:layout_height="@dimen/playing_song_image"
+      android:layout_width="fill_parent"
+      android:layout_height="wrap_content"
       android:adjustViewBounds="true"
-      android:scaleType="centerInside"
-      android:paddingRight="@dimen/horizontal_padding"
+      android:scaleType="centerCrop"
     />
     <LinearLayout
       android:orientation="vertical"
+      android:layout_gravity="bottom|left"
       android:layout_width="fill_parent"
       android:layout_height="wrap_content"
+      android:paddingBottom="@dimen/vertical_padding"
+      android:paddingLeft="@dimen/horizontal_padding"
+      android:paddingRight="@dimen/horizontal_padding"
     >
       <TextView android:id="@+id/artist_label" style="@style/PlayingSongArtist" />
       <TextView android:id="@+id/title_label" style="@style/PlayingSongTitle" />
@@ -46,7 +45,7 @@
         />
       </LinearLayout>
     </LinearLayout>
-  </LinearLayout>
+  </FrameLayout>
 
   <LinearLayout
     style="@style/Raised"

@@ -8,6 +8,7 @@ package org.erat.nup
 import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
+import android.graphics.Bitmap
 import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
@@ -59,6 +60,9 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
     private lateinit var downloadStatusLabel: TextView
     private lateinit var playlistView: ListView
 
+    // Used for songs without cover images.
+    private val emptyBitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+
     public override fun onCreate(savedInstanceState: Bundle?) {
         Log.d(TAG, "Activity created")
         super.onCreate(savedInstanceState)
@@ -86,6 +90,8 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         playlistView.adapter = songListAdapter
 
         volumeControlStream = AudioManager.STREAM_MUSIC
+
+        emptyBitmap.eraseColor(ContextCompat.getColor(this@NupActivity, R.color.primary_dark))
     }
 
     override fun onDestroy() {
@@ -175,10 +181,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
     override fun onSongCoverLoad(song: Song) {
         runOnUiThread {
-            if (song == curSong) {
-                albumImageView.visibility = View.VISIBLE
-                albumImageView.setImageBitmap(song.coverBitmap)
-            }
+            if (song == curSong) albumImageView.setImageBitmap(song.coverBitmap)
         }
     }
 
@@ -212,30 +215,21 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
     /** Update onscreen information about the current song. */
     private fun updateSongDisplay(song: Song?) {
-        if (song == null) {
-            artistLabel.text = ""
-            titleLabel.text = ""
-            albumLabel.text = ""
-            timeLabel.text = ""
-            downloadStatusLabel.text = ""
-            albumImageView.visibility = View.INVISIBLE
-        } else {
-            artistLabel.text = song.artist
-            titleLabel.text = song.title
-            albumLabel.text = song.album
-            timeLabel.text = formatDurationProgress(
+        artistLabel.text = song?.artist ?: ""
+        titleLabel.text = song?.title ?: ""
+        albumLabel.text = song?.album ?: ""
+
+        timeLabel.text =
+            if (song != null) formatDurationProgress(
                 if (song == service.curSong) service.lastPosMs / 1000 else 0,
                 song.lengthSec.toInt()
             )
-            downloadStatusLabel.text = ""
+            else ""
+        downloadStatusLabel.text = ""
 
-            if (song.coverBitmap != null) {
-                albumImageView.visibility = View.VISIBLE
-                albumImageView.setImageBitmap(song.coverBitmap)
-            } else {
-                albumImageView.visibility = View.INVISIBLE
-                service.fetchCoverForSongIfMissing(song)
-            }
+        albumImageView.setImageBitmap(song?.coverBitmap ?: emptyBitmap)
+        if (song != null && song.coverBitmap == null) {
+            service.fetchCoverForSongIfMissing(song)
         }
 
         // Update the displayed time in response to the next position change we get.
