@@ -8,6 +8,7 @@ package org.erat.nup
 import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
+import android.graphics.Bitmap
 import android.support.v4.media.MediaDescriptionCompat
 import android.support.v4.media.MediaMetadataCompat
 import android.support.v4.media.RatingCompat
@@ -18,6 +19,11 @@ import android.support.v4.media.session.PlaybackStateCompat
 /** Updates [MediaSession] data for the current song. */
 class MediaSessionManager constructor(context: Context, callback: MediaSessionCompat.Callback) {
     val session: MediaSessionCompat
+
+    // Used for songs without cover images. If we don't give MediaMetadataCompat.Builder a new
+    // bitmap via METADATA_KEY_ALBUM_ART, it appears to continue showing the previous one:
+    // https://github.com/derat/nup-android/issues/42
+    private val emptyBitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
 
     /** Release the session. */
     fun release() {
@@ -60,16 +66,14 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
         }
         builder.putLong(MediaMetadataCompat.METADATA_KEY_DURATION, (song.lengthSec * 1000).toLong())
 
-        val bitmap = song.coverBitmap
-        if (bitmap != null) {
-            // Pass a copy of the original bitmap. Apparently the later apply() call recycles
-            // the bitmap, which then causes a crash when we try to use it later:
-            // https://code.google.com/p/android/issues/detail?id=74967
-            builder.putBitmap(
-                MediaMetadataCompat.METADATA_KEY_ALBUM_ART,
-                bitmap.copy(bitmap.config, true)
-            )
-        }
+        // Pass a copy of the original bitmap. Apparently the later apply() call recycles
+        // the bitmap, which then causes a crash when we try to use it later:
+        // https://code.google.com/p/android/issues/detail?id=74967
+        val bitmap = song.coverBitmap ?: emptyBitmap
+        builder.putBitmap(
+            MediaMetadataCompat.METADATA_KEY_ALBUM_ART,
+            bitmap.copy(bitmap.config, true)
+        )
 
         // It seems completely bonkers that you can shove a field from MediaDescriptionCompat into
         // MediaMetadataCompat, but see
@@ -162,6 +166,10 @@ class MediaSessionManager constructor(context: Context, callback: MediaSessionCo
     }
 
     init {
+        // As far as I can tell, the Porter-Duff "over" operation or something like it is used to
+        // composite the new bitmap on top of the previous one, so make this non-transparent.
+        emptyBitmap.eraseColor(context.getResources().getColor(R.color.primary_dark))
+
         session = MediaSessionCompat(context, "nup").apply {
             setCallback(callback)
             setFlags(MediaSessionCompat.FLAG_HANDLES_QUEUE_COMMANDS)

@@ -86,9 +86,6 @@ class NotificationCreator(
             .setWhen(System.currentTimeMillis())
             .setShowWhen(false)
 
-        // TODO: When we don't pass an icon due to the song not having a cover,
-        // the notification strangely includes a low-res version of the old icon:
-        // https://github.com/derat/nup-android/issues/42
         if (!mediaId.isEmpty() && cover != null) builder.setLargeIcon(cover)
 
         val style = MediaStyle()
