@@ -19,12 +19,14 @@
       android:adjustViewBounds="true"
       android:scaleType="centerCrop"
     />
+    <!-- paddingBottom deliberately uses horizontal_padding rather than vertical_padding
+         so there'll be an equal margin around the text. -->
     <LinearLayout
       android:orientation="vertical"
       android:layout_gravity="bottom|left"
       android:layout_width="fill_parent"
       android:layout_height="wrap_content"
-      android:paddingBottom="@dimen/vertical_padding"
+      android:paddingBottom="@dimen/horizontal_padding"
       android:paddingLeft="@dimen/horizontal_padding"
       android:paddingRight="@dimen/horizontal_padding"
     >

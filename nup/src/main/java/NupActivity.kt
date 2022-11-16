@@ -9,6 +9,7 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
@@ -60,7 +61,8 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
     private lateinit var downloadStatusLabel: TextView
     private lateinit var playlistView: ListView
 
-    // Used for songs without cover images.
+    // Used for songs without cover images and the state when there's no song.
+    private val solidBitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
     private val emptyBitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
 
     public override fun onCreate(savedInstanceState: Bundle?) {
@@ -91,7 +93,8 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
         volumeControlStream = AudioManager.STREAM_MUSIC
 
-        emptyBitmap.eraseColor(ContextCompat.getColor(this@NupActivity, R.color.primary_dark))
+        solidBitmap.eraseColor(ContextCompat.getColor(this@NupActivity, R.color.primary_dark))
+        emptyBitmap.eraseColor(Color.TRANSPARENT)
     }
 
     override fun onDestroy() {
@@ -227,7 +230,10 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
             else ""
         downloadStatusLabel.text = ""
 
-        albumImageView.setImageBitmap(song?.coverBitmap ?: emptyBitmap)
+        albumImageView.setImageBitmap(
+            if (song != null) song.coverBitmap ?: solidBitmap
+            else emptyBitmap
+        )
         if (song != null && song.coverBitmap == null) {
             service.fetchCoverForSongIfMissing(song)
         }
