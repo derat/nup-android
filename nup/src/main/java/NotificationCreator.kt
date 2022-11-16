@@ -81,12 +81,15 @@ class NotificationCreator(
             .setContentText(title ?: context.getString(R.string.startup_message_text))
             .setSmallIcon(R.drawable.status)
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setContentIntent(mediaSession.controller.sessionActivity)
+            .setContentIntent(controller.sessionActivity)
             .setOngoing(true)
             .setWhen(System.currentTimeMillis())
             .setShowWhen(false)
 
-        if (!mediaId.isEmpty()) builder.setLargeIcon(cover)
+        // TODO: When we don't pass an icon due to the song not having a cover,
+        // the notification strangely includes a low-res version of the old icon:
+        // https://github.com/derat/nup-android/issues/42
+        if (!mediaId.isEmpty() && cover != null) builder.setLargeIcon(cover)
 
         val style = MediaStyle()
         style.setMediaSession(mediaSession.sessionToken)

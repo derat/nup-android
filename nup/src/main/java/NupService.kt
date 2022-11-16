@@ -751,6 +751,7 @@ class NupService :
 
         songListener?.onPlaylistChange(playlist)
         mediaSessionManager.updatePlaylist(playlist)
+        updatePlaybackState()
         updateNotification()
     }
     /** Convenience wrapper around [removeRangeFromPlaylist]. */
@@ -1125,6 +1126,7 @@ class NupService :
                 }
             }
         }
+        updatePlaybackState()
         updateNotification()
     }
 
