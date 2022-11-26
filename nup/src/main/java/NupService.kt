@@ -444,10 +444,9 @@ class NupService :
 
         if (this::prefs.isInitialized) {
             prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
-            // Android Auto likes starting us and then killing us immediately.
-            // Avoid overwriting the saved playlist if we didn't get a chance to load it.
-            if (playlistRestored) savePlaylist()
         }
+
+        savePlaylist()
 
         // Make sure that coroutines don't run after SongDatabase has been dismantled:
         // https://github.com/derat/nup-android/issues/17
@@ -582,6 +581,10 @@ class NupService :
 
     /** Save playlist so it can be restored the next time the service starts. */
     private fun savePlaylist() {
+        // Android Auto likes starting us and then killing us immediately.
+        // Avoid overwriting the saved playlist if we didn't get a chance to load it.
+        if (!this::prefs.isInitialized || !playlistRestored) return
+
         val origPolicy = StrictMode.allowThreadDiskWrites()
         try {
             val editor = prefs.edit()
@@ -887,6 +890,7 @@ class NupService :
         updatePlaybackState()
         updateNotification()
         if (curSongIndex < playlist.size - 1) selectSongAtIndex(curSongIndex + 1)
+        savePlaylist()
     }
 
     override fun onPlaybackPositionChange(file: File, positionMs: Int, durationMs: Int) {
@@ -918,6 +922,7 @@ class NupService :
         songListener?.onPauseStateChange(this.paused)
         updatePlaybackState()
         updateNotification()
+        if (this.paused) savePlaylist()
     }
 
     override fun onPlaybackError(description: String) {
