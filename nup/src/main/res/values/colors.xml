@@ -10,5 +10,6 @@
   <color name="icons">#FFFFFF</color>
   <color name="divider">#B6B6B6</color>
 
+  <color name="no_song_cover">#3777</color>
   <color name="playlist_row_background">#DDD</color>
 </resources>

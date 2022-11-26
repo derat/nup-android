@@ -64,8 +64,8 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
     private lateinit var playlistView: ListView
 
-    // Used for songs without cover images.
-    private val solidBitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
+    // Used while loading cover images and for songs without cover images.
+    private val noCoverBitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
 
     public override fun onCreate(savedInstanceState: Bundle?) {
         Log.d(TAG, "Activity created")
@@ -97,7 +97,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
         volumeControlStream = AudioManager.STREAM_MUSIC
 
-        solidBitmap.eraseColor(ContextCompat.getColor(this@NupActivity, R.color.primary_dark))
+        noCoverBitmap.eraseColor(ContextCompat.getColor(this@NupActivity, R.color.no_song_cover))
     }
 
     override fun onDestroy() {
@@ -233,8 +233,8 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
             else ""
         downloadStatusLabel.text = ""
 
-        coverImageView.setImageBitmap(song?.coverBitmap ?: solidBitmap)
-        if (song != null && song.coverBitmap == null) {
+        coverImageView.setImageBitmap(song?.coverBitmap ?: noCoverBitmap)
+        if (song?.coverBitmap == null && song?.coverFilename != null) {
             service.fetchCoverForSongIfMissing(song)
         }
 
