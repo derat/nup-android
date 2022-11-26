@@ -30,6 +30,7 @@
   <style name="PlayingSongTime" parent="PlayingSongText" />
   <style name="PlayingSongDownload" parent="PlayingSongText">
     <item name="android:alpha">0.8</item>
+    <item name="android:textSize">@dimen/playing_song_download_text</item>
   </style>
 
   <style name="Button" parent="Widget.MaterialComponents.Button">
