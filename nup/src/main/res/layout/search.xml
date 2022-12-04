@@ -94,6 +94,18 @@
         />
       </com.google.android.material.textfield.TextInputLayout>
 
+      <!-- Tags -->
+      <com.google.android.material.textfield.TextInputLayout
+        android:hint="@string/tags"
+        style="@style/SearchAutocompleteLayout"
+      >
+        <com.google.android.material.textfield.MaterialAutoCompleteTextView
+          android:id="@+id/tags_edit_text"
+          android:completionThreshold="0"
+          style="@style/SearchTextField"
+        />
+      </com.google.android.material.textfield.TextInputLayout>
+
       <LinearLayout
         android:orientation="horizontal"
         android:layout_width="fill_parent"
@@ -149,18 +161,6 @@
       >
         <com.google.android.material.textfield.TextInputEditText
           android:id="@+id/keywords_edit_text"
-          style="@style/SearchTextField"
-        />
-      </com.google.android.material.textfield.TextInputLayout>
-
-      <!-- Tags -->
-      <com.google.android.material.textfield.TextInputLayout
-        android:hint="@string/tags"
-        style="@style/SearchAutocompleteLayout"
-      >
-        <com.google.android.material.textfield.MaterialAutoCompleteTextView
-          android:id="@+id/tags_edit_text"
-          android:completionThreshold="0"
           style="@style/SearchTextField"
         />
       </com.google.android.material.textfield.TextInputLayout>

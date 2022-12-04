@@ -151,6 +151,7 @@ class SongDatabase(
         minDate: String? = null, // ISO-8601, i.e. Instant.toString()
         maxDate: String? = null, // ISO-8601, i.e. Instant.toString()
         minRating: Int = 0,
+        tags: String? = null, // e.g. "drums electronic -vocals"
         shuffle: Boolean = false,
         substring: Boolean = false,
         onlyCached: Boolean = false,
@@ -207,17 +208,26 @@ class SongDatabase(
                 listOf(artistPrefix, "$artistPrefix %")
             )
         }
+        tags?.trim()?.split("\\s+".toRegex())?.forEach {
+            // Escape '%' characters in tags. Use space as the escape character since
+            // we know it won't appear in tags (since we split on whitespace above).
+            val tag = it.replace("%", " %")
+            if (tag.startsWith("-")) builder.add("Tags NOT LIKE ? ESCAPE ' '", "%|${tag.drop(1)}|%")
+            else if (!tag.isEmpty()) builder.add("Tags LIKE ? ESCAPE ' '", "%|$tag|%")
+        }
+
         val cachedJoin = if (onlyCached) "JOIN CachedSongs cs ON(s.SongId = cs.SongId)" else ""
         val order = if (shuffle) "RANDOM()" else "Album ASC, AlbumId ASC, Disc ASC, Track ASC"
         val query =
             """
             SELECT s.SongId, Artist, Title, Album, AlbumId, Filename, CoverFilename, Length,
-              Track, Disc, Date, TrackGain, AlbumGain, PeakAmp, Rating
+              Track, Disc, Date, TrackGain, AlbumGain, PeakAmp, Rating, Tags
               FROM Songs s $cachedJoin
               ${builder.whereClause()}
               ORDER BY $order
               LIMIT $MAX_QUERY_RESULTS
             """.trimIndent()
+
         val songs = mutableListOf<Song>()
         opener.getDb() task@{ db ->
             if (db == null) return@task // quit() already called
@@ -246,6 +256,9 @@ class SongDatabase(
                                 albumGain = getFloat(12).toDouble(),
                                 peakAmp = getFloat(13).toDouble(),
                                 rating = getInt(14),
+                                tags = getString(15).trim('|').let {
+                                    if (it.isEmpty()) listOf<String>() else it.split("|")
+                                },
                             )
                         )
                     }
@@ -462,11 +475,20 @@ class SongDatabase(
             var path = "/export?type=song" +
                 "&omit=plays,sha1" +
                 "&minLastModifiedNsec=$prevStartTimeNsec" +
-                "&max=$SERVER_SONG_BATCH_SIZE"
+                "&max=$SYNC_SONG_BATCH_SIZE"
             if (!serverCursor.isEmpty()) path += "&cursor=$serverCursor"
             if (deleted) path += "&deleted=1"
 
-            val (response, error) = downloader.downloadString(path)
+            // Retry to make it easier to do full syncs on flaky connections.
+            var response: String? = null
+            var error: String? = null
+            for (i in 0 until SYNC_RETRIES + 1) {
+                val res = downloader.downloadString(path)
+                response = res.data
+                error = res.error
+                if (response != null) break
+                Log.w(TAG, "Got error while syncing songs: $error")
+            }
             response ?: throw ServerException(error!!)
 
             try {
@@ -500,6 +522,17 @@ class SongDatabase(
                                     }
                                 }
 
+                                // JSONArray unfortunately doesn't expose an iterator.
+                                var tags = ""
+                                val tagsArray = item.optJSONArray("tags")
+                                if (tagsArray != null && tagsArray.length() > 0) {
+                                    val tagsList = arrayListOf<String>()
+                                    for (i in 0 until tagsArray.length()) {
+                                        tagsList.add(tagsArray.optString(i))
+                                    }
+                                    tags = "|" + tagsList.joinToString("|") + "|"
+                                }
+
                                 val values = ContentValues(18)
                                 values.put("SongId", songId)
                                 values.put("Filename", item.getString("filename"))
@@ -519,6 +552,7 @@ class SongDatabase(
                                 values.put("AlbumGain", item.optDouble("albumGain", 0.0))
                                 values.put("PeakAmp", item.optDouble("peakAmp", 0.0))
                                 values.put("Rating", item.getInt("rating"))
+                                values.put("Tags", tags)
                                 db.replace("Songs", "", values)
                             }
                             numUpdates++
@@ -876,7 +910,8 @@ class SongDatabase(
 
         public const val DATABASE_NAME = "NupSongs" // public for tests
         private const val MAX_QUERY_RESULTS = 250
-        private const val SERVER_SONG_BATCH_SIZE = 100
+        private const val SYNC_SONG_BATCH_SIZE = 100
+        private const val SYNC_RETRIES = 2
     }
 
     init {

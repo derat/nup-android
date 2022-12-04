@@ -238,8 +238,9 @@ suspend fun searchUsingPreset(
     networkHelper: NetworkHelper,
     preset: SearchPreset
 ): List<Song> {
+    val tags = if (preset.tags != "") preset.tags else null
     if (preset.canSearchLocal()) {
-        return db.query(minRating = preset.minRating, shuffle = preset.shuffle)
+        return db.query(minRating = preset.minRating, tags = tags, shuffle = preset.shuffle)
     }
 
     if (!networkHelper.isNetworkAvailable) {
@@ -248,7 +249,7 @@ suspend fun searchUsingPreset(
     return searchServer(
         db,
         downloader,
-        tags = if (preset.tags != "") preset.tags else null,
+        tags = tags,
         minRating = preset.minRating,
         unrated = preset.unrated,
         firstPlayed = preset.firstPlayed,
@@ -275,8 +276,7 @@ data class SearchPreset(
     val play: Boolean, // automatically play results
 ) {
     /** Return true if the search can be performed with [searchLocal] rather than [searchServer]. */
-    fun canSearchLocal() = tags.isEmpty() &&
-        unrated == false &&
+    fun canSearchLocal() = unrated == false &&
         firstPlayed == 0 &&
         lastPlayed == 0 &&
         orderByLastPlayed == false &&

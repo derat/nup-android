@@ -18,23 +18,24 @@ fun createSongDatabase(db: SQLiteDatabase) {
         """
 CREATE TABLE Songs (
   SongId INTEGER PRIMARY KEY NOT NULL,
-  Filename VARCHAR(256) NOT NULL,
-  CoverFilename VARCHAR(256) NOT NULL,
-  Artist VARCHAR(256) NOT NULL,
-  Title VARCHAR(256) NOT NULL,
-  Album VARCHAR(256) NOT NULL,
-  AlbumId VARCHAR(256) NOT NULL,
-  ArtistNorm VARCHAR(256) NOT NULL,
-  TitleNorm VARCHAR(256) NOT NULL,
-  AlbumNorm VARCHAR(256) NOT NULL,
+  Filename TEXT NOT NULL,
+  CoverFilename TEXT NOT NULL,
+  Artist TEXT NOT NULL,
+  Title TEXT NOT NULL,
+  Album TEXT NOT NULL,
+  AlbumId TEXT NOT NULL,
+  ArtistNorm TEXT NOT NULL,
+  TitleNorm TEXT NOT NULL,
+  AlbumNorm TEXT NOT NULL,
   Track INTEGER NOT NULL,
   Disc INTEGER NOT NULL,
   Date TEXT NOT NULL, -- RFC 3339 UTC, e.g. '2011-12-03T10:15:30Z'
-  Length FLOAT NOT NULL,
-  TrackGain FLOAT NOT NULL,
-  AlbumGain FLOAT NOT NULL,
-  PeakAmp FLOAT NOT NULL,
-  Rating INTEGER NOT NULL);
+  Length REAL NOT NULL,
+  TrackGain REAL NOT NULL,
+  AlbumGain REAL NOT NULL,
+  PeakAmp REAL NOT NULL,
+  Rating INTEGER NOT NULL,
+  Tags TEXT NOT NULL); -- e.g. '|drums|instrumental|rock|'
 CREATE INDEX Artist ON Songs (Artist);
 CREATE INDEX Album ON Songs (Album);
 CREATE INDEX AlbumId ON Songs (AlbumId);
@@ -434,6 +435,46 @@ private val upgradeSteps = mapOf<Int, (SQLiteDatabase) -> Unit>(
               Date TEXT NOT NULL); -- RFC 3339 UTC, e.g. '2011-12-03T10:15:30Z'
             CREATE INDEX ArtistSortKey ON ArtistAlbumStats (ArtistSortKey);
             CREATE INDEX AlbumSortKey ON ArtistAlbumStats (AlbumSortKey);
+            """
+        )
+    },
+    24 to { db ->
+        // Add Tags to Songs and switch to canonical data types.
+        // Also force a full sync to get all of the tags.
+        runSQL(
+            db,
+            """
+            ALTER TABLE Songs RENAME TO SongsTmp;
+            CREATE TABLE Songs (
+              SongId INTEGER PRIMARY KEY NOT NULL,
+              Filename TEXT NOT NULL,
+              CoverFilename TEXT NOT NULL,
+              Artist TEXT NOT NULL,
+              Title TEXT NOT NULL,
+              Album TEXT NOT NULL,
+              AlbumId TEXT NOT NULL,
+              ArtistNorm TEXT NOT NULL,
+              TitleNorm TEXT NOT NULL,
+              AlbumNorm TEXT NOT NULL,
+              Track INTEGER NOT NULL,
+              Disc INTEGER NOT NULL,
+              Date TEXT NOT NULL, -- RFC 3339 UTC, e.g. '2011-12-03T10:15:30Z'
+              Length REAL NOT NULL,
+              TrackGain REAL NOT NULL,
+              AlbumGain REAL NOT NULL,
+              PeakAmp REAL NOT NULL,
+              Rating INTEGER NOT NULL,
+              Tags TEXT NOT NULL); -- e.g. '|drums|instrumental|rock|'
+            INSERT INTO Songs
+              SELECT SongId, Filename, CoverFilename, Artist, Title, Album, AlbumId, ArtistNorm,
+                TitleNorm, AlbumNorm, Track, Disc, Date, Length, TrackGain, AlbumGain, PeakAmp,
+                Rating, '' AS Tags
+              FROM SongsTmp;
+            DROP TABLE SongsTmp;
+            CREATE INDEX Artist ON Songs (Artist);
+            CREATE INDEX Album ON Songs (Album);
+            CREATE INDEX AlbumId ON Songs (AlbumId);
+            UPDATE LastUpdateTime SET LocalTimeNsec = 0, ServerTimeNsec = 0;
             """
         )
     },

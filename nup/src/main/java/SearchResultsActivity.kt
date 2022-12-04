@@ -146,6 +146,7 @@ class SearchResultsActivity : AppCompatActivity() {
             minDate = intent.getStringExtra(BUNDLE_MIN_DATE),
             maxDate = intent.getStringExtra(BUNDLE_MAX_DATE),
             minRating = intent.getIntExtra(BUNDLE_MIN_RATING, 0),
+            tags = intent.getStringExtra(BUNDLE_TAGS),
             shuffle = intent.getBooleanExtra(BUNDLE_SHUFFLE, false),
             substring = intent.getBooleanExtra(BUNDLE_SUBSTRING, false),
             onlyCached = intent.getBooleanExtra(BUNDLE_CACHED, false),
@@ -157,7 +158,6 @@ class SearchResultsActivity : AppCompatActivity() {
      */
     private fun needsServerSearch(): Boolean {
         return !intent.getStringExtra(BUNDLE_KEYWORDS).isNullOrEmpty() ||
-            !intent.getStringExtra(BUNDLE_TAGS).isNullOrEmpty() ||
             intent.getBooleanExtra(BUNDLE_ORDER_BY_LAST_PLAYED, false) ||
             intent.getIntExtra(BUNDLE_MAX_PLAYS, -1) >= 0 ||
             intent.getIntExtra(BUNDLE_FIRST_PLAYED, 0) > 0 ||
@@ -246,7 +246,7 @@ class SearchResultsActivity : AppCompatActivity() {
         const val BUNDLE_SUBSTRING = "substring"
         const val BUNDLE_CACHED = "cached"
         const val BUNDLE_KEYWORDS = "keywords"
-        const val BUNDLE_TAGS = "tags"
+        const val BUNDLE_TAGS = "tags" // e.g. "drums electronic -vocals"
         const val BUNDLE_ORDER_BY_LAST_PLAYED = "order_by_last_played"
         const val BUNDLE_MAX_PLAYS = "max_plays"
         const val BUNDLE_FIRST_PLAYED = "first_played"

@@ -169,11 +169,13 @@ class SongDatabaseTest {
     @Test fun syncAndQuery() = runBlockingTest {
         val s1 = makeSong("Ä", "Track 1", "Album 1", 1, rating = 4)
         val s2 = makeSong(
-            "A", "Track 2", "Album 1", 2, rating = 2, date = Instant.parse("2005-01-23T00:00:00Z")
+            "A", "Track 2", "Album 1", 2, rating = 2, date = Instant.parse("2005-01-23T00:00:00Z"),
+            tags = listOf("instrumental"),
         )
         val s3 = makeSong("B feat. C", "Track 3", "Album 1", 3, rating = 5)
         val s4 = makeSong(
-            "B", "Traĉk 1", "Albúm ²", 1, rating = 0, date = Instant.parse("2011-12-03T10:15:30Z")
+            "B", "Traĉk 1", "Albúm ²", 1, rating = 0, date = Instant.parse("2011-12-03T10:15:30Z"),
+            tags = listOf("instrumental", "electronic", "10%"),
         )
         serverSongs.addAll(listOf(SongInfo(s1), SongInfo(s2), SongInfo(s3), SongInfo(s4)))
 
@@ -208,6 +210,13 @@ class SongDatabaseTest {
             listOf(s2),
             db.query(minDate = "2000-01-01T00:00:00Z", maxDate = "2010-01-01T00:00:00Z")
         )
+        assertEquals(listOf(s2, s4), db.query(tags = "instrumental"))
+        assertEquals(listOf(s4), db.query(tags = "instrumental electronic"))
+        assertEquals(listOf(s2), db.query(tags = "instrumental -electronic"))
+        assertEquals(listOf(s4), db.query(tags = "electronic -bogus"))
+        assertEquals(listOf<Song>(), db.query(tags = "bogus"))
+        assertEquals(listOf(s4), db.query(tags = "10%"))
+        assertEquals(listOf<Song>(), db.query(tags = "%")) // interpreted literally
 
         assertEquals(
             Pair(listOf(s1, s4, s3, s2), 2),
@@ -237,7 +246,7 @@ class SongDatabaseTest {
 
         // At time 1, update the first song, delete the second song, and add a third song.
         serverNowNs++
-        val s1u = makeSong("A", "Track 1", "Album 1", 1, rating = 3)
+        val s1u = makeSong("A", "Track 1", "Album 1", 1, rating = 3, tags = listOf("rock"))
         serverSongs[0] = SongInfo(s1u, serverNowNs)
         serverDelSongs.add(SongInfo(s2, serverNowNs))
         val s3 = makeSong("A", "Track 3", "Album 1", 3, rating = 5)
@@ -498,6 +507,7 @@ class SongDatabaseTest {
             albumGain = 0.0, // not in version 13
             peakAmp = 0.0, // not in version 13
             rating = 4,
+            tags = listOf<String>(), // not in version 13
         )
         val report = SongDatabase.PendingPlaybackReport(song.id, Date(1641855862L * 1000))
 
@@ -570,8 +580,9 @@ fun makeSong(
     album: String,
     track: Int,
     disc: Int = 1,
-    rating: Int? = null,
     date: Instant? = null,
+    rating: Int? = null,
+    tags: List<String>? = null,
 ): Song {
     val albumId =
         if (album.isEmpty()) ""
@@ -594,6 +605,7 @@ fun makeSong(
         albumGain = -7.5,
         peakAmp = 1.0,
         rating = if (rating != null) rating else (size % 5) + 1,
+        tags = if (tags != null) tags else listOf<String>(),
     )
 }
 
@@ -615,6 +627,7 @@ private fun songToJson(s: Song): JSONObject {
     o.put("albumGain", s.albumGain)
     o.put("peakAmp", s.peakAmp)
     o.put("rating", s.rating)
+    if (!s.tags.isEmpty()) o.put("tags", JSONArray(s.tags))
     return o
 }
 
