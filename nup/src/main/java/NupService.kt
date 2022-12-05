@@ -259,7 +259,7 @@ class NupService :
         filter.addAction(Intent.ACTION_USER_FOREGROUND)
         registerReceiver(broadcastReceiver, filter)
 
-        networkHelper = NetworkHelper(this)
+        networkHelper = NetworkHelper(this, scope)
         downloader = Downloader()
         player = Player(this, this, mainExecutor, audioAttrs)
         cache = FileCache(this, this, mainExecutor, downloader, networkHelper)

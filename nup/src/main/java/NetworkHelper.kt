@@ -10,11 +10,14 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
-import android.provider.Settings
 import android.util.Log
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
 /** Monitors network connectivity. */
-open class NetworkHelper(private val context: Context) {
+open class NetworkHelper(private val context: Context, private val scope: CoroutineScope) {
     private val connectivityManager =
         context.getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
 
@@ -31,31 +34,40 @@ open class NetworkHelper(private val context: Context) {
     fun removeListener(listener: Listener) = listeners.remove(listener)
 
     /** Is a network connection currently available? */
-    val isNetworkAvailable get(): Boolean {
-        // For some reason, I'm still seeing an active cellular network when I enable airplane mode.
-        if (Settings.Global.getInt(
-                context.getContentResolver(),
-                Settings.Global.AIRPLANE_MODE_ON, 0
-            ) != 0
-        ) {
-            return false
+    val isNetworkAvailable get() =
+        connectivityManager.getNetworkCapabilities(
+            connectivityManager.activeNetwork
+        ).let { caps -> requiredCaps.all { caps?.hasCapability(it) ?: false } }
+
+    /** Schedule a task to check the state and notify listeners about changes. */
+    private fun scheduleUpdate() =
+        scope.launch(Dispatchers.Main) task@{
+            // Android doesn't seem to provide an easy way to figure out when general network
+            // connectivity (in the sense of "can I talk to a random server on the Internet?")
+            // comes or goes.
+            //
+            // ConnectivityManager.NetworkCallback appears to focus on monitoring individual network
+            // connections, and the documentation for its methods are full of (accurate) warnings
+            // like "Do NOT call ConnectivityManager.getNetworkCapabilities(android.net.Network) or
+            // ConnectivityManager.getLinkProperties(android.net.Network) or other synchronous
+            // ConnectivityManager methods in this callback as this is prone to race conditions ;
+            // calling these methods while in a callback may return an outdated or even a null
+            // object."
+            //
+            // isNetworkAvailable's approach of just checking the active network's capabilities
+            // seems to mostly work, so just post delayed tasks from the callback in the hope that
+            // things will have settled down by the time that we look at the state.
+            delay(UPDATE_DELAY_MS)
+            val updated = isNetworkAvailable
+            if (available == updated) return@task
+            available = updated
+            Log.d(TAG, "Network became ${if (available) "" else "un"}available")
+            for (l in listeners) l.onNetworkAvailabilityChange(available)
         }
-
-        val caps = connectivityManager.getNetworkCapabilities(connectivityManager.activeNetwork)
-        if (caps == null) return false
-        return requiredCaps.all { caps.hasCapability(it) }
-    }
-
-    private fun updateAvailable() {
-        val updated = isNetworkAvailable
-        if (available == updated) return
-        available = updated
-        Log.d(TAG, "Network became ${if (available) "" else "un"}available")
-        for (l in listeners) l.onNetworkAvailabilityChange(available)
-    }
 
     companion object {
         private const val TAG = "NetworkHelper"
+        private const val UPDATE_DELAY_MS = 500L
     }
 
     private val requiredCaps = listOf(
@@ -72,13 +84,13 @@ open class NetworkHelper(private val context: Context) {
         connectivityManager.registerNetworkCallback(
             builder.build(),
             object : ConnectivityManager.NetworkCallback() {
-                override fun onAvailable(network: Network) {
-                    super.onLost(network)
-                    updateAvailable()
+                override fun onCapabilitiesChanged(network: Network, caps: NetworkCapabilities) {
+                    super.onCapabilitiesChanged(network, caps)
+                    scheduleUpdate()
                 }
                 override fun onLost(network: Network) {
                     super.onLost(network)
-                    updateAvailable()
+                    scheduleUpdate()
                 }
             }
         )
