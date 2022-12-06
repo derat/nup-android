@@ -26,6 +26,7 @@ import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.BaseAdapter
 import android.widget.ImageView
 import android.widget.ListView
+import android.widget.SeekBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
@@ -49,13 +50,19 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         _service?.unpause()
     }
 
+    private var seekbarDragMs = -1 // most-recent [seekbar] position while scrubbing
+
     private lateinit var currentSongFrame: View
     private lateinit var coverImageView: ImageView
     private lateinit var artistLabel: TextView
     private lateinit var titleLabel: TextView
     private lateinit var albumLabel: TextView
-    private lateinit var timeLabel: TextView
     private lateinit var downloadStatusLabel: TextView
+
+    private lateinit var progressRow: View
+    private lateinit var positionLabel: TextView
+    private lateinit var durationLabel: TextView
+    private lateinit var seekbar: SeekBar
 
     private lateinit var playbackButtonsRow: View
     private lateinit var pauseButton: MaterialButton
@@ -82,8 +89,29 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         artistLabel = findViewById<TextView>(R.id.artist_label)
         titleLabel = findViewById<TextView>(R.id.title_label)
         albumLabel = findViewById<TextView>(R.id.album_label)
-        timeLabel = findViewById<TextView>(R.id.time_label)
         downloadStatusLabel = findViewById<TextView>(R.id.download_status_label)
+
+        progressRow = findViewById<View>(R.id.progress_row)
+        positionLabel = findViewById<TextView>(R.id.position_label)
+        durationLabel = findViewById<TextView>(R.id.duration_label)
+        seekbar = findViewById<SeekBar>(R.id.seekbar)
+        seekbar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekbar: SeekBar, progress: Int, fromUser: Boolean) {
+                if (!fromUser) return
+                seekbarDragMs = progress
+                positionLabel.text = formatDuration(seekbarDragMs / 1000)
+            }
+            override fun onStartTrackingTouch(seekbar: SeekBar) {
+                seekbarDragMs = seekbar.getProgress()
+            }
+            override fun onStopTrackingTouch(seekbar: SeekBar) {
+                // TODO: Only seek if the user dragged? Also try to ignore accidental motion while
+                // lifting finger: https://www.erat.org/rants.html#android-sliders
+                if (seekbarDragMs >= 0) service.seek(seekbarDragMs.toLong())
+                positionLabel.text = formatDuration(service.lastPosMs / 1000)
+                seekbarDragMs = -1
+            }
+        })
 
         playbackButtonsRow = findViewById<View>(R.id.playback_buttons_row)
         pauseButton = findViewById<MaterialButton>(R.id.pause_button)
@@ -163,17 +191,27 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         runOnUiThread(
             task@{
                 if (song != curSong) return@task
-                val sec = positionMs / 1000
-                if (sec == lastPosSec) return@task
 
                 // If we've already downloaded the whole song, use the duration computed by
                 // MediaPlayer in case it's different from the length in the database.
-                val downloaded = song.availableBytes == song.totalBytes
-                val durationSec =
-                    if (downloaded && durationMs >= 0) durationMs / 1000
-                    else song.lengthSec.toInt()
-                timeLabel.text = formatDurationProgress(sec, durationSec)
-                lastPosSec = sec
+                val lenMs =
+                    if (song.availableBytes == song.totalBytes && durationMs >= 0) durationMs
+                    else (song.lengthSec * 1000).toInt()
+                seekbar.setMax(lenMs)
+
+                // Avoid messing with the progress bar and labels while dragging.
+                val dragging = seekbarDragMs >= 0
+                if (!dragging) {
+                    seekbar.setProgress(positionMs)
+
+                    // Only update the position label when the second has changed.
+                    val posSec = positionMs / 1000
+                    if (lastPosSec != posSec) {
+                        positionLabel.text = formatDuration(posSec)
+                        durationLabel.text = formatDuration(lenMs / 1000)
+                        lastPosSec = posSec
+                    }
+                }
             }
         )
     }
@@ -223,14 +261,22 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         artistLabel.text = song?.artist ?: ""
         titleLabel.text = song?.title ?: ""
         albumLabel.text = song?.album ?: ""
-
-        timeLabel.text =
-            if (song != null) formatDurationProgress(
-                if (song == service.curSong) service.lastPosMs / 1000 else 0,
-                song.lengthSec.toInt()
-            )
-            else ""
         downloadStatusLabel.text = ""
+
+        if (song != null) {
+            val posMs = if (song == service.curSong) service.lastPosMs else 0
+            val lenMs = (song.lengthSec * 1000).toInt()
+            seekbar.setMax(lenMs)
+            seekbar.setProgress(posMs)
+            seekbar.setEnabled(true)
+            positionLabel.text = formatDuration(posMs / 1000)
+            durationLabel.text = formatDuration(lenMs / 1000)
+        } else {
+            seekbar.setEnabled(false)
+            seekbar.setProgress(0)
+            positionLabel.text = ""
+            durationLabel.text = ""
+        }
 
         coverImageView.setImageBitmap(song?.coverBitmap ?: noCoverBitmap)
         if (song?.coverBitmap == null && song?.coverFilename != null) {
@@ -243,6 +289,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         // Hide the controls when there's no song.
         val vis = if (song != null) View.VISIBLE else View.INVISIBLE
         currentSongFrame.visibility = vis
+        progressRow.visibility = vis
         playbackButtonsRow.visibility = vis
     }
 

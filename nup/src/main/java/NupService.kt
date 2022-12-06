@@ -667,6 +667,8 @@ class NupService :
         player.togglePause()
     }
 
+    fun seek(posMs: Long) = player.seek(posMs)
+
     /**
      * Request the audio focus if it isn't already held.
      *
@@ -741,6 +743,9 @@ class NupService :
             if (!playlist.isEmpty() && curSongIndex < playlist.size) {
                 selectSongAtIndex(curSongIndex)
             } else {
+                // TODO: This can leave us in a weird state with a non-empty playlist but no song
+                // selected and the prev/next buttons disabled. It'd probably be best to jump to the
+                // end of the last song in the playlist, or maybe select it without playing.
                 curSongIndex = -1
                 mediaSessionManager.updateSong(null, null)
                 updatePlaybackState()

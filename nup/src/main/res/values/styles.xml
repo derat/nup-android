@@ -32,6 +32,10 @@
     <item name="android:alpha">0.8</item>
     <item name="android:textSize">@dimen/playing_song_download_text</item>
   </style>
+  <style name="SeekLabel">
+    <item name="android:layout_width">@dimen/seek_label_width</item>
+    <item name="android:layout_height">wrap_content</item>
+  </style>
 
   <style name="Button" parent="Widget.MaterialComponents.Button">
      <item name="android:layout_width">fill_parent</item>

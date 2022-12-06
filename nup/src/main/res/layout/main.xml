@@ -20,6 +20,15 @@
       android:adjustViewBounds="true"
       android:scaleType="centerCrop"
     />
+    <TextView
+      android:id="@+id/download_status_label"
+      style="@style/PlayingSongDownload"
+      android:layout_gravity="top|right"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:paddingRight="@dimen/horizontal_padding"
+      android:paddingTop="@dimen/vertical_padding"
+    />
     <LinearLayout
       android:orientation="vertical"
       android:layout_gravity="bottom|left"
@@ -34,23 +43,34 @@
       <TextView android:id="@+id/artist_label" style="@style/PlayingSongArtist" />
       <TextView android:id="@+id/title_label" style="@style/PlayingSongTitle" />
       <TextView android:id="@+id/album_label" style="@style/PlayingSongAlbum" />
-      <LinearLayout
-        android:orientation="horizontal"
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:clipChildren="false"
-        android:clipToPadding="false"
-      >
-        <TextView android:id="@+id/time_label" style="@style/PlayingSongTime" />
-        <TextView
-          android:id="@+id/download_status_label"
-          style="@style/PlayingSongDownload"
-          android:layout_width="fill_parent"
-          android:gravity="right"
-        />
-      </LinearLayout>
     </LinearLayout>
   </FrameLayout>
+
+  <LinearLayout
+    style="@style/Raised"
+    android:id="@+id/progress_row"
+    android:orientation="horizontal"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:paddingLeft="@dimen/horizontal_padding"
+    android:paddingRight="@dimen/horizontal_padding"
+    android:paddingTop="@dimen/vertical_padding"
+    android:paddingBottom="@dimen/vertical_padding"
+    android:clipChildren="false"
+  >
+    <TextView android:id="@+id/position_label" style="@style/SeekLabel" />
+    <SeekBar
+      android:id="@+id/seekbar"
+      android:layout_width="0px"
+      android:layout_height="wrap_content"
+      android:layout_weight="1"
+    />
+    <TextView
+      android:id="@+id/duration_label"
+      style="@style/SeekLabel"
+      android:gravity="right"
+    />
+  </LinearLayout>
 
   <LinearLayout
     style="@style/Raised"
@@ -64,25 +84,25 @@
     android:paddingBottom="@dimen/vertical_padding"
   >
     <Button
-        android:id="@+id/prev_button"
-        style="@style/IconButton"
-        app:icon="@drawable/skip_previous"
-        android:onClick="onPrevButtonClicked"
-      />
+      android:id="@+id/prev_button"
+      style="@style/IconButton"
+      app:icon="@drawable/skip_previous"
+      android:onClick="onPrevButtonClicked"
+    />
     <Space android:layout_width="@dimen/button_spacing" android:layout_height="fill_parent" />
     <Button
-        android:id="@+id/pause_button"
-        style="@style/IconButton"
-        app:icon="@drawable/play"
-        android:onClick="onPauseButtonClicked"
-      />
+      android:id="@+id/pause_button"
+      style="@style/IconButton"
+      app:icon="@drawable/play"
+      android:onClick="onPauseButtonClicked"
+    />
     <Space android:layout_width="@dimen/button_spacing" android:layout_height="fill_parent" />
     <Button
-        android:id="@+id/next_button"
-        style="@style/IconButton"
-        app:icon="@drawable/skip_next"
-        android:onClick="onNextButtonClicked"
-      />
+      android:id="@+id/next_button"
+      style="@style/IconButton"
+      app:icon="@drawable/skip_next"
+      android:onClick="onNextButtonClicked"
+    />
   </LinearLayout>
 
   <LinearLayout
