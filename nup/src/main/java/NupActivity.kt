@@ -123,7 +123,6 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
             val song = curSong
             if (song != null && song == service.curSong) {
                 onSongPositionChange(song, service.lastPosMs, -1)
-                playlistView.smoothScrollToPosition(curSongIndex)
             }
 
             // TODO: Go to prefs page if server is unset.
@@ -387,7 +386,26 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         curSongIndex = index
         updateSongDisplay(curSong)
         songListAdapter.notifyDataSetChanged()
+        scrollPlaylist()
         updateButtonStates()
+    }
+
+    /** Scrolls [playlistView] such that [curSong] is visible. */
+    private fun scrollPlaylist() {
+        if (curSong == null) return
+
+        val first = playlistView.getFirstVisiblePosition()
+        val last = playlistView.getLastVisiblePosition()
+
+        val min = Math.max(curSongIndex - PLAYLIST_SCROLL_THRESHOLD, 0)
+        val max = Math.min(curSongIndex + PLAYLIST_SCROLL_THRESHOLD, songs.size - 1)
+
+        // Skip scrolling as long as the songs within the threshold are visible.
+        if (first <= min && last >= max) return
+
+        // Scroll as far as we can while still keeping the threshold visible.
+        if (max > last) playlistView.smoothScrollToPosition(songs.size - 1, min)
+        else playlistView.smoothScrollToPosition(0, max)
     }
 
     /** Update state of playback buttons. */
@@ -414,6 +432,9 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         // This avoids requesting a bunch of tracks that we don't want when the user is repeatedly
         // pressing the button to skip through tracks.
         private const val SONG_CHANGE_DELAY_MS = 500L
+
+        // Number of playlist entries to keep visible before and after the current song.
+        private const val PLAYLIST_SCROLL_THRESHOLD = 2
 
         // IDs for items in our context menus.
         private const val MENU_ITEM_PLAY = 1
