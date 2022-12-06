@@ -390,22 +390,24 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         updateButtonStates()
     }
 
-    /** Scrolls [playlistView] such that [curSong] is visible. */
+    /** Scrolls [playlistView] so that [curSong] is visible. */
     private fun scrollPlaylist() {
         if (curSong == null) return
 
-        val first = playlistView.getFirstVisiblePosition()
-        val last = playlistView.getLastVisiblePosition()
+        val visMin = playlistView.getFirstVisiblePosition()
+        val visMax = playlistView.getLastVisiblePosition()
 
-        val min = Math.max(curSongIndex - PLAYLIST_SCROLL_THRESHOLD, 0)
-        val max = Math.min(curSongIndex + PLAYLIST_SCROLL_THRESHOLD, songs.size - 1)
+        val wantMin = Math.max(curSongIndex - PLAYLIST_SCROLL_THRESHOLD, 0)
+        val wantMax = Math.min(curSongIndex + PLAYLIST_SCROLL_THRESHOLD, songs.size - 1)
 
-        // Skip scrolling as long as the songs within the threshold are visible.
-        if (first <= min && last >= max) return
-
-        // Scroll as far as we can while still keeping the threshold visible.
-        if (max > last) playlistView.smoothScrollToPosition(songs.size - 1, min)
-        else playlistView.smoothScrollToPosition(0, max)
+        // Scroll as far as we can while still keeping nearby entries visible.
+        // TODO: This will probably jump back and forth on successive calls to scrollPlaylist() if
+        // the device's display is small enough that wantMax-wantMin is greater than visMax-visMin.
+        // TODO: The scrolling itself seems to be constant-speed, which looks quite ugly.
+        // AbsListView has a nonsensical implementation that prohibits overriding this:
+        // https://stackoverflow.com/questions/31064758.
+        if (visMax < wantMax) playlistView.smoothScrollToPosition(songs.size - 1, wantMin)
+        else if (visMin > wantMin) playlistView.smoothScrollToPosition(0, wantMax)
     }
 
     /** Update state of playback buttons. */
