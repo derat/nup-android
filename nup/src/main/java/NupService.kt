@@ -740,12 +740,12 @@ class NupService :
         if (playlist.isEmpty()) player.shuffled = false
 
         if (removedPlaying) {
-            if (!playlist.isEmpty() && curSongIndex < playlist.size) {
+            if (curSongIndex in 0 until playlist.size) {
                 selectSongAtIndex(curSongIndex)
+            } else if (!playlist.isEmpty()) {
+                pause()
+                selectSongAtIndex(playlist.size - 1)
             } else {
-                // TODO: This can leave us in a weird state with a non-empty playlist but no song
-                // selected and the prev/next buttons disabled. It'd probably be best to jump to the
-                // end of the last song in the playlist, or maybe select it without playing.
                 curSongIndex = -1
                 mediaSessionManager.updateSong(null, null)
                 updatePlaybackState()
