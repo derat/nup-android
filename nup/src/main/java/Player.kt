@@ -225,7 +225,7 @@ class Player(
             }
             if (currentPlayer != null && !paused) {
                 currentPlayer!!.mediaPlayer.start()
-                startPositionTimer()
+                startPositionTask()
             }
         }
     }
@@ -254,7 +254,7 @@ class Player(
     /** Reset [currentPlayer]. */
     private fun resetCurrent() {
         threadChecker.assertThread()
-        stopPositionTimer()
+        stopPositionTask()
         currentPlayer?.close()
         currentPlayer = null
     }
@@ -290,7 +290,7 @@ class Player(
             if (player != null) {
                 if (paused) {
                     player.mediaPlayer.pause()
-                    stopPositionTimer()
+                    stopPositionTask()
                 } else {
                     // If the file is already fully loaded, play from it instead of a stream.
                     var switchedToFile = false
@@ -303,7 +303,7 @@ class Player(
                         }
                     }
                     if (!switchedToFile) player.mediaPlayer.start()
-                    startPositionTimer()
+                    startPositionTask()
                 }
             }
 
@@ -316,7 +316,7 @@ class Player(
         executor.execute {
             Log.d(TAG, "Seeking to $posMs ms")
             currentPlayer?.mediaPlayer?.seekTo(posMs.toInt())
-            positionTask()
+            reportPosition()
         }
     }
 
@@ -364,34 +364,41 @@ class Player(
             }
         }
 
-    /** Periodically invoked to notify [listener] about playback position of current song. */
-    private val positionTask = task@{
+    /** Notify [listener] about playback position of current song. */
+    private fun reportPosition() {
         threadChecker.assertThread()
-        currentPlayer ?: return@task
-        val player = currentPlayer!!
+        val player = currentPlayer
+        player ?: return
+
         val file = player.file
-        val positionMs = player.mediaPlayer.currentPosition
-        val durationMs = player.mediaPlayer.duration
-        listenerExecutor.execute { listener.onPlaybackPositionChange(file, positionMs, durationMs) }
+        val posMs = player.mediaPlayer.currentPosition
+        val durMs = player.mediaPlayer.duration
+        listenerExecutor.execute { listener.onPlaybackPositionChange(file, posMs, durMs) }
+    }
+
+    /** Call [reportPosition] and reschedule to run again after next second. */
+    private val positionTask = object : Runnable {
+        override fun run() {
+            reportPosition()
+
+            // Schedule ourselves to run again after the next second boundary is crossed.
+            val posMs = currentPlayer?.mediaPlayer?.currentPosition ?: return
+            val partMs = posMs.toLong() % 1000L
+            val delayMs = (1000L + POSITION_CHANGE_DELAY_MS - partMs) % 1000L
+            positionFuture = executor.schedule(this, delayMs, TimeUnit.MILLISECONDS)
+        }
     }
     private var positionFuture: ScheduledFuture<*>? = null
 
     /** Start running [positionTask]. */
-    private fun startPositionTimer() {
+    private fun startPositionTask() {
         threadChecker.assertThread()
-        stopPositionTimer()
-
-        // Report the position immediately and then slightly after we pass each second mark.
-        positionTask()
-        val partMs = (currentPlayer?.mediaPlayer?.currentPosition?.toLong() ?: 0L) % 1000L
-        val initialMs = (1000L + POSITION_CHANGE_DELAY_MS - partMs) % 1000L
-        positionFuture = executor.scheduleAtFixedRate(
-            positionTask, initialMs, 1000, TimeUnit.MILLISECONDS
-        )
+        stopPositionTask()
+        positionTask.run() // also schedules future calls
     }
 
     /** Stop running [positionTask]. */
-    private fun stopPositionTimer() {
+    private fun stopPositionTask() {
         threadChecker.assertThread()
         positionFuture?.cancel(false)
         positionFuture = null

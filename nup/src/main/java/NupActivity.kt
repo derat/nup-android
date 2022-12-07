@@ -39,7 +39,6 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
     private val curSong: Song?
         get() = if (curSongIndex in 0 until songs.size) songs[curSongIndex] else null
 
-    private var lastPosSec = -1 // last song position time passed to [onSongPositionChange]
     private val songListAdapter = SongListAdapter() // adapts [songs] for [playlistView]
 
     // Context.mainExecutor is annoyingly an Executor rather than a ScheduledExecutorService,
@@ -203,14 +202,8 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
                 val dragging = seekbarDragMs >= 0
                 if (!dragging) {
                     seekbar.setProgress(positionMs)
-
-                    // Only update the position label when the second has changed.
-                    val posSec = positionMs / 1000
-                    if (lastPosSec != posSec) {
-                        positionLabel.text = formatDuration(posSec)
-                        durationLabel.text = formatDuration(lenMs / 1000)
-                        lastPosSec = posSec
-                    }
+                    positionLabel.text = formatDuration(positionMs / 1000)
+                    durationLabel.text = formatDuration(lenMs / 1000)
                 }
             }
         )
@@ -285,9 +278,6 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         if (song?.coverBitmap == null && song?.coverFilename != null) {
             service.fetchCoverForSongIfMissing(song)
         }
-
-        // Update the displayed time in response to the next position change we get.
-        lastPosSec = -1
 
         // Hide the controls when there's no song.
         val vis = if (song != null) View.VISIBLE else View.INVISIBLE
