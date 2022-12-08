@@ -22,12 +22,14 @@
     />
     <TextView
       android:id="@+id/download_status_label"
-      style="@style/PlayingSongDownload"
+      style="@style/PlayingSongText"
       android:layout_gravity="top|right"
       android:layout_width="wrap_content"
       android:layout_height="wrap_content"
       android:paddingRight="@dimen/horizontal_padding"
       android:paddingTop="@dimen/vertical_padding"
+      android:alpha="0.8"
+      android:textSize="@dimen/playing_song_download_text"
     />
     <LinearLayout
       android:orientation="vertical"
@@ -40,9 +42,20 @@
       android:clipChildren="false"
       android:clipToPadding="false"
     >
-      <TextView android:id="@+id/artist_label" style="@style/PlayingSongArtist" />
-      <TextView android:id="@+id/title_label" style="@style/PlayingSongTitle" />
-      <TextView android:id="@+id/album_label" style="@style/PlayingSongAlbum" />
+      <TextView
+        android:id="@+id/artist_label"
+        style="@style/PlayingSongText"
+        android:textStyle="bold"
+      />
+      <TextView
+        android:id="@+id/title_label"
+        style="@style/PlayingSongText"
+        android:textStyle="italic"
+      />
+      <TextView
+        android:id="@+id/album_label"
+        style="@style/PlayingSongText"
+      />
     </LinearLayout>
   </FrameLayout>
 

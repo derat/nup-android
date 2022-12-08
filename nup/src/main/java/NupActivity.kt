@@ -9,6 +9,7 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
 import android.graphics.Bitmap
+import android.graphics.Color
 import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
@@ -217,7 +218,10 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
     override fun onSongCoverLoad(song: Song) {
         runOnUiThread {
-            if (song == curSong) coverImageView.setImageBitmap(song.coverBitmap)
+            if (song == curSong) {
+                coverImageView.setImageBitmap(song.coverBitmap)
+                updateSongTextColor(song)
+            }
         }
     }
 
@@ -275,6 +279,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         }
 
         coverImageView.setImageBitmap(song?.coverBitmap ?: noCoverBitmap)
+        updateSongTextColor(song)
         if (song?.coverBitmap == null && song?.coverFilename != null) {
             service.fetchCoverForSongIfMissing(song)
         }
@@ -284,6 +289,17 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         currentSongFrame.visibility = vis
         progressRow.visibility = vis
         playbackButtonsRow.visibility = vis
+    }
+
+    /** Update text view styles to be legible over [song]'s cover image. */
+    private fun updateSongTextColor(song: Song?) {
+        val bg = song?.coverColor ?: R.color.no_song_cover
+        val style =
+            if (Color.luminance(bg) >= LIGHT_COVER_MIN_LUMINANCE) R.style.PlayingSongTextDark
+            else R.style.PlayingSongText
+        for (view in arrayOf(artistLabel, titleLabel, albumLabel, downloadStatusLabel)) {
+            view.setTextAppearance(style)
+        }
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {
@@ -483,6 +499,11 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
         // Number of playlist entries to keep visible before and after the current song.
         private const val PLAYLIST_SCROLL_THRESHOLD = 2
+
+        // Minimum luminance at which a cover image is considered to be "light", implying that
+        // overlaid text should be black rather than white. Chosen based on experimentation, but
+        // see also https://stackoverflow.com/a/3943023.
+        private const val LIGHT_COVER_MIN_LUMINANCE = 0.4
 
         // IDs for items in our context menus.
         private const val MENU_ITEM_PLAY = 1

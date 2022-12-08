@@ -865,7 +865,10 @@ class NupService :
         songCoverFetches.add(song)
         scope.launch(Dispatchers.Main) {
             val bitmap = async(Dispatchers.IO) { coverLoader.getBitmap(song.coverFilename) }.await()
-            storeCoverForSong(song, bitmap)
+            val color = async(Dispatchers.IO) {
+                getAverageColor(bitmap, top = COVER_BOTTOM_PCT, right = COVER_LEFT_PCT)
+            }.await()
+            storeCoverForSong(song, bitmap, color)
             songCoverFetches.remove(song)
 
             if (song.coverBitmap != null) {
@@ -1183,12 +1186,13 @@ class NupService :
     }
 
     /**
-     * Set [song]'s cover bitmap to [bitmap].
+     * Set [song]'s cover bitmap to [bitmap] and its average color to [color].
      *
-     * Also makes sure that we don't have more than |MAX_LOADED_COVERS| bitmaps in-memory.
+     * Also makes sure that we don't have more than [MAX_LOADED_COVERS] bitmaps in-memory.
      */
-    private fun storeCoverForSong(song: Song?, bitmap: Bitmap?) {
-        song!!.coverBitmap = bitmap
+    private fun storeCoverForSong(song: Song, bitmap: Bitmap?, color: Int?) {
+        song.coverBitmap = bitmap
+        song.coverColor = color
         val existingIndex = songsWithCovers.indexOf(song)
 
         // If we didn't get a bitmap, bail out early.
@@ -1207,6 +1211,7 @@ class NupService :
         // If we're full, drop the cover from the first song on the list.
         if (songsWithCovers.size == MAX_LOADED_COVERS) {
             songsWithCovers[0].coverBitmap = null
+            songsWithCovers[0].coverColor = null
             songsWithCovers.removeAt(0)
         }
         songsWithCovers.add(song)
@@ -1245,5 +1250,7 @@ class NupService :
         private const val REPORT_PLAYBACK_THRESHOLD_MS = 240 * 1000L // always report after 4 min
         private const val IGNORE_NOISY_AUDIO_AFTER_USER_SWITCH_MS = 1000L
         private const val MAX_RESTORE_AGE_MS = 12 * 3600 * 1000L // max age for restoring state
+        private const val COVER_BOTTOM_PCT = 0.2 // bottom fraction covered by text
+        private const val COVER_LEFT_PCT = 0.5 // left fraction covered by text
     }
 }
