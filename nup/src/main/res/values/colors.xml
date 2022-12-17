@@ -11,5 +11,7 @@
   <color name="divider">#B6B6B6</color>
 
   <color name="no_song_cover">#3777</color>
+  <color name="dark_cover_overlay">#C000</color>
+  <color name="light_cover_overlay">#CFFF</color>
   <color name="playlist_row_background">#DDD</color>
 </resources>

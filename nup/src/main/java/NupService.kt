@@ -865,10 +865,11 @@ class NupService :
         songCoverFetches.add(song)
         scope.launch(Dispatchers.Main) {
             val bitmap = async(Dispatchers.IO) { coverLoader.getBitmap(song.coverFilename) }.await()
-            val color = async(Dispatchers.IO) {
-                getAverageColor(bitmap, top = COVER_BOTTOM_PCT, right = COVER_LEFT_PCT)
+            val brightness = async(Dispatchers.IO) {
+                computeBrightness(bitmap, top = COVER_TOP_PCT, right = COVER_RIGHT_PCT)
             }.await()
-            storeCoverForSong(song, bitmap, color)
+            Log.d(TAG, "XXX ${song.album} ${brightness?.name}") // FIXME
+            storeCoverForSong(song, bitmap, brightness)
             songCoverFetches.remove(song)
 
             if (song.coverBitmap != null) {
@@ -1186,13 +1187,13 @@ class NupService :
     }
 
     /**
-     * Set [song]'s cover bitmap to [bitmap] and its average color to [color].
+     * Set [song]'s cover bitmap to [bitmap] and store the bitmap's brightness.
      *
      * Also makes sure that we don't have more than [MAX_LOADED_COVERS] bitmaps in-memory.
      */
-    private fun storeCoverForSong(song: Song, bitmap: Bitmap?, color: Int?) {
+    private fun storeCoverForSong(song: Song, bitmap: Bitmap?, brightness: Brightness?) {
         song.coverBitmap = bitmap
-        song.coverColor = color
+        song.coverBrightness = brightness
         val existingIndex = songsWithCovers.indexOf(song)
 
         // If we didn't get a bitmap, bail out early.
@@ -1211,7 +1212,7 @@ class NupService :
         // If we're full, drop the cover from the first song on the list.
         if (songsWithCovers.size == MAX_LOADED_COVERS) {
             songsWithCovers[0].coverBitmap = null
-            songsWithCovers[0].coverColor = null
+            songsWithCovers[0].coverBrightness = null
             songsWithCovers.removeAt(0)
         }
         songsWithCovers.add(song)
@@ -1250,7 +1251,7 @@ class NupService :
         private const val REPORT_PLAYBACK_THRESHOLD_MS = 240 * 1000L // always report after 4 min
         private const val IGNORE_NOISY_AUDIO_AFTER_USER_SWITCH_MS = 1000L
         private const val MAX_RESTORE_AGE_MS = 12 * 3600 * 1000L // max age for restoring state
-        private const val COVER_BOTTOM_PCT = 0.2 // bottom fraction covered by text
-        private const val COVER_LEFT_PCT = 0.5 // left fraction covered by text
+        private const val COVER_TOP_PCT = 0.8 // fraction from top of image where text starts
+        private const val COVER_RIGHT_PCT = 0.5 // fraction from left edge where text (mostly) stops
     }
 }

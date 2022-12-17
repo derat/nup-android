@@ -9,7 +9,6 @@ import android.content.ComponentName
 import android.content.Intent
 import android.content.ServiceConnection
 import android.graphics.Bitmap
-import android.graphics.Color
 import android.media.AudioManager
 import android.os.Bundle
 import android.os.Handler
@@ -54,6 +53,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
     private lateinit var currentSongFrame: View
     private lateinit var coverImageView: ImageView
+    private lateinit var songTextLayout: View
     private lateinit var artistLabel: TextView
     private lateinit var titleLabel: TextView
     private lateinit var albumLabel: TextView
@@ -86,6 +86,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
         currentSongFrame = findViewById<View>(R.id.current_song_frame)
         coverImageView = findViewById<ImageView>(R.id.cover_image)
+        songTextLayout = findViewById<View>(R.id.song_text_layout)
         artistLabel = findViewById<TextView>(R.id.artist_label)
         titleLabel = findViewById<TextView>(R.id.title_label)
         albumLabel = findViewById<TextView>(R.id.album_label)
@@ -125,7 +126,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
         volumeControlStream = AudioManager.STREAM_MUSIC
 
-        noCoverBitmap.eraseColor(ContextCompat.getColor(this@NupActivity, R.color.no_song_cover))
+        noCoverBitmap.eraseColor(getColor(R.color.no_song_cover))
     }
 
     override fun onDestroy() {
@@ -293,13 +294,22 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
     /** Update text view styles to be legible over [song]'s cover image. */
     private fun updateSongTextColor(song: Song?) {
-        val bg = song?.coverColor ?: R.color.no_song_cover
-        val style =
-            if (Color.luminance(bg) >= LIGHT_COVER_MIN_LUMINANCE) R.style.PlayingSongTextDark
-            else R.style.PlayingSongText
+        val brightness = song?.coverBrightness ?: Brightness.DARK
+        val style = when (brightness) {
+            Brightness.DARK, Brightness.DARK_BUSY -> R.style.PlayingSongText
+            else -> R.style.PlayingSongTextDark
+        }
         for (view in arrayOf(artistLabel, titleLabel, albumLabel, downloadStatusLabel)) {
             view.setTextAppearance(style)
         }
+
+        songTextLayout.setBackground(
+            when (brightness) {
+                Brightness.DARK_BUSY -> CoverGradient(getColor(R.color.dark_cover_overlay))
+                Brightness.LIGHT_BUSY -> CoverGradient(getColor(R.color.light_cover_overlay))
+                else -> null
+            }
+        )
     }
 
     override fun onCreateOptionsMenu(menu: Menu): Boolean {

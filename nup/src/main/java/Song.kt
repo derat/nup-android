@@ -29,7 +29,7 @@ data class Song(
     val tags: List<String>,
 ) : Serializable {
     var coverBitmap: Bitmap? = null
-    var coverColor: Int? = null // average of bottom-left text region of [coverBitmap]
+    var coverBrightness: Brightness? = null // bottom-left region of [coverBitmap]
 
     // Number of bytes available to us (i.e. what we have on disk).
     var availableBytes: Long = 0

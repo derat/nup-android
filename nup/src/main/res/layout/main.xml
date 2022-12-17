@@ -32,12 +32,14 @@
       android:textSize="@dimen/playing_song_download_text"
     />
     <LinearLayout
+      android:id="@+id/song_text_layout"
       android:orientation="vertical"
       android:layout_gravity="bottom|left"
-      android:layout_width="fill_parent"
+      android:layout_width="wrap_content"
       android:layout_height="wrap_content"
       android:paddingLeft="@dimen/horizontal_padding"
-      android:paddingRight="@dimen/horizontal_padding"
+      android:paddingRight="@dimen/cover_gradient_right"
+      android:paddingTop="@dimen/cover_gradient_top"
       android:paddingBottom="@dimen/vertical_padding"
       android:clipChildren="false"
       android:clipToPadding="false"
