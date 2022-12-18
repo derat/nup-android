@@ -24,26 +24,24 @@ import android.graphics.drawable.Drawable
  */
 class CoverGradient(private val startColor: Int) : Drawable() {
     private val start = Color.pack(startColor)
-    private val mid = scaleAlpha(start, 0.8f)
     private val end = scaleAlpha(start, 0f)
 
     override fun draw(canvas: Canvas) {
         val width = canvas.getWidth().toFloat()
         val height = canvas.getHeight().toFloat()
-        val colors = longArrayOf(start, mid, end)
-        val stops = floatArrayOf(0f, 0.7f, 1f)
+        val colors = longArrayOf(start, end)
 
         val paint = Paint()
         paint.setDither(true)
 
         // TODO: I'm still not happy with how this looks.
         val rleft = width - height
-        val rgrad = RadialGradient(rleft, height, height, colors, stops, TileMode.CLAMP)
+        val rgrad = RadialGradient(rleft, height, height, colors, null, TileMode.CLAMP)
         paint.setShader(rgrad)
         canvas.drawRect(rleft, 0f, width, height, paint)
 
         if (rleft > 0f) {
-            val lgrad = LinearGradient(0f, height, 0f, 0f, colors, stops, TileMode.CLAMP)
+            val lgrad = LinearGradient(0f, height, 0f, 0f, colors, null, TileMode.CLAMP)
             paint.setShader(lgrad)
             canvas.drawRect(0f, 0f, rleft, height, paint)
         }

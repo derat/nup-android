@@ -12,63 +12,51 @@ import androidx.core.math.MathUtils
 /** Compute the brightness of the specified region of [bitmap]. */
 suspend fun computeBrightness(
     bitmap: Bitmap?,
-    left: Double = 0.0,
-    top: Double = 0.0,
-    right: Double = 1.0,
-    bottom: Double = 1.0,
+    left: Float = 0f,
+    top: Float = 0f,
+    right: Float = 1f,
+    bottom: Float = 1f,
 ): Brightness? {
     bitmap ?: return null
     val width = bitmap.getWidth()
     val height = bitmap.getHeight()
 
-    val x = (MathUtils.clamp(left, 0.0, 1.0) * width).toInt()
-    val y = (MathUtils.clamp(top, 0.0, 1.0) * height).toInt()
+    val x = (MathUtils.clamp(left, 0f, 1f) * width).toInt()
+    val y = (MathUtils.clamp(top, 0f, 1f) * height).toInt()
     val w = MathUtils.clamp(((right - left) * width).toInt(), 0, width - x)
     val h = MathUtils.clamp(((bottom - top) * height).toInt(), 0, height - y)
     val pixels = IntArray(w * h)
     bitmap.getPixels(pixels, 0, w, x, y, w, h)
 
-    // Count the number of light-colored pixels and compute the mean and standard deviation
-    // of pixels' luminosities: https://www.strchr.com/standard_deviation_in_one_pass
-    var lc = 0; var n = 0
-    var sum = 0.0; var sqSum = 0.0
+    // Count pixels with high contrast against white/black text.
+    var white = 0f; var black = 0f; var n = 0f
     for (p in pixels) {
         if (Color.alpha(p) == 0) continue
         val lum = Color.luminance(p)
-        if (lum >= lightThreshold) lc++
-        sum += lum
-        sqSum += lum * lum
+        if (getContrastRatio(lum, whiteLum) > minWhiteContrast) white++
+        if (getContrastRatio(lum, blackLum) > minBlackContrast) black++
         n++
     }
-    if (n == 0) return null
+    if (n == 0f) return null
 
-    val lightPct = lc.toDouble() / n
-    val mean = sum / n
-    val stdDev = Math.sqrt(sqSum / n - mean * mean)
-
-    // TODO: I'm not really happy with this approach. It might be better to use Palette
-    // (https://developer.android.com/reference/kotlin/androidx/palette/graphics/Palette) to extract
-    // the dominant color from the region, and then choose white or black text based on its contrast
-    // against that color (see e.g. https://ux.stackexchange.com/a/107319). Palette seemed pretty
-    // unreliable when I tried it, though, often just falling back to the passed-in default color.
-    // Perhaps the average color should be used as the default, but that may produce bad results for
-    // e.g. a mix of pure white and black pixels.
-    //
-    // Alternately, since using the standard deviation to determine busy-ness also doesn't work that
-    // well, maybe it'd be best to check white and black's contrast against each pixel's luminosity,
-    // and then use just those numbers to determine how to classify the bitmap.
-    val light = lightPct >= 0.5
-    val busy = stdDev >= busyThreshold
+    val dark = white >= black
+    val busy = 1f - Math.max(white, black) / n >= busyThreshold
     return when {
-        light && busy -> Brightness.LIGHT_BUSY
-        !light && busy -> Brightness.DARK_BUSY
-        light -> Brightness.LIGHT
-        else -> Brightness.DARK
+        dark && busy -> Brightness.DARK_BUSY
+        dark -> Brightness.DARK
+        busy -> Brightness.LIGHT_BUSY
+        else -> Brightness.LIGHT
     }
 }
 
-val lightThreshold = 0.5 // min luminosity for pixel to be bright
-val busyThreshold = 0.1 // min luminosity std dev for bitmap to be busy
+fun getContrastRatio(lum1: Float, lum2: Float) =
+    (Math.max(lum1, lum2) + 0.05f) / (Math.min(lum1, lum2) + 0.05f)
+
+val whiteLum = Color.luminance(Color.WHITE)
+val blackLum = Color.luminance(Color.BLACK)
+val minWhiteContrast = 4f // min contrast against white text
+val minBlackContrast = 12f // min contrast against black text
+val busyThreshold = 0.05f // busy if this fraction or more are low-contrast
 
 enum class Brightness {
     LIGHT,

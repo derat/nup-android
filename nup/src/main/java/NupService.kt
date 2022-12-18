@@ -157,6 +157,13 @@ class NupService :
 
     private var lastUserSwitch: Date? = null // time when user was last fore/backgrounded
 
+    // Edges in [0.0, 1.0] of the region of cover images typically covered by text.
+    // These are updated in onCreate() based on display size and layout dimensions.
+    private var coverTextLeft = 0f
+    private var coverTextTop = 0.8f
+    private var coverTextRight = 0.5f
+    private var coverTextBottom = 1f
+
     // Listen for miscellaneous broadcasts.
     private val broadcastReceiver: BroadcastReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -259,6 +266,8 @@ class NupService :
         filter.addAction(Intent.ACTION_USER_FOREGROUND)
         registerReceiver(broadcastReceiver, filter)
 
+        val res = getResources()
+
         networkHelper = NetworkHelper(this, scope)
         downloader = Downloader()
         player = Player(this, this, mainExecutor, audioAttrs)
@@ -280,7 +289,7 @@ class NupService :
                 // a proper configuration. Use UI contexts such as an activity or a context created via
                 // createWindowContext(Display, int, Bundle) or
                 // createConfigurationContext(Configuration) with a proper configuration."
-                createConfigurationContext(getResources().getConfiguration()),
+                createConfigurationContext(res.getConfiguration()),
                 R.xml.settings,
                 // Without passing true for readAgain, "this method sets the default values only if
                 // this method has never been called in the past".
@@ -416,9 +425,7 @@ class NupService :
         )
         sessionToken = mediaSessionManager.session.sessionToken
 
-        mediaBrowserHelper = MediaBrowserHelper(
-            this, songDb, downloader, networkHelper, scope, getResources()
-        )
+        mediaBrowserHelper = MediaBrowserHelper(this, songDb, downloader, networkHelper, scope, res)
 
         notificationManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
         notificationCreator = NotificationCreator(
@@ -434,6 +441,24 @@ class NupService :
         windowContext = createDisplayContext(display).createWindowContext(
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null
         )
+
+        // TODO: This isn't great for a bunch of reasons:
+        // - It doesn't update when the screen is rotated
+        //   (https://github.com/derat/nup-android/issues/49) or the activity is resized for some
+        //   other reason.
+        // - I'm hardcoding 0.5 for the right edge of the text instead of recomputing this
+        //   dynamically based on the text width (which would require doing this in the activity
+        //   instead).
+        // - The TextViews seem to have some additional vertical padding, but I'm not sure what it
+        //   is so I'm just multiplying by 3.6 instead of 3 (which seems like it still may not be
+        //   enough).
+        val coverSize =
+            getApplicationContext().getResources().getDisplayMetrics().widthPixels.toFloat()
+        coverTextLeft = res.getDimension(R.dimen.horizontal_padding) / coverSize
+        coverTextRight = 0.5f
+        coverTextBottom = (coverSize - res.getDimension(R.dimen.vertical_padding)) / coverSize
+        coverTextTop = coverTextBottom -
+            3.6f * (res.getDimension(R.dimen.playing_song_text) / coverSize)
     }
 
     override fun onDestroy() {
@@ -866,9 +891,11 @@ class NupService :
         scope.launch(Dispatchers.Main) {
             val bitmap = async(Dispatchers.IO) { coverLoader.getBitmap(song.coverFilename) }.await()
             val brightness = async(Dispatchers.IO) {
-                computeBrightness(bitmap, top = COVER_TOP_PCT, right = COVER_RIGHT_PCT)
+                computeBrightness(
+                    bitmap, left = coverTextLeft, top = coverTextTop,
+                    right = coverTextRight, bottom = coverTextBottom
+                )
             }.await()
-            Log.d(TAG, "XXX ${song.album} ${brightness?.name}") // FIXME
             storeCoverForSong(song, bitmap, brightness)
             songCoverFetches.remove(song)
 
