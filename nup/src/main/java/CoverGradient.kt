@@ -18,40 +18,85 @@ import android.graphics.drawable.Drawable
 /**
  * Draws a translucent gradient to display over cover images to make text more readable.
  *
- * The gradient fills the canvas and fades to be fully transparent at its top and right edges.
- * Android unfortunately doesn't seem to be able to do something like this via its built-in
- * gradients -- radial gradients seem to only support circles, not arbitrary ellipses.
+ * The gradient starts at [startColor] in its bottom-left corner and fades to be completely
+ * transparent to the top and right. The drawable should be sized to match the text, but the
+ * gradient extends beyond the canvas's top and right edges, so the parent view should set
+ * android:clipChildren="false".
  */
 class CoverGradient(private val startColor: Int) : Drawable() {
-    private val start = Color.pack(startColor)
-    private val end = scaleAlpha(start, 0f)
+    private var colors: LongArray
+    private var stops: FloatArray
 
     override fun draw(canvas: Canvas) {
         val width = canvas.getWidth().toFloat()
         val height = canvas.getHeight().toFloat()
-        val colors = longArrayOf(start, end)
+        val size = 3 * height
 
         val paint = Paint()
         paint.setDither(true)
 
-        // TODO: I'm still not happy with how this looks.
         val rleft = width - height
-        val rgrad = RadialGradient(rleft, height, height, colors, null, TileMode.CLAMP)
+        val rgrad = RadialGradient(rleft, height, size, colors, stops, TileMode.CLAMP)
         paint.setShader(rgrad)
-        canvas.drawRect(rleft, 0f, width, height, paint)
+        canvas.drawRect(rleft, height - size, rleft + size, height, paint)
 
         if (rleft > 0f) {
-            val lgrad = LinearGradient(0f, height, 0f, 0f, colors, null, TileMode.CLAMP)
+            val lgrad = LinearGradient(0f, height, 0f, height - size, colors, stops, TileMode.CLAMP)
             paint.setShader(lgrad)
-            canvas.drawRect(0f, 0f, rleft, height, paint)
+            canvas.drawRect(0f, height - size, rleft, height, paint)
         }
     }
-
-    private fun scaleAlpha(color: Long, scale: Float): Long = Color.pack(
-        Color.red(color), Color.green(color), Color.blue(color), Color.alpha(color) * scale
-    )
 
     override fun getOpacity() = PixelFormat.TRANSLUCENT
     override fun setAlpha(a: Int) {}
     override fun setColorFilter(f: ColorFilter?) {}
+
+    init {
+        val start = Color.pack(startColor)
+        val scale = { a: Float ->
+            Color.pack(
+                Color.red(start), Color.green(start), Color.blue(start),
+                Color.alpha(start) * a
+            )
+        }
+
+        // These values come from https://larsenwork.com/easing-gradients/.
+        // See also https://ishadeed.com/article/handling-text-over-image-css/.
+        colors = longArrayOf(
+            scale(1.0f),
+            scale(0.987f),
+            scale(0.951f),
+            scale(0.896f),
+            scale(0.825f),
+            scale(0.741f),
+            scale(0.648f),
+            scale(0.55f),
+            scale(0.45f),
+            scale(0.352f),
+            scale(0.259f),
+            scale(0.175f),
+            scale(0.104f),
+            scale(0.049f),
+            scale(0.013f),
+            scale(0f),
+        )
+        stops = floatArrayOf(
+            0f,
+            0.081f,
+            0.155f,
+            0.225f,
+            0.29f,
+            0.353f,
+            0.412f,
+            0.471f,
+            0.529f,
+            0.588f,
+            0.647f,
+            0.71f,
+            0.775f,
+            0.845f,
+            0.919f,
+            1f,
+        )
+    }
 }
