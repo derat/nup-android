@@ -15,9 +15,9 @@ import com.google.common.util.concurrent.MoreExecutors
 import java.time.Instant
 import java.util.Date
 import java.util.UUID
-import kotlinx.coroutines.test.TestCoroutineDispatcher
-import kotlinx.coroutines.test.TestCoroutineScope
-import kotlinx.coroutines.test.runBlockingTest
+import kotlinx.coroutines.test.TestScope
+import kotlinx.coroutines.test.UnconfinedTestDispatcher
+import kotlinx.coroutines.test.runTest
 import org.erat.nup.Downloader
 import org.erat.nup.FileCache
 import org.erat.nup.NetworkHelper
@@ -52,8 +52,8 @@ import org.robolectric.shadows.ShadowLog
 )
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class SongDatabaseTest {
-    val scope = TestCoroutineScope()
-    val dispatcher = TestCoroutineDispatcher()
+    val scope = TestScope()
+    val dispatcher = UnconfinedTestDispatcher()
     lateinit var db: SongDatabase
 
     lateinit var openMocks: AutoCloseable
@@ -166,7 +166,7 @@ class SongDatabaseTest {
         )
     }
 
-    @Test fun syncAndQuery() = runBlockingTest {
+    @Test fun syncAndQuery() = runTest(dispatcher) {
         val s1 = makeSong("Ä", "Track 1", "Album 1", 1, rating = 4)
         val s2 = makeSong(
             "A", "Track 2", "Album 1", 2, rating = 2, date = Instant.parse("2005-01-23T00:00:00Z"),
@@ -231,7 +231,7 @@ class SongDatabaseTest {
         assertEquals(listOf(s1, s2, s3, s4), db.query())
     }
 
-    @Test fun syncUpdates() = runBlockingTest {
+    @Test fun syncUpdates() = runTest(dispatcher) {
         // Add some songs at time 0 and sync at time 1.
         val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 4)
         val s2 = makeSong("A", "Track 2", "Album 1", 2, rating = 2)
@@ -259,7 +259,7 @@ class SongDatabaseTest {
         assertEquals(listOf(s1u, s3), db.query())
     }
 
-    @Test fun aggregateData() = runBlockingTest {
+    @Test fun aggregateData() = runTest(dispatcher) {
         assertTrue(db.aggregateDataLoaded) // happens initially
         val oldUpdates = aggregateDataUpdates
 
@@ -342,7 +342,7 @@ class SongDatabaseTest {
         )
     }
 
-    @Test fun cachedSongs() = runBlockingTest {
+    @Test fun cachedSongs() = runTest(dispatcher) {
         val d1 = Instant.parse("2000-01-01T00:00:00Z")
         val d2 = Instant.parse("1990-01-01T00:00:00Z")
         val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 4, date = d1)
@@ -423,7 +423,7 @@ class SongDatabaseTest {
         )
     }
 
-    @Test fun syncSearchPresets() = runBlockingTest {
+    @Test fun syncSearchPresets() = runTest(dispatcher) {
         serverSearchPresets.add(
             SearchPreset(
                 name = "Favorites",
@@ -449,7 +449,7 @@ class SongDatabaseTest {
     }
 
     // This tests a function from Search.kt, but it depends heavily on [SongDatabase].
-    @Test fun searchLocalSongs() = runBlockingTest {
+    @Test fun searchLocalSongs() = runTest(dispatcher) {
         val s1 = makeSong("A", "Track 1", "Album 1", 1, rating = 4)
         val s2 = makeSong("B", "Track 2", "Album 1", 2, rating = 5)
         val s3 = makeSong("B feat. C", "Track 3", "Album 1", 3, rating = 4)
@@ -467,7 +467,7 @@ class SongDatabaseTest {
         assertEquals(listOf(s2), searchLocal(db, ""))
     }
 
-    @Test fun playbackReports() = runBlockingTest {
+    @Test fun playbackReports() = runTest(dispatcher) {
         val r1 = SongDatabase.PendingPlaybackReport(1, Date(1))
         val r2 = SongDatabase.PendingPlaybackReport(2, Date(2))
         db.addPendingPlaybackReport(r1.songId, r1.startDate)
@@ -485,7 +485,7 @@ class SongDatabaseTest {
         assertTrue(db.allPendingPlaybackReports().isEmpty())
     }
 
-    @Test fun upgradeDatabase() = runBlockingTest {
+    @Test fun upgradeDatabase() = runTest(dispatcher) {
         // Replace the existing SQLite database with an ancient version.
         db.quit()
         val ctx: Context = ApplicationProvider.getApplicationContext()

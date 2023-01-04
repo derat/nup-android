@@ -2,9 +2,10 @@
 
 # Installs the Android SDK to $ANDROID_HOME and Gradle to $GRADLE_HOME.
 
-CMDLINE_TOOLS_VERSION=7583922
-BUILD_TOOLS_VERSION=30.0.3
-GRADLE_VERSION=7.3.3
+CMDLINE_TOOLS_VERSION=9123335
+ANDROID_VERSION=33
+BUILD_TOOLS_VERSION=33.0.1
+GRADLE_VERSION=7.6
 
 if [ -z "$ANDROID_HOME" ] || [ -z "$GRADLE_HOME" ]; then
   echo "ANDROID_HOME and GRADLE_HOME must be set" >&2
@@ -43,7 +44,7 @@ yes | "${ANDROID_HOME}/cmdline-tools/bin/sdkmanager" \
   "cmdline-tools;latest" \
   "extras;google;google_play_services" \
   "platform-tools" \
-  "platforms;android-31"
+  "platforms;android-${ANDROID_VERSION}"
 yes | "${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager" --licenses
 
 wget -q -O /tmp/gradle.zip \

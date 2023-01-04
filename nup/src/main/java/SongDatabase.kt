@@ -59,7 +59,7 @@ class SongDatabase(
     val albumsSortedAlphabetically: List<StatsRow> get() = _albumsSortedAlphabetically
     // Each artist's albums are sorted by ascending date.
     fun albumsByArtist(artist: String): List<StatsRow> =
-        _artistAlbums[artist.toLowerCase()] ?: listOf()
+        _artistAlbums[artist.lowercase()] ?: listOf()
 
     private var _searchPresets = mutableListOf<SearchPreset>()
     val searchPresets: List<SearchPreset> get() = _searchPresets
@@ -879,7 +879,7 @@ class SongDatabase(
             if (aggregateAlbums &&
                 lastAlbum != null &&
                 lastAlbum.key.albumId == albumId &&
-                lastAlbum.key.album.trim().toLowerCase() == album.trim().toLowerCase()
+                lastAlbum.key.album.trim().lowercase() == album.trim().lowercase()
             ) {
                 lastAlbum.count += count
                 lastAlbum.key.artist += ", " + artist
@@ -893,7 +893,7 @@ class SongDatabase(
             // affect the count displayed when navigating from BrowseArtistsActivity to
             // BrowseAlbumsActivity.
             artistAlbums
-                ?.getOrPut(artist.toLowerCase(), { mutableListOf() })
+                ?.getOrPut(artist.lowercase(), { mutableListOf() })
                 ?.add(StatsRow(artist, album, albumId, count, cover, date))
 
             cursor.moveToNext()
@@ -976,5 +976,5 @@ fun normalizeForSearch(s: String): String {
         .normalize(s, Normalizer.Form.NFKD)
         .replace("\\p{Mn}".toRegex(), "")
         .trim()
-        .toLowerCase()
+        .lowercase()
 }

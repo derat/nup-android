@@ -7,6 +7,8 @@ plugins {
 }
 
 android {
+  namespace "org.erat.nup"
+
   defaultConfig {
     applicationId 'org.erat.nup'
     versionCode 1
@@ -18,16 +20,12 @@ android {
     // behaviors to maintain your app's forward-compatibility with the target
     // version. The application is still able to run on older versions (down to
     // minSdkVersion)."
-    minSdkVersion 22    // Android 5.1 (Lollipop, Nov. 2014 -- Fire HD 8 2017)
-    targetSdkVersion 31 // Android 12 (Oct. 2021)
+    minSdkVersion 22    // Android 5.1 (Lollipop, Nov. 2014 -- Fire HD 8 2016)
+    targetSdkVersion 33 // Android 13 (Aug. 2022)
   }
 
-  compileSdkVersion 31
-  buildToolsVersion '30.0.3'
-
-  dexOptions {
-    preDexLibraries true
-  }
+  compileSdkVersion 33
+  buildToolsVersion '33.0.1'
 
   buildTypes {
     debug {
@@ -40,7 +38,7 @@ android {
   kotlinOptions {
     // Avoid a build warning about PlaybackReporterTest's use of
     // @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class).
-    freeCompilerArgs += '-Xopt-in=kotlin.RequiresOptIn'
+    freeCompilerArgs += '-opt-in=kotlin.RequiresOptIn'
 
     // Avoid the following error from doAfterTextChanged in SearchFormActivity:
     //   Cannot inline bytecode built with JVM target 1.8 into bytecode that is being built with JVM
@@ -80,11 +78,11 @@ dependencies {
   testImplementation 'androidx.test:core:1.0.0'
   testImplementation 'com.google.guava:guava:23.0'
   testImplementation 'com.google.truth:truth:1.1.2'
-  testImplementation 'junit:junit:4.12'
+  testImplementation 'junit:junit:4.13.2'
   testImplementation "org.jetbrains.kotlinx:kotlinx-coroutines-test:$kotlin_coroutines_version"
   testImplementation 'org.mockito:mockito-core:3.8.0'
   testImplementation 'org.mockito:mockito-inline:3.8.0'
-  testImplementation 'org.robolectric:robolectric:4.7.3'
+  testImplementation 'org.robolectric:robolectric:4.9.2'
 
   androidTestImplementation 'org.mockito:mockito-android:3.8.0'
 }

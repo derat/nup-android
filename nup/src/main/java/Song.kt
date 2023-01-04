@@ -56,7 +56,7 @@ data class Song(
  * run, as sorting keys are cached in the database.
  */
 fun getSongSortKey(str: String): String {
-    val key = str.toLowerCase()
+    val key = str.lowercase()
 
     // Preserve bracketed strings used by MusicBrainz and/or Picard.
     if (keyTags.contains(key)) return "!$key"

@@ -31,6 +31,9 @@ class NupApplication : Application() {
         StrictMode.setVmPolicy(
             StrictMode.VmPolicy.Builder()
                 .detectAll()
+                // TODO: Framework bug? For some reason, I'm seeing this:
+                // android.os.strictmode.InstanceCountViolation: class org.erat.nup.NupActivity; instances=3; limit=2
+                .setClassInstanceLimit(NupActivity::class.java, 3)
                 // TODO: android.view.SurfaceControl: https://github.com/derat/nup-android/issues/11
                 .penaltyLog()
                 .build()

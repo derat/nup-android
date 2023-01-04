@@ -3,14 +3,14 @@
 
 buildscript {
   // https://developer.android.com/kotlin/add-kotlin
-  ext.kotlin_version = '1.4.30'
-  ext.kotlin_coroutines_version = '1.4.2'
+  ext.kotlin_version = '1.8.0'
+  ext.kotlin_coroutines_version = '1.6.4'
 
   dependencies {
     // 4.1.0+ requires Gradle 6.5:
     // https://developer.android.com/studio/releases/gradle-plugin
     // Gradle needs to be installed manually from https://gradle.org/releases/
-    classpath 'com.android.tools.build:gradle:4.1.0'
+    classpath 'com.android.tools.build:gradle:7.3.1'
     classpath "org.jetbrains.kotlin:kotlin-gradle-plugin:$kotlin_version"
   }
 

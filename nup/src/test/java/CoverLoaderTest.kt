@@ -15,7 +15,7 @@ import java.net.HttpURLConnection
 import java.net.URL
 import java.nio.file.Files
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.test.TestCoroutineScope
+import kotlinx.coroutines.test.TestScope
 import org.erat.nup.CoverLoader
 import org.erat.nup.Downloader
 import org.erat.nup.NetworkHelper
@@ -33,7 +33,7 @@ import org.robolectric.shadows.ShadowLog
 @RunWith(RobolectricTestRunner::class)
 @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class)
 class CoverLoaderTest {
-    val scope = TestCoroutineScope()
+    val scope = TestScope()
     lateinit var tempDir: File
     lateinit var coverLoader: CoverLoader
     lateinit var bitmapDataMap: HashMap<String, Bitmap>

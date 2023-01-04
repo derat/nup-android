@@ -38,6 +38,9 @@ class SearchResultsActivity : AppCompatActivity() {
         // If we're being restored e.g. after an orientation change, restore the saved results.
         // The cast here is pretty convoluted: https://stackoverflow.com/a/36570969
         if (savedInstanceState != null) {
+            // TODO: This is deprecated: https://stackoverflow.com/q/73388006
+            // The new thing has issues: https://issuetracker.google.com/issues/242048899
+            @Suppress("DEPRECATION")
             val serialized = savedInstanceState.getSerializable(BUNDLE_SONGS)
             if (serialized is List<*>) {
                 songs = serialized.filterIsInstance<Song>()

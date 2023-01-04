@@ -7,7 +7,7 @@ steps:
 
   # I initially thought it might be better to create a Docker container with
   # dependencies pre-installed so that 'gradle test' and 'gradle assembleDebug'
-  # stages could run in parallel, but I've seen install_dep.sh only take about
+  # stages could run in parallel, but I've seen install_deps.sh only take about
   # 1.5 minutes, and pulling big Docker containers from GCR is slow, and running
   # everything in a single step probably saves time by reusing the
   # already-running Gradle daemon.

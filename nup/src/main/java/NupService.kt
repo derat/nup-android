@@ -390,16 +390,14 @@ class NupService :
                 override fun onRemoveQueueItem(description: MediaDescriptionCompat) {
                     val id = description.getMediaId() ?: return
                     Log.d(TAG, "MediaSession request to remove $id")
+                    // TODO: Per the docs, this is supposed to only remove the first occurrence of
+                    // the item, not all occurrences.
                     getSongsForMediaId(id) { songs ->
                         songs.map { getSongIndex(it.id) }
                             .filter { it >= 0 }
                             .sortedDescending()
                             .forEach { removeFromPlaylist(it) }
                     }
-                }
-                override fun onRemoveQueueItemAt(index: Int) {
-                    Log.d(TAG, "MediaSession request to remove item at $index")
-                    removeFromPlaylist(index)
                 }
                 override fun onSeekTo(pos: Long) {
                     Log.d(TAG, "MediaSession request to seek to $pos")
