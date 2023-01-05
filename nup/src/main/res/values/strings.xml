@@ -41,10 +41,11 @@
   <string name="download_rate_description">Limit in KB/sec (0 is unlimited)</string>
   <string name="download_rate_value">%d KB/sec</string>
   <string name="exit">Exit</string>
-  <string name="gain_adjustment">Gain adjustment</string>
   <string name="first_played">First played</string>
   <string name="first_played_suffix"> or less ago</string>
   <string name="four_star_songs">Four-star songs</string>
+  <string name="gain_adjustment">Gain adjustment</string>
+  <string name="guest_mode">Guest mode</string>
   <string name="insert">Insert</string>
   <string name="keywords">Keywords</string>
   <string name="last_played">Last played</string>
@@ -73,6 +74,7 @@
   <string name="pre_amp_gain_value">%+.1f dB</string>
   <string name="presets">Presets</string>
   <string name="rating_colon">Rating:</string>
+  <string name="report_plays">Report plays</string>
   <string name="reset">Reset</string>
   <string name="remove_from_list">Remove from list</string>
   <string name="replace">Replace</string>

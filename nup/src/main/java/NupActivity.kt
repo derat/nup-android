@@ -321,7 +321,13 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
     }
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
+        // TODO: Material adds gratuitous padding on both sides of menu checkboxes, but I haven't
+        // been able to find a good way to remove it (either programatically or via XML).
+        // https://stackoverflow.com/questions/69606994 has some discussion, but the workaround is
+        // super-gross and involves modifying the default padding of all checkboxes.
         updateDownloadAllMenuItem(menu.findItem(R.id.download_all_menu_item))
+        updateReportPlaysMenuItem(menu.findItem(R.id.report_plays_menu_item))
+        menu.setGroupVisible(R.id.guest_mode_menu_group, service.guestMode)
         return true
     }
 
@@ -347,6 +353,15 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
                 updateDownloadAllMenuItem(item)
                 true
             }
+            R.id.report_plays_menu_item -> {
+                // The menu item shouldn't be shown if we aren't in guest mode, but be careful to
+                // make sure that we don't get into a state where plays are silently dropped.
+                service.shouldReportPlays =
+                    if (service.guestMode) !service.shouldReportPlays
+                    else true
+                updateReportPlaysMenuItem(item)
+                true
+            }
             R.id.settings_menu_item -> {
                 startActivity(Intent(this, SettingsActivity::class.java))
                 true
@@ -360,17 +375,13 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         }
     }
 
-    /** Update the "Download all" menu item's checked state and icon. */
-    private fun updateDownloadAllMenuItem(item: MenuItem) {
-        val downloadAll = _service?.shouldDownloadAll ?: false
-        item.setChecked(downloadAll)
-        item.setIcon(if (downloadAll) R.drawable.download_off else R.drawable.download)
+    /** Update the "Download all" menu item's checked state. */
+    private fun updateDownloadAllMenuItem(item: MenuItem) =
+        item.setChecked(_service?.shouldDownloadAll ?: false)
 
-        // TODO: Material adds gratuitous padding on both sides of the checkbox, but I haven't been
-        // able to find a good way to remove it (either programatically or via XML).
-        // https://stackoverflow.com/questions/69606994 has some discussion, but the workaround is
-        // super-gross and involves modifying the default padding of all checkboxes.
-    }
+    /** Update the "Report plays" menu item's checked state. */
+    private fun updateReportPlaysMenuItem(item: MenuItem) =
+        item.setChecked(_service?.shouldReportPlays ?: false)
 
     /** Adapts information about the current playlist and song for the song list view. */
     private inner class SongListAdapter : BaseAdapter() {

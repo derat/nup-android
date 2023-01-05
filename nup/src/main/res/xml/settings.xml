@@ -25,6 +25,12 @@
       android:dialogMessage="@string/password_description"
       app:iconSpaceReserved="false"
     />
+    <CheckBoxPreference
+      android:key="guest_mode"
+      android:defaultValue="false"
+      android:title="@string/guest_mode"
+      app:iconSpaceReserved="false"
+    />
     <org.erat.nup.YesNoPreference
       android:key="sync_song_list"
       android:title="@string/sync_song_list"

@@ -6,11 +6,12 @@
 package org.erat.nup
 
 object NupPreferences {
-    // These are all strings. I think that Android's settings-related UI classes make (or made?) it
-    // hard to use numeric types for prefs.
+    // These are strings unless noted otherwise. I think that Android's settings-related UI classes
+    // make (or made?) it hard to use numeric types for prefs.
     const val SERVER_URL = "server_url"
     const val USERNAME = "username"
     const val PASSWORD = "password"
+    const val GUEST_MODE = "guest_mode" // boolean
     const val SYNC_SONG_LIST = "sync_song_list"
     const val GAIN_TYPE = "gain_type" // values are GAIN_TYPE_*
     const val PRE_AMP_GAIN = "pre_amp_gain" // positive or negative decibels

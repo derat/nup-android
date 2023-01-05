@@ -153,6 +153,12 @@ class NupService :
             }
         }
 
+    /** Report played songs to the server via [playbackReporter]. */
+    var shouldReportPlays: Boolean = true
+
+    /** If true, [shouldReportPlays] defaults to false and can be toggled via NupActivity. */
+    var guestMode: Boolean = false
+
     private val songCoverFetches = mutableSetOf<Song>() // songs whose covers are being fetched
     private val songsWithCovers = mutableListOf<Song>() // songs whose covers are in-memory
 
@@ -320,6 +326,7 @@ class NupService :
             applyPref(NupPreferences.USERNAME)
             applyPref(NupPreferences.SERVER_URL)
             applyPref(NupPreferences.SONGS_TO_PRELOAD)
+            applyPref(NupPreferences.GUEST_MODE)
 
             restorePlaylist()
             playlistRestored = true
@@ -591,25 +598,31 @@ class NupService :
     private suspend fun applyPref(key: String) {
         when (key) {
             NupPreferences.CACHE_SIZE -> {
-                val size = readPref(key).toLong()
+                val size = readStringPref(key).toLong()
                 cache.maxBytes = if (size > 0) size * 1024 * 1024 else size
             }
             NupPreferences.DOWNLOAD_RATE -> {
-                val rate = readPref(key).toLong()
+                val rate = readStringPref(key).toLong()
                 cache.maxRate = if (rate > 0) rate * 1024 else rate
             }
-            NupPreferences.PASSWORD -> downloader.password = readPref(key)
-            NupPreferences.GAIN_TYPE -> player.gainType = readPref(key)
-            NupPreferences.PRE_AMP_GAIN -> player.preAmpGain = readPref(key).toDouble()
-            NupPreferences.USERNAME -> downloader.username = readPref(key)
-            NupPreferences.SERVER_URL -> downloader.server = readPref(key)
-            NupPreferences.SONGS_TO_PRELOAD -> songsToPreload = readPref(key).toInt()
+            NupPreferences.PASSWORD -> downloader.password = readStringPref(key)
+            NupPreferences.GAIN_TYPE -> player.gainType = readStringPref(key)
+            NupPreferences.PRE_AMP_GAIN -> player.preAmpGain = readStringPref(key).toDouble()
+            NupPreferences.USERNAME -> downloader.username = readStringPref(key)
+            NupPreferences.SERVER_URL -> downloader.server = readStringPref(key)
+            NupPreferences.SONGS_TO_PRELOAD -> songsToPreload = readStringPref(key).toInt()
+            NupPreferences.GUEST_MODE -> {
+                guestMode = readBooleanPref(key)
+                shouldReportPlays = !guestMode
+            }
         }
     }
 
     /** Return [key]'s value. */
-    private suspend fun readPref(key: String) =
+    private suspend fun readStringPref(key: String) =
         scope.async(Dispatchers.IO) { prefs.getString(key, null)!! }.await()
+    private suspend fun readBooleanPref(key: String) =
+        scope.async(Dispatchers.IO) { prefs.getBoolean(key, false) }.await()
 
     /** Save playlist so it can be restored the next time the service starts. */
     private fun savePlaylist() {
@@ -955,8 +968,12 @@ class NupService :
             // https://www.last.fm/api/scrobbling#scrobble-requests
             val halfMs = Math.max(durationMs, (song.lengthSec * 1000).toInt()).toLong() / 2
             if (!reported && playedMs >= Math.min(halfMs, REPORT_PLAYBACK_THRESHOLD_MS)) {
-                val start = playStart!!
-                scope.launch(Dispatchers.IO) { playbackReporter.report(song.id, start) }
+                if (shouldReportPlays) {
+                    val start = playStart!!
+                    scope.launch(Dispatchers.IO) { playbackReporter.report(song.id, start) }
+                } else {
+                    Log.d(TAG, "Not reporting play of ${song.id} due to guest mode")
+                }
                 reported = true
             }
         }
