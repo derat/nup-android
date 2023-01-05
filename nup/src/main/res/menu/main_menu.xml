@@ -27,6 +27,7 @@
     android:id="@+id/download_all_menu_item"
     android:icon="@drawable/download"
     android:title="@string/download_all"
+    android:checkable="true"
     app:iconTint="?android:attr/textColorPrimary"
   />
   <item

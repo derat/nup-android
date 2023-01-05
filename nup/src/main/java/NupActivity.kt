@@ -318,10 +318,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
     }
 
     override fun onPrepareOptionsMenu(menu: Menu): Boolean {
-        val item = menu.findItem(R.id.download_all_menu_item)
-        val downloadAll = _service?.shouldDownloadAll ?: false
-        item.setTitle(if (downloadAll) R.string.dont_download_all else R.string.download_all)
-        item.setIcon(if (downloadAll) R.drawable.download_off else R.drawable.download)
+        updateDownloadAllMenuItem(menu.findItem(R.id.download_all_menu_item))
         return true
     }
 
@@ -344,6 +341,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
             }
             R.id.download_all_menu_item -> {
                 service.shouldDownloadAll = !service.shouldDownloadAll
+                updateDownloadAllMenuItem(item)
                 true
             }
             R.id.settings_menu_item -> {
@@ -357,6 +355,18 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
             }
             else -> super.onOptionsItemSelected(item)
         }
+    }
+
+    /** Update the "Download all" menu item's checked state and icon. */
+    private fun updateDownloadAllMenuItem(item: MenuItem) {
+        val downloadAll = _service?.shouldDownloadAll ?: false
+        item.setChecked(downloadAll)
+        item.setIcon(if (downloadAll) R.drawable.download_off else R.drawable.download)
+
+        // TODO: Material adds gratuitous padding on both sides of the checkbox, but I haven't been
+        // able to find a good way to remove it (either programatically or via XML).
+        // https://stackoverflow.com/questions/69606994 has some discussion, but the workaround is
+        // super-gross and involves modifying the default padding of all checkboxes.
     }
 
     /** Adapts information about the current playlist and song for the song list view. */
