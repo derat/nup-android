@@ -53,10 +53,7 @@
         style="@style/PlayingSongText"
         android:textStyle="italic"
       />
-      <TextView
-        android:id="@+id/album_label"
-        style="@style/PlayingSongText"
-      />
+      <TextView android:id="@+id/album_label" style="@style/PlayingSongText" />
     </LinearLayout>
   </FrameLayout>
 
@@ -79,11 +76,7 @@
       android:layout_height="wrap_content"
       android:layout_weight="1"
     />
-    <TextView
-      android:id="@+id/duration_label"
-      style="@style/SeekLabel"
-      android:gravity="right"
-    />
+    <TextView android:id="@+id/duration_label" style="@style/SeekLabel" android:gravity="right" />
   </LinearLayout>
 
   <LinearLayout

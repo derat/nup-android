@@ -123,10 +123,7 @@
           />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <Space
-          android:layout_width="8dp"
-          android:layout_height="wrap_content"
-        />
+        <Space android:layout_width="8dp" android:layout_height="wrap_content" />
 
         <!-- Max date -->
         <com.google.android.material.textfield.TextInputLayout
@@ -217,10 +214,7 @@
       </com.google.android.material.textfield.TextInputLayout>
 
       <!-- Add blank space at bottom to prevent overlap with fixed-position buttons. -->
-      <Space
-        android:layout_width="fill_parent"
-        android:layout_height="56dp"
-      />
+      <Space android:layout_width="fill_parent" android:layout_height="56dp" />
     </LinearLayout>
   </ScrollView>
 

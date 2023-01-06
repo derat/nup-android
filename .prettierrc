@@ -1,1 +1,6 @@
 printWidth: 100
+xmlWhitespaceSensitivity: "ignore"
+overrides:
+  - files: "nup/src/main/res/values/strings.xml"
+    options:
+      xmlWhitespaceSensitivity: "strict"
