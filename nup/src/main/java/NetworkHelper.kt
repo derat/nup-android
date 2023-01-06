@@ -36,10 +36,14 @@ open class NetworkHelper(private val context: Context, private val scope: Corout
 
     /** Is a network connection currently available? */
     val isNetworkAvailable get() =
-        if (Build.VERSION.SDK_INT >= 26) connectivityManager.getNetworkCapabilities(
-            connectivityManager.activeNetwork
-        ).let { caps -> requiredCaps.all { caps?.hasCapability(it) ?: false } }
-        else connectivityManager.activeNetworkInfo?.isConnected() ?: false
+        if (Build.VERSION.SDK_INT >= 26) {
+            connectivityManager.getNetworkCapabilities(
+                connectivityManager.activeNetwork
+            ).let { caps -> requiredCaps.all { caps?.hasCapability(it) ?: false } }
+        } else {
+            @Suppress("DEPRECATION")
+            connectivityManager.activeNetworkInfo?.isConnected() ?: false
+        }
 
     /** Schedule a task to check the state and notify listeners about changes. */
     private fun scheduleUpdate() =

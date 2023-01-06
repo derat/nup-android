@@ -478,8 +478,12 @@ class NupService :
         super.onDestroy()
         Log.d(TAG, "Service destroyed")
 
-        if (Build.VERSION.SDK_INT >= 26) audioManager.abandonAudioFocusRequest(audioFocusReq)
-        else audioManager.abandonAudioFocus(audioFocusListener)
+        if (Build.VERSION.SDK_INT >= 26) {
+            audioManager.abandonAudioFocusRequest(audioFocusReq)
+        } else {
+            @Suppress("DEPRECATION")
+            audioManager.abandonAudioFocus(audioFocusListener)
+        }
 
         if (this::prefs.isInitialized) {
             prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
@@ -730,10 +734,14 @@ class NupService :
         if (haveFocus) return true
 
         val res =
-            if (Build.VERSION.SDK_INT >= 26) audioManager.requestAudioFocus(audioFocusReq)
-            else audioManager.requestAudioFocus(
-                audioFocusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN
-            )
+            if (Build.VERSION.SDK_INT >= 26) {
+                audioManager.requestAudioFocus(audioFocusReq)
+            } else {
+                @Suppress("DEPRECATION")
+                audioManager.requestAudioFocus(
+                    audioFocusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN
+                )
+            }
         Log.d(TAG, "Requested audio focus; got $res")
         haveFocus = res == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
         return haveFocus
