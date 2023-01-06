@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<LinearLayout
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:app="http://schemas.android.com/apk/res-auto"
+  style="@style/Raised"
+  android:id="@+id/playback_buttons_row"
+  android:orientation="horizontal"
+  android:layout_width="fill_parent"
+  android:layout_height="wrap_content"
+  android:paddingLeft="@dimen/horizontal_padding"
+  android:paddingRight="@dimen/horizontal_padding"
+  android:paddingTop="@dimen/vertical_padding"
+  android:paddingBottom="@dimen/vertical_padding"
+>
+  <Button
+    android:id="@+id/prev_button"
+    style="@style/IconButton"
+    app:icon="@drawable/skip_previous"
+    android:onClick="onPrevButtonClicked"
+  />
+  <Space android:layout_width="@dimen/button_spacing" android:layout_height="fill_parent" />
+  <Button
+    android:id="@+id/pause_button"
+    style="@style/IconButton"
+    app:icon="@drawable/play"
+    android:onClick="onPauseButtonClicked"
+  />
+  <Space android:layout_width="@dimen/button_spacing" android:layout_height="fill_parent" />
+  <Button
+    android:id="@+id/next_button"
+    style="@style/IconButton"
+    app:icon="@drawable/skip_next"
+    android:onClick="onNextButtonClicked"
+  />
+</LinearLayout>
