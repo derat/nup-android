@@ -12,6 +12,7 @@ import android.database.Cursor
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.Uri
+import android.os.Build
 import android.os.ParcelFileDescriptor
 import android.util.Log
 import androidx.core.content.FileProvider
@@ -112,12 +113,19 @@ open class CoverLoader(
 
         startLoad(filename)
 
-        var success = false
         val file = File(coverDir, filename)
-        if (!file.toPath().startsWith(coverDir.toPath())) {
+
+        // java.nio.File annoyingly wasn't available until 26:
+        // https://stackoverflow.com/a/18982273/6882947
+        val inDir =
+            if (Build.VERSION.SDK_INT >= 26) file.toPath().startsWith(coverDir.toPath())
+            else file.getCanonicalPath().startsWith(coverDir.getCanonicalPath() + "/")
+        if (!inDir) {
             Log.e(TAG, "Cover $filename escapes cover dir")
             return null
         }
+
+        var success = false
         val enc = URLEncoder.encode(filename, "UTF-8")
         val url = downloader.getServerUrl("/cover?filename=$enc&size=$COVER_SIZE&webp=1")
         var conn: HttpURLConnection? = null
@@ -180,11 +188,19 @@ open class CoverLoader(
     /** Delete all downloaded covers. */
     suspend fun clear() {
         var bytes = 0L
+        val prefix = coverDir.getCanonicalPath() + "/"
         try {
             loadLock.withLock {
                 coverDir.walkTopDown().forEach loop@{ file ->
-                    val fn = coverDir.toPath().relativize(file.toPath()).toString()
-                    if (!file.isFile || filesBeingLoaded.contains(fn)) return@loop
+                    if (!file.isFile) return@loop
+                    val path = file.getCanonicalPath()
+
+                    // TODO: Simplify this if/when only supporting SDK >= 26:
+                    // coverDir.toPath().relativize(file.toPath()).toString()
+                    if (!path.startsWith(prefix)) return@loop // huh?
+                    val fn = path.substring(prefix.length)
+                    if (filesBeingLoaded.contains(fn)) return@loop
+
                     val len = file.length()
                     file.delete()
                     bytes += len

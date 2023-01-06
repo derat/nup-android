@@ -29,6 +29,7 @@ import android.util.Log
 import android.view.Display
 import android.view.WindowManager
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.media.MediaBrowserServiceCompat
 import androidx.media.session.MediaButtonReceiver
 import androidx.preference.PreferenceManager
@@ -252,13 +253,16 @@ class NupService :
             .setUsage(AudioAttributes.USAGE_MEDIA)
             .setContentType(AudioAttributes.CONTENT_TYPE_MUSIC)
             .build()
-        // TODO: Consider calling setAcceptsDelayedFocusGain(true) and then handling
-        // AUDIOFOCUS_REQUEST_DELAYED in getAudioFocus(). I'm not sure how often requests actually
-        // get rejected such that this would help.
-        audioFocusReq = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
-            .setOnAudioFocusChangeListener(audioFocusListener)
-            .setAudioAttributes(audioAttrs)
-            .build()
+
+        if (Build.VERSION.SDK_INT >= 26) {
+            // TODO: Consider calling setAcceptsDelayedFocusGain(true) and then handling
+            // AUDIOFOCUS_REQUEST_DELAYED in getAudioFocus(). I'm not sure how often requests actually
+            // get rejected such that this would help.
+            audioFocusReq = AudioFocusRequest.Builder(AudioManager.AUDIOFOCUS_GAIN)
+                .setOnAudioFocusChangeListener(audioFocusListener)
+                .setAudioAttributes(audioAttrs)
+                .build()
+        }
 
         val filter = IntentFilter()
         filter.addAction(AudioManager.ACTION_AUDIO_BECOMING_NOISY)
@@ -267,12 +271,13 @@ class NupService :
         registerReceiver(broadcastReceiver, filter)
 
         val res = getResources()
+        val mainExec = ContextCompat.getMainExecutor(this)
 
         networkHelper = NetworkHelper(this, scope)
         downloader = Downloader()
-        player = Player(this, this, mainExecutor, audioAttrs)
-        cache = FileCache(this, this, mainExecutor, downloader, networkHelper)
-        songDb = SongDatabase(this, scope, this, mainExecutor, cache, downloader, networkHelper)
+        player = Player(this, this, mainExec, audioAttrs)
+        cache = FileCache(this, this, mainExec, downloader, networkHelper)
+        songDb = SongDatabase(this, scope, this, mainExec, cache, downloader, networkHelper)
         coverLoader = CoverLoader(this, scope, downloader, networkHelper)
         playbackReporter = PlaybackReporter(scope, songDb, downloader, networkHelper)
 
@@ -436,9 +441,12 @@ class NupService :
         // Create a context that can be used to display toasts.
         val displayManager = getSystemService(DISPLAY_SERVICE) as DisplayManager
         val display = displayManager.getDisplay(Display.DEFAULT_DISPLAY)
-        windowContext = createDisplayContext(display).createWindowContext(
-            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null
-        )
+
+        windowContext =
+            if (Build.VERSION.SDK_INT >= 30) createDisplayContext(display).createWindowContext(
+                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY, null
+            )
+            else this@NupService
 
         // TODO: This isn't great for a bunch of reasons:
         // - It doesn't update when the screen is rotated
@@ -463,7 +471,8 @@ class NupService :
         super.onDestroy()
         Log.d(TAG, "Service destroyed")
 
-        audioManager.abandonAudioFocusRequest(audioFocusReq)
+        if (Build.VERSION.SDK_INT >= 26) audioManager.abandonAudioFocusRequest(audioFocusReq)
+        else audioManager.abandonAudioFocus(audioFocusListener)
 
         if (this::prefs.isInitialized) {
             prefs.unregisterOnSharedPreferenceChangeListener(prefsListener)
@@ -706,7 +715,12 @@ class NupService :
      */
     private fun getAudioFocus(): Boolean {
         if (haveFocus) return true
-        val res = audioManager.requestAudioFocus(audioFocusReq)
+
+        val res =
+            if (Build.VERSION.SDK_INT >= 26) audioManager.requestAudioFocus(audioFocusReq)
+            else audioManager.requestAudioFocus(
+                audioFocusListener, AudioManager.STREAM_MUSIC, AudioManager.AUDIOFOCUS_GAIN
+            )
         Log.d(TAG, "Requested audio focus; got $res")
         haveFocus = res == AudioManager.AUDIOFOCUS_REQUEST_GRANTED
         return haveFocus

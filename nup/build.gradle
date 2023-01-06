@@ -44,6 +44,14 @@ android {
     }
   }
 
+  compileOptions {
+    // This allows java.time.Instant to be used on older devices:
+    // https://stackoverflow.com/a/61218004
+    sourceCompatibility JavaVersion.VERSION_1_8
+    targetCompatibility JavaVersion.VERSION_1_8
+    coreLibraryDesugaringEnabled true
+  }
+
   kotlinOptions {
     // Avoid a build warning about PlaybackReporterTest's use of
     // @OptIn(kotlinx.coroutines.ExperimentalCoroutinesApi::class).
@@ -94,6 +102,9 @@ dependencies {
   testImplementation 'org.robolectric:robolectric:4.9.2'
 
   androidTestImplementation 'org.mockito:mockito-android:3.8.0'
+
+  // This is needed for the java.time.Instant junk in compileOptions.
+  coreLibraryDesugaring 'com.android.tools:desugar_jdk_libs:1.2.2'
 }
 
 // Generate gen_preset*.xml drawables with different gradient colors.

@@ -24,7 +24,7 @@ import android.graphics.drawable.Drawable
  * android:clipChildren="false".
  */
 class CoverGradient(private val startColor: Int) : Drawable() {
-    private var colors: LongArray
+    private var colors: IntArray
     private var stops: FloatArray
 
     override fun draw(canvas: Canvas) {
@@ -52,17 +52,16 @@ class CoverGradient(private val startColor: Int) : Drawable() {
     override fun setColorFilter(f: ColorFilter?) {}
 
     init {
-        val start = Color.pack(startColor)
         val scale = { a: Float ->
-            Color.pack(
-                Color.red(start), Color.green(start), Color.blue(start),
-                Color.alpha(start) * a
+            Color.argb(
+                Math.round(Color.alpha(startColor).toFloat() * a).toInt(),
+                Color.red(startColor), Color.green(startColor), Color.blue(startColor)
             )
         }
 
         // These values come from https://larsenwork.com/easing-gradients/.
         // See also https://ishadeed.com/article/handling-text-over-image-css/.
-        colors = longArrayOf(
+        colors = intArrayOf(
             scale(1.0f),
             scale(0.987f),
             scale(0.951f),

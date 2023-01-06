@@ -6,6 +6,7 @@
 package org.erat.nup
 
 import android.content.Context
+import android.os.Build
 import android.os.Environment
 import android.os.SystemClock
 import android.util.Log
@@ -187,7 +188,7 @@ class FileCache constructor(
         private var backoffTimeMs = 0L
 
         private lateinit var reason: String // failure reason
-        private var conn: HttpURLConnection? = null
+        private lateinit var conn: HttpURLConnection
         private var outputStream: FileOutputStream? = null
 
         /** Synchronously perform the download. */
@@ -253,10 +254,8 @@ class FileCache constructor(
                     // than App Engine's max response size of 32 MB), we'll kick off another
                     // download.
                 } finally {
-                    conn?.disconnect()
-                    conn = null
+                    if (this::conn.isInitialized) conn.disconnect()
                     outputStream?.close()
-                    outputStream = null
                 }
             }
         }
@@ -275,12 +274,18 @@ class FileCache constructor(
                 // don't end up with garbage if we resume the download of a file that's changed on
                 // the server in the meantime.
                 conn = downloader.download(url, "GET", Downloader.AuthType.SERVER, headers)
-                val status = conn!!.getResponseCode()
+                val status = conn.getResponseCode()
                 Log.d(TAG, "Got $status from server")
                 when (status) {
                     200 -> {
                         // Update the cache entry with the total file size.
-                        val len = conn!!.getContentLengthLong()
+                        // TODO: This is baffling. On Fire OS 5 (which corresponds to 22),
+                        // getContentLengthLong() hangs indefinitely, but getContentLength() works.
+                        // From looking at the AOSP change that introduced getContentLengthLong(), I
+                        // have no idea what's going on.
+                        val len =
+                            if (Build.VERSION.SDK_INT > 22) conn.getContentLengthLong()
+                            else conn.getContentLength().toLong()
                         if (len <= 1) {
                             reason = "Got invalid content length $len"
                             return DownloadStatus.FATAL_ERROR
@@ -288,7 +293,7 @@ class FileCache constructor(
                         db.setTotalBytes(entry.songId, len)
                     }
                     206 -> {
-                        val range = getRangeInfo(conn!!)
+                        val range = getRangeInfo(conn)
                         if (range == null) {
                             reason = "Failed parsing response range"
                             return DownloadStatus.FATAL_ERROR
@@ -326,7 +331,7 @@ class FileCache constructor(
             threadChecker.assertThread()
 
             // Make space for whatever we're planning to download.
-            val len = conn!!.contentLength
+            val len = conn.contentLength
             if (!makeSpace(len.toLong())) {
                 reason = "Unable to make space for $len-byte download"
                 return DownloadStatus.FATAL_ERROR
@@ -342,7 +347,7 @@ class FileCache constructor(
                 }
             }
 
-            val statusCode = conn!!.responseCode
+            val statusCode = conn.responseCode
             try {
                 val append = (statusCode == 206)
                 outputStream = FileOutputStream(entry.file, append)
@@ -359,7 +364,7 @@ class FileCache constructor(
                 var bytesRead: Int
                 var bytesWritten = 0
                 val buffer = ByteArray(BUFFER_SIZE)
-                while ((conn!!.inputStream.read(buffer).also { bytesRead = it }) != -1) {
+                while ((conn.inputStream.read(buffer).also { bytesRead = it }) != -1) {
                     if (canceled) return DownloadStatus.ABORTED
                     outputStream!!.write(buffer, 0, bytesRead)
                     bytesWritten += bytesRead
@@ -384,8 +389,8 @@ class FileCache constructor(
                 )
 
                 // I see this happen when I kill the server midway through the download.
-                if (bytesWritten != conn!!.contentLength) {
-                    reason = "Expected ${conn!!.contentLength} bytes but got $bytesWritten"
+                if (bytesWritten != conn.contentLength) {
+                    reason = "Expected ${conn.contentLength} bytes but got $bytesWritten"
                     return DownloadStatus.RETRYABLE_ERROR
                 }
             } catch (e: IOException) {

@@ -10,6 +10,7 @@ import android.net.ConnectivityManager
 import android.net.Network
 import android.net.NetworkCapabilities
 import android.net.NetworkRequest
+import android.os.Build
 import android.util.Log
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -35,9 +36,10 @@ open class NetworkHelper(private val context: Context, private val scope: Corout
 
     /** Is a network connection currently available? */
     val isNetworkAvailable get() =
-        connectivityManager.getNetworkCapabilities(
+        if (Build.VERSION.SDK_INT >= 26) connectivityManager.getNetworkCapabilities(
             connectivityManager.activeNetwork
         ).let { caps -> requiredCaps.all { caps?.hasCapability(it) ?: false } }
+        else connectivityManager.activeNetworkInfo?.isConnected() ?: false
 
     /** Schedule a task to check the state and notify listeners about changes. */
     private fun scheduleUpdate() =
@@ -70,12 +72,13 @@ open class NetworkHelper(private val context: Context, private val scope: Corout
         private const val UPDATE_DELAY_MS = 500L
     }
 
-    private val requiredCaps = listOf(
-        NetworkCapabilities.NET_CAPABILITY_FOREGROUND,
-        NetworkCapabilities.NET_CAPABILITY_INTERNET,
-        NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED,
-        NetworkCapabilities.NET_CAPABILITY_VALIDATED,
-    )
+    // Sigh, what a mess.
+    private val requiredCaps = mapOf(
+        NetworkCapabilities.NET_CAPABILITY_FOREGROUND to 28,
+        NetworkCapabilities.NET_CAPABILITY_INTERNET to 21,
+        NetworkCapabilities.NET_CAPABILITY_NOT_RESTRICTED to 21,
+        NetworkCapabilities.NET_CAPABILITY_VALIDATED to 23,
+    ).filter { Build.VERSION.SDK_INT >= it.value }.keys
 
     init {
         val builder = NetworkRequest.Builder()

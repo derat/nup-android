@@ -7,6 +7,8 @@ package org.erat.nup
 
 import android.graphics.Bitmap
 import android.graphics.Color
+import android.os.Build
+import androidx.core.graphics.ColorUtils
 import androidx.core.math.MathUtils
 
 /** Compute the brightness of the specified region of [bitmap]. */
@@ -32,7 +34,7 @@ suspend fun computeBrightness(
     var white = 0f; var black = 0f; var n = 0f
     for (p in pixels) {
         if (Color.alpha(p) == 0) continue
-        val lum = Color.luminance(p)
+        val lum = getLuminance(p)
         if (getContrastRatio(lum, whiteLum) > minWhiteContrast) white++
         if (getContrastRatio(lum, blackLum) > minBlackContrast) black++
         n++
@@ -49,11 +51,15 @@ suspend fun computeBrightness(
     }
 }
 
+fun getLuminance(color: Int): Float =
+    if (Build.VERSION.SDK_INT >= 24) Color.luminance(color)
+    else ColorUtils.calculateLuminance(color).toFloat()
+
 fun getContrastRatio(lum1: Float, lum2: Float) =
     (Math.max(lum1, lum2) + 0.05f) / (Math.min(lum1, lum2) + 0.05f)
 
-val whiteLum = Color.luminance(Color.WHITE)
-val blackLum = Color.luminance(Color.BLACK)
+val whiteLum = getLuminance(Color.WHITE)
+val blackLum = getLuminance(Color.BLACK)
 val minWhiteContrast = 4f // min contrast against white text
 val minBlackContrast = 12f // min contrast against black text
 val busyThreshold = 0.05f // busy if this fraction or more are low-contrast

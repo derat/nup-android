@@ -30,6 +30,7 @@ import android.widget.SeekBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
+import androidx.core.widget.TextViewCompat
 import com.google.android.material.button.MaterialButton
 
 /** Main activity showing current song and playlist. */
@@ -126,7 +127,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
         volumeControlStream = AudioManager.STREAM_MUSIC
 
-        noCoverBitmap.eraseColor(getColor(R.color.no_song_cover))
+        noCoverBitmap.eraseColor(ContextCompat.getColor(this, R.color.no_song_cover))
     }
 
     override fun onDestroy() {
@@ -300,13 +301,15 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
             else -> R.style.PlayingSongTextDark
         }
         for (view in arrayOf(artistLabel, titleLabel, albumLabel, downloadStatusLabel)) {
-            view.setTextAppearance(style)
+            TextViewCompat.setTextAppearance(view, style)
         }
 
         songTextLayout.setBackground(
             when (brightness) {
-                Brightness.DARK_BUSY -> CoverGradient(getColor(R.color.dark_cover_overlay))
-                Brightness.LIGHT_BUSY -> CoverGradient(getColor(R.color.light_cover_overlay))
+                Brightness.DARK_BUSY ->
+                    CoverGradient(ContextCompat.getColor(this, R.color.dark_cover_overlay))
+                Brightness.LIGHT_BUSY ->
+                    CoverGradient(ContextCompat.getColor(this, R.color.light_cover_overlay))
                 else -> null
             }
         )
