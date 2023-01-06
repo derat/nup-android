@@ -8,13 +8,13 @@
     android:icon="@drawable/pause"
     android:title="@string/pause"
     app:iconTint="?android:attr/textColorPrimary"
-    app:showAsAction="always|withText"
+    app:showAsAction="always"
   />
   <item
     android:id="@+id/browse_return_menu_item"
     android:icon="@drawable/close"
     android:title="@string/return_to_player"
     app:iconTint="?android:attr/textColorPrimary"
-    app:showAsAction="always|withText"
+    app:showAsAction="always"
   />
 </menu>
