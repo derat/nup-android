@@ -471,7 +471,7 @@ class NupService :
         coverTextRight = 0.5f
         coverTextBottom = (coverSize - res.getDimension(R.dimen.vertical_padding)) / coverSize
         coverTextTop = coverTextBottom -
-            3.6f * (res.getDimension(R.dimen.playing_song_text) / coverSize)
+            3.6f * (res.getDimension(R.dimen.current_song_text) / coverSize)
     }
 
     override fun onDestroy() {

@@ -1,37 +1,8 @@
 <?xml version="1.0" encoding="utf-8" ?>
-<LinearLayout
+<ListView
   xmlns:android="http://schemas.android.com/apk/res/android"
-  xmlns:app="http://schemas.android.com/apk/res-auto"
-  android:orientation="vertical"
+  android:id="@+id/playlist"
   android:layout_width="fill_parent"
   android:layout_height="fill_parent"
->
-  <LinearLayout
-    style="@style/Raised"
-    android:id="@+id/playlist_heading"
-    android:orientation="horizontal"
-    android:layout_width="fill_parent"
-    android:layout_height="wrap_content"
-    android:paddingLeft="@dimen/horizontal_padding"
-    android:paddingRight="@dimen/horizontal_padding"
-  >
-    <TextView
-      style="@style/SongListArtist"
-      android:text="@string/artist"
-      android:textStyle="bold"
-    />
-    <TextView
-      style="@style/SongListTitle"
-      android:layout_weight="2"
-      android:text="@string/title"
-      android:textStyle="bold"
-    />
-  </LinearLayout>
-
-  <ListView
-    android:id="@+id/playlist"
-    android:layout_width="fill_parent"
-    android:layout_height="fill_parent"
-    android:divider="@android:color/transparent"
-  />
-</LinearLayout>
+  android:divider="@android:color/transparent"
+/>

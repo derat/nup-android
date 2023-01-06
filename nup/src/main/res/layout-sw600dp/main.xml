@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- This is NupActivity's main layout for portrait-mode tablets.
+     It consists of a small cover image on the left and the current song's artist,
+     title, album, and download status stacked vertically on the right. Below that,
+     the progress bar, playback buttons, and playlist are stacked vertically. -->
+<LinearLayout
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:app="http://schemas.android.com/apk/res-auto"
+  android:orientation="vertical"
+  android:layout_width="fill_parent"
+  android:layout_height="fill_parent"
+>
+  <!-- Upper raised region (including playlist heading) -->
+  <LinearLayout
+    style="@style/Raised"
+    android:orientation="vertical"
+    android:layout_width="fill_parent"
+    android:layout_height="wrap_content"
+    android:paddingLeft="@dimen/horizontal_padding"
+    android:paddingRight="@dimen/horizontal_padding"
+    android:paddingTop="@dimen/vertical_padding"
+  >
+    <!-- Cover image and song text -->
+    <LinearLayout
+      android:id="@+id/current_song_frame"
+      android:orientation="horizontal"
+      android:layout_width="fill_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginTop="@dimen/vertical_padding"
+      android:layout_marginBottom="@dimen/vertical_padding"
+    >
+      <ImageView
+        android:id="@+id/cover_image"
+        android:layout_width="@dimen/cover_size"
+        android:layout_height="@dimen/cover_size"
+        android:layout_marginRight="@dimen/horizontal_padding"
+        android:adjustViewBounds="true"
+        android:scaleType="centerInside"
+      />
+      <LinearLayout
+        android:id="@+id/song_text_layout"
+        android:orientation="vertical"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+      >
+        <include layout="@layout/main_song_text" />
+        <include layout="@layout/main_download_status" />
+      </LinearLayout>
+    </LinearLayout>
+
+    <include
+      layout="@layout/main_progress"
+      android:layout_width="fill_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginBottom="@dimen/vertical_padding"
+    />
+    <include
+      layout="@layout/main_buttons"
+      android:layout_width="fill_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginBottom="@dimen/vertical_padding"
+    />
+    <include layout="@layout/main_playlist_heading" />
+  </LinearLayout>
+
+  <!-- Lower non-raised region with playlist -->
+  <include layout="@layout/main_playlist" />
+</LinearLayout>

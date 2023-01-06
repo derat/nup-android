@@ -295,17 +295,24 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
     /** Update text view styles to be legible over [song]'s cover image. */
     private fun updateSongTextColor(song: Song?) {
+        // Only display a gradient if the view containing the text has a tag indicating
+        // that it'll be drawn over the cover image.
+        val overlay = songTextLayout.getTag() == "overlay"
         val brightness = song?.coverBrightness ?: Brightness.DARK
-        val style = when (brightness) {
-            Brightness.DARK, Brightness.DARK_BUSY -> R.style.PlayingSongText
-            else -> R.style.PlayingSongTextDark
-        }
+
+        val style =
+            if (!overlay) R.style.CurrentSongText
+            else when (brightness) {
+                Brightness.DARK, Brightness.DARK_BUSY -> R.style.CurrentSongTextLight
+                else -> R.style.CurrentSongTextDark
+            }
         for (view in arrayOf(artistLabel, titleLabel, albumLabel, downloadStatusLabel)) {
             TextViewCompat.setTextAppearance(view, style)
         }
 
         songTextLayout.setBackground(
-            when (brightness) {
+            if (!overlay) null
+            else when (brightness) {
                 Brightness.DARK_BUSY ->
                     CoverGradient(ContextCompat.getColor(this, R.color.dark_cover_overlay))
                 Brightness.LIGHT_BUSY ->

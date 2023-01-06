@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<LinearLayout
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  android:id="@+id/playlist_heading"
+  android:orientation="horizontal"
+  android:layout_width="fill_parent"
+  android:layout_height="wrap_content"
+>
+  <TextView style="@style/SongListArtist" android:text="@string/artist" android:textStyle="bold" />
+  <TextView
+    style="@style/SongListTitle"
+    android:layout_weight="2"
+    android:text="@string/title"
+    android:textStyle="bold"
+  />
+</LinearLayout>

@@ -20,8 +20,8 @@ android {
     // behaviors to maintain your app's forward-compatibility with the target
     // version. The application is still able to run on older versions (down to
     // minSdkVersion)."
-    minSdkVersion 22    // Android 5.1 (Lollipop, Nov. 2014 -- Fire HD 8 2016)
     targetSdkVersion 33 // Android 13 (Aug. 2022)
+    minSdkVersion 22    // Android 5.1 (Lollipop, Nov. 2014 -- Fire HD 8 2017)
   }
 
   compileSdkVersion 33

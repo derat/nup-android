@@ -9,8 +9,8 @@
   <dimen name="text_spacing">12dp</dimen>
   <dimen name="button_spacing">12dp</dimen>
 
-  <dimen name="playing_song_text">17dp</dimen>
-  <dimen name="playing_song_download_text">15dp</dimen>
+  <dimen name="current_song_text">17dp</dimen>
+  <dimen name="download_status_text">15dp</dimen>
   <dimen name="seek_label_width">36dp</dimen>
 
   <dimen name="song_list_text">15sp</dimen>

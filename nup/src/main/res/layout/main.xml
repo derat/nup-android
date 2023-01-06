@@ -1,4 +1,8 @@
 <?xml version="1.0" encoding="utf-8" ?>
+<!-- This is NupActivity's main layout for portrait-mode phones.
+     It consists of a big, full-width cover image with the current song's artist, title,
+     and album in the lower left and the download status in the upper right. Below that,
+     the progress bar, playback buttons, and playlist are stacked vertically. -->
 <LinearLayout
   xmlns:android="http://schemas.android.com/apk/res/android"
   xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -6,36 +10,80 @@
   android:layout_width="fill_parent"
   android:layout_height="fill_parent"
 >
-  <FrameLayout
+  <!-- Upper raised region (including playlist heading) -->
+  <LinearLayout
     style="@style/Raised"
-    android:id="@+id/current_song_frame"
+    android:orientation="vertical"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
-    android:paddingBottom="@dimen/vertical_padding"
-    android:clipChildren="false"
   >
-    <ImageView
-      android:id="@+id/cover_image"
+    <!-- Upper part of raised region with full-width cover image and song text -->
+    <FrameLayout
+      android:id="@+id/current_song_frame"
       android:layout_width="fill_parent"
       android:layout_height="wrap_content"
-      android:adjustViewBounds="true"
-      android:scaleType="centerCrop"
-    />
-    <include
-      layout="@layout/main_download_status"
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:layout_gravity="top|right"
-    />
-    <include
-      layout="@layout/main_song_text"
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:layout_gravity="bottom|left"
-    />
-  </FrameLayout>
+      android:layout_marginBottom="@dimen/vertical_padding"
+      android:clipChildren="false"
+    >
+      <ImageView
+        android:id="@+id/cover_image"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:adjustViewBounds="true"
+        android:scaleType="centerCrop"
+      />
+      <include
+        layout="@layout/main_download_status"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="top|right"
+        android:layout_marginRight="@dimen/horizontal_padding"
+        android:layout_marginTop="@dimen/vertical_padding"
+      />
+      <LinearLayout
+        android:id="@+id/song_text_layout"
+        android:tag="overlay"
+        android:orientation="vertical"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|left"
+        android:paddingLeft="@dimen/horizontal_padding"
+        android:paddingRight="@dimen/horizontal_padding"
+        android:paddingTop="@dimen/vertical_padding"
+        android:paddingBottom="@dimen/vertical_padding"
+        android:clipChildren="false"
+        android:clipToPadding="false"
+      >
+        <include layout="@layout/main_song_text" />
+      </LinearLayout>
+    </FrameLayout>
 
-  <include layout="@layout/main_progress" />
-  <include layout="@layout/main_buttons" />
+    <!-- Lower part of raised region with horizontal margins -->
+    <LinearLayout
+      android:orientation="vertical"
+      android:layout_width="fill_parent"
+      android:layout_height="wrap_content"
+      android:layout_marginLeft="@dimen/horizontal_padding"
+      android:layout_marginRight="@dimen/horizontal_padding"
+    >
+      <include
+        layout="@layout/main_progress"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/vertical_padding"
+        android:layout_marginBottom="@dimen/vertical_padding"
+      />
+      <include
+        layout="@layout/main_buttons"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/vertical_padding"
+        android:layout_marginBottom="@dimen/vertical_padding"
+      />
+      <include layout="@layout/main_playlist_heading" />
+    </LinearLayout>
+  </LinearLayout>
+
+  <!-- Lower non-raised region with playlist -->
   <include layout="@layout/main_playlist" />
 </LinearLayout>
