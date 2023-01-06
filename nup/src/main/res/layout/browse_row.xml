@@ -4,8 +4,8 @@
   android:orientation="horizontal"
   android:layout_width="fill_parent"
   android:layout_height="wrap_content"
-  android:paddingLeft="@dimen/horizontal_padding"
-  android:paddingRight="@dimen/horizontal_padding"
+  android:paddingLeft="@dimen/horiz_space"
+  android:paddingRight="@dimen/horiz_space"
 >
   <TextView
     android:id="@+id/main"
@@ -17,6 +17,6 @@
     android:id="@+id/extra"
     style="@style/BrowseRowExtra"
     android:layout_alignParentRight="true"
-    android:paddingLeft="@dimen/text_spacing"
+    android:paddingLeft="@dimen/horiz_space"
   />
 </RelativeLayout>

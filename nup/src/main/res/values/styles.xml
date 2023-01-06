@@ -8,7 +8,7 @@
 
   <style name="Raised">
     <item name="android:background">?android:attr/colorBackground</item>
-    <item name="android:elevation">@dimen/height1</item>
+    <item name="android:elevation">2dp</item>
   </style>
 
   <style name="CurrentSongText">
@@ -29,8 +29,8 @@
     <item name="android:shadowRadius">4</item>
   </style>
 
-  <style name="SeekLabel">
-    <item name="android:layout_width">@dimen/seek_label_width</item>
+  <style name="ProgressLabel">
+    <item name="android:layout_width">@dimen/progress_label_width</item>
     <item name="android:layout_height">wrap_content</item>
   </style>
 
@@ -55,7 +55,7 @@
     <item name="android:layout_width">fill_parent</item>
     <item name="android:layout_height">wrap_content</item>
     <item name="android:layout_weight">3</item>
-    <item name="android:paddingRight">4dp</item>
+    <item name="android:paddingRight">4sp</item>
     <item name="android:textSize">@dimen/song_list_text</item>
     <item name="android:singleLine">true</item>
     <item name="android:textColor">?android:attr/textColorPrimary</item>
@@ -70,8 +70,8 @@
   <style name="SongListPercent">
     <item name="android:layout_width">wrap_content</item>
     <item name="android:layout_height">wrap_content</item>
-    <item name="android:paddingTop">2dp</item>
-    <item name="android:paddingLeft">4dp</item>
+    <item name="android:paddingTop">2sp</item>
+    <item name="android:paddingLeft">4sp</item>
     <item name="android:textSize">@dimen/song_list_percent</item>
     <item name="android:singleLine">true</item>
     <item name="android:textColor">?android:attr/textColorPrimary</item>
@@ -80,8 +80,8 @@
   <style name="BrowseRowText">
     <item name="android:layout_width">wrap_content</item>
     <item name="android:layout_height">wrap_content</item>
-    <item name="android:paddingTop">@dimen/vertical_padding</item>
-    <item name="android:paddingBottom">@dimen/vertical_padding</item>
+    <item name="android:paddingTop">@dimen/vert_space</item>
+    <item name="android:paddingBottom">@dimen/vert_space</item>
     <item name="android:textColor">?android:attr/textColorPrimary</item>
     <item name="android:textSize">@dimen/song_list_text</item>
     <item name="android:singleLine">true</item>
@@ -91,7 +91,7 @@
   </style>
 
   <style name="SongDetailsLabel">
-    <item name="android:paddingRight">4dp</item>
+    <item name="android:paddingRight">4sp</item>
     <item name="android:gravity">right</item>
     <item name="android:textColor">?android:attr/textColorPrimary</item>
     <item name="android:textSize">@dimen/song_details_text</item>

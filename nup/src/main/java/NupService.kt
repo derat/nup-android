@@ -467,9 +467,9 @@ class NupService :
         //   enough).
         val coverSize =
             getApplicationContext().getResources().getDisplayMetrics().widthPixels.toFloat()
-        coverTextLeft = res.getDimension(R.dimen.horizontal_padding) / coverSize
+        coverTextLeft = res.getDimension(R.dimen.horiz_space) / coverSize
         coverTextRight = 0.5f
-        coverTextBottom = (coverSize - res.getDimension(R.dimen.vertical_padding)) / coverSize
+        coverTextBottom = (coverSize - res.getDimension(R.dimen.vert_space)) / coverSize
         coverTextTop = coverTextBottom -
             3.6f * (res.getDimension(R.dimen.current_song_text) / coverSize)
     }

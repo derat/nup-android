@@ -10,10 +10,10 @@
     android:orientation="horizontal"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
-    android:paddingLeft="@dimen/horizontal_padding"
-    android:paddingRight="@dimen/horizontal_padding"
-    android:paddingTop="@dimen/vertical_padding"
-    android:paddingBottom="@dimen/vertical_padding"
+    android:paddingLeft="@dimen/horiz_space"
+    android:paddingRight="@dimen/horiz_space"
+    android:paddingTop="@dimen/vert_space"
+    android:paddingBottom="@dimen/vert_space"
   >
     <Button
       android:id="@+id/append_button"
@@ -22,7 +22,7 @@
       android:onClick="onAppendButtonClicked"
       android:enabled="false"
     />
-    <Space android:layout_width="@dimen/button_spacing" android:layout_height="fill_parent" />
+    <Space android:layout_width="@dimen/horiz_space" android:layout_height="fill_parent" />
     <Button
       android:id="@+id/insert_button"
       style="@style/Button"
@@ -30,7 +30,7 @@
       android:onClick="onInsertButtonClicked"
       android:enabled="false"
     />
-    <Space android:layout_width="@dimen/button_spacing" android:layout_height="fill_parent" />
+    <Space android:layout_width="@dimen/horiz_space" android:layout_height="fill_parent" />
     <Button
       android:id="@+id/replace_button"
       style="@style/Button"
@@ -46,8 +46,8 @@
     android:orientation="horizontal"
     android:layout_width="fill_parent"
     android:layout_height="wrap_content"
-    android:paddingLeft="@dimen/horizontal_padding"
-    android:paddingRight="@dimen/horizontal_padding"
+    android:paddingLeft="@dimen/horiz_space"
+    android:paddingRight="@dimen/horiz_space"
   >
     <TextView
       style="@style/SongListArtist"

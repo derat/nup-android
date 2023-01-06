@@ -22,7 +22,7 @@
       android:id="@+id/current_song_frame"
       android:layout_width="fill_parent"
       android:layout_height="wrap_content"
-      android:layout_marginBottom="@dimen/vertical_padding"
+      android:layout_marginBottom="@dimen/vert_space"
       android:clipChildren="false"
     >
       <ImageView
@@ -37,8 +37,8 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="top|right"
-        android:layout_marginRight="@dimen/horizontal_padding"
-        android:layout_marginTop="@dimen/vertical_padding"
+        android:layout_marginRight="@dimen/horiz_space"
+        android:layout_marginTop="@dimen/vert_space"
       />
       <LinearLayout
         android:id="@+id/song_text_layout"
@@ -47,10 +47,10 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:layout_gravity="bottom|left"
-        android:paddingLeft="@dimen/horizontal_padding"
-        android:paddingRight="@dimen/horizontal_padding"
-        android:paddingTop="@dimen/vertical_padding"
-        android:paddingBottom="@dimen/vertical_padding"
+        android:paddingLeft="@dimen/horiz_space"
+        android:paddingRight="@dimen/horiz_space"
+        android:paddingTop="@dimen/vert_space"
+        android:paddingBottom="@dimen/vert_space"
         android:clipChildren="false"
         android:clipToPadding="false"
       >
@@ -63,22 +63,22 @@
       android:orientation="vertical"
       android:layout_width="fill_parent"
       android:layout_height="wrap_content"
-      android:layout_marginLeft="@dimen/horizontal_padding"
-      android:layout_marginRight="@dimen/horizontal_padding"
+      android:layout_marginLeft="@dimen/horiz_space"
+      android:layout_marginRight="@dimen/horiz_space"
     >
       <include
         layout="@layout/main_progress"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/vertical_padding"
-        android:layout_marginBottom="@dimen/vertical_padding"
+        android:layout_marginTop="@dimen/vert_space"
+        android:layout_marginBottom="@dimen/vert_space"
       />
       <include
         layout="@layout/main_buttons"
         android:layout_width="fill_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="@dimen/vertical_padding"
-        android:layout_marginBottom="@dimen/vertical_padding"
+        android:layout_marginTop="@dimen/vert_space"
+        android:layout_marginBottom="@dimen/vert_space"
       />
       <include layout="@layout/main_playlist_heading" />
     </LinearLayout>

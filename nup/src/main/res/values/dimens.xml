@@ -1,21 +1,22 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <resources>
-  <dimen name="height1">2dp</dimen>
-  <dimen name="height2">4dp</dimen>
+  <!-- Generic horizontal and vertical padding/margin -->
+  <dimen name="horiz_space">12dp</dimen>
+  <dimen name="vert_space">8dp</dimen>
 
-  <dimen name="horizontal_padding">12dp</dimen>
-  <dimen name="vertical_padding">8dp</dimen>
+  <!-- NupActivity current song and progress bar -->
+  <dimen name="current_song_text">17sp</dimen>
+  <dimen name="download_status_text">15sp</dimen>
+  <dimen name="progress_label_width">36sp</dimen>
 
-  <dimen name="text_spacing">12dp</dimen>
-  <dimen name="button_spacing">12dp</dimen>
-
-  <dimen name="current_song_text">17dp</dimen>
-  <dimen name="download_status_text">15dp</dimen>
-  <dimen name="seek_label_width">36dp</dimen>
-
+  <!-- NupActivity playlist and SearchResultsActivity results list -->
   <dimen name="song_list_text">15sp</dimen>
   <dimen name="song_list_percent">13sp</dimen>
+
+  <!-- SongDetailsDialog -->
   <dimen name="song_details_text">15sp</dimen>
+
+  <!-- SearchFormActivity -->
   <dimen name="search_heading_text">17sp</dimen>
   <dimen name="search_label_text">16sp</dimen>
 </resources>

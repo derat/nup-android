@@ -201,7 +201,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
                     else (song.lengthSec * 1000).toInt()
                 seekbar.setMax(lenMs)
 
-                // Avoid messing with the progress bar and labels while dragging.
+                // Avoid messing with the seekbar and labels while dragging.
                 val dragging = seekbarDragMs >= 0
                 if (!dragging) {
                     seekbar.setProgress(positionMs)

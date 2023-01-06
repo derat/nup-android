@@ -13,14 +13,14 @@
     app:icon="@drawable/skip_previous"
     android:onClick="onPrevButtonClicked"
   />
-  <Space android:layout_width="@dimen/button_spacing" android:layout_height="fill_parent" />
+  <Space android:layout_width="@dimen/horiz_space" android:layout_height="fill_parent" />
   <Button
     android:id="@+id/pause_button"
     style="@style/IconButton"
     app:icon="@drawable/play"
     android:onClick="onPauseButtonClicked"
   />
-  <Space android:layout_width="@dimen/button_spacing" android:layout_height="fill_parent" />
+  <Space android:layout_width="@dimen/horiz_space" android:layout_height="fill_parent" />
   <Button
     android:id="@+id/next_button"
     style="@style/IconButton"

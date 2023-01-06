@@ -9,12 +9,12 @@
   android:gravity="center_vertical"
   android:clipChildren="false"
 >
-  <TextView android:id="@+id/position_label" style="@style/SeekLabel" />
+  <TextView android:id="@+id/position_label" style="@style/ProgressLabel" />
   <SeekBar
     android:id="@+id/seekbar"
     android:layout_width="0px"
     android:layout_height="wrap_content"
     android:layout_weight="1"
   />
-  <TextView android:id="@+id/duration_label" style="@style/SeekLabel" android:gravity="right" />
+  <TextView android:id="@+id/duration_label" style="@style/ProgressLabel" android:gravity="right" />
 </LinearLayout>
