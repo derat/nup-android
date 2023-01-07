@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!-- This is NupActivity's main layout for landscape-mode devices.
+     It consists of a left pane with a full-height cover image with the current song's artist,
+     title, and album in the lower left and the download status in the upper right. The right
+     pane contains the playlist, progress bar, and playback buttons stacked vertically. -->
+<LinearLayout
+  android:id="@+id/root"
+  xmlns:android="http://schemas.android.com/apk/res/android"
+  xmlns:app="http://schemas.android.com/apk/res-auto"
+  android:orientation="horizontal"
+  android:layout_width="fill_parent"
+  android:layout_height="fill_parent"
+>
+  <!-- Left pane (cover image with text) -->
+  <FrameLayout
+    android:layout_width="wrap_content"
+    android:layout_height="fill_parent"
+    android:clipChildren="false"
+  >
+    <ImageView
+      android:id="@+id/cover_image"
+      android:layout_width="wrap_content"
+      android:layout_height="fill_parent"
+      android:adjustViewBounds="true"
+      android:scaleType="centerCrop"
+    />
+    <include
+      layout="@layout/main_download_status"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_gravity="top|right"
+      android:layout_marginRight="@dimen/horiz_space"
+      android:layout_marginTop="@dimen/vert_space"
+    />
+    <!-- Despite hours of experimenting with various combinations of ConstraintLayout,
+         FrameLayout, and LinearLayout, I haven't been able to find any way to prevent this text
+         from growing the outer layout's width beyond the cover image's width. I finally resorted
+         to a hack in NupActivity's onCreate() method that automatically sets the individual
+         TextViews' max widths so they won't exceed the cover's chosen width. -->
+    <LinearLayout
+      android:id="@+id/song_text_layout"
+      android:tag="overlay"
+      android:orientation="vertical"
+      android:layout_width="wrap_content"
+      android:layout_height="wrap_content"
+      android:layout_gravity="bottom|left"
+      android:paddingLeft="@dimen/horiz_space"
+      android:paddingRight="@dimen/horiz_space"
+      android:paddingTop="@dimen/vert_space"
+      android:paddingBottom="@dimen/vert_space"
+      android:clipChildren="false"
+      android:clipToPadding="false"
+    >
+      <include layout="@layout/main_song_text" />
+    </LinearLayout>
+  </FrameLayout>
+
+  <!-- Right pane (playlist, progress bar, playback buttons) -->
+  <LinearLayout
+    android:orientation="vertical"
+    android:layout_width="0px"
+    android:layout_height="fill_parent"
+    android:layout_weight="1"
+  >
+    <!-- Raised upper part with playlist header -->
+    <LinearLayout
+      style="@style/Raised"
+      android:orientation="vertical"
+      android:layout_width="fill_parent"
+      android:layout_height="wrap_content"
+      android:paddingTop="@dimen/vert_space"
+      android:paddingLeft="@dimen/horiz_space"
+      android:paddingRight="@dimen/horiz_space"
+    >
+      <include layout="@layout/main_playlist_heading" />
+    </LinearLayout>
+
+    <!-- Playlist in middle -->
+    <include
+      layout="@layout/main_playlist"
+      android:layout_width="fill_parent"
+      android:layout_height="0dp"
+      android:layout_weight="1"
+    />
+
+    <!-- Raised bottom part with progress bar and playback buttons -->
+    <LinearLayout
+      style="@style/Raised"
+      android:orientation="vertical"
+      android:layout_width="fill_parent"
+      android:layout_height="wrap_content"
+      android:paddingLeft="@dimen/horiz_space"
+      android:paddingRight="@dimen/horiz_space"
+      android:paddingTop="@dimen/vert_space"
+    >
+      <!-- TODO: The vertical spacing around the progress bar looks
+           okay on a Pixel 4a running Android 13, but it's much bigger
+           on an old tablet with Android 5. Figure out why. -->
+      <include
+        layout="@layout/main_progress"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/vert_space"
+        android:layout_marginBottom="@dimen/vert_space"
+      />
+      <!-- TODO: The bottom margin here looks weird in the dark theme,
+           but the light theme looks terrible without it. -->
+      <include
+        layout="@layout/main_buttons"
+        android:layout_width="fill_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="@dimen/vert_space"
+        android:layout_marginBottom="@dimen/horiz_space"
+      />
+    </LinearLayout>
+  </LinearLayout>
+</LinearLayout>

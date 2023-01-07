@@ -22,6 +22,7 @@ import android.view.Menu
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewTreeObserver.OnGlobalLayoutListener
 import android.widget.AdapterView.AdapterContextMenuInfo
 import android.widget.BaseAdapter
 import android.widget.ImageView
@@ -52,7 +53,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
     private var seekbarDragMs = -1 // most-recent [seekbar] position while scrubbing
 
-    private lateinit var currentSongFrame: View
+    private lateinit var rootView: View
     private lateinit var coverImageView: ImageView
     private lateinit var songTextLayout: View
     private lateinit var artistLabel: TextView
@@ -60,17 +61,19 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
     private lateinit var albumLabel: TextView
     private lateinit var downloadStatusLabel: TextView
 
-    private lateinit var progressRow: View
     private lateinit var positionLabel: TextView
     private lateinit var durationLabel: TextView
     private lateinit var seekbar: SeekBar
 
-    private lateinit var playbackButtonsRow: View
     private lateinit var pauseButton: MaterialButton
     private lateinit var prevButton: MaterialButton
     private lateinit var nextButton: MaterialButton
 
     private lateinit var playlistView: ListView
+
+    // True if [songTextLayout] is drawn on top of [coverImageView].
+    private val songTextOverCoverImage: Boolean
+        get() = songTextLayout.getTag() == "overlay"
 
     // Used while loading cover images and for songs without cover images.
     private val noCoverBitmap = Bitmap.createBitmap(1, 1, Bitmap.Config.ARGB_8888)
@@ -85,7 +88,7 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
 
         setContentView(R.layout.main)
 
-        currentSongFrame = findViewById<View>(R.id.current_song_frame)
+        rootView = findViewById<View>(R.id.root)
         coverImageView = findViewById<ImageView>(R.id.cover_image)
         songTextLayout = findViewById<View>(R.id.song_text_layout)
         artistLabel = findViewById<TextView>(R.id.artist_label)
@@ -93,7 +96,6 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         albumLabel = findViewById<TextView>(R.id.album_label)
         downloadStatusLabel = findViewById<TextView>(R.id.download_status_label)
 
-        progressRow = findViewById<View>(R.id.progress_row)
         positionLabel = findViewById<TextView>(R.id.position_label)
         durationLabel = findViewById<TextView>(R.id.duration_label)
         seekbar = findViewById<SeekBar>(R.id.seekbar)
@@ -115,7 +117,6 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
             }
         })
 
-        playbackButtonsRow = findViewById<View>(R.id.playback_buttons_row)
         pauseButton = findViewById<MaterialButton>(R.id.pause_button)
         prevButton = findViewById<MaterialButton>(R.id.prev_button)
         nextButton = findViewById<MaterialButton>(R.id.next_button)
@@ -128,6 +129,26 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
         volumeControlStream = AudioManager.STREAM_MUSIC
 
         noCoverBitmap.eraseColor(ContextCompat.getColor(this, R.color.no_song_cover))
+
+        // This is a disgusting hack. I'm unable to find any way to prevent long artist/title/album
+        // names from expanding the left frame beyond the cover image's width when using the
+        // landscape-mode layout. So, I'm resorting to setting the individual TextViews' max widths
+        // to the cover image's width minus their horizontal padding.
+        coverImageView.getViewTreeObserver().addOnGlobalLayoutListener(
+            object : OnGlobalLayoutListener {
+                override fun onGlobalLayout() {
+                    val maxWidth = if (songTextOverCoverImage) {
+                        coverImageView.getWidth() -
+                            2 * getResources().getDimensionPixelSize(R.dimen.horiz_space)
+                    } else {
+                        Integer.MAX_VALUE
+                    }
+                    artistLabel.setMaxWidth(maxWidth)
+                    titleLabel.setMaxWidth(maxWidth)
+                    albumLabel.setMaxWidth(maxWidth)
+                    downloadStatusLabel.setMaxWidth(maxWidth)
+                }
+            })
     }
 
     override fun onDestroy() {
@@ -286,32 +307,29 @@ class NupActivity : AppCompatActivity(), NupService.SongListener {
             service.fetchCoverForSongIfMissing(song)
         }
 
-        // Hide the controls when there's no song.
-        val vis = if (song != null) View.VISIBLE else View.INVISIBLE
-        currentSongFrame.visibility = vis
-        progressRow.visibility = vis
-        playbackButtonsRow.visibility = vis
+        // Hide everything when there's no song.
+        rootView.visibility = if (song != null) View.VISIBLE else View.INVISIBLE
     }
 
     /** Update text view styles to be legible over [song]'s cover image. */
     private fun updateSongTextColor(song: Song?) {
         // Only display a gradient if the view containing the text has a tag indicating
         // that it'll be drawn over the cover image.
-        val overlay = songTextLayout.getTag() == "overlay"
         val brightness = song?.coverBrightness ?: Brightness.DARK
 
         val style =
-            if (!overlay) R.style.CurrentSongText
+            if (!songTextOverCoverImage) R.style.CurrentSongText
             else when (brightness) {
                 Brightness.DARK, Brightness.DARK_BUSY -> R.style.CurrentSongTextLight
                 else -> R.style.CurrentSongTextDark
             }
-        for (view in arrayOf(artistLabel, titleLabel, albumLabel, downloadStatusLabel)) {
-            TextViewCompat.setTextAppearance(view, style)
-        }
+        TextViewCompat.setTextAppearance(artistLabel, style)
+        TextViewCompat.setTextAppearance(titleLabel, style)
+        TextViewCompat.setTextAppearance(albumLabel, style)
+        TextViewCompat.setTextAppearance(downloadStatusLabel, style)
 
         songTextLayout.setBackground(
-            if (!overlay) null
+            if (!songTextOverCoverImage) null
             else when (brightness) {
                 Brightness.DARK_BUSY ->
                     CoverGradient(ContextCompat.getColor(this, R.color.dark_cover_overlay))
