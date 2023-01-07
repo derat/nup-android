@@ -39,16 +39,6 @@
     app:iconTint="?android:attr/textColorPrimary"
     app:showAsAction="never"
   />
-  <group android:id="@+id/guest_mode_menu_group">
-    <item
-      android:id="@+id/report_plays_menu_item"
-      android:icon="@drawable/cloud_upload"
-      android:title="@string/report_plays"
-      android:checkable="true"
-      app:iconTint="?android:attr/textColorPrimary"
-      app:showAsAction="never"
-    />
-  </group>
   <item
     android:id="@+id/exit_menu_item"
     android:icon="@drawable/close"

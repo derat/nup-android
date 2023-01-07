@@ -153,10 +153,7 @@ class NupService :
             }
         }
 
-    /** Report played songs to the server via [playbackReporter]. */
-    var shouldReportPlays: Boolean = true
-
-    /** If true, [shouldReportPlays] defaults to false and can be toggled via NupActivity. */
+    /** Corresponds to [NupPreferences.GUEST_MODE]. If true, plays are not reported. */
     var guestMode: Boolean = false
 
     private val songCoverFetches = mutableSetOf<Song>() // songs whose covers are being fetched
@@ -615,10 +612,7 @@ class NupService :
             NupPreferences.USERNAME -> downloader.username = readStringPref(key)
             NupPreferences.SERVER_URL -> downloader.server = readStringPref(key)
             NupPreferences.SONGS_TO_PRELOAD -> songsToPreload = readStringPref(key).toInt()
-            NupPreferences.GUEST_MODE -> {
-                guestMode = readBooleanPref(key)
-                shouldReportPlays = !guestMode
-            }
+            NupPreferences.GUEST_MODE -> guestMode = readBooleanPref(key)
         }
     }
 
@@ -976,11 +970,11 @@ class NupService :
             // https://www.last.fm/api/scrobbling#scrobble-requests
             val halfMs = Math.max(durationMs, (song.lengthSec * 1000).toInt()).toLong() / 2
             if (!reported && playedMs >= Math.min(halfMs, REPORT_PLAYBACK_THRESHOLD_MS)) {
-                if (shouldReportPlays) {
+                if (guestMode) {
+                    Log.d(TAG, "Not reporting play of ${song.id} due to guest mode")
+                } else {
                     val start = playStart!!
                     scope.launch(Dispatchers.IO) { playbackReporter.report(song.id, start) }
-                } else {
-                    Log.d(TAG, "Not reporting play of ${song.id} due to guest mode")
                 }
                 reported = true
             }
