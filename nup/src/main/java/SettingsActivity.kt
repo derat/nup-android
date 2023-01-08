@@ -93,7 +93,7 @@ class SettingsFragment :
         val decimal = InputType.TYPE_NUMBER_FLAG_DECIMAL
         val noSuggest = InputType.TYPE_TEXT_FLAG_NO_SUGGESTIONS
         val number = InputType.TYPE_CLASS_NUMBER
-        val password = InputType.TYPE_TEXT_VARIATION_PASSWORD
+        val password = InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD
         val signed = InputType.TYPE_NUMBER_FLAG_SIGNED
         val text = InputType.TYPE_CLASS_TEXT
 
@@ -168,18 +168,24 @@ class SettingsFragment :
         select: Boolean,
     ) {
         val pref = findPreference<EditTextPreference>(key)!!
+        val pass = inputType and InputType.TYPE_TEXT_VARIATION_VISIBLE_PASSWORD != 0
         if (summaryProvider != null) pref.setSummaryProvider(summaryProvider)
-        pref.setOnBindEditTextListener {
-            it.setInputType(inputType)
+        pref.setOnBindEditTextListener { editText ->
+            editText.setInputType(inputType)
+
+            // Hide the previously-saved password.
+            if (pass) editText.setText("")
+
             // setSingleLine() doesn't work in conjunction with TYPE_TEXT_VARIATION_PASSWORD;
             // the password remains visible: https://stackoverflow.com/a/47827280/6882947
-            it.maxLines = 1
-            if (select) {
-                it.selectAll()
-            } else {
-                it.setSelection(it.getText().length)
-            }
+            editText.maxLines = 1
+
+            if (select) editText.selectAll()
+            else editText.setSelection(editText.getText().length)
         }
+
+        // Don't save empty passwords (since we clear them when the EditText is bound).
+        if (pass) pref.setOnPreferenceChangeListener { _, new -> !(new as String?).isNullOrEmpty() }
     }
 
     // Custom providers for producing summaries of different prefs' current values.
