@@ -9,15 +9,15 @@
     <item quantity="other">%d songs</item>
   </plurals>
   <plurals name="sync_update_fmt">
-    <item quantity="one">Updated %d song...</item>
-    <item quantity="other">Updated %d songs...</item>
+    <item quantity="one">Updated %d song…</item>
+    <item quantity="other">Updated %d songs…</item>
   </plurals>
   <plurals name="sync_delete_fmt">
-    <item quantity="one">Deleted %d song...</item>
-    <item quantity="other">Deleted %d songs...</item>
+    <item quantity="one">Deleted %d song…</item>
+    <item quantity="other">Deleted %d songs…</item>
   </plurals>
   <plurals name="sync_status_fmt">
-    <item quantity="one">%1$d song\nLast sync: %2$s</item>
-    <item quantity="other">%1$d songs\nLast sync: %2$s</item>
+    <item quantity="one">%1$d song%2$s\nLast sync: %3$s</item>
+    <item quantity="other">%1$d songs%2$s\nLast sync: %3$s</item>
   </plurals>
 </resources>

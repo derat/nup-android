@@ -145,9 +145,6 @@ class SettingsFragment :
 
     override fun onSongDatabaseUpdate() {
         findPreference<YesNoPreference>(NupPreferences.SYNC_SONG_LIST)!!.notifyChanged()
-        // TODO: If syncing updated NupPreferences.GUEST_MODE, the corresponding CheckBoxPreference
-        // is stale at this point. Its notifyChanged() member is private, so we can't call it.
-        // I'm not sure how to fix this; it has the right state after this activity is recreated.
     }
     override fun onCacheSizeChange() {
         findPreference<YesNoPreference>(NupPreferences.CLEAR_CACHE)!!.notifyChanged()
@@ -197,6 +194,7 @@ class SettingsFragment :
                 service.songDb.numSongs,
                 service.songDb.aggregateDataLoaded,
                 service.songDb.lastSyncDate,
+                service.guestMode,
             )
         }
     }
@@ -256,6 +254,7 @@ private fun getSyncSummary(
     totalSongs: Int,
     aggregateDataLoaded: Boolean,
     lastSyncDate: Date?,
+    guestMode: Boolean,
 ): String {
     return when (state) {
         SongDatabase.SyncState.IDLE -> {
@@ -267,7 +266,8 @@ private fun getSyncSummary(
             } else {
                 SimpleDateFormat.getDateInstance().format(lastSyncDate)
             }
-            res.getQuantityString(R.plurals.sync_status_fmt, totalSongs, totalSongs, date)
+            val guest = if (guestMode) res.getString(R.string.guest_mode_suffix) else ""
+            res.getQuantityString(R.plurals.sync_status_fmt, totalSongs, totalSongs, guest, date)
         }
         SongDatabase.SyncState.STARTING ->
             res.getString(R.string.sync_progress_starting)
