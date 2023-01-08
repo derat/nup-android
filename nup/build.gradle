@@ -30,16 +30,13 @@ android {
   buildTypes {
     debug {
       minifyEnabled true
-      // TODO: As of 20230105, rebuilding after modifying an XML file always fails:
+      // As of 20230105, rebuilding after modifying an XML file always fails:
       //   java.lang.IllegalArgumentException: Unable to locate resourceFile
       //   (.../nup/build/intermediates/merged-not-compiled-resources/debug/layout/notification_action.xml)
       //   in source-sets.
-      // Per https://stackoverflow.com/questions/72212885, setting "shrinkResources false" might
-      // work around this, but I'd rather not do that. All of the other answers
-      // are just "clear the cache and rebuild". There's some discussion of
-      // srcSets at https://issuetracker.google.com/issues/206674992, but this
-      // feels more like a bug in the toolchain.
-      shrinkResources true
+      // The next build succeeds. Disabling shrinkResources seems to fix this:
+      // https://stackoverflow.com/questions/72212885
+      shrinkResources false
       proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
     }
   }
