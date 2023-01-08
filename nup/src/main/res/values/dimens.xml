@@ -13,6 +13,9 @@
   <dimen name="song_list_text">15sp</dimen>
   <dimen name="song_list_percent">13sp</dimen>
 
+  <!-- NupActivity small cover size (not used in default layout) -->
+  <dimen name="cover_size">0dp</dimen>
+
   <!-- SongDetailsDialog -->
   <dimen name="song_details_text">15sp</dimen>
 
