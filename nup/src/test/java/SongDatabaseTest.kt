@@ -70,6 +70,9 @@ class SongDatabaseTest {
                 else -> {}
             }
         }
+        override fun onUserInfoFetch(userInfo: SongDatabase.UserInfo) {
+            lastSyncUserInfo = userInfo
+        }
         override fun onSyncDone(success: Boolean, message: String) {
             lastSyncSuccess = success
             lastSyncMessage = message
@@ -80,6 +83,7 @@ class SongDatabaseTest {
     var lastSyncDeletedSongs = 0
     var lastSyncSuccess = false
     var lastSyncMessage = ""
+    var lastSyncUserInfo: SongDatabase.UserInfo? = null
     var aggregateDataUpdates = 0
 
     // Server info returned by [downloader].
@@ -88,6 +92,7 @@ class SongDatabaseTest {
     val serverSongs = mutableListOf<SongInfo>()
     val serverDelSongs = mutableListOf<SongInfo>()
     val serverSearchPresets = mutableListOf<SearchPreset>()
+    var serverUserInfo = SongDatabase.UserInfo()
 
     // Matches HTTP request paths from [SongDatabase.syncSongUpdates].
     val exportRegex = Regex(
@@ -117,6 +122,12 @@ class SongDatabaseTest {
                                 .toString(),
                             null
                         )
+                        (path == "/user") -> {
+                            val obj = JSONObject()
+                            obj.put("guest", serverUserInfo.guest)
+                            obj.put("excludedTags", JSONArray(serverUserInfo.excludedTags))
+                            return Downloader.DownloadStringResult(obj.toString(), null)
+                        }
                         exportRegex.matches(path) -> {
                             val match = exportRegex.find(path)!!
                             val lastMod = match.groupValues[1].toLong()
@@ -137,6 +148,7 @@ class SongDatabaseTest {
         lastSyncUpdatedSongs = 0
         lastSyncDeletedSongs = 0
         lastSyncSuccess = false
+        lastSyncUserInfo = null
         aggregateDataUpdates = 0
 
         // Reset server data.
@@ -144,6 +156,7 @@ class SongDatabaseTest {
         serverSongs.clear()
         serverDelSongs.clear()
         serverSearchPresets.clear()
+        serverUserInfo = SongDatabase.UserInfo()
 
         initDb()
     }
@@ -178,6 +191,7 @@ class SongDatabaseTest {
             tags = listOf("instrumental", "electronic", "10%"),
         )
         serverSongs.addAll(listOf(SongInfo(s1), SongInfo(s2), SongInfo(s3), SongInfo(s4)))
+        serverUserInfo = SongDatabase.UserInfo(guest = true, excludedTags = setOf("foo", "bar"))
 
         db.syncWithServer()
         assertEquals(SongDatabase.SyncState.IDLE, db.syncState)
@@ -185,6 +199,7 @@ class SongDatabaseTest {
         assertEquals(4, lastSyncUpdatedSongs)
         assertTrue(db.aggregateDataLoaded)
         assertEquals(4, db.numSongs)
+        assertEquals(serverUserInfo, lastSyncUserInfo)
 
         assertEquals(listOf(s1, s2, s3, s4), db.query())
         assertEquals(listOf(s1, s2), db.query(artist = "Ä"))
@@ -257,6 +272,20 @@ class SongDatabaseTest {
         assertEquals(1, lastSyncDeletedSongs)
         assertEquals(2, db.numSongs)
         assertEquals(listOf(s1u, s3), db.query())
+
+        // At time 2, add fourth and fifth songs and introduce an excluded tag that excludes
+        // the fourth song and drops the updated first song.
+        serverNowNs++
+        val s4 = makeSong("A", "Track 4", "Album 1", 4, rating = 3, tags = listOf("rock", "drums"))
+        val s5 = makeSong("A", "Track 5", "Album 1", 5, rating = 4, tags = listOf("jazz"))
+        serverSongs.add(SongInfo(s4, serverNowNs))
+        serverSongs.add(SongInfo(s5, serverNowNs))
+        serverUserInfo = SongDatabase.UserInfo(excludedTags = setOf("rock"))
+        db.syncWithServer()
+        assertTrue(lastSyncMessage, lastSyncSuccess)
+        assertEquals(2, lastSyncUpdatedSongs) // new song and dropped song
+        assertEquals(2, db.numSongs)
+        assertEquals(listOf(s3, s5), db.query())
     }
 
     @Test fun aggregateData() = runTest(dispatcher) {

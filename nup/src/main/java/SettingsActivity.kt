@@ -145,6 +145,9 @@ class SettingsFragment :
 
     override fun onSongDatabaseUpdate() {
         findPreference<YesNoPreference>(NupPreferences.SYNC_SONG_LIST)!!.notifyChanged()
+        // TODO: If syncing updated NupPreferences.GUEST_MODE, the corresponding CheckBoxPreference
+        // is stale at this point. Its notifyChanged() member is private, so we can't call it.
+        // I'm not sure how to fix this; it has the right state after this activity is recreated.
     }
     override fun onCacheSizeChange() {
         findPreference<YesNoPreference>(NupPreferences.CLEAR_CACHE)!!.notifyChanged()
@@ -268,6 +271,8 @@ private fun getSyncSummary(
         }
         SongDatabase.SyncState.STARTING ->
             res.getString(R.string.sync_progress_starting)
+        SongDatabase.SyncState.FETCHING_USER_INFO ->
+            res.getString(R.string.sync_progress_fetching_user_info)
         SongDatabase.SyncState.UPDATING_PRESETS ->
             res.getString(R.string.sync_progress_updating_presets)
         SongDatabase.SyncState.UPDATING_SONGS ->

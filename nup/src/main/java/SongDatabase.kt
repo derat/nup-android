@@ -68,6 +68,7 @@ class SongDatabase(
     enum class SyncState {
         IDLE,
         STARTING,
+        FETCHING_USER_INFO,
         UPDATING_PRESETS,
         UPDATING_SONGS,
         DELETING_SONGS,
@@ -78,6 +79,8 @@ class SongDatabase(
     interface Listener {
         /** Called when [syncState] changes. */
         fun onSyncChange(state: SyncState, updatedSongs: Int)
+        /** Called when [userInfo] has been fetched from the server. */
+        fun onUserInfoFetch(userInfo: UserInfo)
         /** Called synchronization finishes (either successfully or not). */
         fun onSyncDone(success: Boolean, message: String)
         /** Called when aggregate stats have been updated. */
@@ -308,7 +311,7 @@ class SongDatabase(
     suspend fun handleSongEvicted(songId: Long) {
         opener.getDb() task@{ db ->
             if (db == null) return@task // quit() already called
-            db.delete("CachedSongs ", "SongId = ?", arrayOf(songId.toString()))
+            db.delete("CachedSongs", "SongId = ?", arrayOf(songId.toString()))
         }
     }
 
@@ -367,6 +370,11 @@ class SongDatabase(
                 notifySyncDone(false, context.getString(R.string.network_is_unavailable))
                 return
             }
+
+            setSyncState(SyncState.FETCHING_USER_INFO, 0)
+            val userInfo = fetchUserInfo()
+            listenerExecutor.execute { listener.onUserInfoFetch(userInfo) }
+
             opener.getDb() task@{ db ->
                 if (db == null) {
                     notifySyncDone(false, "Database already closed")
@@ -380,7 +388,7 @@ class SongDatabase(
                 }
                 loadSearchPresets(db)
 
-                val songsRes = syncSongs(db)
+                val songsRes = syncSongs(db, userInfo.excludedTags)
                 if (!songsRes.success) {
                     notifySyncDone(false, songsRes.error!!)
                     return@task
@@ -397,7 +405,7 @@ class SongDatabase(
     data class SyncResult(val success: Boolean, val updatedItems: Int, val error: String?)
 
     /** Update local list of songs on behalf of [syncWithServer]. */
-    private fun syncSongs(db: SQLiteDatabase): SyncResult {
+    private fun syncSongs(db: SQLiteDatabase, excludedTags: Set<String>): SyncResult {
         var updatedSongs = 0
 
         if (db.inTransaction()) throw RuntimeException("Already in transaction")
@@ -417,12 +425,15 @@ class SongDatabase(
             }
 
             try {
-                updatedSongs += syncSongUpdates(db, prevStartNs, false)
-                updatedSongs += syncSongUpdates(db, prevStartNs, true)
+                updatedSongs += syncSongUpdates(db, prevStartNs, false /* deleted */, excludedTags)
+                updatedSongs += syncSongUpdates(db, prevStartNs, true /* deleted */, excludedTags)
             } catch (e: ServerException) {
                 Log.e(TAG, e.message!!)
                 return SyncResult(false, updatedSongs, e.message)
             }
+
+            // Delete any existing songs that have now-excluded tags.
+            updatedSongs += deleteSongsWithTags(db, excludedTags)
 
             val values = ContentValues(2)
             values.put("LocalTimeNsec", Date().time * 1000 * 1000)
@@ -455,6 +466,27 @@ class SongDatabase(
     /** Thrown by [syncSongUpdates] and [syncSearchPresets] if an error is encountered. */
     class ServerException(reason: String) : Exception(reason)
 
+    /** User information from the server's /user endpoint. */
+    data class UserInfo(
+        val guest: Boolean = false,
+        val excludedTags: Set<String> = setOf<String>(),
+    )
+
+    @Throws(ServerException::class)
+    private fun fetchUserInfo(): UserInfo {
+        val (response, error) = downloader.downloadString("/user")
+        response ?: throw ServerException(error!!)
+        try {
+            val obj = JSONObject(JSONTokener(response))
+            return UserInfo(
+                guest = obj.optBoolean("guest"),
+                excludedTags = jsonStringArrayToList(obj.optJSONArray("excludedTags")).toSet(),
+            )
+        } catch (e: JSONException) {
+            throw ServerException("Couldn't parse response: $e")
+        }
+    }
+
     /**
      * Get updated songs from the server on behalf of [syncSongs].
      *
@@ -465,6 +497,7 @@ class SongDatabase(
         db: SQLiteDatabase,
         prevStartTimeNsec: Long,
         deleted: Boolean,
+        excludedTags: Set<String>,
     ): Int {
         // The server breaks its results up into batches instead of sending us a bunch of songs
         // at once, so use the cursor that it returns to start in the correct place in the next
@@ -522,15 +555,15 @@ class SongDatabase(
                                     }
                                 }
 
-                                // JSONArray unfortunately doesn't expose an iterator.
                                 var tags = ""
                                 val tagsArray = item.optJSONArray("tags")
                                 if (tagsArray != null && tagsArray.length() > 0) {
-                                    val tagsList = arrayListOf<String>()
-                                    for (i in 0 until tagsArray.length()) {
-                                        tagsList.add(tagsArray.optString(i))
+                                    val list = jsonStringArrayToList(tagsArray)
+                                    if (list.any { excludedTags.contains(it) }) {
+                                        Log.d(TAG, "Skipping song $songId due to excluded tag")
+                                        continue
                                     }
-                                    tags = "|" + tagsList.joinToString("|") + "|"
+                                    tags = "|" + list.joinToString("|") + "|"
                                 }
 
                                 val values = ContentValues(18)
@@ -580,6 +613,22 @@ class SongDatabase(
             numUpdates,
         )
         return numUpdates
+    }
+
+    /** Delete rows from the Songs table with one or more of [tags]. */
+    private fun deleteSongsWithTags(db: SQLiteDatabase, tags: Set<String>): Int {
+        if (tags.isEmpty()) return 0
+
+        val clauses = mutableListOf<String>()
+        val params = mutableListOf<String>()
+        tags.forEach {
+            val tag = it.replace("%", " %") // escape '%' characters; see [query]
+            clauses.add("Tags LIKE ? ESCAPE ' '")
+            params.add("%|$tag|%")
+        }
+        val deleted = db.delete("Songs", clauses.joinToString(" OR "), params.toTypedArray())
+        Log.d(TAG, "Deleted $deleted existing song(s) due to excluded tags")
+        return deleted
     }
 
     /** Fetch and save all search presets from the server. */
@@ -977,4 +1026,16 @@ fun normalizeForSearch(s: String): String {
         .replace("\\p{Mn}".toRegex(), "")
         .trim()
         .lowercase()
+}
+
+/** Convert an optional array of strings into a list. */
+fun jsonStringArrayToList(array: JSONArray?): List<String> {
+    var list = arrayListOf<String>()
+    if (array != null) {
+        // JSONArray unfortunately doesn't expose an iterator.
+        for (i in 0 until array.length()) {
+            list.add(array.optString(i))
+        }
+    }
+    return list
 }

@@ -1107,6 +1107,14 @@ class NupService :
         }
     }
 
+    override fun onUserInfoFetch(userInfo: SongDatabase.UserInfo) {
+        assertOnMainThread()
+        Log.d(TAG, "Fetched user info: $userInfo")
+        scope.launch(Dispatchers.IO) {
+            prefs.edit().putBoolean(NupPreferences.GUEST_MODE, userInfo.guest).commit()
+        }
+    }
+
     override fun onSyncDone(success: Boolean, message: String) {
         assertOnMainThread()
         Log.d(TAG, "Sync ${if (success) "succeeded" else "failed"}: $message")

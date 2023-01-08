@@ -95,6 +95,7 @@
   <string name="startup_message_text">Feed me some songs.</string>
   <string name="sync_already">Already synchronizing</string>
   <string name="sync_complete">Synchronization complete</string>
+  <string name="sync_progress_fetching_user_info">Fetching user info...</string>
   <string name="sync_progress_rebuilding_stats_tables">Rebuilding stats tables...</string>
   <string name="sync_progress_starting">Starting sync...</string>
   <string name="sync_progress_updating_presets">Updating presets...</string>
