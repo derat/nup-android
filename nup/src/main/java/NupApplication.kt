@@ -6,6 +6,7 @@
 package org.erat.nup
 
 import android.app.Application
+import android.os.Build
 import android.os.StrictMode
 import android.util.Log
 import java.io.File
@@ -20,14 +21,18 @@ class NupApplication : Application() {
         // The documentation about where strict mode should be enabled isn't great, but setting it
         // here seems to catch both thread and VM policy violations in both NupActivity's and
         // NupService's onCreate methods.
-        StrictMode.setThreadPolicy(
+        val threadBuilder =
             StrictMode.ThreadPolicy.Builder()
                 .detectAll()
-                .penaltyDeathOnNetwork()
-                .penaltyDialog()
                 .penaltyLog()
-                .build()
-        )
+                .penaltyDeathOnNetwork()
+        // I've seen weird DiskReadViolation errors when NupActivity.launchBrowser() calls
+        // startActivity() on a Samsung S21, so avoid showing the dialog there.
+        if (listOf(Build.BRAND, Build.MANUFACTURER).any { it.equals("samsung", true) }) {
+            threadBuilder.penaltyDialog()
+        }
+        StrictMode.setThreadPolicy(threadBuilder.build())
+
         StrictMode.setVmPolicy(
             StrictMode.VmPolicy.Builder()
                 .detectAll()

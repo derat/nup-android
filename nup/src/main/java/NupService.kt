@@ -289,7 +289,7 @@ class NupService :
         // Looper.prepare()" while inflating PreferenceScreen when I call it on the IO thread. I
         // haven't been able to find any official documentation giving a full example of the right
         // way to implement preferences.
-        val origPolicy = StrictMode.allowThreadDiskReads()
+        val origPolicy = StrictMode.allowThreadDiskWrites()
         try {
             PreferenceManager.setDefaultValues(
                 // Passing the service as the context produces "StrictMode policy violation:
