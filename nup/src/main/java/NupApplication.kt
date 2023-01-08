@@ -25,21 +25,26 @@ class NupApplication : Application() {
             StrictMode.ThreadPolicy.Builder()
                 .detectAll()
                 .penaltyLog()
-                .penaltyDeathOnNetwork()
-        // I've seen weird DiskReadViolation errors when NupActivity.launchBrowser() calls
-        // startActivity() on a Samsung S21, so avoid showing the dialog there.
-        if (listOf(Build.BRAND, Build.MANUFACTURER).any { it.equals("samsung", true) }) {
-            threadBuilder.penaltyDialog()
+        if (BuildConfig.DEBUG) {
+            threadBuilder.penaltyDeathOnNetwork()
+            // I've seen weird DiskReadViolation errors when NupActivity.launchBrowser() calls
+            // startActivity() on a Samsung S21, so avoid showing the dialog there.
+            if (!listOf(Build.BRAND, Build.MANUFACTURER).any { it.equals("samsung", true) }) {
+                threadBuilder.penaltyDialog()
+            }
         }
         StrictMode.setThreadPolicy(threadBuilder.build())
 
+        // TODO: It'd be nice to set penaltyDeath() here for debug builds, but there is (was?) a
+        // frequent LeakedClosableViolation from android.view.SurfaceControl:
+        // https://github.com/derat/nup-android/issues/11
         StrictMode.setVmPolicy(
             StrictMode.VmPolicy.Builder()
                 .detectAll()
-                // TODO: Framework bug? For some reason, I'm seeing this:
-                // android.os.strictmode.InstanceCountViolation: class org.erat.nup.NupActivity; instances=3; limit=2
+                // TODO: I'm seeing an InstanceCountViolation:
+                // "class org.erat.nup.NupActivity; instances=3; limit=2"
+                // Maybe it's a bug in the framework?
                 .setClassInstanceLimit(NupActivity::class.java, 3)
-                // TODO: android.view.SurfaceControl: https://github.com/derat/nup-android/issues/11
                 .penaltyLog()
                 .build()
         )
