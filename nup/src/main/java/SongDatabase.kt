@@ -372,8 +372,12 @@ class SongDatabase(
             }
 
             setSyncState(SyncState.FETCHING_USER_INFO, 0)
-            val userInfo = fetchUserInfo()
-            listenerExecutor.execute { listener.onUserInfoFetch(userInfo) }
+            val (userInfo, userError) = fetchUserInfo()
+            if (userError != null) {
+                notifySyncDone(false, userError)
+                return
+            }
+            listenerExecutor.execute { listener.onUserInfoFetch(userInfo!!) }
 
             opener.getDb() task@{ db ->
                 if (db == null) {
@@ -388,7 +392,7 @@ class SongDatabase(
                 }
                 loadSearchPresets(db)
 
-                val songsRes = syncSongs(db, userInfo.excludedTags)
+                val songsRes = syncSongs(db, userInfo!!.excludedTags)
                 if (!songsRes.success) {
                     notifySyncDone(false, songsRes.error!!)
                     return@task
@@ -398,6 +402,33 @@ class SongDatabase(
             }
         } finally {
             setSyncState(SyncState.IDLE, 0)
+        }
+    }
+
+    /** User information from the server's /user endpoint. */
+    data class UserInfo(
+        val guest: Boolean = false,
+        val excludedTags: Set<String> = setOf<String>(),
+    )
+
+    /** Returned by [fetchUserInfo]. */
+    private data class FetchUserInfoResult(val info: UserInfo?, val error: String?)
+
+    /** Fetch info about the current user from the server. */
+    private fun fetchUserInfo(): FetchUserInfoResult {
+        val (response, error) = downloader.downloadString("/user")
+        response ?: return FetchUserInfoResult(null, error!!)
+        try {
+            val obj = JSONObject(JSONTokener(response))
+            return FetchUserInfoResult(
+                UserInfo(
+                    guest = obj.optBoolean("guest"),
+                    excludedTags = jsonStringArrayToList(obj.optJSONArray("excludedTags")).toSet(),
+                ),
+                null
+            )
+        } catch (e: JSONException) {
+            return FetchUserInfoResult(null, "Couldn't parse response: $e")
         }
     }
 
@@ -465,27 +496,6 @@ class SongDatabase(
 
     /** Thrown by [syncSongUpdates] and [syncSearchPresets] if an error is encountered. */
     class ServerException(reason: String) : Exception(reason)
-
-    /** User information from the server's /user endpoint. */
-    data class UserInfo(
-        val guest: Boolean = false,
-        val excludedTags: Set<String> = setOf<String>(),
-    )
-
-    @Throws(ServerException::class)
-    private fun fetchUserInfo(): UserInfo {
-        val (response, error) = downloader.downloadString("/user")
-        response ?: throw ServerException(error!!)
-        try {
-            val obj = JSONObject(JSONTokener(response))
-            return UserInfo(
-                guest = obj.optBoolean("guest"),
-                excludedTags = jsonStringArrayToList(obj.optJSONArray("excludedTags")).toSet(),
-            )
-        } catch (e: JSONException) {
-            throw ServerException("Couldn't parse response: $e")
-        }
-    }
 
     /**
      * Get updated songs from the server on behalf of [syncSongs].
