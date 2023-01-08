@@ -775,6 +775,7 @@ class SongDatabase(
 
         // If the song data didn't change and we've already loaded it, bail out early.
         if (!songsUpdated && aggregateDataLoaded) {
+            lastSyncDate = newSyncDate
             listenerExecutor.execute { listener.onAggregateDataUpdate() }
             return
         }
